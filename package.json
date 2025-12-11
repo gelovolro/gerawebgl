@@ -1,0 +1,31 @@
+{
+  "name": "gerawebgl",
+  "version": "0.1.0",
+  "description": "",
+  "scripts": {
+    "clear:all": "rimraf docs",
+    "copy:demo-html": "copyfiles -f demo/index.html docs/demo",
+    "build:debug": "esbuild demo/stub.js --bundle --format=esm --sourcemap --outfile=docs/demo/gerawebgl.js",
+    "build:release": "esbuild demo/stub.js --bundle --minify --format=esm --outfile=docs/demo/gerawebgl.min.js",
+    "build": "npm run build:debug && npm run build:release && npm run copy:demo-html",
+    "demo:serve": "python -m http.server 9090 -d docs/demo",
+    "docs:build": "jsdoc -c jsdoc.json",
+    "docs:serve": "python -m http.server 9091 -d docs",
+    "docs:build-and-serve": "npm run docs:build && python -m http.server 9091 -d docs",
+    "build:all": "npm run clear:all && npm run build && npm run docs:build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "gelovolro",
+  "license": "SEE LICENSE IN LICENSE",
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "copyfiles": "^2.4.1",
+    "esbuild": "^0.27.1",
+    "eslint": "^9.39.1",
+    "eslint-plugin-jsdoc": "^61.5.0",
+    "globals": "^16.5.0",
+    "jsdoc": "^4.0.5",
+    "rimraf": "^6.1.2"
+  }
+}
