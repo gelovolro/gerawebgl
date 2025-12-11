@@ -2,9 +2,13 @@
 
 I first developed my own WebGL library (based on v1.0) back in 2014. Now I’ve decided to revisit those ideas, explore what WebGL 2.0 offers, and rebuild everything from scratch. The project is named in memory of my cat, who died in 2017.
 
+- **API reference (JSDoc):** https://gelovolro.github.io/gerawebgl/
+- **Demo:** https://gelovolro.github.io/gerawebgl/demo/
+
 ## Build & run demo:
 ```bash
-npm run build
+npm install
+npm run build # or npm run build:all
 npm run demo:serve
 ```
 
