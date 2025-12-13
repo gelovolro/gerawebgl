@@ -4,14 +4,14 @@
   "description": "",
   "scripts": {
     "clear:all": "rimraf docs",
-    "copy:demo-html": "copyfiles -f demo/index.html docs/demo",
-    "build:debug": "esbuild demo/stub.js --bundle --format=esm --sourcemap --outfile=docs/demo/gerawebgl.js",
-    "build:release": "esbuild demo/stub.js --bundle --minify --format=esm --outfile=docs/demo/gerawebgl.min.js",
-    "build": "npm run build:debug && npm run build:release && npm run copy:demo-html",
+    "copy:demo": "copyfiles -f demo/index.html demo/app.js docs/demo",
     "demo:serve": "python -m http.server 9090 -d docs/demo",
     "docs:build": "jsdoc -c jsdoc.json",
     "docs:serve": "python -m http.server 9091 -d docs",
     "docs:build-and-serve": "npm run docs:build && python -m http.server 9091 -d docs",
+    "build:lib:debug": "esbuild core/library.js --bundle --format=esm --sourcemap --outfile=docs/demo/gerawebgl.js",
+    "build:lib:release": "esbuild core/library.js --bundle --minify --format=esm --outfile=docs/demo/gerawebgl.min.js",
+    "build": "npm run build:lib:debug && npm run build:lib:release && npm run copy:demo",
     "build:all": "npm run clear:all && npm run build && npm run docs:build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

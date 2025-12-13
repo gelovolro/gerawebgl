@@ -52,7 +52,10 @@ export class Renderer {
         const aspectRatio = canvas.width / canvas.height;
         camera.setAspectRatio(aspectRatio);
 
-        const projectionMatrix = camera.getProjectionMatrix();
+        const projectionMatrix     = camera.getProjectionMatrix();
+        const viewMatrix           = camera.getViewMatrix();
+        const viewProjectionMatrix = Matrix4.multiply(projectionMatrix, viewMatrix);
+
         scene.updateWorldMatrix(null);
         scene.traverse((object3d) => {
             if (!(object3d instanceof Mesh)) {
@@ -62,8 +65,9 @@ export class Renderer {
             const mesh        = object3d;
             const geometry    = mesh.geometry;
             const material    = mesh.material;
-            const world       = mesh.worldMatrix;
-            const finalMatrix = Matrix4.multiply(projectionMatrix, world);
+            const worldMatrix = mesh.worldMatrix;
+            const finalMatrix = Matrix4.multiply(viewProjectionMatrix, worldMatrix);
+
             material.use();
             material.apply(finalMatrix);
             geometry.bind();
@@ -73,6 +77,7 @@ export class Renderer {
 
             const mode       = isWireframeEnabled ? renderingContext.LINES : renderingContext.TRIANGLES;
             const indexCount = geometry.getIndexCount(isWireframeEnabled);
+
             renderingContext.drawElements(
                 mode,
                 indexCount,

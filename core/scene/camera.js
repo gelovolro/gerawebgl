@@ -7,6 +7,9 @@ const MINIMUM_NEAR_CLIP_DISTANCE = 0.0;
 /** @type {number} */
 const MINIMUM_ASPECT_RATIO = 0.0; // Aspect ratio must be greater than this value.
 
+/** @type {number} */
+const SCALE_INVERSE_NUMERATOR = 1.0;
+
 /**
  * Perspective camera with field of view, aspect ratio and clipping planes.
  */
@@ -77,6 +80,44 @@ export class PerspectiveCamera extends Object3D {
             this.#aspectRatio,
             this.#near,
             this.#far
+        );
+    }
+
+    /**
+     * Returns the view matrix for this camera (inverse of its world transform).
+     *
+     * @returns {Float32Array}
+     */
+    getViewMatrix() {
+        const position = this.position;
+        const rotation = this.rotation;
+        const scale    = this.scale;
+
+        if (scale.x === 0 || scale.y === 0 || scale.z === 0) {
+            throw new RangeError('PerspectiveCamera.getViewMatrix cannot invert a zero scale.');
+        }
+
+        const inverseScale = Matrix4.createScale(
+            SCALE_INVERSE_NUMERATOR / scale.x,
+            SCALE_INVERSE_NUMERATOR / scale.y,
+            SCALE_INVERSE_NUMERATOR / scale.z
+        );
+
+        const inverseRotationX   = Matrix4.createRotationX(-rotation.x);
+        const inverseRotationY   = Matrix4.createRotationY(-rotation.y);
+        const inverseRotationZ   = Matrix4.createRotationZ(-rotation.z);
+        const inverseTranslation = Matrix4.createTranslation(
+            -position.x,
+            -position.y,
+            -position.z
+        );
+
+        return Matrix4.multiplyMany(
+            inverseScale,
+            inverseRotationX,
+            inverseRotationY,
+            inverseRotationZ,
+            inverseTranslation
         );
     }
 }

@@ -19,16 +19,16 @@ var WebGLContext = class _WebGLContext {
    * @throws {TypeError} If the provided value is not an HTMLCanvasElement.
    * @throws {Error} If WebGL2 is not supported by the browser.
    */
-  constructor(canvas2) {
-    if (!(canvas2 instanceof HTMLCanvasElement)) {
+  constructor(canvas) {
+    if (!(canvas instanceof HTMLCanvasElement)) {
       throw new TypeError("WebGLContext constructor expects an HTMLCanvasElement.");
     }
-    this.#canvas = canvas2;
-    const webglContext2 = this.#canvas.getContext(WEBGL2_CONTEXT_TYPE);
-    if (!webglContext2) {
+    this.#canvas = canvas;
+    const webglContext = this.#canvas.getContext(WEBGL2_CONTEXT_TYPE);
+    if (!webglContext) {
       throw new Error("WebGL2 is not supported in this browser.");
     }
-    this.#webglContext = webglContext2;
+    this.#webglContext = webglContext;
     this.#initializeDefaults();
   }
   /**
@@ -37,13 +37,13 @@ var WebGLContext = class _WebGLContext {
    * @private
    */
   #initializeDefaults() {
-    const webglContext2 = this.#webglContext;
+    const webglContext = this.#webglContext;
     if (_WebGLContext.#ENABLE_DEPTH_TEST) {
-      webglContext2.enable(webglContext2.DEPTH_TEST);
-      webglContext2.depthFunc(webglContext2.LEQUAL);
+      webglContext.enable(webglContext.DEPTH_TEST);
+      webglContext.depthFunc(webglContext.LEQUAL);
     }
     const [red, green, blue, alpha] = _WebGLContext.#DEFAULT_CLEAR_COLOR;
-    webglContext2.clearColor(red, green, blue, alpha);
+    webglContext.clearColor(red, green, blue, alpha);
   }
   /**
    * Returns the underlying WebGL2RenderingContext for direct low-level access.
@@ -368,6 +368,555 @@ var Matrix4 = class _Matrix4 {
   }
 };
 
+// core/geometry/geometry.js
+var POSITION_ATTRIBUTE_LOCATION = 0;
+var POSITION_COMPONENT_COUNT = 3;
+var COLOR_ATTRIBUTE_LOCATION = 1;
+var COLOR_COMPONENT_COUNT = 3;
+var ATTRIBUTE_NORMALIZED = false;
+var ATTRIBUTE_NO_STRIDE = 0;
+var ATTRIBUTE_NO_OFFSET = 0;
+var Geometry = class {
+  /** @type {WebGL2RenderingContext} */
+  #webglContext;
+  /** @type {WebGLVertexArrayObject} */
+  #vertexArrayObject;
+  /** @type {WebGLBuffer} */
+  #positionBuffer;
+  /** @type {WebGLBuffer | null} */
+  #colorBuffer;
+  /** @type {WebGLBuffer} */
+  #indexBufferSolid;
+  /** @type {WebGLBuffer} */
+  #indexBufferWireframe;
+  /** @type {number} */
+  #solidIndexCount;
+  /** @type {number} */
+  #wireframeIndexCount;
+  /**
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
+   * @param {Float32Array} positions              - [x, y, z] triples.
+   * @param {Float32Array | null} colors          - [red, green, blue] triples or null.
+   * @param {Uint16Array} indicesSolid            - Indices for solid triangles.
+   * @param {Uint16Array} indicesWireframe        - Indices for wireframe lines.
+   */
+  constructor(webglContext, positions, colors, indicesSolid, indicesWireframe) {
+    if (!(webglContext instanceof WebGL2RenderingContext)) {
+      throw new TypeError("Geometry expects a WebGL2RenderingContext.");
+    }
+    if (!(positions instanceof Float32Array)) {
+      throw new TypeError("Geometry expects positions as Float32Array.");
+    }
+    if (colors !== null && !(colors instanceof Float32Array)) {
+      throw new TypeError("Geometry expects colors as Float32Array or null.");
+    }
+    if (!(indicesSolid instanceof Uint16Array) || !(indicesWireframe instanceof Uint16Array)) {
+      throw new TypeError("Geometry expects indices as Uint16Array.");
+    }
+    this.#webglContext = webglContext;
+    this.#solidIndexCount = indicesSolid.length;
+    this.#wireframeIndexCount = indicesWireframe.length;
+    this.#vertexArrayObject = this.#createVertexArrayObject();
+    this.#positionBuffer = this.#createStaticArrayBuffer(positions);
+    this.#colorBuffer = colors ? this.#createStaticArrayBuffer(colors) : null;
+    this.#indexBufferSolid = this.#createIndexBuffer(indicesSolid);
+    this.#indexBufferWireframe = this.#createIndexBuffer(indicesWireframe);
+    this.#configureVertexArray();
+  }
+  /**
+   * Binds the VAO of this geometry.
+   */
+  bind() {
+    this.#webglContext.bindVertexArray(this.#vertexArrayObject);
+  }
+  /**
+   * Binds the appropriate index buffer depending on the wireframe flag.
+   *
+   * @param {boolean} wireframe - Flag indicating whether the geometry should be drawn in wireframe mode.
+   */
+  bindIndexBuffer(wireframe) {
+    const buffer = wireframe ? this.#indexBufferWireframe : this.#indexBufferSolid;
+    this.#webglContext.bindBuffer(this.#webglContext.ELEMENT_ARRAY_BUFFER, buffer);
+  }
+  /**
+   * Returns the index count depending on the wireframe flag.
+   *
+   * @param {boolean} wireframe - Flag indicating whether the geometry should be drawn in wireframe mode.
+   * @returns {number}
+   */
+  getIndexCount(wireframe) {
+    return wireframe ? this.#wireframeIndexCount : this.#solidIndexCount;
+  }
+  /**
+   * Creates a vertex array object (VAO).
+   *
+   * @returns {WebGLVertexArrayObject}
+   * @private
+   */
+  #createVertexArrayObject() {
+    const vao = this.#webglContext.createVertexArray();
+    if (!vao) {
+      throw new Error("Failed to create vertex array object (VAO).");
+    }
+    return vao;
+  }
+  /**
+   * Creates a static ARRAY_BUFFER and uploads the given data.
+   *
+   * @param {Float32Array} data - Vertex attribute data stored as a flat array of numeric components.
+   * @returns {WebGLBuffer}
+   * @private
+   */
+  #createStaticArrayBuffer(data) {
+    const buffer = this.#webglContext.createBuffer();
+    if (!buffer) {
+      throw new Error("Failed to create ARRAY_BUFFER.");
+    }
+    this.#webglContext.bindBuffer(this.#webglContext.ARRAY_BUFFER, buffer);
+    this.#webglContext.bufferData(this.#webglContext.ARRAY_BUFFER, data, this.#webglContext.STATIC_DRAW);
+    return buffer;
+  }
+  /**
+   * Creates an ELEMENT_ARRAY_BUFFER and uploads the given index data.
+   *
+   * @param {Uint16Array} indices - Index data referencing vertices in the associated vertex buffers.
+   * @returns {WebGLBuffer}
+   * @private
+   */
+  #createIndexBuffer(indices) {
+    const buffer = this.#webglContext.createBuffer();
+    if (!buffer) {
+      throw new Error("Failed to create ELEMENT_ARRAY_BUFFER.");
+    }
+    this.#webglContext.bindBuffer(this.#webglContext.ELEMENT_ARRAY_BUFFER, buffer);
+    this.#webglContext.bufferData(this.#webglContext.ELEMENT_ARRAY_BUFFER, indices, this.#webglContext.STATIC_DRAW);
+    return buffer;
+  }
+  /**
+   * Configures the vertex array object (VAO) with position and optional color attributes.
+   *
+   * Attribute layout:
+   * - location 0: vec3 position
+   * - location 1: vec3 color (if present)
+   *
+   * @private
+   */
+  #configureVertexArray() {
+    const webglContext = this.#webglContext;
+    webglContext.bindVertexArray(this.#vertexArrayObject);
+    webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#positionBuffer);
+    webglContext.enableVertexAttribArray(POSITION_ATTRIBUTE_LOCATION);
+    webglContext.vertexAttribPointer(
+      POSITION_ATTRIBUTE_LOCATION,
+      POSITION_COMPONENT_COUNT,
+      webglContext.FLOAT,
+      ATTRIBUTE_NORMALIZED,
+      ATTRIBUTE_NO_STRIDE,
+      ATTRIBUTE_NO_OFFSET
+    );
+    if (this.#colorBuffer) {
+      webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#colorBuffer);
+      webglContext.enableVertexAttribArray(COLOR_ATTRIBUTE_LOCATION);
+      webglContext.vertexAttribPointer(
+        COLOR_ATTRIBUTE_LOCATION,
+        COLOR_COMPONENT_COUNT,
+        webglContext.FLOAT,
+        ATTRIBUTE_NORMALIZED,
+        ATTRIBUTE_NO_STRIDE,
+        ATTRIBUTE_NO_OFFSET
+      );
+    }
+    webglContext.bindBuffer(webglContext.ELEMENT_ARRAY_BUFFER, this.#indexBufferSolid);
+    webglContext.bindVertexArray(null);
+  }
+};
+
+// core/geometry/box-geometry.js
+var DEFAULT_BOX_SIZE = 1;
+var BOX_HALF_SIZE_DIVISOR = 2;
+var BoxGeometry = class extends Geometry {
+  /**
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
+   * @param {number} size - Edge length of the box.
+   */
+  constructor(webglContext, size = DEFAULT_BOX_SIZE) {
+    if (typeof size !== "number" || size <= 0) {
+      throw new RangeError("BoxGeometry expects a positive size.");
+    }
+    const halfSize = size / BOX_HALF_SIZE_DIVISOR;
+    const positions = new Float32Array([
+      // Front face
+      -halfSize,
+      -halfSize,
+      halfSize,
+      // 0
+      halfSize,
+      -halfSize,
+      halfSize,
+      // 1
+      halfSize,
+      halfSize,
+      halfSize,
+      // 2
+      -halfSize,
+      halfSize,
+      halfSize,
+      // 3
+      // Back face
+      -halfSize,
+      -halfSize,
+      -halfSize,
+      // 4
+      halfSize,
+      -halfSize,
+      -halfSize,
+      // 5
+      halfSize,
+      halfSize,
+      -halfSize,
+      // 6
+      -halfSize,
+      halfSize,
+      -halfSize
+      // 7
+    ]);
+    const colors = new Float32Array([
+      // Front vertices (0-3) - red
+      1,
+      0,
+      0,
+      1,
+      0,
+      0,
+      1,
+      0,
+      0,
+      1,
+      0,
+      0,
+      // Back vertices (4-7) - blue
+      0,
+      0,
+      1,
+      0,
+      0,
+      1,
+      0,
+      0,
+      1,
+      0,
+      0,
+      1
+    ]);
+    const indicesSolid = new Uint16Array([
+      // Front face
+      0,
+      1,
+      2,
+      2,
+      3,
+      0,
+      // Back face
+      5,
+      4,
+      7,
+      7,
+      6,
+      5,
+      // Top face
+      3,
+      2,
+      6,
+      6,
+      7,
+      3,
+      // Bottom face
+      4,
+      5,
+      1,
+      1,
+      0,
+      4,
+      // Right face
+      1,
+      5,
+      6,
+      6,
+      2,
+      1,
+      // Left face
+      4,
+      0,
+      3,
+      3,
+      7,
+      4
+    ]);
+    const indicesWireframe = new Uint16Array([
+      // Front face edges
+      0,
+      1,
+      1,
+      2,
+      2,
+      3,
+      3,
+      0,
+      // Back face edges
+      4,
+      5,
+      5,
+      6,
+      6,
+      7,
+      7,
+      4,
+      // Side edges
+      0,
+      4,
+      1,
+      5,
+      2,
+      6,
+      3,
+      7
+    ]);
+    super(webglContext, positions, colors, indicesSolid, indicesWireframe);
+  }
+};
+
+// core/shader/shader-program.js
+var MATRIX_4x4_ELEMENT_COUNT2 = 16;
+var ShaderProgram = class {
+  /** @type {WebGL2RenderingContext} */
+  #webglRenderingContext;
+  /** @type {WebGLProgram} */
+  #program;
+  /** @type {Map<string, WebGLUniformLocation>} */
+  #uniformLocations;
+  /**
+   * @param {WebGL2RenderingContext} webglRenderingContext - WebGL2 rendering context used to create shaders and the program.
+   * @param {string} vertexSource   - GLSL source code of the vertex shader.
+   * @param {string} fragmentSource - GLSL source code of the fragment shader.
+   */
+  constructor(webglRenderingContext, vertexSource, fragmentSource) {
+    if (!(webglRenderingContext instanceof WebGL2RenderingContext)) {
+      throw new TypeError("ShaderProgram expects a WebGL2RenderingContext.");
+    }
+    if (typeof vertexSource !== "string" || typeof fragmentSource !== "string") {
+      throw new TypeError("ShaderProgram expects vertex and fragment source as strings.");
+    }
+    this.#webglRenderingContext = webglRenderingContext;
+    this.#uniformLocations = /* @__PURE__ */ new Map();
+    const vertexShader = this.#compileShader(this.#webglRenderingContext.VERTEX_SHADER, vertexSource);
+    const fragmentShader = this.#compileShader(this.#webglRenderingContext.FRAGMENT_SHADER, fragmentSource);
+    const program = this.#webglRenderingContext.createProgram();
+    if (!program) {
+      this.#webglRenderingContext.deleteShader(vertexShader);
+      this.#webglRenderingContext.deleteShader(fragmentShader);
+      throw new Error("Failed to create WebGL program.");
+    }
+    this.#webglRenderingContext.attachShader(program, vertexShader);
+    this.#webglRenderingContext.attachShader(program, fragmentShader);
+    this.#webglRenderingContext.linkProgram(program);
+    const linkStatus = this.#webglRenderingContext.getProgramParameter(
+      program,
+      this.#webglRenderingContext.LINK_STATUS
+    );
+    this.#webglRenderingContext.deleteShader(vertexShader);
+    this.#webglRenderingContext.deleteShader(fragmentShader);
+    if (!linkStatus) {
+      const infoLog = this.#webglRenderingContext.getProgramInfoLog(program) || "Unknown program link error";
+      this.#webglRenderingContext.deleteProgram(program);
+      throw new Error(`Failed to link program: ${infoLog}`);
+    }
+    this.#program = program;
+  }
+  /**
+   * Returns the underlying WebGL program object.
+   *
+   * @returns {WebGLProgram}
+   */
+  get program() {
+    return this.#program;
+  }
+  /**
+   * Makes this program active for subsequent draw calls.
+   */
+  use() {
+    this.#webglRenderingContext.useProgram(this.#program);
+  }
+  /**
+   * Sets a 4x4 matrix uniform.
+   *
+   * @param {string} name         - Name of the uniform variable in the GLSL program.
+   * @param {Float32Array} matrix - 4x4 matrix in column-major order to upload to the uniform.
+   */
+  setMatrix4(name, matrix) {
+    if (typeof name !== "string") {
+      throw new TypeError("ShaderProgram.setMatrix4 expects uniform name as a string.");
+    }
+    if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT2) {
+      throw new TypeError("ShaderProgram.setMatrix4 expects a 4x4 Float32Array.");
+    }
+    const location = this.#getUniformLocation(name);
+    this.#webglRenderingContext.uniformMatrix4fv(location, false, matrix);
+  }
+  /**
+   * Looks up a uniform location with caching.
+   *
+   * @param {string} name - Name of the uniform variable in the linked shader program.
+   * @returns {WebGLUniformLocation}
+   * @private
+   */
+  #getUniformLocation(name) {
+    if (typeof name !== "string") {
+      throw new TypeError("ShaderProgram.#getUniformLocation expects a string name.");
+    }
+    if (this.#uniformLocations.has(name)) {
+      const cachedLocation = this.#uniformLocations.get(name);
+      return cachedLocation;
+    }
+    const location = this.#webglRenderingContext.getUniformLocation(this.#program, name);
+    if (location === null) {
+      throw new Error(`Uniform "${name}" not found in shader program.`);
+    }
+    this.#uniformLocations.set(name, location);
+    return location;
+  }
+  /**
+   * Compiles a shader of the given type.
+   *
+   * @param {number} type   - Shader type constant (e.g. gl.VERTEX_SHADER or gl.FRAGMENT_SHADER).
+   * @param {string} source - GLSL source code for the shader.
+   * @returns {WebGLShader}
+   * @private
+   */
+  #compileShader(type, source) {
+    if (typeof type !== "number") {
+      throw new TypeError("ShaderProgram.#compileShader expects a numeric shader type.");
+    }
+    if (typeof source !== "string") {
+      throw new TypeError("ShaderProgram.#compileShader expects shader source as a string.");
+    }
+    const shader = this.#webglRenderingContext.createShader(type);
+    if (!shader) {
+      throw new Error("Failed to create WebGL shader.");
+    }
+    this.#webglRenderingContext.shaderSource(shader, source);
+    this.#webglRenderingContext.compileShader(shader);
+    const compileStatus = this.#webglRenderingContext.getShaderParameter(shader, this.#webglRenderingContext.COMPILE_STATUS);
+    if (!compileStatus) {
+      const infoLog = this.#webglRenderingContext.getShaderInfoLog(shader) || "Unknown shader compilation error";
+      this.#webglRenderingContext.deleteShader(shader);
+      throw new Error(`Failed to compile shader: ${infoLog}`);
+    }
+    return shader;
+  }
+};
+
+// core/material/material.js
+var Material = class {
+  /** @type {WebGL2RenderingContext} */
+  #webglContext;
+  /** @type {ShaderProgram} */
+  #shaderProgram;
+  /** @type {boolean} */
+  #wireframeEnabled = false;
+  /**
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
+   * @param {ShaderProgram} shaderProgram - Compiled and linked shader program used by this material for rendering.
+   */
+  constructor(webglContext, shaderProgram) {
+    if (!(webglContext instanceof WebGL2RenderingContext)) {
+      throw new TypeError("Material expects a WebGL2RenderingContext.");
+    }
+    if (!(shaderProgram instanceof ShaderProgram)) {
+      throw new TypeError("Material expects a ShaderProgram instance.");
+    }
+    this.#webglContext = webglContext;
+    this.#shaderProgram = shaderProgram;
+  }
+  /**
+   * @returns {WebGL2RenderingContext}
+   */
+  get webglContext() {
+    return this.#webglContext;
+  }
+  /**
+   * @returns {ShaderProgram}
+   */
+  get shaderProgram() {
+    return this.#shaderProgram;
+  }
+  /**
+   * Makes this material's shader program active.
+   */
+  use() {
+    this.#shaderProgram.use();
+  }
+  /**
+   * Enables or disables wireframe rendering.
+   *
+   * @param {boolean} enabled - When true, switches material to wireframe mode. When false, uses solid rendering.
+   */
+  setWireframeEnabled(enabled) {
+    this.#wireframeEnabled = Boolean(enabled);
+  }
+  /**
+   * Toggles wireframe mode.
+   */
+  toggleWireframe() {
+    this.#wireframeEnabled = !this.#wireframeEnabled;
+  }
+  /**
+   * @returns {boolean}
+   */
+  isWireframeEnabled() {
+    return this.#wireframeEnabled;
+  }
+};
+
+// core/material/basic-material.js
+var VERTEX_SHADER_SOURCE = `#version 300 es
+precision mediump float;
+layout(location = 0) in vec3 a_position;
+layout(location = 1) in vec3 a_color;
+uniform mat4 u_matrix;
+out vec3 v_color;
+
+void main() {
+    gl_Position = u_matrix * vec4(a_position, 1.0);
+    v_color = a_color;
+}
+`;
+var FRAGMENT_SHADER_SOURCE = `#version 300 es
+precision mediump float;
+in vec3 v_color;
+out vec4 outColor;
+
+void main() {
+    outColor = vec4(v_color, 1.0);
+}
+`;
+var BasicMaterial = class extends Material {
+  /**
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
+   */
+  constructor(webglContext) {
+    const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
+    super(webglContext, shaderProgram);
+  }
+  /**
+   * Applies per-object uniforms.
+   *
+   * @param {Float32Array} matrix4 - Transformation matrix passed as u_matrix.
+   */
+  apply(matrix4) {
+    this.shaderProgram.setMatrix4("u_matrix", matrix4);
+  }
+};
+
 // core/scene/object3d.js
 var CHILD_NOT_FOUND_INDEX = -1;
 var SINGLE_CHILD_REMOVE_COUNT = 1;
@@ -539,361 +1088,6 @@ var Object3D = class _Object3D {
   }
 };
 
-// core/geometry/geometry.js
-var POSITION_ATTRIBUTE_LOCATION = 0;
-var POSITION_COMPONENT_COUNT = 3;
-var COLOR_ATTRIBUTE_LOCATION = 1;
-var COLOR_COMPONENT_COUNT = 3;
-var ATTRIBUTE_NORMALIZED = false;
-var ATTRIBUTE_NO_STRIDE = 0;
-var ATTRIBUTE_NO_OFFSET = 0;
-var Geometry = class {
-  /** @type {WebGL2RenderingContext} */
-  #webglContext;
-  /** @type {WebGLVertexArrayObject} */
-  #vertexArrayObject;
-  /** @type {WebGLBuffer} */
-  #positionBuffer;
-  /** @type {WebGLBuffer | null} */
-  #colorBuffer;
-  /** @type {WebGLBuffer} */
-  #indexBufferSolid;
-  /** @type {WebGLBuffer} */
-  #indexBufferWireframe;
-  /** @type {number} */
-  #solidIndexCount;
-  /** @type {number} */
-  #wireframeIndexCount;
-  /**
-   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
-   * @param {Float32Array} positions              - [x, y, z] triples.
-   * @param {Float32Array | null} colors          - [red, green, blue] triples or null.
-   * @param {Uint16Array} indicesSolid            - Indices for solid triangles.
-   * @param {Uint16Array} indicesWireframe        - Indices for wireframe lines.
-   */
-  constructor(webglContext2, positions, colors, indicesSolid, indicesWireframe) {
-    if (!(webglContext2 instanceof WebGL2RenderingContext)) {
-      throw new TypeError("Geometry expects a WebGL2RenderingContext.");
-    }
-    if (!(positions instanceof Float32Array)) {
-      throw new TypeError("Geometry expects positions as Float32Array.");
-    }
-    if (colors !== null && !(colors instanceof Float32Array)) {
-      throw new TypeError("Geometry expects colors as Float32Array or null.");
-    }
-    if (!(indicesSolid instanceof Uint16Array) || !(indicesWireframe instanceof Uint16Array)) {
-      throw new TypeError("Geometry expects indices as Uint16Array.");
-    }
-    this.#webglContext = webglContext2;
-    this.#solidIndexCount = indicesSolid.length;
-    this.#wireframeIndexCount = indicesWireframe.length;
-    this.#vertexArrayObject = this.#createVertexArrayObject();
-    this.#positionBuffer = this.#createStaticArrayBuffer(positions);
-    this.#colorBuffer = colors ? this.#createStaticArrayBuffer(colors) : null;
-    this.#indexBufferSolid = this.#createIndexBuffer(indicesSolid);
-    this.#indexBufferWireframe = this.#createIndexBuffer(indicesWireframe);
-    this.#configureVertexArray();
-  }
-  /**
-   * Binds the VAO of this geometry.
-   */
-  bind() {
-    this.#webglContext.bindVertexArray(this.#vertexArrayObject);
-  }
-  /**
-   * Binds the appropriate index buffer depending on the wireframe flag.
-   *
-   * @param {boolean} wireframe - Flag indicating whether the geometry should be drawn in wireframe mode.
-   */
-  bindIndexBuffer(wireframe) {
-    const buffer = wireframe ? this.#indexBufferWireframe : this.#indexBufferSolid;
-    this.#webglContext.bindBuffer(this.#webglContext.ELEMENT_ARRAY_BUFFER, buffer);
-  }
-  /**
-   * Returns the index count depending on the wireframe flag.
-   *
-   * @param {boolean} wireframe - Flag indicating whether the geometry should be drawn in wireframe mode.
-   * @returns {number}
-   */
-  getIndexCount(wireframe) {
-    return wireframe ? this.#wireframeIndexCount : this.#solidIndexCount;
-  }
-  /**
-   * Creates a vertex array object (VAO).
-   *
-   * @returns {WebGLVertexArrayObject}
-   * @private
-   */
-  #createVertexArrayObject() {
-    const vao = this.#webglContext.createVertexArray();
-    if (!vao) {
-      throw new Error("Failed to create vertex array object (VAO).");
-    }
-    return vao;
-  }
-  /**
-   * Creates a static ARRAY_BUFFER and uploads the given data.
-   *
-   * @param {Float32Array} data - Vertex attribute data stored as a flat array of numeric components.
-   * @returns {WebGLBuffer}
-   * @private
-   */
-  #createStaticArrayBuffer(data) {
-    const buffer = this.#webglContext.createBuffer();
-    if (!buffer) {
-      throw new Error("Failed to create ARRAY_BUFFER.");
-    }
-    this.#webglContext.bindBuffer(this.#webglContext.ARRAY_BUFFER, buffer);
-    this.#webglContext.bufferData(this.#webglContext.ARRAY_BUFFER, data, this.#webglContext.STATIC_DRAW);
-    return buffer;
-  }
-  /**
-   * Creates an ELEMENT_ARRAY_BUFFER and uploads the given index data.
-   *
-   * @param {Uint16Array} indices - Index data referencing vertices in the associated vertex buffers.
-   * @returns {WebGLBuffer}
-   * @private
-   */
-  #createIndexBuffer(indices) {
-    const buffer = this.#webglContext.createBuffer();
-    if (!buffer) {
-      throw new Error("Failed to create ELEMENT_ARRAY_BUFFER.");
-    }
-    this.#webglContext.bindBuffer(this.#webglContext.ELEMENT_ARRAY_BUFFER, buffer);
-    this.#webglContext.bufferData(this.#webglContext.ELEMENT_ARRAY_BUFFER, indices, this.#webglContext.STATIC_DRAW);
-    return buffer;
-  }
-  /**
-   * Configures the vertex array object (VAO) with position and optional color attributes.
-   *
-   * Attribute layout:
-   * - location 0: vec3 position
-   * - location 1: vec3 color (if present)
-   *
-   * @private
-   */
-  #configureVertexArray() {
-    const webglContext2 = this.#webglContext;
-    webglContext2.bindVertexArray(this.#vertexArrayObject);
-    webglContext2.bindBuffer(webglContext2.ARRAY_BUFFER, this.#positionBuffer);
-    webglContext2.enableVertexAttribArray(POSITION_ATTRIBUTE_LOCATION);
-    webglContext2.vertexAttribPointer(
-      POSITION_ATTRIBUTE_LOCATION,
-      POSITION_COMPONENT_COUNT,
-      webglContext2.FLOAT,
-      ATTRIBUTE_NORMALIZED,
-      ATTRIBUTE_NO_STRIDE,
-      ATTRIBUTE_NO_OFFSET
-    );
-    if (this.#colorBuffer) {
-      webglContext2.bindBuffer(webglContext2.ARRAY_BUFFER, this.#colorBuffer);
-      webglContext2.enableVertexAttribArray(COLOR_ATTRIBUTE_LOCATION);
-      webglContext2.vertexAttribPointer(
-        COLOR_ATTRIBUTE_LOCATION,
-        COLOR_COMPONENT_COUNT,
-        webglContext2.FLOAT,
-        ATTRIBUTE_NORMALIZED,
-        ATTRIBUTE_NO_STRIDE,
-        ATTRIBUTE_NO_OFFSET
-      );
-    }
-    webglContext2.bindBuffer(webglContext2.ELEMENT_ARRAY_BUFFER, this.#indexBufferSolid);
-    webglContext2.bindVertexArray(null);
-  }
-};
-
-// core/shader/shader-program.js
-var MATRIX_4x4_ELEMENT_COUNT2 = 16;
-var ShaderProgram = class {
-  /** @type {WebGL2RenderingContext} */
-  #webglRenderingContext;
-  /** @type {WebGLProgram} */
-  #program;
-  /** @type {Map<string, WebGLUniformLocation>} */
-  #uniformLocations;
-  /**
-   * @param {WebGL2RenderingContext} webglRenderingContext - WebGL2 rendering context used to create shaders and the program.
-   * @param {string} vertexSource   - GLSL source code of the vertex shader.
-   * @param {string} fragmentSource - GLSL source code of the fragment shader.
-   */
-  constructor(webglRenderingContext, vertexSource, fragmentSource) {
-    if (!(webglRenderingContext instanceof WebGL2RenderingContext)) {
-      throw new TypeError("ShaderProgram expects a WebGL2RenderingContext.");
-    }
-    if (typeof vertexSource !== "string" || typeof fragmentSource !== "string") {
-      throw new TypeError("ShaderProgram expects vertex and fragment source as strings.");
-    }
-    this.#webglRenderingContext = webglRenderingContext;
-    this.#uniformLocations = /* @__PURE__ */ new Map();
-    const vertexShader = this.#compileShader(this.#webglRenderingContext.VERTEX_SHADER, vertexSource);
-    const fragmentShader = this.#compileShader(this.#webglRenderingContext.FRAGMENT_SHADER, fragmentSource);
-    const program = this.#webglRenderingContext.createProgram();
-    if (!program) {
-      this.#webglRenderingContext.deleteShader(vertexShader);
-      this.#webglRenderingContext.deleteShader(fragmentShader);
-      throw new Error("Failed to create WebGL program.");
-    }
-    this.#webglRenderingContext.attachShader(program, vertexShader);
-    this.#webglRenderingContext.attachShader(program, fragmentShader);
-    this.#webglRenderingContext.linkProgram(program);
-    const linkStatus = this.#webglRenderingContext.getProgramParameter(
-      program,
-      this.#webglRenderingContext.LINK_STATUS
-    );
-    this.#webglRenderingContext.deleteShader(vertexShader);
-    this.#webglRenderingContext.deleteShader(fragmentShader);
-    if (!linkStatus) {
-      const infoLog = this.#webglRenderingContext.getProgramInfoLog(program) || "Unknown program link error";
-      this.#webglRenderingContext.deleteProgram(program);
-      throw new Error(`Failed to link program: ${infoLog}`);
-    }
-    this.#program = program;
-  }
-  /**
-   * Returns the underlying WebGL program object.
-   *
-   * @returns {WebGLProgram}
-   */
-  get program() {
-    return this.#program;
-  }
-  /**
-   * Makes this program active for subsequent draw calls.
-   */
-  use() {
-    this.#webglRenderingContext.useProgram(this.#program);
-  }
-  /**
-   * Sets a 4x4 matrix uniform.
-   *
-   * @param {string} name         - Name of the uniform variable in the GLSL program.
-   * @param {Float32Array} matrix - 4x4 matrix in column-major order to upload to the uniform.
-   */
-  setMatrix4(name, matrix) {
-    if (typeof name !== "string") {
-      throw new TypeError("ShaderProgram.setMatrix4 expects uniform name as a string.");
-    }
-    if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT2) {
-      throw new TypeError("ShaderProgram.setMatrix4 expects a 4x4 Float32Array.");
-    }
-    const location = this.#getUniformLocation(name);
-    this.#webglRenderingContext.uniformMatrix4fv(location, false, matrix);
-  }
-  /**
-   * Looks up a uniform location with caching.
-   *
-   * @param {string} name - Name of the uniform variable in the linked shader program.
-   * @returns {WebGLUniformLocation}
-   * @private
-   */
-  #getUniformLocation(name) {
-    if (typeof name !== "string") {
-      throw new TypeError("ShaderProgram.#getUniformLocation expects a string name.");
-    }
-    if (this.#uniformLocations.has(name)) {
-      const cachedLocation = this.#uniformLocations.get(name);
-      return cachedLocation;
-    }
-    const location = this.#webglRenderingContext.getUniformLocation(this.#program, name);
-    if (location === null) {
-      throw new Error(`Uniform "${name}" not found in shader program.`);
-    }
-    this.#uniformLocations.set(name, location);
-    return location;
-  }
-  /**
-   * Compiles a shader of the given type.
-   *
-   * @param {number} type   - Shader type constant (e.g. gl.VERTEX_SHADER or gl.FRAGMENT_SHADER).
-   * @param {string} source - GLSL source code for the shader.
-   * @returns {WebGLShader}
-   * @private
-   */
-  #compileShader(type, source) {
-    if (typeof type !== "number") {
-      throw new TypeError("ShaderProgram.#compileShader expects a numeric shader type.");
-    }
-    if (typeof source !== "string") {
-      throw new TypeError("ShaderProgram.#compileShader expects shader source as a string.");
-    }
-    const shader = this.#webglRenderingContext.createShader(type);
-    if (!shader) {
-      throw new Error("Failed to create WebGL shader.");
-    }
-    this.#webglRenderingContext.shaderSource(shader, source);
-    this.#webglRenderingContext.compileShader(shader);
-    const compileStatus = this.#webglRenderingContext.getShaderParameter(shader, this.#webglRenderingContext.COMPILE_STATUS);
-    if (!compileStatus) {
-      const infoLog = this.#webglRenderingContext.getShaderInfoLog(shader) || "Unknown shader compilation error";
-      this.#webglRenderingContext.deleteShader(shader);
-      throw new Error(`Failed to compile shader: ${infoLog}`);
-    }
-    return shader;
-  }
-};
-
-// core/material/material.js
-var Material = class {
-  /** @type {WebGL2RenderingContext} */
-  #webglContext;
-  /** @type {ShaderProgram} */
-  #shaderProgram;
-  /** @type {boolean} */
-  #wireframeEnabled = false;
-  /**
-   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
-   * @param {ShaderProgram} shaderProgram - Compiled and linked shader program used by this material for rendering.
-   */
-  constructor(webglContext2, shaderProgram) {
-    if (!(webglContext2 instanceof WebGL2RenderingContext)) {
-      throw new TypeError("Material expects a WebGL2RenderingContext.");
-    }
-    if (!(shaderProgram instanceof ShaderProgram)) {
-      throw new TypeError("Material expects a ShaderProgram instance.");
-    }
-    this.#webglContext = webglContext2;
-    this.#shaderProgram = shaderProgram;
-  }
-  /**
-   * @returns {WebGL2RenderingContext}
-   */
-  get webglContext() {
-    return this.#webglContext;
-  }
-  /**
-   * @returns {ShaderProgram}
-   */
-  get shaderProgram() {
-    return this.#shaderProgram;
-  }
-  /**
-   * Makes this material's shader program active.
-   */
-  use() {
-    this.#shaderProgram.use();
-  }
-  /**
-   * Enables or disables wireframe rendering.
-   *
-   * @param {boolean} enabled - When true, switches material to wireframe mode. When false, uses solid rendering.
-   */
-  setWireframeEnabled(enabled) {
-    this.#wireframeEnabled = Boolean(enabled);
-  }
-  /**
-   * Toggles wireframe mode.
-   */
-  toggleWireframe() {
-    this.#wireframeEnabled = !this.#wireframeEnabled;
-  }
-  /**
-   * @returns {boolean}
-   */
-  isWireframeEnabled() {
-    return this.#wireframeEnabled;
-  }
-};
-
 // core/scene/mesh.js
 var Mesh = class extends Object3D {
   /** @type {Geometry} */
@@ -904,16 +1098,16 @@ var Mesh = class extends Object3D {
    * @param {Geometry} geometry - Geometry that provides vertex and index buffers for this mesh.
    * @param {Material} material - Material that defines how the geometry should be shaded and rendered.
    */
-  constructor(geometry, material2) {
+  constructor(geometry, material) {
     super();
     if (!(geometry instanceof Geometry)) {
       throw new TypeError("Mesh constructor expects a Geometry instance.");
     }
-    if (!(material2 instanceof Material)) {
+    if (!(material instanceof Material)) {
       throw new TypeError("Mesh constructor expects a Material instance.");
     }
     this.#geometry = geometry;
-    this.#material = material2;
+    this.#material = material;
   }
   /**
    * @returns {Geometry}
@@ -939,6 +1133,7 @@ var Scene = class extends Object3D {
 // core/scene/camera.js
 var MINIMUM_NEAR_CLIP_DISTANCE = 0;
 var MINIMUM_ASPECT_RATIO = 0;
+var SCALE_INVERSE_NUMERATOR = 1;
 var PerspectiveCamera = class extends Object3D {
   /** @type {number} */
   #fieldOfViewRadians;
@@ -994,6 +1189,39 @@ var PerspectiveCamera = class extends Object3D {
       this.#far
     );
   }
+  /**
+   * Returns the view matrix for this camera (inverse of its world transform).
+   *
+   * @returns {Float32Array}
+   */
+  getViewMatrix() {
+    const position = this.position;
+    const rotation = this.rotation;
+    const scale = this.scale;
+    if (scale.x === 0 || scale.y === 0 || scale.z === 0) {
+      throw new RangeError("PerspectiveCamera.getViewMatrix cannot invert a zero scale.");
+    }
+    const inverseScale = Matrix4.createScale(
+      SCALE_INVERSE_NUMERATOR / scale.x,
+      SCALE_INVERSE_NUMERATOR / scale.y,
+      SCALE_INVERSE_NUMERATOR / scale.z
+    );
+    const inverseRotationX = Matrix4.createRotationX(-rotation.x);
+    const inverseRotationY = Matrix4.createRotationY(-rotation.y);
+    const inverseRotationZ = Matrix4.createRotationZ(-rotation.z);
+    const inverseTranslation = Matrix4.createTranslation(
+      -position.x,
+      -position.y,
+      -position.z
+    );
+    return Matrix4.multiplyMany(
+      inverseScale,
+      inverseRotationX,
+      inverseRotationY,
+      inverseRotationZ,
+      inverseTranslation
+    );
+  }
 };
 
 // core/render/renderer.js
@@ -1006,12 +1234,12 @@ var Renderer = class {
   /**
    * @param {WebGLContext} webglContext - Wrapper around the underlying WebGL2 rendering context.
    */
-  constructor(webglContext2) {
-    if (!(webglContext2 instanceof WebGLContext)) {
+  constructor(webglContext) {
+    if (!(webglContext instanceof WebGLContext)) {
       throw new TypeError("Renderer expects a WebGLContext instance.");
     }
-    this.#contextWrapper = webglContext2;
-    this.#webglRenderingContext = webglContext2.context;
+    this.#contextWrapper = webglContext;
+    this.#webglRenderingContext = webglContext.context;
   }
   /**
    * Renders the given scene from the point of view of the given camera.
@@ -1019,34 +1247,36 @@ var Renderer = class {
    * @param {Scene} scene - Scene graph containing all objects, that should be rendered.
    * @param {PerspectiveCamera} camera - Camera, that defines the view and projection used for rendering.
    */
-  render(scene2, camera2) {
-    if (!(scene2 instanceof Scene)) {
+  render(scene, camera) {
+    if (!(scene instanceof Scene)) {
       throw new TypeError("Renderer.render expects a Scene instance.");
     }
-    if (!(camera2 instanceof PerspectiveCamera)) {
+    if (!(camera instanceof PerspectiveCamera)) {
       throw new TypeError("Renderer.render expects a PerspectiveCamera instance.");
     }
     const renderingContext = this.#webglRenderingContext;
     this.#contextWrapper.resizeToDisplaySize();
     this.#contextWrapper.clear();
-    const canvas2 = renderingContext.canvas;
-    const aspectRatio = canvas2.width / canvas2.height;
-    camera2.setAspectRatio(aspectRatio);
-    const projectionMatrix = camera2.getProjectionMatrix();
-    scene2.updateWorldMatrix(null);
-    scene2.traverse((object3d) => {
+    const canvas = renderingContext.canvas;
+    const aspectRatio = canvas.width / canvas.height;
+    camera.setAspectRatio(aspectRatio);
+    const projectionMatrix = camera.getProjectionMatrix();
+    const viewMatrix = camera.getViewMatrix();
+    const viewProjectionMatrix = Matrix4.multiply(projectionMatrix, viewMatrix);
+    scene.updateWorldMatrix(null);
+    scene.traverse((object3d) => {
       if (!(object3d instanceof Mesh)) {
         return;
       }
       const mesh = object3d;
       const geometry = mesh.geometry;
-      const material2 = mesh.material;
-      const world = mesh.worldMatrix;
-      const finalMatrix = Matrix4.multiply(projectionMatrix, world);
-      material2.use();
-      material2.apply(finalMatrix);
+      const material = mesh.material;
+      const worldMatrix = mesh.worldMatrix;
+      const finalMatrix = Matrix4.multiply(viewProjectionMatrix, worldMatrix);
+      material.use();
+      material.apply(finalMatrix);
       geometry.bind();
-      const isWireframeEnabled = material2.isWireframeEnabled();
+      const isWireframeEnabled = material.isWireframeEnabled();
       geometry.bindIndexBuffer(isWireframeEnabled);
       const mode = isWireframeEnabled ? renderingContext.LINES : renderingContext.TRIANGLES;
       const indexCount = geometry.getIndexCount(isWireframeEnabled);
@@ -1059,246 +1289,18 @@ var Renderer = class {
     });
   }
 };
-
-// core/geometry/box-geometry.js
-var DEFAULT_BOX_SIZE = 1;
-var BOX_HALF_SIZE_DIVISOR = 2;
-var BoxGeometry = class extends Geometry {
-  /**
-   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
-   * @param {number} size - Edge length of the box.
-   */
-  constructor(webglContext2, size = DEFAULT_BOX_SIZE) {
-    if (typeof size !== "number" || size <= 0) {
-      throw new RangeError("BoxGeometry expects a positive size.");
-    }
-    const halfSize = size / BOX_HALF_SIZE_DIVISOR;
-    const positions = new Float32Array([
-      // Front face
-      -halfSize,
-      -halfSize,
-      halfSize,
-      // 0
-      halfSize,
-      -halfSize,
-      halfSize,
-      // 1
-      halfSize,
-      halfSize,
-      halfSize,
-      // 2
-      -halfSize,
-      halfSize,
-      halfSize,
-      // 3
-      // Back face
-      -halfSize,
-      -halfSize,
-      -halfSize,
-      // 4
-      halfSize,
-      -halfSize,
-      -halfSize,
-      // 5
-      halfSize,
-      halfSize,
-      -halfSize,
-      // 6
-      -halfSize,
-      halfSize,
-      -halfSize
-      // 7
-    ]);
-    const colors = new Float32Array([
-      // Front vertices (0-3) - red
-      1,
-      0,
-      0,
-      1,
-      0,
-      0,
-      1,
-      0,
-      0,
-      1,
-      0,
-      0,
-      // Back vertices (4-7) - blue
-      0,
-      0,
-      1,
-      0,
-      0,
-      1,
-      0,
-      0,
-      1,
-      0,
-      0,
-      1
-    ]);
-    const indicesSolid = new Uint16Array([
-      // Front face
-      0,
-      1,
-      2,
-      2,
-      3,
-      0,
-      // Back face
-      5,
-      4,
-      7,
-      7,
-      6,
-      5,
-      // Top face
-      3,
-      2,
-      6,
-      6,
-      7,
-      3,
-      // Bottom face
-      4,
-      5,
-      1,
-      1,
-      0,
-      4,
-      // Right face
-      1,
-      5,
-      6,
-      6,
-      2,
-      1,
-      // Left face
-      4,
-      0,
-      3,
-      3,
-      7,
-      4
-    ]);
-    const indicesWireframe = new Uint16Array([
-      // Front face edges
-      0,
-      1,
-      1,
-      2,
-      2,
-      3,
-      3,
-      0,
-      // Back face edges
-      4,
-      5,
-      5,
-      6,
-      6,
-      7,
-      7,
-      4,
-      // Side edges
-      0,
-      4,
-      1,
-      5,
-      2,
-      6,
-      3,
-      7
-    ]);
-    super(webglContext2, positions, colors, indicesSolid, indicesWireframe);
-  }
+export {
+  BasicMaterial,
+  BoxGeometry,
+  Geometry,
+  Material,
+  Matrix4,
+  Mesh,
+  Object3D,
+  PerspectiveCamera,
+  Renderer,
+  Scene,
+  ShaderProgram,
+  WebGLContext
 };
-
-// core/material/basic-material.js
-var VERTEX_SHADER_SOURCE = `#version 300 es
-precision mediump float;
-layout(location = 0) in vec3 a_position;
-layout(location = 1) in vec3 a_color;
-uniform mat4 u_matrix;
-out vec3 v_color;
-
-void main() {
-    gl_Position = u_matrix * vec4(a_position, 1.0);
-    v_color = a_color;
-}
-`;
-var FRAGMENT_SHADER_SOURCE = `#version 300 es
-precision mediump float;
-in vec3 v_color;
-out vec4 outColor;
-
-void main() {
-    outColor = vec4(v_color, 1.0);
-}
-`;
-var BasicMaterial = class extends Material {
-  /**
-   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
-   */
-  constructor(webglContext2) {
-    const shaderProgram = new ShaderProgram(webglContext2, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
-    super(webglContext2, shaderProgram);
-  }
-  /**
-   * Applies per-object uniforms.
-   *
-   * @param {Float32Array} matrix4 - Transformation matrix passed as u_matrix.
-   */
-  apply(matrix4) {
-    this.shaderProgram.setMatrix4("u_matrix", matrix4);
-  }
-};
-
-// demo/stub.js
-var canvas = document.getElementById("glcanvas");
-if (!canvas) {
-  throw new Error('Canvas element with id "glcanvas" not found.');
-}
-var webglContext = new WebGLContext(canvas);
-var renderer = new Renderer(webglContext);
-var scene = new Scene();
-var gl = webglContext.context;
-var camera = new PerspectiveCamera(
-  Math.PI / 4,
-  // 45 degrees
-  canvas.width / canvas.height,
-  0.1,
-  100
-);
-var boxGeometry = new BoxGeometry(gl, 1);
-var material = new BasicMaterial(gl);
-var cube = new Mesh(boxGeometry, material);
-cube.position.z = -3;
-scene.add(cube);
-var wireframeToggleButton = document.getElementById("wireframeToggleButton");
-if (!wireframeToggleButton) {
-  throw new Error('Button with id "wireframeToggleButton" not found.');
-}
-function updateWireframeButtonLabel() {
-  const isWireframeEnabled = material.isWireframeEnabled();
-  wireframeToggleButton.textContent = isWireframeEnabled ? "Wireframe: ON" : "Wireframe: OFF";
-}
-wireframeToggleButton.addEventListener("click", () => {
-  material.toggleWireframe();
-  updateWireframeButtonLabel();
-});
-updateWireframeButtonLabel();
-var lastTimestamp = performance.now();
-var rotationSpeedX = Math.PI / 4;
-var rotationSpeedY = Math.PI / 3;
-function renderFrame(currentTimestamp) {
-  const deltaMilliseconds = currentTimestamp - lastTimestamp;
-  lastTimestamp = currentTimestamp;
-  const deltaSeconds = deltaMilliseconds / 1e3;
-  cube.rotation.x += rotationSpeedX * deltaSeconds;
-  cube.rotation.y += rotationSpeedY * deltaSeconds;
-  renderer.render(scene, camera);
-  window.requestAnimationFrame(renderFrame);
-}
-window.requestAnimationFrame(renderFrame);
 //# sourceMappingURL=gerawebgl.js.map
