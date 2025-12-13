@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: shader/shader-program.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: shader/shader-program.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/** @type {number} */
+const MATRIX_4x4_ELEMENT_COUNT = 16;
+
+/**
+ * Thin wrapper around a linked WebGL shader program.
+ */
+export class ShaderProgram {
+    /** @type {WebGL2RenderingContext} */
+    #webglRenderingContext;
+
+    /** @type {WebGLProgram} */
+    #program;
+
+    /** @type {Map&lt;string, WebGLUniformLocation>} */
+    #uniformLocations;
+
+    /**
+     * @param {WebGL2RenderingContext} webglRenderingContext - WebGL2 rendering context used to create shaders and the program.
+     * @param {string} vertexSource   - GLSL source code of the vertex shader.
+     * @param {string} fragmentSource - GLSL source code of the fragment shader.
+     */
+    constructor(webglRenderingContext, vertexSource, fragmentSource) {
+        if (!(webglRenderingContext instanceof WebGL2RenderingContext)) {
+            throw new TypeError('ShaderProgram expects a WebGL2RenderingContext.');
+        }
+
+        if (typeof vertexSource !== 'string' || typeof fragmentSource !== 'string') {
+            throw new TypeError('ShaderProgram expects vertex and fragment source as strings.');
+        }
+
+        this.#webglRenderingContext = webglRenderingContext;
+        this.#uniformLocations      = new Map();
+
+        const vertexShader   = this.#compileShader(this.#webglRenderingContext.VERTEX_SHADER, vertexSource);
+        const fragmentShader = this.#compileShader(this.#webglRenderingContext.FRAGMENT_SHADER, fragmentSource);
+        const program        = this.#webglRenderingContext.createProgram();
+
+        if (!program) {
+            this.#webglRenderingContext.deleteShader(vertexShader);
+            this.#webglRenderingContext.deleteShader(fragmentShader);
+            throw new Error('Failed to create WebGL program.');
+        }
+
+        this.#webglRenderingContext.attachShader(program, vertexShader);
+        this.#webglRenderingContext.attachShader(program, fragmentShader);
+        this.#webglRenderingContext.linkProgram(program);
+
+        const linkStatus = this.#webglRenderingContext.getProgramParameter(
+            program,
+            this.#webglRenderingContext.LINK_STATUS
+        );
+
+        this.#webglRenderingContext.deleteShader(vertexShader);
+        this.#webglRenderingContext.deleteShader(fragmentShader);
+
+        if (!linkStatus) {
+            const infoLog = this.#webglRenderingContext.getProgramInfoLog(program) || 'Unknown program link error';
+            this.#webglRenderingContext.deleteProgram(program);
+            throw new Error(`Failed to link program: ${infoLog}`);
+        }
+
+        this.#program = program;
+    }
+
+    /**
+     * Returns the underlying WebGL program object.
+     *
+     * @returns {WebGLProgram}
+     */
+    get program() {
+        return this.#program;
+    }
+
+    /**
+     * Makes this program active for subsequent draw calls.
+     */
+    use() {
+        this.#webglRenderingContext.useProgram(this.#program);
+    }
+
+    /**
+     * Sets a 4x4 matrix uniform.
+     *
+     * @param {string} name         - Name of the uniform variable in the GLSL program.
+     * @param {Float32Array} matrix - 4x4 matrix in column-major order to upload to the uniform.
+     */
+    setMatrix4(name, matrix) {
+        if (typeof name !== 'string') {
+            throw new TypeError('ShaderProgram.setMatrix4 expects uniform name as a string.');
+        }
+
+        if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+            throw new TypeError('ShaderProgram.setMatrix4 expects a 4x4 Float32Array.');
+        }
+
+        const location = this.#getUniformLocation(name);
+        this.#webglRenderingContext.uniformMatrix4fv(location, false, matrix);
+    }
+
+    /**
+     * Looks up a uniform location with caching.
+     *
+     * @param {string} name - Name of the uniform variable in the linked shader program.
+     * @returns {WebGLUniformLocation}
+     * @private
+     */
+    #getUniformLocation(name) {
+        if (typeof name !== 'string') {
+            throw new TypeError('ShaderProgram.#getUniformLocation expects a string name.');
+        }
+
+        if (this.#uniformLocations.has(name)) {
+            const cachedLocation = this.#uniformLocations.get(name);
+            return cachedLocation;
+        }
+
+        const location = this.#webglRenderingContext.getUniformLocation(this.#program, name);
+
+        if (location === null) {
+            throw new Error(`Uniform "${name}" not found in shader program.`);
+        }
+
+        this.#uniformLocations.set(name, location);
+        return location;
+    }
+
+    /**
+     * Compiles a shader of the given type.
+     *
+     * @param {number} type   - Shader type constant (e.g. gl.VERTEX_SHADER or gl.FRAGMENT_SHADER).
+     * @param {string} source - GLSL source code for the shader.
+     * @returns {WebGLShader}
+     * @private
+     */
+    #compileShader(type, source) {
+        if (typeof type !== 'number') {
+            throw new TypeError('ShaderProgram.#compileShader expects a numeric shader type.');
+        }
+
+        if (typeof source !== 'string') {
+            throw new TypeError('ShaderProgram.#compileShader expects shader source as a string.');
+        }
+
+        const shader = this.#webglRenderingContext.createShader(type);
+
+        if (!shader) {
+            throw new Error('Failed to create WebGL shader.');
+        }
+
+        this.#webglRenderingContext.shaderSource(shader, source);
+        this.#webglRenderingContext.compileShader(shader);
+        const compileStatus = this.#webglRenderingContext.getShaderParameter(shader, this.#webglRenderingContext.COMPILE_STATUS);
+
+        if (!compileStatus) {
+            const infoLog = this.#webglRenderingContext.getShaderInfoLog(shader) || 'Unknown shader compilation error';
+            this.#webglRenderingContext.deleteShader(shader);
+            throw new Error(`Failed to compile shader: ${infoLog}`);
+        }
+
+        return shader;
+    }
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="BasicMaterial.html">BasicMaterial</a></li><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Sat Dec 13 2025 21:02:03 GMT+0300 (Moscow Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: geometry/geometry.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: geometry/geometry.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/** @type {number} */
+const POSITION_ATTRIBUTE_LOCATION = 0;
+
+/** @type {number} */
+const POSITION_COMPONENT_COUNT = 3;
+
+/** @type {number} */
+const COLOR_ATTRIBUTE_LOCATION = 1;
+
+/** @type {number} */
+const COLOR_COMPONENT_COUNT = 3;
+
+/** @type {boolean} */
+const ATTRIBUTE_NORMALIZED = false;
+
+/** @type {number} */
+const ATTRIBUTE_NO_STRIDE = 0;
+
+/** @type {number} */
+const ATTRIBUTE_NO_OFFSET = 0;
+
+/**
+ * Geometry holds vertex buffers and index buffers for rendering.
+ */
+export class Geometry {
+    /** @type {WebGL2RenderingContext} */
+    #webglContext;
+
+    /** @type {WebGLVertexArrayObject} */
+    #vertexArrayObject;
+
+    /** @type {WebGLBuffer} */
+    #positionBuffer;
+
+    /** @type {WebGLBuffer | null} */
+    #colorBuffer;
+
+    /** @type {WebGLBuffer} */
+    #indexBufferSolid;
+
+    /** @type {WebGLBuffer} */
+    #indexBufferWireframe;
+
+    /** @type {number} */
+    #solidIndexCount;
+
+    /** @type {number} */
+    #wireframeIndexCount;
+
+    /**
+     * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
+     * @param {Float32Array} positions              - [x, y, z] triples.
+     * @param {Float32Array | null} colors          - [red, green, blue] triples or null.
+     * @param {Uint16Array} indicesSolid            - Indices for solid triangles.
+     * @param {Uint16Array} indicesWireframe        - Indices for wireframe lines.
+     */
+    constructor(webglContext, positions, colors, indicesSolid, indicesWireframe) {
+        if (!(webglContext instanceof WebGL2RenderingContext)) {
+            throw new TypeError('Geometry expects a WebGL2RenderingContext.');
+        }
+
+        if (!(positions instanceof Float32Array)) {
+            throw new TypeError('Geometry expects positions as Float32Array.');
+        }
+
+        if (colors !== null &amp;&amp; !(colors instanceof Float32Array)) {
+            throw new TypeError('Geometry expects colors as Float32Array or null.');
+        }
+
+        if (!(indicesSolid instanceof Uint16Array) || !(indicesWireframe instanceof Uint16Array)) {
+            throw new TypeError('Geometry expects indices as Uint16Array.');
+        }
+
+        this.#webglContext         = webglContext;
+        this.#solidIndexCount      = indicesSolid.length;
+        this.#wireframeIndexCount  = indicesWireframe.length;
+        this.#vertexArrayObject    = this.#createVertexArrayObject();
+        this.#positionBuffer       = this.#createStaticArrayBuffer(positions);
+        this.#colorBuffer          = colors ? this.#createStaticArrayBuffer(colors) : null;
+        this.#indexBufferSolid     = this.#createIndexBuffer(indicesSolid);
+        this.#indexBufferWireframe = this.#createIndexBuffer(indicesWireframe);
+        this.#configureVertexArray();
+    }
+
+    /**
+     * Binds the VAO of this geometry.
+     */
+    bind() {
+        this.#webglContext.bindVertexArray(this.#vertexArrayObject);
+    }
+
+    /**
+     * Binds the appropriate index buffer depending on the wireframe flag.
+     *
+     * @param {boolean} wireframe - Flag indicating whether the geometry should be drawn in wireframe mode.
+     */
+    bindIndexBuffer(wireframe) {
+        const buffer = wireframe ? this.#indexBufferWireframe : this.#indexBufferSolid;
+        this.#webglContext.bindBuffer(this.#webglContext.ELEMENT_ARRAY_BUFFER, buffer);
+    }
+
+    /**
+     * Returns the index count depending on the wireframe flag.
+     *
+     * @param {boolean} wireframe - Flag indicating whether the geometry should be drawn in wireframe mode.
+     * @returns {number}
+     */
+    getIndexCount(wireframe) {
+        return wireframe ? this.#wireframeIndexCount : this.#solidIndexCount;
+    }
+
+    /**
+     * Creates a vertex array object (VAO).
+     *
+     * @returns {WebGLVertexArrayObject}
+     * @private
+     */
+    #createVertexArrayObject() {
+        const vao = this.#webglContext.createVertexArray();
+
+        if (!vao) {
+            throw new Error('Failed to create vertex array object (VAO).');
+        }
+
+        return vao;
+    }
+
+    /**
+     * Creates a static ARRAY_BUFFER and uploads the given data.
+     *
+     * @param {Float32Array} data - Vertex attribute data stored as a flat array of numeric components.
+     * @returns {WebGLBuffer}
+     * @private
+     */
+    #createStaticArrayBuffer(data) {
+        const buffer = this.#webglContext.createBuffer();
+
+        if (!buffer) {
+            throw new Error('Failed to create ARRAY_BUFFER.');
+        }
+
+        this.#webglContext.bindBuffer(this.#webglContext.ARRAY_BUFFER, buffer);
+        this.#webglContext.bufferData(this.#webglContext.ARRAY_BUFFER, data, this.#webglContext.STATIC_DRAW);
+        return buffer;
+    }
+
+    /**
+     * Creates an ELEMENT_ARRAY_BUFFER and uploads the given index data.
+     *
+     * @param {Uint16Array} indices - Index data referencing vertices in the associated vertex buffers.
+     * @returns {WebGLBuffer}
+     * @private
+     */
+    #createIndexBuffer(indices) {
+        const buffer = this.#webglContext.createBuffer();
+
+        if (!buffer) {
+            throw new Error('Failed to create ELEMENT_ARRAY_BUFFER.');
+        }
+
+        this.#webglContext.bindBuffer(this.#webglContext.ELEMENT_ARRAY_BUFFER, buffer);
+        this.#webglContext.bufferData(this.#webglContext.ELEMENT_ARRAY_BUFFER, indices, this.#webglContext.STATIC_DRAW);
+        return buffer;
+    }
+
+    /**
+     * Configures the vertex array object (VAO) with position and optional color attributes.
+     *
+     * Attribute layout:
+     * - location 0: vec3 position
+     * - location 1: vec3 color (if present)
+     *
+     * @private
+     */
+    #configureVertexArray() {
+        const webglContext = this.#webglContext;
+        webglContext.bindVertexArray(this.#vertexArrayObject);
+
+        // Set position attribute at location = 0:
+        webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#positionBuffer);
+        webglContext.enableVertexAttribArray(POSITION_ATTRIBUTE_LOCATION);
+        webglContext.vertexAttribPointer(
+            POSITION_ATTRIBUTE_LOCATION,
+            POSITION_COMPONENT_COUNT,
+            webglContext.FLOAT,
+            ATTRIBUTE_NORMALIZED,
+            ATTRIBUTE_NO_STRIDE,
+            ATTRIBUTE_NO_OFFSET
+        );
+
+        // Set color attribute at location = 1, if present:
+        if (this.#colorBuffer) {
+            webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#colorBuffer);
+            webglContext.enableVertexAttribArray(COLOR_ATTRIBUTE_LOCATION);
+            webglContext.vertexAttribPointer(
+                COLOR_ATTRIBUTE_LOCATION,
+                COLOR_COMPONENT_COUNT,
+                webglContext.FLOAT,
+                ATTRIBUTE_NORMALIZED,
+                ATTRIBUTE_NO_STRIDE,
+                ATTRIBUTE_NO_OFFSET
+            );
+        }
+
+        // Bind the default index buffer (solid) to the VAO:
+        webglContext.bindBuffer(webglContext.ELEMENT_ARRAY_BUFFER, this.#indexBufferSolid);
+        webglContext.bindVertexArray(null);
+    }
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="BasicMaterial.html">BasicMaterial</a></li><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Sat Dec 13 2025 21:02:03 GMT+0300 (Moscow Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

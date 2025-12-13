@@ -1,0 +1,319 @@
+/** @type {number} */
+const HALF_FIELD_OF_VIEW_DIVISOR = 2.0;
+
+/** @type {number} */
+const PROJECTION_SCALE_NUMERATOR = 1.0;
+
+/** @type {number} */
+const DEPTH_RANGE_NUMERATOR = 1.0;
+
+/** @type {number} */
+const PERSPECTIVE_Z_RANGE_MULTIPLIER = 2.0;
+
+/** @type {number} */
+const PERSPECTIVE_W_COMPONENT_SCALE = -1.0;
+
+/** @type {number} */
+const MATRIX_4x4_ELEMENT_COUNT = 16;
+
+/** @type {number} */
+const MATRIX_COLUMN_COUNT = 4;
+
+/** @type {number} */
+const MATRIX_ROW_COUNT = 4;
+
+/** @type {number} */
+const MATRIX_STRIDE = 4; 
+
+/**
+ * Utility class for working with 4x4 matrices in column-major order.
+ * All methods are static and return new {@link Float32Array} instances.
+ */
+export class Matrix4 {
+    /**
+     * Creates a new 4x4 identity matrix.
+     *
+     * @returns {Float32Array} - A new identity matrix.
+     */
+    static createIdentity() {
+        const out = Matrix4.#createEmpty();
+        out[0]  = 1;
+        out[5]  = 1;
+        out[10] = 1;
+        out[15] = 1;
+        return out;
+    }
+
+    /**
+     * Creates a scale matrix.
+     *
+     * @param {number} scaleX - Scale along X.
+     * @param {number} scaleY - Scale along Y.
+     * @param {number} scaleZ - Scale along Z.
+     * @returns {Float32Array} A new scale matrix.
+     */
+    static createScale(scaleX, scaleY, scaleZ) {
+        if (typeof scaleX    !== 'number'
+            || typeof scaleY !== 'number'
+            || typeof scaleZ !== 'number') {
+            throw new TypeError('Matrix4.createScale expects numeric arguments.');
+        }
+
+        const out = Matrix4.#createEmpty();
+        out[0]  = scaleX;
+        out[5]  = scaleY;
+        out[10] = scaleZ;
+        out[15] = 1;
+        return out;
+    }
+
+    /**
+     * Creates a perspective projection matrix.
+     *
+     * @param {number} fieldOfViewRadians - Vertical field of view in radians.
+     * @param {number} aspectRatio        - Viewport aspect ratio (width / height).
+     * @param {number} near               - Near clipping plane, must be > 0.
+     * @param {number} far                - Far clipping plane, must be > near.
+     * @returns {Float32Array} A new perspective projection matrix.
+     */
+    static createPerspective(fieldOfViewRadians, aspectRatio, near, far) {
+        if (typeof fieldOfViewRadians !== 'number'
+            || typeof aspectRatio     !== 'number'
+            || typeof near            !== 'number'
+            || typeof far             !== 'number') {
+            throw new TypeError('Matrix4.createPerspective expects numeric arguments.');
+        }
+
+        if (near <= 0 || far <= near) {
+            throw new RangeError('Matrix4.createPerspective expects 0 < near < far.');
+        }
+
+        const out               = Matrix4.#createEmpty();
+        const projectionScale   = PROJECTION_SCALE_NUMERATOR / Math.tan(fieldOfViewRadians / HALF_FIELD_OF_VIEW_DIVISOR);
+        const inverseDepthRange = DEPTH_RANGE_NUMERATOR / (near - far);
+
+        // Column-major layout:
+        out[0]  = projectionScale / aspectRatio;
+        out[1]  = 0;
+        out[2]  = 0;
+        out[3]  = 0;
+
+        out[4]  = 0;
+        out[5]  = projectionScale;
+        out[6]  = 0;
+        out[7]  = 0;
+
+        out[8]  = 0;
+        out[9]  = 0;
+        out[10] = (far + near) * inverseDepthRange;
+        out[11] = PERSPECTIVE_W_COMPONENT_SCALE;
+
+        out[12] = 0;
+        out[13] = 0;
+        out[14] = (PERSPECTIVE_Z_RANGE_MULTIPLIER * far * near) * inverseDepthRange;
+        out[15] = 0;
+
+        return out;
+    }
+
+    /**
+     * Creates a translation matrix.
+     *
+     * @param {number} translateX - Translation along X axis.
+     * @param {number} translateY - Translation along Y axis.
+     * @param {number} translateZ - Translation along Z axis.
+     * @returns {Float32Array} A new translation matrix.
+     */
+    static createTranslation(translateX, translateY, translateZ) {
+        if (typeof translateX    !== 'number'
+            || typeof translateY !== 'number'
+            || typeof translateZ !== 'number') {
+            throw new TypeError('Matrix4.createTranslation expects numeric arguments.');
+        }
+
+        const out = Matrix4.createIdentity();
+        out[12]   = translateX;
+        out[13]   = translateY;
+        out[14]   = translateZ;
+        return out;
+    }
+
+    /**
+     * Creates a rotation matrix around the X axis.
+     *
+     * @param {number} angleRadians - Angle in radians.
+     * @returns {Float32Array} A new rotation matrix.
+     */
+    static createRotationX(angleRadians) {
+        if (typeof angleRadians !== 'number') {
+            throw new TypeError('Matrix4.createRotationX expects a numeric argument.');
+        }
+
+        const cosAngle = Math.cos(angleRadians);
+        const sinAngle = Math.sin(angleRadians);
+        const out      = Matrix4.#createEmpty();
+
+        out[0] = 1;
+        out[1] = 0;
+        out[2] = 0;
+        out[3] = 0;
+
+        out[4] = 0;
+        out[5] = cosAngle;
+        out[6] = sinAngle;
+        out[7] = 0;
+
+        out[8]  = 0;
+        out[9]  = -sinAngle;
+        out[10] = cosAngle;
+        out[11] = 0;
+
+        out[12] = 0;
+        out[13] = 0;
+        out[14] = 0;
+        out[15] = 1;
+
+        return out;
+    }
+
+    /**
+     * Creates a rotation matrix around the Y axis.
+     *
+     * @param {number} angleRadians - Angle in radians.
+     * @returns {Float32Array} A new rotation matrix.
+     */
+    static createRotationY(angleRadians) {
+        if (typeof angleRadians !== 'number') {
+            throw new TypeError('Matrix4.createRotationY expects a numeric argument.');
+        }
+
+        const cosAngle = Math.cos(angleRadians);
+        const sinAngle = Math.sin(angleRadians);
+        const out      = Matrix4.#createEmpty();
+
+        out[0] = cosAngle;
+        out[1] = 0;
+        out[2] = -sinAngle;
+        out[3] = 0;
+
+        out[4] = 0;
+        out[5] = 1;
+        out[6] = 0;
+        out[7] = 0;
+
+        out[8]  = sinAngle;
+        out[9]  = 0;
+        out[10] = cosAngle;
+        out[11] = 0;
+
+        out[12] = 0;
+        out[13] = 0;
+        out[14] = 0;
+        out[15] = 1;
+
+        return out;
+    }
+
+    /**
+     * Creates a rotation matrix around the Z axis.
+     *
+     * @param {number} angleRadians - Angle in radians.
+     * @returns {Float32Array} A new rotation matrix.
+     */
+    static createRotationZ(angleRadians) {
+        if (typeof angleRadians !== 'number') {
+            throw new TypeError('Matrix4.createRotationZ expects a numeric argument.');
+        }
+
+        const cosAngle = Math.cos(angleRadians);
+        const sinAngle = Math.sin(angleRadians);
+        const out      = Matrix4.#createEmpty();
+
+        out[0]  = cosAngle;
+        out[1]  = sinAngle;
+        out[2]  = 0;
+        out[3]  = 0;
+
+        out[4]  = -sinAngle;
+        out[5]  = cosAngle;
+        out[6]  = 0;
+        out[7]  = 0;
+
+        out[8]  = 0;
+        out[9]  = 0;
+        out[10] = 1;
+        out[11] = 0;
+
+        out[12] = 0;
+        out[13] = 0;
+        out[14] = 0;
+        out[15] = 1;
+
+        return out;
+    }
+
+    /**
+     * Multiplies two 4x4 matrices: result = leftMatrix * rightMatrix.
+     *
+     * @param {Float32Array} leftMatrix  - Left-hand matrix (4x4).
+     * @param {Float32Array} rightMatrix - Right-hand matrix (4x4).
+     * @returns {Float32Array} A new matrix containing the product.
+     */
+    static multiply(leftMatrix, rightMatrix) {
+        if (!(leftMatrix instanceof Float32Array)
+            || leftMatrix.length !== MATRIX_4x4_ELEMENT_COUNT
+            || !(rightMatrix instanceof Float32Array)
+            || rightMatrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+            throw new TypeError('Matrix4.multiply expects two 4x4 Float32Array matrices.');
+        }
+
+        const out = Matrix4.#createEmpty();
+
+        for (let columnIndex = 0; columnIndex < MATRIX_COLUMN_COUNT; columnIndex += 1) {
+            const rightColumnOffset = columnIndex * MATRIX_STRIDE;
+
+            for (let rowIndex = 0; rowIndex < MATRIX_ROW_COUNT; rowIndex += 1) {
+                const resultIndex = rightColumnOffset + rowIndex;
+
+                out[resultIndex] =
+                  leftMatrix[0 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 0]
+                + leftMatrix[1 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 1]
+                + leftMatrix[2 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 2]
+                + leftMatrix[3 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 3];
+            }
+        }
+
+        return out;
+    }
+
+    /**
+     * Multiplies several matrices in sequence:
+     * result = m0 * m1 * m2 * ... * mn
+     *
+     * @param {...Float32Array} matrices - Matrices to multiply, in order.
+     * @returns {Float32Array} The resulting matrix.
+     */
+    static multiplyMany(...matrices) {
+        if (matrices.length === 0) {
+            return Matrix4.createIdentity();
+        }
+
+        let result = matrices[0];
+
+        for (let index = 1; index < matrices.length; index += 1) {
+            result = Matrix4.multiply(result, matrices[index]);
+        }
+
+        return result;
+    }
+
+    /**
+     * Internal helper to create a zero-filled 4x4 matrix.
+     *
+     * @returns {Float32Array}
+     * @private
+     */
+    static #createEmpty() {
+        return new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
+    }
+}
