@@ -177,10 +177,10 @@ var Matrix4 = class _Matrix4 {
   /**
    * Creates a scale matrix.
    *
-   * @param {number} scaleX - Scale along X.
-   * @param {number} scaleY - Scale along Y.
-   * @param {number} scaleZ - Scale along Z.
-   * @returns {Float32Array} A new scale matrix.
+   * @param {number} scaleX  - Scale along X.
+   * @param {number} scaleY  - Scale along Y.
+   * @param {number} scaleZ  - Scale along Z.
+   * @returns {Float32Array} - A new scale matrix.
    */
   static createScale(scaleX, scaleY, scaleZ) {
     if (typeof scaleX !== "number" || typeof scaleY !== "number" || typeof scaleZ !== "number") {
@@ -200,7 +200,7 @@ var Matrix4 = class _Matrix4 {
    * @param {number} aspectRatio        - Viewport aspect ratio (width / height).
    * @param {number} near               - Near clipping plane, must be > 0.
    * @param {number} far                - Far clipping plane, must be > near.
-   * @returns {Float32Array} A new perspective projection matrix.
+   * @returns {Float32Array}            - A new perspective projection matrix.
    */
   static createPerspective(fieldOfViewRadians, aspectRatio, near, far) {
     if (typeof fieldOfViewRadians !== "number" || typeof aspectRatio !== "number" || typeof near !== "number" || typeof far !== "number") {
@@ -236,7 +236,7 @@ var Matrix4 = class _Matrix4 {
    * @param {number} translateX - Translation along X axis.
    * @param {number} translateY - Translation along Y axis.
    * @param {number} translateZ - Translation along Z axis.
-   * @returns {Float32Array} A new translation matrix.
+   * @returns {Float32Array}    - A new translation matrix.
    */
   static createTranslation(translateX, translateY, translateZ) {
     if (typeof translateX !== "number" || typeof translateY !== "number" || typeof translateZ !== "number") {
@@ -252,7 +252,7 @@ var Matrix4 = class _Matrix4 {
    * Creates a rotation matrix around the X axis.
    *
    * @param {number} angleRadians - Angle in radians.
-   * @returns {Float32Array} A new rotation matrix.
+   * @returns {Float32Array}      - A new rotation matrix.
    */
   static createRotationX(angleRadians) {
     if (typeof angleRadians !== "number") {
@@ -283,7 +283,7 @@ var Matrix4 = class _Matrix4 {
    * Creates a rotation matrix around the Y axis.
    *
    * @param {number} angleRadians - Angle in radians.
-   * @returns {Float32Array} A new rotation matrix.
+   * @returns {Float32Array}      - A new rotation matrix.
    */
   static createRotationY(angleRadians) {
     if (typeof angleRadians !== "number") {
@@ -314,7 +314,7 @@ var Matrix4 = class _Matrix4 {
    * Creates a rotation matrix around the Z axis.
    *
    * @param {number} angleRadians - Angle in radians.
-   * @returns {Float32Array} A new rotation matrix.
+   * @returns {Float32Array}      - A new rotation matrix.
    */
   static createRotationZ(angleRadians) {
     if (typeof angleRadians !== "number") {
@@ -346,28 +346,43 @@ var Matrix4 = class _Matrix4 {
    *
    * @param {Float32Array} leftMatrix  - Left-hand matrix (4x4).
    * @param {Float32Array} rightMatrix - Right-hand matrix (4x4).
-   * @returns {Float32Array} A new matrix containing the product.
+   * @returns {Float32Array}           - A new matrix containing the product.
    */
   static multiply(leftMatrix, rightMatrix) {
     if (!(leftMatrix instanceof Float32Array) || leftMatrix.length !== MATRIX_4x4_ELEMENT_COUNT || !(rightMatrix instanceof Float32Array) || rightMatrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
       throw new TypeError("Matrix4.multiply expects two 4x4 Float32Array matrices.");
     }
     const out = _Matrix4.#createEmpty();
-    for (let columnIndex = 0; columnIndex < MATRIX_COLUMN_COUNT; columnIndex += 1) {
-      const rightColumnOffset = columnIndex * MATRIX_STRIDE;
-      for (let rowIndex = 0; rowIndex < MATRIX_ROW_COUNT; rowIndex += 1) {
-        const resultIndex = rightColumnOffset + rowIndex;
-        out[resultIndex] = leftMatrix[0 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 0] + leftMatrix[1 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 1] + leftMatrix[2 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 2] + leftMatrix[3 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 3];
-      }
+    return _Matrix4.#multiplyIntoUnchecked(out, leftMatrix, rightMatrix);
+  }
+  /**
+   * Multiplies two 4x4 matrices into an existing output matrix:
+   * out = leftMatrix * rightMatrix.
+   *
+   * Notes: out must not be the same object as leftMatrix or rightMatrix.
+   *
+   * @param {Float32Array} out         - Output 4x4 matrix.
+   * @param {Float32Array} leftMatrix  - Left-hand matrix (4x4).
+   * @param {Float32Array} rightMatrix - Right-hand matrix (4x4).
+   * @returns {Float32Array}           - The output matrix (out).
+   */
+  static multiplyTo(out, leftMatrix, rightMatrix) {
+    if (!(out instanceof Float32Array) || out.length !== MATRIX_4x4_ELEMENT_COUNT || !(leftMatrix instanceof Float32Array) || leftMatrix.length !== MATRIX_4x4_ELEMENT_COUNT || !(rightMatrix instanceof Float32Array) || rightMatrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+      throw new TypeError("Matrix4.multiplyTo expects three 4x4 Float32Array matrices.");
     }
-    return out;
+    if (out === leftMatrix || out === rightMatrix) {
+      throw new Error("Matrix4.multiplyTo does not support in-place multiplication. Use a separate output matrix.");
+    }
+    return _Matrix4.#multiplyIntoUnchecked(out, leftMatrix, rightMatrix);
   }
   /**
    * Multiplies several matrices in sequence:
    * result = m0 * m1 * m2 * ... * mn
    *
+   * Notes: If no matrices are provided, returns a new identity matrix. If exactly one matrix is provided, returns the same matrix instance (no copy).
+   *
    * @param {...Float32Array} matrices - Matrices to multiply, in order.
-   * @returns {Float32Array} The resulting matrix.
+   * @returns {Float32Array}           - The resulting matrix.
    */
   static multiplyMany(...matrices) {
     if (matrices.length === 0) {
@@ -380,9 +395,28 @@ var Matrix4 = class _Matrix4 {
     return result;
   }
   /**
+   * Multiplies two 4x4 matrices into out without validation.
+   *
+   * @param {Float32Array} out         - Output 4x4 matrix that will receive the result.
+   * @param {Float32Array} leftMatrix  - Left-hand 4x4 matrix.
+   * @param {Float32Array} rightMatrix - Right-hand 4x4 matrix.
+   * @returns {Float32Array}           - The output matrix (out).
+   * @private
+   */
+  static #multiplyIntoUnchecked(out, leftMatrix, rightMatrix) {
+    for (let columnIndex = 0; columnIndex < MATRIX_COLUMN_COUNT; columnIndex += 1) {
+      const rightColumnOffset = columnIndex * MATRIX_STRIDE;
+      for (let rowIndex = 0; rowIndex < MATRIX_ROW_COUNT; rowIndex += 1) {
+        const resultIndex = rightColumnOffset + rowIndex;
+        out[resultIndex] = leftMatrix[0 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 0] + leftMatrix[1 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 1] + leftMatrix[2 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 2] + leftMatrix[3 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 3];
+      }
+    }
+    return out;
+  }
+  /**
    * Internal helper to create a zero-filled 4x4 matrix.
    *
-   * @returns {Float32Array}
+   * @returns {Float32Array} - A new zero-filled 4x4 matrix (length 16).
    * @private
    */
   static #createEmpty() {
