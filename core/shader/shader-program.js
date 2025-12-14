@@ -8,11 +8,14 @@ export class ShaderProgram {
     /** @type {WebGL2RenderingContext} */
     #webglRenderingContext;
 
-    /** @type {WebGLProgram} */
+    /** @type {WebGLProgram | null} */
     #program;
 
     /** @type {Map<string, WebGLUniformLocation>} */
     #uniformLocations;
+
+    /** @type {boolean} */
+    #isDisposed = false;
 
     /**
      * @param {WebGL2RenderingContext} webglRenderingContext - WebGL2 rendering context used to create shaders and the program.
@@ -68,6 +71,7 @@ export class ShaderProgram {
      * @returns {WebGLProgram}
      */
     get program() {
+        this.#assertNotDisposed();
         return this.#program;
     }
 
@@ -75,6 +79,7 @@ export class ShaderProgram {
      * Makes this program active for subsequent draw calls.
      */
     use() {
+        this.#assertNotDisposed();
         this.#webglRenderingContext.useProgram(this.#program);
     }
 
@@ -85,6 +90,8 @@ export class ShaderProgram {
      * @param {Float32Array} matrix - 4x4 matrix in column-major order to upload to the uniform.
      */
     setMatrix4(name, matrix) {
+        this.#assertNotDisposed();
+
         if (typeof name !== 'string') {
             throw new TypeError('ShaderProgram.setMatrix4 expects uniform name as a string.');
         }
@@ -98,6 +105,32 @@ export class ShaderProgram {
     }
 
     /**
+     * Releases the underlying WebGL program. After calling dispose, this instance must not be used.
+     */
+    dispose() {
+        if (this.#isDisposed) {
+            return;
+        }
+
+        if (this.#program) {
+            this.#webglRenderingContext.deleteProgram(this.#program);
+        }
+
+        this.#uniformLocations.clear();
+        this.#program    = null;
+        this.#isDisposed = true;
+    }
+
+    /**
+     * @private
+     */
+    #assertNotDisposed() {
+        if (this.#isDisposed || this.#program === null) {
+            throw new Error('ShaderProgram has been disposed and can no longer be used.');
+        }
+    }
+
+    /**
      * Looks up a uniform location with caching.
      *
      * @param {string} name - Name of the uniform variable in the linked shader program.
@@ -105,6 +138,8 @@ export class ShaderProgram {
      * @private
      */
     #getUniformLocation(name) {
+        this.#assertNotDisposed();
+
         if (typeof name !== 'string') {
             throw new TypeError('ShaderProgram.#getUniformLocation expects a string name.');
         }

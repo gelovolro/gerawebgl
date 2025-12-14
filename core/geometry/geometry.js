@@ -47,6 +47,9 @@ export class Geometry {
     /** @type {number} */
     #wireframeIndexCount;
 
+    /** @type {boolean} */
+    #isDisposed = false;
+
     /**
      * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
      * @param {Float32Array} positions              - [x, y, z] triples.
@@ -86,6 +89,7 @@ export class Geometry {
      * Binds the VAO of this geometry.
      */
     bind() {
+        this.#assertNotDisposed();
         this.#webglContext.bindVertexArray(this.#vertexArrayObject);
     }
 
@@ -95,6 +99,7 @@ export class Geometry {
      * @param {boolean} wireframe - Flag indicating whether the geometry should be drawn in wireframe mode.
      */
     bindIndexBuffer(wireframe) {
+        this.#assertNotDisposed();
         const buffer = wireframe ? this.#indexBufferWireframe : this.#indexBufferSolid;
         this.#webglContext.bindBuffer(this.#webglContext.ELEMENT_ARRAY_BUFFER, buffer);
     }
@@ -106,7 +111,40 @@ export class Geometry {
      * @returns {number}
      */
     getIndexCount(wireframe) {
+        this.#assertNotDisposed();
         return wireframe ? this.#wireframeIndexCount : this.#solidIndexCount;
+    }
+
+    /**
+     * Releases all GPU resources owned by this geometry (VAO and buffers).
+     * After calling dispose, this geometry instance must not be used for rendering.
+     */
+    dispose() {
+        if (this.#isDisposed) {
+            return;
+        }
+
+        const webglContext = this.#webglContext;
+        webglContext.deleteBuffer(this.#positionBuffer);
+
+        if (this.#colorBuffer) {
+            webglContext.deleteBuffer(this.#colorBuffer);
+            this.#colorBuffer = null;
+        }
+
+        webglContext.deleteBuffer(this.#indexBufferSolid);
+        webglContext.deleteBuffer(this.#indexBufferWireframe);
+        webglContext.deleteVertexArray(this.#vertexArrayObject);
+        this.#isDisposed = true;
+    }
+
+    /**
+     * @private
+     */
+    #assertNotDisposed() {
+        if (this.#isDisposed) {
+            throw new Error('Geometry has been disposed and can no longer be used.');
+        }
     }
 
     /**

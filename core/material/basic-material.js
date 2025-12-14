@@ -36,7 +36,7 @@ export class BasicMaterial extends Material {
      */
     constructor(webglContext) {
         const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
-        super(webglContext, shaderProgram);
+        super(webglContext, shaderProgram, { ownsShaderProgram: true });
     }
 
     /**

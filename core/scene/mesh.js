@@ -12,6 +12,9 @@ export class Mesh extends Object3D {
     /** @type {Material} */
     #material;
 
+    /** @type {boolean} */
+    #isDisposed = false;
+
     /**
      * @param {Geometry} geometry - Geometry that provides vertex and index buffers for this mesh.
      * @param {Material} material - Material that defines how the geometry should be shaded and rendered.
@@ -32,6 +35,20 @@ export class Mesh extends Object3D {
     }
 
     /**
+     * Releases GPU resources owned by this mesh (geometry and material).
+     * After dispose, the mesh can remain as a scene object, but it should not be rendered.
+     */
+    dispose() {
+        if (this.#isDisposed) {
+            return;
+        }
+
+        this.#geometry.dispose();
+        this.#material.dispose();
+        this.#isDisposed = true;
+    }
+
+    /**
      * @returns {Geometry}
      */
     get geometry() {
@@ -43,5 +60,12 @@ export class Mesh extends Object3D {
      */
     get material() {
         return this.#material;
+    }
+
+    /**
+     * @returns {boolean}
+     */
+    get isDisposed() {
+        return this.#isDisposed;
     }
 }

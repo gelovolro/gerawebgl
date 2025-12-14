@@ -62,12 +62,16 @@ export class Renderer {
                 return;
             }
 
-            const mesh        = object3d;
+            const mesh = object3d;
+
+            if (mesh.isDisposed) {
+                return;
+            }
+
             const geometry    = mesh.geometry;
             const material    = mesh.material;
             const worldMatrix = mesh.worldMatrix;
             const finalMatrix = Matrix4.multiply(viewProjectionMatrix, worldMatrix);
-
             material.use();
             material.apply(finalMatrix);
             geometry.bind();

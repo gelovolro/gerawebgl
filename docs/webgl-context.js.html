@@ -51,9 +51,25 @@ const VIEWPORT_ORIGIN_X = 0;
 const VIEWPORT_ORIGIN_Y = 0;
 
 /**
+ * Minimum drawing buffer size (in pixels) for `canvas.width/canvas.height`.
+ * Used as a safeguard, when the canvas CSS size is 0.
+ *
+ * @type {number}
+ */
+const MIN_DRAWING_BUFFER_DIMENSION = 1;
+
+/**
  * RGBA color represented as [red, green, blue, alpha],
  * each component in the range [0 -> 1].
  * @typedef {number[]} RGBAColor
+ */
+
+/**
+ * Options used by resizeToDisplaySize.
+ *
+ * @typedef {Object} ResizeToDisplaySizeOptions
+ * @property {boolean} [fitToWindow=false] - When true, uses `window.innerWidth/innerHeight`.
+ * When false, uses the canvas CSS size (client size) and updates the drawing buffer accordingly.
  */
 
 /**
@@ -127,13 +143,39 @@ export class WebGLContext {
     }
 
     /**
-     * Resizes the underlying canvas to match the current window size
+     * Resizes the underlying canvas drawing buffer to match the current display size
      * (taking into account device pixel ratio) and updates the WebGL viewport.
+     *
+     * By default, the display size is taken from the canvas element CSS size.
+     *
+     * @param {ResizeToDisplaySizeOptions} [options] - Resize options.
      */
-    resizeToDisplaySize() {
-        const pixelRatio   = window.devicePixelRatio || DEFAULT_DEVICE_PIXEL_RATIO;
-        const targetWidth  = Math.floor(window.innerWidth * pixelRatio);
-        const targetHeight = Math.floor(window.innerHeight * pixelRatio);
+    resizeToDisplaySize(options = {}) {
+        if (options === null || typeof options !== 'object' || Array.isArray(options)) {
+            throw new TypeError('resizeToDisplaySize expects an options object.');
+        }
+
+        const { fitToWindow = false } = options;
+
+        if (typeof fitToWindow !== 'boolean') {
+            throw new TypeError('resizeToDisplaySize option "fitToWindow" must be a boolean.');
+        }
+
+        const pixelRatio = window.devicePixelRatio || DEFAULT_DEVICE_PIXEL_RATIO;
+        let cssWidth     = null;
+        let cssHeight    = null;
+
+        if (fitToWindow) {
+            cssWidth  = window.innerWidth;
+            cssHeight = window.innerHeight;
+        } else {
+            const rect = this.#canvas.getBoundingClientRect();
+            cssWidth   = rect.width  || this.#canvas.clientWidth;
+            cssHeight  = rect.height || this.#canvas.clientHeight;
+        }
+
+        const targetWidth  = Math.max(MIN_DRAWING_BUFFER_DIMENSION, Math.floor(cssWidth  * pixelRatio));
+        const targetHeight = Math.max(MIN_DRAWING_BUFFER_DIMENSION, Math.floor(cssHeight * pixelRatio));
 
         if (this.#canvas.width !== targetWidth || this.#canvas.height !== targetHeight) {
             this.#canvas.width  = targetWidth;
@@ -161,11 +203,11 @@ export class WebGLContext {
     /**
      * Sets the default clear color used when initializing new WebGLContext instances.
      *
-     * @param {number} red   - Red component, from 0 to 1.
-     * @param {number} green - Green component, from 0 to 1.
-     * @param {number} blue  - Blue component, from 0 to 1.
-     * @param {number} alpha - Alpha component, from 0 to 1.
-     * @throws {TypeError} If any component is not a number.
+     * @param {number} red   - Red component   , from 0 to 1.
+     * @param {number} green - Green component , from 0 to 1.
+     * @param {number} blue  - Blue component  , from 0 to 1.
+     * @param {number} alpha - Alpha component , from 0 to 1.
+     * @throws {TypeError}  If any component is not a number.
      * @throws {RangeError} If any component is outside the [0, 1] range.
      */
     static setDefaultClearColor(red, green, blue, alpha) {
@@ -219,13 +261,13 @@ export class WebGLContext {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="BasicMaterial.html">BasicMaterial</a></li><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="BasicMaterial.html">BasicMaterial</a></li><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#MIN_DRAWING_BUFFER_DIMENSION">MIN_DRAWING_BUFFER_DIMENSION</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Sat Dec 13 2025 22:40:13 GMT+0300 (Moscow Standard Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Sun Dec 14 2025 15:50:04 GMT+0300 (Moscow Standard Time)
 </footer>
 
 <script> prettyPrint(); </script>

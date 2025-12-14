@@ -23,9 +23,25 @@ const VIEWPORT_ORIGIN_X = 0;
 const VIEWPORT_ORIGIN_Y = 0;
 
 /**
+ * Minimum drawing buffer size (in pixels) for `canvas.width/canvas.height`.
+ * Used as a safeguard, when the canvas CSS size is 0.
+ *
+ * @type {number}
+ */
+const MIN_DRAWING_BUFFER_DIMENSION = 1;
+
+/**
  * RGBA color represented as [red, green, blue, alpha],
  * each component in the range [0 -> 1].
  * @typedef {number[]} RGBAColor
+ */
+
+/**
+ * Options used by resizeToDisplaySize.
+ *
+ * @typedef {Object} ResizeToDisplaySizeOptions
+ * @property {boolean} [fitToWindow=false] - When true, uses `window.innerWidth/innerHeight`.
+ * When false, uses the canvas CSS size (client size) and updates the drawing buffer accordingly.
  */
 
 /**
@@ -99,13 +115,39 @@ export class WebGLContext {
     }
 
     /**
-     * Resizes the underlying canvas to match the current window size
+     * Resizes the underlying canvas drawing buffer to match the current display size
      * (taking into account device pixel ratio) and updates the WebGL viewport.
+     *
+     * By default, the display size is taken from the canvas element CSS size.
+     *
+     * @param {ResizeToDisplaySizeOptions} [options] - Resize options.
      */
-    resizeToDisplaySize() {
-        const pixelRatio   = window.devicePixelRatio || DEFAULT_DEVICE_PIXEL_RATIO;
-        const targetWidth  = Math.floor(window.innerWidth * pixelRatio);
-        const targetHeight = Math.floor(window.innerHeight * pixelRatio);
+    resizeToDisplaySize(options = {}) {
+        if (options === null || typeof options !== 'object' || Array.isArray(options)) {
+            throw new TypeError('resizeToDisplaySize expects an options object.');
+        }
+
+        const { fitToWindow = false } = options;
+
+        if (typeof fitToWindow !== 'boolean') {
+            throw new TypeError('resizeToDisplaySize option "fitToWindow" must be a boolean.');
+        }
+
+        const pixelRatio = window.devicePixelRatio || DEFAULT_DEVICE_PIXEL_RATIO;
+        let cssWidth     = null;
+        let cssHeight    = null;
+
+        if (fitToWindow) {
+            cssWidth  = window.innerWidth;
+            cssHeight = window.innerHeight;
+        } else {
+            const rect = this.#canvas.getBoundingClientRect();
+            cssWidth   = rect.width  || this.#canvas.clientWidth;
+            cssHeight  = rect.height || this.#canvas.clientHeight;
+        }
+
+        const targetWidth  = Math.max(MIN_DRAWING_BUFFER_DIMENSION, Math.floor(cssWidth  * pixelRatio));
+        const targetHeight = Math.max(MIN_DRAWING_BUFFER_DIMENSION, Math.floor(cssHeight * pixelRatio));
 
         if (this.#canvas.width !== targetWidth || this.#canvas.height !== targetHeight) {
             this.#canvas.width  = targetWidth;
@@ -133,11 +175,11 @@ export class WebGLContext {
     /**
      * Sets the default clear color used when initializing new WebGLContext instances.
      *
-     * @param {number} red   - Red component, from 0 to 1.
-     * @param {number} green - Green component, from 0 to 1.
-     * @param {number} blue  - Blue component, from 0 to 1.
-     * @param {number} alpha - Alpha component, from 0 to 1.
-     * @throws {TypeError} If any component is not a number.
+     * @param {number} red   - Red component   , from 0 to 1.
+     * @param {number} green - Green component , from 0 to 1.
+     * @param {number} blue  - Blue component  , from 0 to 1.
+     * @param {number} alpha - Alpha component , from 0 to 1.
+     * @throws {TypeError}  If any component is not a number.
      * @throws {RangeError} If any component is outside the [0, 1] range.
      */
     static setDefaultClearColor(red, green, blue, alpha) {

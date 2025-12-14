@@ -151,7 +151,7 @@ Responsible for:
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="webgl-context.js.html">webgl-context.js</a>, <a href="webgl-context.js.html#line39">line 39</a>
+        <a href="webgl-context.js.html">webgl-context.js</a>, <a href="webgl-context.js.html#line55">line 55</a>
     </li></ul></dd>
     
 
@@ -308,7 +308,7 @@ Responsible for:
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="webgl-context.js.html">webgl-context.js</a>, <a href="webgl-context.js.html#line97">line 97</a>
+        <a href="webgl-context.js.html">webgl-context.js</a>, <a href="webgl-context.js.html#line113">line 113</a>
     </li></ul></dd>
     
 
@@ -388,7 +388,7 @@ Responsible for:
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="webgl-context.js.html">webgl-context.js</a>, <a href="webgl-context.js.html#line126">line 126</a>
+        <a href="webgl-context.js.html">webgl-context.js</a>, <a href="webgl-context.js.html#line168">line 168</a>
     </li></ul></dd>
     
 
@@ -424,7 +424,7 @@ Responsible for:
     
 
     
-    <h4 class="name" id="resizeToDisplaySize"><span class="type-signature"></span>resizeToDisplaySize<span class="signature">()</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="resizeToDisplaySize"><span class="type-signature"></span>resizeToDisplaySize<span class="signature">(options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
     
 
     
@@ -432,8 +432,10 @@ Responsible for:
 
 
 <div class="description">
-    Resizes the underlying canvas to match the current window size
+    Resizes the underlying canvas drawing buffer to match the current display size
 (taking into account device pixel ratio) and updates the WebGL viewport.
+
+By default, the display size is taken from the canvas element CSS size.
 </div>
 
 
@@ -442,6 +444,67 @@ Responsible for:
 
 
 
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#ResizeToDisplaySizeOptions">ResizeToDisplaySizeOptions</a></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Resize options.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
 
 
 
@@ -477,7 +540,7 @@ Responsible for:
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="webgl-context.js.html">webgl-context.js</a>, <a href="webgl-context.js.html#line105">line 105</a>
+        <a href="webgl-context.js.html">webgl-context.js</a>, <a href="webgl-context.js.html#line125">line 125</a>
     </li></ul></dd>
     
 
@@ -573,7 +636,7 @@ Responsible for:
 
             
 
-            <td class="description last">Red component, from 0 to 1.</td>
+            <td class="description last">Red component   , from 0 to 1.</td>
         </tr>
 
     
@@ -596,7 +659,7 @@ Responsible for:
 
             
 
-            <td class="description last">Green component, from 0 to 1.</td>
+            <td class="description last">Green component , from 0 to 1.</td>
         </tr>
 
     
@@ -619,7 +682,7 @@ Responsible for:
 
             
 
-            <td class="description last">Blue component, from 0 to 1.</td>
+            <td class="description last">Blue component  , from 0 to 1.</td>
         </tr>
 
     
@@ -642,7 +705,7 @@ Responsible for:
 
             
 
-            <td class="description last">Alpha component, from 0 to 1.</td>
+            <td class="description last">Alpha component , from 0 to 1.</td>
         </tr>
 
     
@@ -683,7 +746,7 @@ Responsible for:
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="webgl-context.js.html">webgl-context.js</a>, <a href="webgl-context.js.html#line143">line 143</a>
+        <a href="webgl-context.js.html">webgl-context.js</a>, <a href="webgl-context.js.html#line185">line 185</a>
     </li></ul></dd>
     
 
@@ -876,7 +939,7 @@ Responsible for:
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="webgl-context.js.html">webgl-context.js</a>, <a href="webgl-context.js.html#line157">line 157</a>
+        <a href="webgl-context.js.html">webgl-context.js</a>, <a href="webgl-context.js.html#line199">line 199</a>
     </li></ul></dd>
     
 
@@ -951,13 +1014,13 @@ Responsible for:
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="BasicMaterial.html">BasicMaterial</a></li><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="BasicMaterial.html">BasicMaterial</a></li><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#MIN_DRAWING_BUFFER_DIMENSION">MIN_DRAWING_BUFFER_DIMENSION</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Sat Dec 13 2025 22:40:13 GMT+0300 (Moscow Standard Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Sun Dec 14 2025 15:50:04 GMT+0300 (Moscow Standard Time)
 </footer>
 
 <script> prettyPrint(); </script>

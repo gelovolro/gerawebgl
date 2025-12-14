@@ -36,11 +36,14 @@ export class ShaderProgram {
     /** @type {WebGL2RenderingContext} */
     #webglRenderingContext;
 
-    /** @type {WebGLProgram} */
+    /** @type {WebGLProgram | null} */
     #program;
 
     /** @type {Map&lt;string, WebGLUniformLocation>} */
     #uniformLocations;
+
+    /** @type {boolean} */
+    #isDisposed = false;
 
     /**
      * @param {WebGL2RenderingContext} webglRenderingContext - WebGL2 rendering context used to create shaders and the program.
@@ -96,6 +99,7 @@ export class ShaderProgram {
      * @returns {WebGLProgram}
      */
     get program() {
+        this.#assertNotDisposed();
         return this.#program;
     }
 
@@ -103,6 +107,7 @@ export class ShaderProgram {
      * Makes this program active for subsequent draw calls.
      */
     use() {
+        this.#assertNotDisposed();
         this.#webglRenderingContext.useProgram(this.#program);
     }
 
@@ -113,6 +118,8 @@ export class ShaderProgram {
      * @param {Float32Array} matrix - 4x4 matrix in column-major order to upload to the uniform.
      */
     setMatrix4(name, matrix) {
+        this.#assertNotDisposed();
+
         if (typeof name !== 'string') {
             throw new TypeError('ShaderProgram.setMatrix4 expects uniform name as a string.');
         }
@@ -126,6 +133,32 @@ export class ShaderProgram {
     }
 
     /**
+     * Releases the underlying WebGL program. After calling dispose, this instance must not be used.
+     */
+    dispose() {
+        if (this.#isDisposed) {
+            return;
+        }
+
+        if (this.#program) {
+            this.#webglRenderingContext.deleteProgram(this.#program);
+        }
+
+        this.#uniformLocations.clear();
+        this.#program    = null;
+        this.#isDisposed = true;
+    }
+
+    /**
+     * @private
+     */
+    #assertNotDisposed() {
+        if (this.#isDisposed || this.#program === null) {
+            throw new Error('ShaderProgram has been disposed and can no longer be used.');
+        }
+    }
+
+    /**
      * Looks up a uniform location with caching.
      *
      * @param {string} name - Name of the uniform variable in the linked shader program.
@@ -133,6 +166,8 @@ export class ShaderProgram {
      * @private
      */
     #getUniformLocation(name) {
+        this.#assertNotDisposed();
+
         if (typeof name !== 'string') {
             throw new TypeError('ShaderProgram.#getUniformLocation expects a string name.');
         }
@@ -198,13 +233,13 @@ export class ShaderProgram {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="BasicMaterial.html">BasicMaterial</a></li><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="BasicMaterial.html">BasicMaterial</a></li><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#MIN_DRAWING_BUFFER_DIMENSION">MIN_DRAWING_BUFFER_DIMENSION</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Sat Dec 13 2025 22:40:13 GMT+0300 (Moscow Standard Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Sun Dec 14 2025 15:50:04 GMT+0300 (Moscow Standard Time)
 </footer>
 
 <script> prettyPrint(); </script>

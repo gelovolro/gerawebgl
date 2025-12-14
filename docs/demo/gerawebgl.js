@@ -3,6 +3,7 @@ var WEBGL2_CONTEXT_TYPE = "webgl2";
 var DEFAULT_DEVICE_PIXEL_RATIO = 1;
 var VIEWPORT_ORIGIN_X = 0;
 var VIEWPORT_ORIGIN_Y = 0;
+var MIN_DRAWING_BUFFER_DIMENSION = 1;
 var WebGLContext = class _WebGLContext {
   /** @type {HTMLCanvasElement} */
   #canvas;
@@ -54,13 +55,34 @@ var WebGLContext = class _WebGLContext {
     return this.#webglContext;
   }
   /**
-   * Resizes the underlying canvas to match the current window size
+   * Resizes the underlying canvas drawing buffer to match the current display size
    * (taking into account device pixel ratio) and updates the WebGL viewport.
+   *
+   * By default, the display size is taken from the canvas element CSS size.
+   *
+   * @param {ResizeToDisplaySizeOptions} [options] - Resize options.
    */
-  resizeToDisplaySize() {
+  resizeToDisplaySize(options = {}) {
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("resizeToDisplaySize expects an options object.");
+    }
+    const { fitToWindow = false } = options;
+    if (typeof fitToWindow !== "boolean") {
+      throw new TypeError('resizeToDisplaySize option "fitToWindow" must be a boolean.');
+    }
     const pixelRatio = window.devicePixelRatio || DEFAULT_DEVICE_PIXEL_RATIO;
-    const targetWidth = Math.floor(window.innerWidth * pixelRatio);
-    const targetHeight = Math.floor(window.innerHeight * pixelRatio);
+    let cssWidth = null;
+    let cssHeight = null;
+    if (fitToWindow) {
+      cssWidth = window.innerWidth;
+      cssHeight = window.innerHeight;
+    } else {
+      const rect = this.#canvas.getBoundingClientRect();
+      cssWidth = rect.width || this.#canvas.clientWidth;
+      cssHeight = rect.height || this.#canvas.clientHeight;
+    }
+    const targetWidth = Math.max(MIN_DRAWING_BUFFER_DIMENSION, Math.floor(cssWidth * pixelRatio));
+    const targetHeight = Math.max(MIN_DRAWING_BUFFER_DIMENSION, Math.floor(cssHeight * pixelRatio));
     if (this.#canvas.width !== targetWidth || this.#canvas.height !== targetHeight) {
       this.#canvas.width = targetWidth;
       this.#canvas.height = targetHeight;
@@ -83,11 +105,11 @@ var WebGLContext = class _WebGLContext {
   /**
    * Sets the default clear color used when initializing new WebGLContext instances.
    *
-   * @param {number} red   - Red component, from 0 to 1.
-   * @param {number} green - Green component, from 0 to 1.
-   * @param {number} blue  - Blue component, from 0 to 1.
-   * @param {number} alpha - Alpha component, from 0 to 1.
-   * @throws {TypeError} If any component is not a number.
+   * @param {number} red   - Red component   , from 0 to 1.
+   * @param {number} green - Green component , from 0 to 1.
+   * @param {number} blue  - Blue component  , from 0 to 1.
+   * @param {number} alpha - Alpha component , from 0 to 1.
+   * @throws {TypeError}  If any component is not a number.
    * @throws {RangeError} If any component is outside the [0, 1] range.
    */
   static setDefaultClearColor(red, green, blue, alpha) {
@@ -393,6 +415,8 @@ var Geometry = class {
   #solidIndexCount;
   /** @type {number} */
   #wireframeIndexCount;
+  /** @type {boolean} */
+  #isDisposed = false;
   /**
    * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
    * @param {Float32Array} positions              - [x, y, z] triples.
@@ -427,6 +451,7 @@ var Geometry = class {
    * Binds the VAO of this geometry.
    */
   bind() {
+    this.#assertNotDisposed();
     this.#webglContext.bindVertexArray(this.#vertexArrayObject);
   }
   /**
@@ -435,6 +460,7 @@ var Geometry = class {
    * @param {boolean} wireframe - Flag indicating whether the geometry should be drawn in wireframe mode.
    */
   bindIndexBuffer(wireframe) {
+    this.#assertNotDisposed();
     const buffer = wireframe ? this.#indexBufferWireframe : this.#indexBufferSolid;
     this.#webglContext.bindBuffer(this.#webglContext.ELEMENT_ARRAY_BUFFER, buffer);
   }
@@ -445,7 +471,35 @@ var Geometry = class {
    * @returns {number}
    */
   getIndexCount(wireframe) {
+    this.#assertNotDisposed();
     return wireframe ? this.#wireframeIndexCount : this.#solidIndexCount;
+  }
+  /**
+   * Releases all GPU resources owned by this geometry (VAO and buffers).
+   * After calling dispose, this geometry instance must not be used for rendering.
+   */
+  dispose() {
+    if (this.#isDisposed) {
+      return;
+    }
+    const webglContext = this.#webglContext;
+    webglContext.deleteBuffer(this.#positionBuffer);
+    if (this.#colorBuffer) {
+      webglContext.deleteBuffer(this.#colorBuffer);
+      this.#colorBuffer = null;
+    }
+    webglContext.deleteBuffer(this.#indexBufferSolid);
+    webglContext.deleteBuffer(this.#indexBufferWireframe);
+    webglContext.deleteVertexArray(this.#vertexArrayObject);
+    this.#isDisposed = true;
+  }
+  /**
+   * @private
+   */
+  #assertNotDisposed() {
+    if (this.#isDisposed) {
+      throw new Error("Geometry has been disposed and can no longer be used.");
+    }
   }
   /**
    * Creates a vertex array object (VAO).
@@ -690,10 +744,12 @@ var MATRIX_4x4_ELEMENT_COUNT2 = 16;
 var ShaderProgram = class {
   /** @type {WebGL2RenderingContext} */
   #webglRenderingContext;
-  /** @type {WebGLProgram} */
+  /** @type {WebGLProgram | null} */
   #program;
   /** @type {Map<string, WebGLUniformLocation>} */
   #uniformLocations;
+  /** @type {boolean} */
+  #isDisposed = false;
   /**
    * @param {WebGL2RenderingContext} webglRenderingContext - WebGL2 rendering context used to create shaders and the program.
    * @param {string} vertexSource   - GLSL source code of the vertex shader.
@@ -738,12 +794,14 @@ var ShaderProgram = class {
    * @returns {WebGLProgram}
    */
   get program() {
+    this.#assertNotDisposed();
     return this.#program;
   }
   /**
    * Makes this program active for subsequent draw calls.
    */
   use() {
+    this.#assertNotDisposed();
     this.#webglRenderingContext.useProgram(this.#program);
   }
   /**
@@ -753,6 +811,7 @@ var ShaderProgram = class {
    * @param {Float32Array} matrix - 4x4 matrix in column-major order to upload to the uniform.
    */
   setMatrix4(name, matrix) {
+    this.#assertNotDisposed();
     if (typeof name !== "string") {
       throw new TypeError("ShaderProgram.setMatrix4 expects uniform name as a string.");
     }
@@ -763,6 +822,28 @@ var ShaderProgram = class {
     this.#webglRenderingContext.uniformMatrix4fv(location, false, matrix);
   }
   /**
+   * Releases the underlying WebGL program. After calling dispose, this instance must not be used.
+   */
+  dispose() {
+    if (this.#isDisposed) {
+      return;
+    }
+    if (this.#program) {
+      this.#webglRenderingContext.deleteProgram(this.#program);
+    }
+    this.#uniformLocations.clear();
+    this.#program = null;
+    this.#isDisposed = true;
+  }
+  /**
+   * @private
+   */
+  #assertNotDisposed() {
+    if (this.#isDisposed || this.#program === null) {
+      throw new Error("ShaderProgram has been disposed and can no longer be used.");
+    }
+  }
+  /**
    * Looks up a uniform location with caching.
    *
    * @param {string} name - Name of the uniform variable in the linked shader program.
@@ -770,6 +851,7 @@ var ShaderProgram = class {
    * @private
    */
   #getUniformLocation(name) {
+    this.#assertNotDisposed();
     if (typeof name !== "string") {
       throw new TypeError("ShaderProgram.#getUniformLocation expects a string name.");
     }
@@ -823,36 +905,52 @@ var Material = class {
   #shaderProgram;
   /** @type {boolean} */
   #wireframeEnabled = false;
+  /** @type {boolean} */
+  #ownsShaderProgram = false;
+  /** @type {boolean} */
+  #isDisposed = false;
   /**
    * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
-   * @param {ShaderProgram} shaderProgram - Compiled and linked shader program used by this material for rendering.
+   * @param {ShaderProgram} shaderProgram         - Compiled and linked shader program used by this material for rendering.
+   * @param {MaterialOptions} [options]           - Material options.
    */
-  constructor(webglContext, shaderProgram) {
+  constructor(webglContext, shaderProgram, options = {}) {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
       throw new TypeError("Material expects a WebGL2RenderingContext.");
+    }
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("Material expects an options object (plain object).");
+    }
+    const { ownsShaderProgram = false } = options;
+    if (typeof ownsShaderProgram !== "boolean") {
+      throw new TypeError('Material option "ownsShaderProgram" must be a boolean.');
     }
     if (!(shaderProgram instanceof ShaderProgram)) {
       throw new TypeError("Material expects a ShaderProgram instance.");
     }
     this.#webglContext = webglContext;
     this.#shaderProgram = shaderProgram;
+    this.#ownsShaderProgram = ownsShaderProgram;
   }
   /**
    * @returns {WebGL2RenderingContext}
    */
   get webglContext() {
+    this.#assertNotDisposed();
     return this.#webglContext;
   }
   /**
    * @returns {ShaderProgram}
    */
   get shaderProgram() {
+    this.#assertNotDisposed();
     return this.#shaderProgram;
   }
   /**
    * Makes this material's shader program active.
    */
   use() {
+    this.#assertNotDisposed();
     this.#shaderProgram.use();
   }
   /**
@@ -861,19 +959,43 @@ var Material = class {
    * @param {boolean} enabled - When true, switches material to wireframe mode. When false, uses solid rendering.
    */
   setWireframeEnabled(enabled) {
+    this.#assertNotDisposed();
     this.#wireframeEnabled = Boolean(enabled);
   }
   /**
    * Toggles wireframe mode.
    */
   toggleWireframe() {
+    this.#assertNotDisposed();
     this.#wireframeEnabled = !this.#wireframeEnabled;
   }
   /**
    * @returns {boolean}
    */
   isWireframeEnabled() {
+    this.#assertNotDisposed();
     return this.#wireframeEnabled;
+  }
+  /**
+   * Releases GPU resources owned by this material.
+   * If ownsShaderProgram is true, the underlying shader program will be disposed as well.
+   */
+  dispose() {
+    if (this.#isDisposed) {
+      return;
+    }
+    if (this.#ownsShaderProgram) {
+      this.#shaderProgram.dispose();
+    }
+    this.#isDisposed = true;
+  }
+  /**
+   * @private
+   */
+  #assertNotDisposed() {
+    if (this.#isDisposed) {
+      throw new Error("Material has been disposed and can no longer be used.");
+    }
   }
 };
 
@@ -905,7 +1027,7 @@ var BasicMaterial = class extends Material {
    */
   constructor(webglContext) {
     const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
-    super(webglContext, shaderProgram);
+    super(webglContext, shaderProgram, { ownsShaderProgram: true });
   }
   /**
    * Applies per-object uniforms.
@@ -1094,6 +1216,8 @@ var Mesh = class extends Object3D {
   #geometry;
   /** @type {Material} */
   #material;
+  /** @type {boolean} */
+  #isDisposed = false;
   /**
    * @param {Geometry} geometry - Geometry that provides vertex and index buffers for this mesh.
    * @param {Material} material - Material that defines how the geometry should be shaded and rendered.
@@ -1110,6 +1234,18 @@ var Mesh = class extends Object3D {
     this.#material = material;
   }
   /**
+   * Releases GPU resources owned by this mesh (geometry and material).
+   * After dispose, the mesh can remain as a scene object, but it should not be rendered.
+   */
+  dispose() {
+    if (this.#isDisposed) {
+      return;
+    }
+    this.#geometry.dispose();
+    this.#material.dispose();
+    this.#isDisposed = true;
+  }
+  /**
    * @returns {Geometry}
    */
   get geometry() {
@@ -1120,6 +1256,12 @@ var Mesh = class extends Object3D {
    */
   get material() {
     return this.#material;
+  }
+  /**
+   * @returns {boolean}
+   */
+  get isDisposed() {
+    return this.#isDisposed;
   }
 };
 
@@ -1269,6 +1411,9 @@ var Renderer = class {
         return;
       }
       const mesh = object3d;
+      if (mesh.isDisposed) {
+        return;
+      }
       const geometry = mesh.geometry;
       const material = mesh.material;
       const worldMatrix = mesh.worldMatrix;
