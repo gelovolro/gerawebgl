@@ -157,14 +157,13 @@ export class WebGLContext {
         if (isResized === true) {
             this.#canvas.width  = targetWidth;
             this.#canvas.height = targetHeight;
+            this.#webglContext.viewport(
+                VIEWPORT_ORIGIN_X,
+                VIEWPORT_ORIGIN_Y,
+                this.#canvas.width,
+                this.#canvas.height
+            );
         }
-
-        this.#webglContext.viewport(
-            VIEWPORT_ORIGIN_X,
-            VIEWPORT_ORIGIN_Y,
-            this.#canvas.width,
-            this.#canvas.height
-        );
 
         return isResized;
     }
