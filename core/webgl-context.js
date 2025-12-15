@@ -131,35 +131,25 @@ export class WebGLContext {
     }
 
     /**
-     * Resizes the underlying canvas to match its display size.
+     * Resizes the underlying canvas drawing buffer to match its display size and updates the viewport.
      *
      * @param {ResizeToDisplaySizeOptions} [options] - Optional resize options.
      * @returns {boolean}                            - True if the canvas was resized, false otherwise.
      */
-    resizeToDisplaySize(options = {}) {
-        if (options === null || typeof options !== 'object' || Array.isArray(options)) {
-            throw new TypeError('WebGLContext.resizeToDisplaySize expects an options object.');
+    resizeToDisplaySize(options) {
+        if (options !== undefined && (options === null || typeof options !== 'object' || Array.isArray(options))) {
+            throw new TypeError('WebGLContext.resizeToDisplaySize expects an options object or undefined.');
         }
 
-        const { fitToWindow = false } = options;
+        const fitToWindow = options !== undefined && options.fitToWindow === true;
 
-        if (typeof fitToWindow !== 'boolean') {
+        if (options !== undefined && 'fitToWindow' in options && typeof options.fitToWindow !== 'boolean') {
             throw new TypeError('WebGLContext.resizeToDisplaySize option `fitToWindow` must be a boolean.');
         }
 
-        const pixelRatio = window.devicePixelRatio || DEFAULT_DEVICE_PIXEL_RATIO;
-        let cssWidth     = 0;
-        let cssHeight    = 0;
-
-        if (fitToWindow === true) {
-            cssWidth  = window.innerWidth;
-            cssHeight = window.innerHeight;
-        } else {
-            const rectangle = this.#canvas.getBoundingClientRect();
-            cssWidth  = rectangle.width  || this.#canvas.clientWidth;
-            cssHeight = rectangle.height || this.#canvas.clientHeight;
-        }
-
+        const pixelRatio   = window.devicePixelRatio || DEFAULT_DEVICE_PIXEL_RATIO;
+        const cssWidth     = fitToWindow ? window.innerWidth  : this.#canvas.clientWidth;
+        const cssHeight    = fitToWindow ? window.innerHeight : this.#canvas.clientHeight;
         const targetWidth  = Math.max(MIN_DRAWING_BUFFER_DIMENSION, Math.floor(cssWidth  * pixelRatio));
         const targetHeight = Math.max(MIN_DRAWING_BUFFER_DIMENSION, Math.floor(cssHeight * pixelRatio));
         const isResized    = (this.#canvas.width !== targetWidth) || (this.#canvas.height !== targetHeight);

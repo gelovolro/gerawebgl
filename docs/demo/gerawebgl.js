@@ -57,30 +57,22 @@ var WebGLContext = class _WebGLContext {
     return this.#webglContext;
   }
   /**
-   * Resizes the underlying canvas to match its display size.
+   * Resizes the underlying canvas drawing buffer to match its display size and updates the viewport.
    *
    * @param {ResizeToDisplaySizeOptions} [options] - Optional resize options.
    * @returns {boolean}                            - True if the canvas was resized, false otherwise.
    */
-  resizeToDisplaySize(options = {}) {
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError("WebGLContext.resizeToDisplaySize expects an options object.");
+  resizeToDisplaySize(options) {
+    if (options !== void 0 && (options === null || typeof options !== "object" || Array.isArray(options))) {
+      throw new TypeError("WebGLContext.resizeToDisplaySize expects an options object or undefined.");
     }
-    const { fitToWindow = false } = options;
-    if (typeof fitToWindow !== "boolean") {
+    const fitToWindow = options !== void 0 && options.fitToWindow === true;
+    if (options !== void 0 && "fitToWindow" in options && typeof options.fitToWindow !== "boolean") {
       throw new TypeError("WebGLContext.resizeToDisplaySize option `fitToWindow` must be a boolean.");
     }
     const pixelRatio = window.devicePixelRatio || DEFAULT_DEVICE_PIXEL_RATIO;
-    let cssWidth = 0;
-    let cssHeight = 0;
-    if (fitToWindow === true) {
-      cssWidth = window.innerWidth;
-      cssHeight = window.innerHeight;
-    } else {
-      const rectangle = this.#canvas.getBoundingClientRect();
-      cssWidth = rectangle.width || this.#canvas.clientWidth;
-      cssHeight = rectangle.height || this.#canvas.clientHeight;
-    }
+    const cssWidth = fitToWindow ? window.innerWidth : this.#canvas.clientWidth;
+    const cssHeight = fitToWindow ? window.innerHeight : this.#canvas.clientHeight;
     const targetWidth = Math.max(MIN_DRAWING_BUFFER_DIMENSION, Math.floor(cssWidth * pixelRatio));
     const targetHeight = Math.max(MIN_DRAWING_BUFFER_DIMENSION, Math.floor(cssHeight * pixelRatio));
     const isResized = this.#canvas.width !== targetWidth || this.#canvas.height !== targetHeight;
@@ -1786,17 +1778,44 @@ var PerspectiveCamera = class extends Object3D {
 var INDEX_BUFFER_OFFSET_BYTES = 0;
 var MATRIX_4x4_ELEMENT_COUNT6 = 16;
 var Renderer = class {
-  /** @type {WebGLContext} */
+  /**
+   * Wrapper around the underlying WebGL2 rendering context.
+   * @type {WebGLContext}
+   * @private
+   */
   #contextWrapper;
-  /** @type {WebGL2RenderingContext} */
+  /**
+   * Raw WebGL2 rendering context.
+   * @type {WebGL2RenderingContext}
+   * @private
+   */
   #webglRenderingContext;
-  /** @type {Float32Array} */
+  /**
+   * Reused buffer for the view-projection matrix.
+   * @type {Float32Array}
+   * @private
+   */
   #viewProjectionMatrix;
-  /** @type {Float32Array} */
+  /**
+   * Reused buffer for the per-mesh final matrix (viewProjection * world).
+   * @type {Float32Array}
+   * @private
+   */
   #finalMatrix;
-  /** @type {Float32Array} */
+  /**
+   * Reference to the view-projection matrix of the current frame.
+   * This is a pointer to a reused Float32Array (no allocations per frame).
+   *
+   * @type {Float32Array}
+   * @private
+   */
   #frameViewProjectionMatrix;
-  /** @type {function(*): void} */
+  /**
+   * Cached traversal callback to avoid allocating an inline function every frame.
+   *
+   * @type {function(Object3D): void}
+   * @private
+   */
   #traverseCallback;
   /**
    * @param {WebGLContext} webglContext - Wrapper around the underlying WebGL2 rendering context.
@@ -1810,13 +1829,13 @@ var Renderer = class {
     this.#viewProjectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
     this.#finalMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
     this.#frameViewProjectionMatrix = this.#viewProjectionMatrix;
-    this.#traverseCallback = (object3d) => this.#renderVisitedObject3D(object3d);
+    this.#traverseCallback = (x) => this.#renderVisitedObject(x);
   }
   /**
    * Renders the given scene from the point of view of the given camera.
    *
-   * @param {Scene} scene              - Scene graph containing all objects, that should be rendered.
-   * @param {PerspectiveCamera} camera - Camera, that defines the view and projection used for rendering.
+   * @param {Scene} scene              - Scene graph containing all objects that should be rendered.
+   * @param {PerspectiveCamera} camera - Camera defining view and projection used for rendering.
    */
   render(scene, camera) {
     if (!(scene instanceof Scene)) {
@@ -1842,14 +1861,19 @@ var Renderer = class {
     scene.traverse(this.#traverseCallback);
   }
   /**
-   * @param {*} object3d - Current visited object from scene traversal.
+   * Renders a single visited scene node during traversal.
+   *
+   * @param {Object3D} visitedObject - Visited scene node (only `Mesh` instances are rendered, they're childs from `Object3D`).
    * @private
    */
-  #renderVisitedObject3D(object3d) {
-    if (!(object3d instanceof Mesh)) {
+  #renderVisitedObject(visitedObject) {
+    if (!(visitedObject instanceof Object3D)) {
       return;
     }
-    const mesh = object3d;
+    if (!(visitedObject instanceof Mesh)) {
+      return;
+    }
+    const mesh = visitedObject;
     if (mesh.isDisposed) {
       return;
     }
@@ -1857,13 +1881,13 @@ var Renderer = class {
     const geometry = mesh.geometry;
     const material = mesh.material;
     const worldMatrix = mesh.worldMatrix;
-    const finalMatrix = Matrix4.multiplyTo(
+    Matrix4.multiplyTo(
       this.#finalMatrix,
       this.#frameViewProjectionMatrix,
       worldMatrix
     );
     material.use();
-    material.apply(finalMatrix);
+    material.apply(this.#finalMatrix);
     geometry.bind();
     const isWireframeEnabled = material.isWireframeEnabled();
     geometry.bindIndexBuffer(isWireframeEnabled);

@@ -1,4 +1,5 @@
 import { Matrix4 }           from '../math/matrix4.js';
+import { Object3D }          from '../scene/object3d.js';
 import { Mesh }              from '../scene/mesh.js';
 import { Scene }             from '../scene/scene.js';
 import { PerspectiveCamera } from '../scene/camera.js';
@@ -11,25 +12,53 @@ const INDEX_BUFFER_OFFSET_BYTES = 0;
 const MATRIX_4x4_ELEMENT_COUNT = 16;
 
 /**
- * High-level renderer, that draws a scene from the perspective of a camera.
+ * High-level renderer that draws a scene from the perspective of a camera.
+ * Keeps per-frame allocations minimal (reuse matrices, reuse traversal callback).
  */
 export class Renderer {
-    /** @type {WebGLContext} */
+    /**
+     * Wrapper around the underlying WebGL2 rendering context.
+     * @type {WebGLContext}
+     * @private
+     */
     #contextWrapper;
 
-    /** @type {WebGL2RenderingContext} */
+    /**
+     * Raw WebGL2 rendering context.
+     * @type {WebGL2RenderingContext}
+     * @private
+     */
     #webglRenderingContext;
 
-    /** @type {Float32Array} */
+    /**
+     * Reused buffer for the view-projection matrix.
+     * @type {Float32Array}
+     * @private
+     */
     #viewProjectionMatrix;
 
-    /** @type {Float32Array} */
+    /**
+     * Reused buffer for the per-mesh final matrix (viewProjection * world).
+     * @type {Float32Array}
+     * @private
+     */
     #finalMatrix;
 
-    /** @type {Float32Array} */
+    /**
+     * Reference to the view-projection matrix of the current frame.
+     * This is a pointer to a reused Float32Array (no allocations per frame).
+     *
+     * @type {Float32Array}
+     * @private
+     */
     #frameViewProjectionMatrix;
 
-    /** @type {function(*): void} */
+    /**
+     * Cached traversal callback to avoid allocating an inline function every frame.
+     *
+     * @type {function(Object3D): void}
+     * @private
+     */
     #traverseCallback;
 
     /**
@@ -46,15 +75,15 @@ export class Renderer {
         this.#finalMatrix               = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
         this.#frameViewProjectionMatrix = this.#viewProjectionMatrix;
 
-        // Allocate the traverse callback once (no per-frame function allocations).
-        this.#traverseCallback = (object3d) => this.#renderVisitedObject3D(object3d);
+        // Allocate the traverse callback once (no per-frame function allocations):
+        this.#traverseCallback = (x) => this.#renderVisitedObject(x);
     }
 
     /**
      * Renders the given scene from the point of view of the given camera.
      *
-     * @param {Scene} scene              - Scene graph containing all objects, that should be rendered.
-     * @param {PerspectiveCamera} camera - Camera, that defines the view and projection used for rendering.
+     * @param {Scene} scene              - Scene graph containing all objects that should be rendered.
+     * @param {PerspectiveCamera} camera - Camera defining view and projection used for rendering.
      */
     render(scene, camera) {
         if (!(scene instanceof Scene)) {
@@ -87,15 +116,21 @@ export class Renderer {
     }
 
     /**
-     * @param {*} object3d - Current visited object from scene traversal.
+     * Renders a single visited scene node during traversal.
+     *
+     * @param {Object3D} visitedObject - Visited scene node (only `Mesh` instances are rendered, they're childs from `Object3D`).
      * @private
      */
-    #renderVisitedObject3D(object3d) {
-        if (!(object3d instanceof Mesh)) {
+    #renderVisitedObject(visitedObject) {
+        if (!(visitedObject instanceof Object3D)) {
             return;
         }
 
-        const mesh = object3d;
+        if (!(visitedObject instanceof Mesh)) {
+            return;
+        }
+
+        const mesh = visitedObject;
 
         if (mesh.isDisposed) {
             return;
@@ -105,14 +140,15 @@ export class Renderer {
         const geometry         = mesh.geometry;
         const material         = mesh.material;
         const worldMatrix      = mesh.worldMatrix;
-        const finalMatrix      = Matrix4.multiplyTo(
+
+        Matrix4.multiplyTo(
             this.#finalMatrix,
             this.#frameViewProjectionMatrix,
             worldMatrix
         );
 
         material.use();
-        material.apply(finalMatrix);
+        material.apply(this.#finalMatrix);
         geometry.bind();
 
         const isWireframeEnabled = material.isWireframeEnabled();
