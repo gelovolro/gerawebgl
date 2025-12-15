@@ -1,17 +1,18 @@
-import { Object3D } from './object3d.js';
-import { Matrix4 }  from '../math/matrix4.js';
+import { Object3D }   from './object3d.js';
+import { CameraMath } from '../math/camera-math.js';
 
 /** @type {number} */
 const MINIMUM_NEAR_CLIP_DISTANCE = 0.0;
 
 /** @type {number} */
-const MINIMUM_ASPECT_RATIO = 0.0; // Aspect ratio must be greater than this value.
+const MINIMUM_ASPECT_RATIO = 0.0;
 
 /** @type {number} */
-const SCALE_INVERSE_NUMERATOR = 1.0;
+const MATRIX_4x4_ELEMENT_COUNT = 16;
 
 /**
  * Perspective camera with field of view, aspect ratio and clipping planes.
+ * Uses cached matrices to avoid per-frame allocations.
  */
 export class PerspectiveCamera extends Object3D {
     /** @type {number} */
@@ -25,6 +26,42 @@ export class PerspectiveCamera extends Object3D {
 
     /** @type {number} */
     #far;
+
+    /** @type {Float32Array} */
+    #projectionMatrix;
+
+    /** @type {Float32Array} */
+    #viewMatrix;
+
+    /** @type {boolean} */
+    #isProjectionMatrixDirty = true;
+
+    /** @type {number} */
+    #cachedPositionX = Number.NaN;
+
+    /** @type {number} */
+    #cachedPositionY = Number.NaN;
+
+    /** @type {number} */
+    #cachedPositionZ = Number.NaN;
+
+    /** @type {number} */
+    #cachedRotationX = Number.NaN;
+
+    /** @type {number} */
+    #cachedRotationY = Number.NaN;
+
+    /** @type {number} */
+    #cachedRotationZ = Number.NaN;
+
+    /** @type {number} */
+    #cachedScaleX = Number.NaN;
+
+    /** @type {number} */
+    #cachedScaleY = Number.NaN;
+
+    /** @type {number} */
+    #cachedScaleZ = Number.NaN;
 
     /**
      * @param {number} fieldOfViewRadians - Vertical field of view in radians.
@@ -54,6 +91,8 @@ export class PerspectiveCamera extends Object3D {
         this.#aspectRatio        = aspectRatio;
         this.#near               = near;
         this.#far                = far;
+        this.#projectionMatrix   = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
+        this.#viewMatrix         = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
     }
 
     /**
@@ -66,58 +105,85 @@ export class PerspectiveCamera extends Object3D {
             throw new RangeError('PerspectiveCamera.setAspectRatio expects a positive number.');
         }
 
+        if (aspectRatio === this.#aspectRatio) {
+            return;
+        }
+
         this.#aspectRatio = aspectRatio;
+        this.#isProjectionMatrixDirty = true;
     }
 
     /**
-     * Returns the projection matrix for this camera.
+     * Returns the projection matrix for this camera. The returned matrix is cached and reused between calls.
      *
-     * @returns {Float32Array}
+     * @returns {Float32Array} - Cached projection matrix.
      */
     getProjectionMatrix() {
-        return Matrix4.createPerspective(
-            this.#fieldOfViewRadians,
-            this.#aspectRatio,
-            this.#near,
-            this.#far
-        );
+        if (this.#isProjectionMatrixDirty) {
+            CameraMath.writePerspectiveMatrixTo(
+                this.#projectionMatrix,
+                this.#fieldOfViewRadians,
+                this.#aspectRatio,
+                this.#near,
+                this.#far
+            );
+
+            this.#isProjectionMatrixDirty = false;
+        }
+
+        return this.#projectionMatrix;
     }
 
     /**
-     * Returns the view matrix for this camera (inverse of its world transform).
+     * Returns the view matrix for this camera (inverse of its local TRS transform).
+     * The returned matrix is cached and reused between calls.
      *
-     * @returns {Float32Array}
+     * @returns {Float32Array} - Cached view matrix.
      */
     getViewMatrix() {
         const position = this.position;
         const rotation = this.rotation;
         const scale    = this.scale;
 
-        if (scale.x === 0 || scale.y === 0 || scale.z === 0) {
-            throw new RangeError('PerspectiveCamera.getViewMatrix cannot invert a zero scale.');
+        const positionX = position.x;
+        const positionY = position.y;
+        const positionZ = position.z;
+
+        const rotationX = rotation.x;
+        const rotationY = rotation.y;
+        const rotationZ = rotation.z;
+
+        const scaleX = scale.x;
+        const scaleY = scale.y;
+        const scaleZ = scale.z;
+
+        const hasTransformChanged =
+           positionX !== this.#cachedPositionX
+        || positionY !== this.#cachedPositionY
+        || positionZ !== this.#cachedPositionZ
+        || rotationX !== this.#cachedRotationX
+        || rotationY !== this.#cachedRotationY
+        || rotationZ !== this.#cachedRotationZ
+        || scaleX    !== this.#cachedScaleX
+        || scaleY    !== this.#cachedScaleY
+        || scaleZ    !== this.#cachedScaleZ;
+
+        if (hasTransformChanged) {
+            CameraMath.writeViewMatrixTo(this.#viewMatrix, position, rotation, scale);
+
+            this.#cachedPositionX = positionX;
+            this.#cachedPositionY = positionY;
+            this.#cachedPositionZ = positionZ;
+
+            this.#cachedRotationX = rotationX;
+            this.#cachedRotationY = rotationY;
+            this.#cachedRotationZ = rotationZ;
+
+            this.#cachedScaleX = scaleX;
+            this.#cachedScaleY = scaleY;
+            this.#cachedScaleZ = scaleZ;
         }
 
-        const inverseScale = Matrix4.createScale(
-            SCALE_INVERSE_NUMERATOR / scale.x,
-            SCALE_INVERSE_NUMERATOR / scale.y,
-            SCALE_INVERSE_NUMERATOR / scale.z
-        );
-
-        const inverseRotationX   = Matrix4.createRotationX(-rotation.x);
-        const inverseRotationY   = Matrix4.createRotationY(-rotation.y);
-        const inverseRotationZ   = Matrix4.createRotationZ(-rotation.z);
-        const inverseTranslation = Matrix4.createTranslation(
-            -position.x,
-            -position.y,
-            -position.z
-        );
-
-        return Matrix4.multiplyMany(
-            inverseScale,
-            inverseRotationX,
-            inverseRotationY,
-            inverseRotationZ,
-            inverseTranslation
-        );
+        return this.#viewMatrix;
     }
 }

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Class: ShaderProgram</title>
+    <title>JSDoc: Class: CameraMath</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Class: ShaderProgram</h1>
+    <h1 class="page-title">Class: CameraMath</h1>
 
     
 
@@ -28,9 +28,9 @@
 
 <header>
     
-        <h2><span class="attribs"><span class="type-signature"></span></span>ShaderProgram<span class="signature">(webglRenderingContext, vertexSource, fragmentSource)</span><span class="type-signature"></span></h2>
+        <h2><span class="attribs"><span class="type-signature"></span></span>CameraMath<span class="signature">()</span><span class="type-signature"></span></h2>
         
-            <div class="class-description">Thin wrapper around a linked WebGL shader program.</div>
+            <div class="class-description">Camera-related matrix computations. Writes results into preallocated output buffers.</div>
         
     
 </header>
@@ -45,7 +45,7 @@
     
 
     
-    <h4 class="name" id="ShaderProgram"><span class="type-signature"></span>new ShaderProgram<span class="signature">(webglRenderingContext, vertexSource, fragmentSource)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="CameraMath"><span class="type-signature"></span>new CameraMath<span class="signature">()</span><span class="type-signature"></span></h4>
     
 
     
@@ -58,101 +58,6 @@
 
 
 
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>webglRenderingContext</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">WebGL2RenderingContext</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">WebGL2 rendering context used to create shaders and the program.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>vertexSource</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">string</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">GLSL source code of the vertex shader.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>fragmentSource</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">string</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">GLSL source code of the fragment shader.</td>
-        </tr>
-
-    
-    </tbody>
-</table>
 
 
 
@@ -188,7 +93,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="shader_shader-program.js.html">shader/shader-program.js</a>, <a href="shader_shader-program.js.html#line7">line 7</a>
+        <a href="math_camera-math.js.html">math/camera-math.js</a>, <a href="math_camera-math.js.html#line33">line 33</a>
     </li></ul></dd>
     
 
@@ -226,13 +131,6 @@
     
 
     
-        <h3 class="subsection-title">Classes</h3>
-
-        <dl>
-            <dt><a href="ShaderProgram.html">ShaderProgram</a></dt>
-            <dd></dd>
-        </dl>
-    
 
     
 
@@ -240,72 +138,6 @@
 
     
 
-    
-        <h3 class="subsection-title">Members</h3>
-
-        
-            
-<h4 class="name" id="program"><span class="type-signature"></span>program<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    Returns the underlying WebGL program object.
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="shader_shader-program.js.html">shader/shader-program.js</a>, <a href="shader_shader-program.js.html#line73">line 73</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
     
 
     
@@ -317,7 +149,7 @@
     
 
     
-    <h4 class="name" id="dispose"><span class="type-signature"></span>dispose<span class="signature">()</span><span class="type-signature"></span></h4>
+    <h4 class="name" id=".writePerspectiveMatrixTo"><span class="type-signature">(static) </span>writePerspectiveMatrixTo<span class="signature">(out, fieldOfViewRadians, aspectRatio, near, far)</span><span class="type-signature"> &rarr; {Float32Array}</span></h4>
     
 
     
@@ -325,95 +157,7 @@
 
 
 <div class="description">
-    Releases the underlying WebGL program. After calling dispose, this instance must not be used.
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="shader_shader-program.js.html">shader/shader-program.js</a>, <a href="shader_shader-program.js.html#line110">line 110</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="setMatrix4"><span class="type-signature"></span>setMatrix4<span class="signature">(name, matrix)</span><span class="type-signature"></span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Sets a 4x4 matrix uniform.
+    Writes a perspective projection matrix into an existing output matrix.
 </div>
 
 
@@ -449,30 +193,7 @@
 
         <tr>
             
-                <td class="name"><code>name</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">string</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">Name of the uniform variable in the GLSL program.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>matrix</code></td>
+                <td class="name"><code>out</code></td>
             
 
             <td class="type">
@@ -488,7 +209,99 @@
 
             
 
-            <td class="description last">4x4 matrix in column-major order to upload to the uniform.</td>
+            <td class="description last">Output 4x4 matrix (length 16), that will receive the projection matrix.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>fieldOfViewRadians</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Vertical field of view in radians.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>aspectRatio</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Viewport aspect ratio (width / height).</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>near</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Near clipping plane distance (must be > 0).</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>far</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Far clipping plane distance (must be > near).</td>
         </tr>
 
     
@@ -529,7 +342,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="shader_shader-program.js.html">shader/shader-program.js</a>, <a href="shader_shader-program.js.html#line92">line 92</a>
+        <a href="math_camera-math.js.html">math/camera-math.js</a>, <a href="math_camera-math.js.html#line44">line 44</a>
     </li></ul></dd>
     
 
@@ -554,6 +367,28 @@
 
 
 
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - The output matrix (out).
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Float32Array</span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 
@@ -565,7 +400,7 @@
     
 
     
-    <h4 class="name" id="use"><span class="type-signature"></span>use<span class="signature">()</span><span class="type-signature"></span></h4>
+    <h4 class="name" id=".writeViewMatrixTo"><span class="type-signature">(static) </span>writeViewMatrixTo<span class="signature">(out, position, rotation, scale)</span><span class="type-signature"> &rarr; {Float32Array}</span></h4>
     
 
     
@@ -573,7 +408,11 @@
 
 
 <div class="description">
-    Makes this program active for subsequent draw calls.
+    Writes a view matrix (inverse of camera, TRS) into an existing output matrix.
+
+Assumes camera local transform order matches Object3D:
+local = T * (Rz * Ry * Rx) * S
+view  = inv(S) * inv(R) * inv(T)
 </div>
 
 
@@ -582,6 +421,124 @@
 
 
 
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>out</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Float32Array</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Output 4x4 matrix (length 16), that will receive the view matrix.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>position</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="Vector3.html">Vector3</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Camera position.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>rotation</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="Vector3.html">Vector3</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Camera rotation in radians.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>scale</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="Vector3.html">Vector3</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Camera scale (must be non-zero on all axes).</td>
+        </tr>
+
+    
+    </tbody>
+</table>
 
 
 
@@ -617,7 +574,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="shader_shader-program.js.html">shader/shader-program.js</a>, <a href="shader_shader-program.js.html#line81">line 81</a>
+        <a href="math_camera-math.js.html">math/camera-math.js</a>, <a href="math_camera-math.js.html#line101">line 101</a>
     </li></ul></dd>
     
 
@@ -642,6 +599,28 @@
 
 
 
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - The output matrix (out).
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Float32Array</span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 

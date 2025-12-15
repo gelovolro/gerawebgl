@@ -598,6 +598,144 @@ var Vector3 = class _Vector3 {
   }
 };
 
+// core/math/camera-math.js
+var HALF_FIELD_OF_VIEW_DIVISOR2 = 2;
+var PROJECTION_SCALE_NUMERATOR2 = 1;
+var DEPTH_RANGE_NUMERATOR2 = 1;
+var PERSPECTIVE_Z_RANGE_MULTIPLIER2 = 2;
+var PERSPECTIVE_W_COMPONENT_SCALE2 = -1;
+var MATRIX_4x4_ELEMENT_COUNT2 = 16;
+var MINIMUM_ASPECT_RATIO = 0;
+var MINIMUM_NEAR_CLIP_DISTANCE = 0;
+var SCALE_INVERSE_NUMERATOR = 1;
+var CameraMath = class _CameraMath {
+  /**
+   * Writes a perspective projection matrix into an existing output matrix.
+   *
+   * @param {Float32Array} out          - Output 4x4 matrix (length 16), that will receive the projection matrix.
+   * @param {number} fieldOfViewRadians - Vertical field of view in radians.
+   * @param {number} aspectRatio        - Viewport aspect ratio (width / height).
+   * @param {number} near               - Near clipping plane distance (must be > 0).
+   * @param {number} far                - Far clipping plane distance (must be > near).
+   * @returns {Float32Array}            - The output matrix (out).
+   */
+  static writePerspectiveMatrixTo(out, fieldOfViewRadians, aspectRatio, near, far) {
+    _CameraMath.#assertMatrix4(out);
+    if (typeof fieldOfViewRadians !== "number" || typeof aspectRatio !== "number" || typeof near !== "number" || typeof far !== "number") {
+      throw new TypeError("CameraMath.writePerspectiveMatrixTo expects numeric arguments.");
+    }
+    if (aspectRatio <= MINIMUM_ASPECT_RATIO) {
+      throw new RangeError("CameraMath.writePerspectiveMatrixTo expects a positive aspect ratio.");
+    }
+    if (near <= MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
+      throw new RangeError("CameraMath.writePerspectiveMatrixTo expects 0 < near < far.");
+    }
+    const projectionScale = PROJECTION_SCALE_NUMERATOR2 / Math.tan(fieldOfViewRadians / HALF_FIELD_OF_VIEW_DIVISOR2);
+    const inverseDepthRange = DEPTH_RANGE_NUMERATOR2 / (near - far);
+    out[0] = projectionScale / aspectRatio;
+    out[1] = 0;
+    out[2] = 0;
+    out[3] = 0;
+    out[4] = 0;
+    out[5] = projectionScale;
+    out[6] = 0;
+    out[7] = 0;
+    out[8] = 0;
+    out[9] = 0;
+    out[10] = (far + near) * inverseDepthRange;
+    out[11] = PERSPECTIVE_W_COMPONENT_SCALE2;
+    out[12] = 0;
+    out[13] = 0;
+    out[14] = PERSPECTIVE_Z_RANGE_MULTIPLIER2 * far * near * inverseDepthRange;
+    out[15] = 0;
+    return out;
+  }
+  /**
+   * Writes a view matrix (inverse of camera, TRS) into an existing output matrix.
+   *
+   * Assumes camera local transform order matches Object3D:
+   * local = T * (Rz * Ry * Rx) * S
+   * view  = inv(S) * inv(R) * inv(T)
+   *
+   * @param {Float32Array} out - Output 4x4 matrix (length 16), that will receive the view matrix.
+   * @param {Vector3} position - Camera position.
+   * @param {Vector3} rotation - Camera rotation in radians.
+   * @param {Vector3} scale    - Camera scale (must be non-zero on all axes).
+   * @returns {Float32Array}   - The output matrix (out).
+   */
+  static writeViewMatrixTo(out, position, rotation, scale) {
+    _CameraMath.#assertMatrix4(out);
+    if (!(position instanceof Vector3) || !(rotation instanceof Vector3) || !(scale instanceof Vector3)) {
+      throw new TypeError("CameraMath.writeViewMatrixTo expects Vector3 arguments (position, rotation, scale).");
+    }
+    if (scale.x === 0 || scale.y === 0 || scale.z === 0) {
+      throw new RangeError("CameraMath.writeViewMatrixTo cannot invert a zero scale.");
+    }
+    const positionX = position.x;
+    const positionY = position.y;
+    const positionZ = position.z;
+    const rotationX = rotation.x;
+    const rotationY = rotation.y;
+    const rotationZ = rotation.z;
+    const inverseScaleX = SCALE_INVERSE_NUMERATOR / scale.x;
+    const inverseScaleY = SCALE_INVERSE_NUMERATOR / scale.y;
+    const inverseScaleZ = SCALE_INVERSE_NUMERATOR / scale.z;
+    const cosX = Math.cos(rotationX);
+    const sinX = Math.sin(rotationX);
+    const cosY = Math.cos(rotationY);
+    const sinY = Math.sin(rotationY);
+    const cosZ = Math.cos(rotationZ);
+    const sinZ = Math.sin(rotationZ);
+    const rot00 = cosZ * cosY;
+    const rot01 = cosZ * sinY * sinX - sinZ * cosX;
+    const rot02 = cosZ * sinY * cosX + sinZ * sinX;
+    const rot10 = sinZ * cosY;
+    const rot11 = sinZ * sinY * sinX + cosZ * cosX;
+    const rot12 = sinZ * sinY * cosX - cosZ * sinX;
+    const rot20 = -sinY;
+    const rot21 = cosY * sinX;
+    const rot22 = cosY * cosX;
+    const a00 = rot00 * inverseScaleX;
+    const a01 = rot10 * inverseScaleX;
+    const a02 = rot20 * inverseScaleX;
+    const a10 = rot01 * inverseScaleY;
+    const a11 = rot11 * inverseScaleY;
+    const a12 = rot21 * inverseScaleY;
+    const a20 = rot02 * inverseScaleZ;
+    const a21 = rot12 * inverseScaleZ;
+    const a22 = rot22 * inverseScaleZ;
+    const translateX = -(a00 * positionX + a01 * positionY + a02 * positionZ);
+    const translateY = -(a10 * positionX + a11 * positionY + a12 * positionZ);
+    const translateZ = -(a20 * positionX + a21 * positionY + a22 * positionZ);
+    out[0] = a00;
+    out[1] = a10;
+    out[2] = a20;
+    out[3] = 0;
+    out[4] = a01;
+    out[5] = a11;
+    out[6] = a21;
+    out[7] = 0;
+    out[8] = a02;
+    out[9] = a12;
+    out[10] = a22;
+    out[11] = 0;
+    out[12] = translateX;
+    out[13] = translateY;
+    out[14] = translateZ;
+    out[15] = 1;
+    return out;
+  }
+  /**
+   * @param {Float32Array} out - Output matrix to validate.
+   * @private
+   */
+  static #assertMatrix4(out) {
+    if (!(out instanceof Float32Array) || out.length !== MATRIX_4x4_ELEMENT_COUNT2) {
+      throw new TypeError("Expected out to be a Float32Array(16).");
+    }
+  }
+};
+
 // core/geometry/geometry.js
 var POSITION_ATTRIBUTE_LOCATION = 0;
 var POSITION_COMPONENT_COUNT = 3;
@@ -948,7 +1086,7 @@ var BoxGeometry = class extends Geometry {
 };
 
 // core/shader/shader-program.js
-var MATRIX_4x4_ELEMENT_COUNT2 = 16;
+var MATRIX_4x4_ELEMENT_COUNT3 = 16;
 var ShaderProgram = class {
   /** @type {WebGL2RenderingContext} */
   #webglRenderingContext;
@@ -1023,7 +1161,7 @@ var ShaderProgram = class {
     if (typeof name !== "string") {
       throw new TypeError("ShaderProgram.setMatrix4 expects uniform name as a string.");
     }
-    if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT2) {
+    if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT3) {
       throw new TypeError("ShaderProgram.setMatrix4 expects a 4x4 Float32Array.");
     }
     const location = this.#getUniformLocation(name);
@@ -1250,7 +1388,7 @@ var BasicMaterial = class extends Material {
 // core/scene/object3d.js
 var CHILD_NOT_FOUND_INDEX = -1;
 var SINGLE_CHILD_REMOVE_COUNT = 1;
-var MATRIX_4x4_ELEMENT_COUNT3 = 16;
+var MATRIX_4x4_ELEMENT_COUNT4 = 16;
 var Object3D = class _Object3D {
   /** @type {Vector3} */
   #position;
@@ -1273,8 +1411,8 @@ var Object3D = class _Object3D {
   constructor() {
     this.#parent = null;
     this.#children = [];
-    this.#localMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT3);
-    this.#worldMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT3);
+    this.#localMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT4);
+    this.#worldMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT4);
     _Object3D.#setIdentityMatrix(this.#localMatrix);
     _Object3D.#setIdentityMatrix(this.#worldMatrix);
     this.#position = Vector3.createZero(() => this.#markTransformDirty());
@@ -1440,7 +1578,7 @@ var Object3D = class _Object3D {
    * @private
    */
   static #setIdentityMatrix(out) {
-    for (let index = 0; index < MATRIX_4x4_ELEMENT_COUNT3; index += 1) {
+    for (let index = 0; index < MATRIX_4x4_ELEMENT_COUNT4; index += 1) {
       out[index] = 0;
     }
     out[0] = 1;
@@ -1513,9 +1651,9 @@ var Scene = class extends Object3D {
 };
 
 // core/scene/camera.js
-var MINIMUM_NEAR_CLIP_DISTANCE = 0;
-var MINIMUM_ASPECT_RATIO = 0;
-var SCALE_INVERSE_NUMERATOR = 1;
+var MINIMUM_NEAR_CLIP_DISTANCE2 = 0;
+var MINIMUM_ASPECT_RATIO2 = 0;
+var MATRIX_4x4_ELEMENT_COUNT5 = 16;
 var PerspectiveCamera = class extends Object3D {
   /** @type {number} */
   #fieldOfViewRadians;
@@ -1525,6 +1663,30 @@ var PerspectiveCamera = class extends Object3D {
   #near;
   /** @type {number} */
   #far;
+  /** @type {Float32Array} */
+  #projectionMatrix;
+  /** @type {Float32Array} */
+  #viewMatrix;
+  /** @type {boolean} */
+  #isProjectionMatrixDirty = true;
+  /** @type {number} */
+  #cachedPositionX = Number.NaN;
+  /** @type {number} */
+  #cachedPositionY = Number.NaN;
+  /** @type {number} */
+  #cachedPositionZ = Number.NaN;
+  /** @type {number} */
+  #cachedRotationX = Number.NaN;
+  /** @type {number} */
+  #cachedRotationY = Number.NaN;
+  /** @type {number} */
+  #cachedRotationZ = Number.NaN;
+  /** @type {number} */
+  #cachedScaleX = Number.NaN;
+  /** @type {number} */
+  #cachedScaleY = Number.NaN;
+  /** @type {number} */
+  #cachedScaleZ = Number.NaN;
   /**
    * @param {number} fieldOfViewRadians - Vertical field of view in radians.
    * @param {number} aspectRatio        - Viewport aspect ratio (width / height).
@@ -1536,16 +1698,18 @@ var PerspectiveCamera = class extends Object3D {
     if (typeof fieldOfViewRadians !== "number" || typeof aspectRatio !== "number" || typeof near !== "number" || typeof far !== "number") {
       throw new TypeError("PerspectiveCamera expects numeric constructor arguments.");
     }
-    if (aspectRatio <= MINIMUM_ASPECT_RATIO) {
+    if (aspectRatio <= MINIMUM_ASPECT_RATIO2) {
       throw new RangeError("PerspectiveCamera expects a positive aspect ratio.");
     }
-    if (near <= MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
+    if (near <= MINIMUM_NEAR_CLIP_DISTANCE2 || far <= near) {
       throw new RangeError("PerspectiveCamera expects 0 < near < far.");
     }
     this.#fieldOfViewRadians = fieldOfViewRadians;
     this.#aspectRatio = aspectRatio;
     this.#near = near;
     this.#far = far;
+    this.#projectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT5);
+    this.#viewMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT5);
   }
   /**
    * Updates the aspect ratio.
@@ -1553,62 +1717,72 @@ var PerspectiveCamera = class extends Object3D {
    * @param {number} aspectRatio - New viewport aspect ratio (canvas width divided by canvas height).
    */
   setAspectRatio(aspectRatio) {
-    if (typeof aspectRatio !== "number" || aspectRatio <= MINIMUM_ASPECT_RATIO) {
+    if (typeof aspectRatio !== "number" || aspectRatio <= MINIMUM_ASPECT_RATIO2) {
       throw new RangeError("PerspectiveCamera.setAspectRatio expects a positive number.");
     }
+    if (aspectRatio === this.#aspectRatio) {
+      return;
+    }
     this.#aspectRatio = aspectRatio;
+    this.#isProjectionMatrixDirty = true;
   }
   /**
-   * Returns the projection matrix for this camera.
+   * Returns the projection matrix for this camera. The returned matrix is cached and reused between calls.
    *
-   * @returns {Float32Array}
+   * @returns {Float32Array} - Cached projection matrix.
    */
   getProjectionMatrix() {
-    return Matrix4.createPerspective(
-      this.#fieldOfViewRadians,
-      this.#aspectRatio,
-      this.#near,
-      this.#far
-    );
+    if (this.#isProjectionMatrixDirty) {
+      CameraMath.writePerspectiveMatrixTo(
+        this.#projectionMatrix,
+        this.#fieldOfViewRadians,
+        this.#aspectRatio,
+        this.#near,
+        this.#far
+      );
+      this.#isProjectionMatrixDirty = false;
+    }
+    return this.#projectionMatrix;
   }
   /**
-   * Returns the view matrix for this camera (inverse of its world transform).
+   * Returns the view matrix for this camera (inverse of its local TRS transform).
+   * The returned matrix is cached and reused between calls.
    *
-   * @returns {Float32Array}
+   * @returns {Float32Array} - Cached view matrix.
    */
   getViewMatrix() {
     const position = this.position;
     const rotation = this.rotation;
     const scale = this.scale;
-    if (scale.x === 0 || scale.y === 0 || scale.z === 0) {
-      throw new RangeError("PerspectiveCamera.getViewMatrix cannot invert a zero scale.");
+    const positionX = position.x;
+    const positionY = position.y;
+    const positionZ = position.z;
+    const rotationX = rotation.x;
+    const rotationY = rotation.y;
+    const rotationZ = rotation.z;
+    const scaleX = scale.x;
+    const scaleY = scale.y;
+    const scaleZ = scale.z;
+    const hasTransformChanged = positionX !== this.#cachedPositionX || positionY !== this.#cachedPositionY || positionZ !== this.#cachedPositionZ || rotationX !== this.#cachedRotationX || rotationY !== this.#cachedRotationY || rotationZ !== this.#cachedRotationZ || scaleX !== this.#cachedScaleX || scaleY !== this.#cachedScaleY || scaleZ !== this.#cachedScaleZ;
+    if (hasTransformChanged) {
+      CameraMath.writeViewMatrixTo(this.#viewMatrix, position, rotation, scale);
+      this.#cachedPositionX = positionX;
+      this.#cachedPositionY = positionY;
+      this.#cachedPositionZ = positionZ;
+      this.#cachedRotationX = rotationX;
+      this.#cachedRotationY = rotationY;
+      this.#cachedRotationZ = rotationZ;
+      this.#cachedScaleX = scaleX;
+      this.#cachedScaleY = scaleY;
+      this.#cachedScaleZ = scaleZ;
     }
-    const inverseScale = Matrix4.createScale(
-      SCALE_INVERSE_NUMERATOR / scale.x,
-      SCALE_INVERSE_NUMERATOR / scale.y,
-      SCALE_INVERSE_NUMERATOR / scale.z
-    );
-    const inverseRotationX = Matrix4.createRotationX(-rotation.x);
-    const inverseRotationY = Matrix4.createRotationY(-rotation.y);
-    const inverseRotationZ = Matrix4.createRotationZ(-rotation.z);
-    const inverseTranslation = Matrix4.createTranslation(
-      -position.x,
-      -position.y,
-      -position.z
-    );
-    return Matrix4.multiplyMany(
-      inverseScale,
-      inverseRotationX,
-      inverseRotationY,
-      inverseRotationZ,
-      inverseTranslation
-    );
+    return this.#viewMatrix;
   }
 };
 
 // core/render/renderer.js
 var INDEX_BUFFER_OFFSET_BYTES = 0;
-var MATRIX_4x4_ELEMENT_COUNT4 = 16;
+var MATRIX_4x4_ELEMENT_COUNT6 = 16;
 var Renderer = class {
   /** @type {WebGLContext} */
   #contextWrapper;
@@ -1627,8 +1801,8 @@ var Renderer = class {
     }
     this.#contextWrapper = webglContext;
     this.#webglRenderingContext = webglContext.context;
-    this.#viewProjectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT4);
-    this.#finalMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT4);
+    this.#viewProjectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
+    this.#finalMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
   }
   /**
    * Renders the given scene from the point of view of the given camera.
@@ -1692,6 +1866,7 @@ var Renderer = class {
 export {
   BasicMaterial,
   BoxGeometry,
+  CameraMath,
   Geometry,
   Material,
   Matrix4,
