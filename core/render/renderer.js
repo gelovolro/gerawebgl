@@ -26,6 +26,12 @@ export class Renderer {
     /** @type {Float32Array} */
     #finalMatrix;
 
+    /** @type {Float32Array} */
+    #frameViewProjectionMatrix;
+
+    /** @type {function(*): void} */
+    #traverseCallback;
+
     /**
      * @param {WebGLContext} webglContext - Wrapper around the underlying WebGL2 rendering context.
      */
@@ -34,16 +40,20 @@ export class Renderer {
             throw new TypeError('Renderer expects a WebGLContext instance.');
         }
 
-        this.#contextWrapper        = webglContext;
-        this.#webglRenderingContext = webglContext.context;
-        this.#viewProjectionMatrix  = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
-        this.#finalMatrix           = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
+        this.#contextWrapper            = webglContext;
+        this.#webglRenderingContext     = webglContext.context;
+        this.#viewProjectionMatrix      = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
+        this.#finalMatrix               = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
+        this.#frameViewProjectionMatrix = this.#viewProjectionMatrix;
+
+        // Allocate the traverse callback once (no per-frame function allocations).
+        this.#traverseCallback = (object3d) => this.#renderVisitedObject3D(object3d);
     }
 
     /**
      * Renders the given scene from the point of view of the given camera.
      *
-     * @param {Scene} scene - Scene graph containing all objects, that should be rendered.
+     * @param {Scene} scene              - Scene graph containing all objects, that should be rendered.
      * @param {PerspectiveCamera} camera - Camera, that defines the view and projection used for rendering.
      */
     render(scene, camera) {
@@ -63,51 +73,59 @@ export class Renderer {
         const aspectRatio = canvas.width / canvas.height;
         camera.setAspectRatio(aspectRatio);
 
-        const projectionMatrix     = camera.getProjectionMatrix();
-        const viewMatrix           = camera.getViewMatrix();
-        const viewProjectionMatrix = Matrix4.multiplyTo(
+        const projectionMatrix = camera.getProjectionMatrix();
+        const viewMatrix       = camera.getViewMatrix();
+
+        this.#frameViewProjectionMatrix = Matrix4.multiplyTo(
             this.#viewProjectionMatrix,
             projectionMatrix,
             viewMatrix
         );
 
         scene.updateWorldMatrix(null);
-        scene.traverse((object3d) => {
-            if (!(object3d instanceof Mesh)) {
-                return;
-            }
+        scene.traverse(this.#traverseCallback);
+    }
 
-            const mesh = object3d;
+    /**
+     * @param {*} object3d - Current visited object from scene traversal.
+     * @private
+     */
+    #renderVisitedObject3D(object3d) {
+        if (!(object3d instanceof Mesh)) {
+            return;
+        }
 
-            if (mesh.isDisposed) {
-                return;
-            }
+        const mesh = object3d;
 
-            const geometry    = mesh.geometry;
-            const material    = mesh.material;
-            const worldMatrix = mesh.worldMatrix;
-            const finalMatrix = Matrix4.multiplyTo(
-                this.#finalMatrix,
-                viewProjectionMatrix,
-                worldMatrix
-            );
+        if (mesh.isDisposed) {
+            return;
+        }
 
-            material.use();
-            material.apply(finalMatrix);
-            geometry.bind();
+        const renderingContext = this.#webglRenderingContext;
+        const geometry         = mesh.geometry;
+        const material         = mesh.material;
+        const worldMatrix      = mesh.worldMatrix;
+        const finalMatrix      = Matrix4.multiplyTo(
+            this.#finalMatrix,
+            this.#frameViewProjectionMatrix,
+            worldMatrix
+        );
 
-            const isWireframeEnabled = material.isWireframeEnabled();
-            geometry.bindIndexBuffer(isWireframeEnabled);
+        material.use();
+        material.apply(finalMatrix);
+        geometry.bind();
 
-            const mode       = isWireframeEnabled ? renderingContext.LINES : renderingContext.TRIANGLES;
-            const indexCount = geometry.getIndexCount(isWireframeEnabled);
+        const isWireframeEnabled = material.isWireframeEnabled();
+        geometry.bindIndexBuffer(isWireframeEnabled);
 
-            renderingContext.drawElements(
-                mode,
-                indexCount,
-                renderingContext.UNSIGNED_SHORT,
-                INDEX_BUFFER_OFFSET_BYTES
-            );
-        });
+        const mode       = isWireframeEnabled ? renderingContext.LINES : renderingContext.TRIANGLES;
+        const indexCount = geometry.getIndexCount(isWireframeEnabled);
+
+        renderingContext.drawElements(
+            mode,
+            indexCount,
+            renderingContext.UNSIGNED_SHORT,
+            INDEX_BUFFER_OFFSET_BYTES
+        );
     }
 }

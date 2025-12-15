@@ -31,6 +31,22 @@ const VIEWPORT_ORIGIN_Y = 0;
 const MIN_DRAWING_BUFFER_DIMENSION = 1;
 
 /**
+ * Minimum allowed value for an RGBA color component.
+ * Used to validate clear color inputs in the range [0 -> 1].
+ *
+ * @type {number}
+ */
+const MIN_COLOR_COMPONENT = 0.0;
+
+/**
+ * Maximum allowed value for an RGBA color component.
+ * Used to validate clear color inputs in the range [0 -> 1].
+ *
+ * @type {number}
+ */
+const MAX_COLOR_COMPONENT = 1.0;
+
+/**
  * RGBA color represented as [red, green, blue, alpha],
  * each component in the range [0 -> 1].
  * @typedef {number[]} RGBAColor
@@ -115,41 +131,40 @@ export class WebGLContext {
     }
 
     /**
-     * Resizes the underlying canvas drawing buffer to match the current display size
-     * (taking into account device pixel ratio) and updates the WebGL viewport.
+     * Resizes the underlying canvas to match its display size.
      *
-     * By default, the display size is taken from the canvas element CSS size.
-     *
-     * @param {ResizeToDisplaySizeOptions} [options] - Resize options.
+     * @param {ResizeToDisplaySizeOptions} [options] - Optional resize options.
+     * @returns {boolean}                            - True if the canvas was resized, false otherwise.
      */
     resizeToDisplaySize(options = {}) {
         if (options === null || typeof options !== 'object' || Array.isArray(options)) {
-            throw new TypeError('resizeToDisplaySize expects an options object.');
+            throw new TypeError('WebGLContext.resizeToDisplaySize expects an options object.');
         }
 
         const { fitToWindow = false } = options;
 
         if (typeof fitToWindow !== 'boolean') {
-            throw new TypeError('resizeToDisplaySize option "fitToWindow" must be a boolean.');
+            throw new TypeError('WebGLContext.resizeToDisplaySize option `fitToWindow` must be a boolean.');
         }
 
         const pixelRatio = window.devicePixelRatio || DEFAULT_DEVICE_PIXEL_RATIO;
-        let cssWidth     = null;
-        let cssHeight    = null;
+        let cssWidth     = 0;
+        let cssHeight    = 0;
 
-        if (fitToWindow) {
+        if (fitToWindow === true) {
             cssWidth  = window.innerWidth;
             cssHeight = window.innerHeight;
         } else {
-            const rect = this.#canvas.getBoundingClientRect();
-            cssWidth   = rect.width  || this.#canvas.clientWidth;
-            cssHeight  = rect.height || this.#canvas.clientHeight;
+            const rectangle = this.#canvas.getBoundingClientRect();
+            cssWidth  = rectangle.width  || this.#canvas.clientWidth;
+            cssHeight = rectangle.height || this.#canvas.clientHeight;
         }
 
         const targetWidth  = Math.max(MIN_DRAWING_BUFFER_DIMENSION, Math.floor(cssWidth  * pixelRatio));
         const targetHeight = Math.max(MIN_DRAWING_BUFFER_DIMENSION, Math.floor(cssHeight * pixelRatio));
+        const isResized    = (this.#canvas.width !== targetWidth) || (this.#canvas.height !== targetHeight);
 
-        if (this.#canvas.width !== targetWidth || this.#canvas.height !== targetHeight) {
+        if (isResized === true) {
             this.#canvas.width  = targetWidth;
             this.#canvas.height = targetHeight;
         }
@@ -160,6 +175,8 @@ export class WebGLContext {
             this.#canvas.width,
             this.#canvas.height
         );
+
+        return isResized;
     }
 
     /**
@@ -208,8 +225,8 @@ export class WebGLContext {
      * Validates that a color component is a number in the [0, 1] range.
      *
      * @param {string} componentName - Name of the component (for error messages).
-     * @param {number} value - Component value to validate.
-     * @throws {TypeError} If value is not a number.
+     * @param {number} value         - Component value to validate.
+     * @throws {TypeError}  If value is not a number.
      * @throws {RangeError} If value is outside the [0, 1] range.
      * @private
      */
@@ -218,7 +235,7 @@ export class WebGLContext {
             throw new TypeError(`Color component "${componentName}" must be a valid number.`);
         }
 
-        if (value < 0.0 || value > 1.0) {
+        if (value < MIN_COLOR_COMPONENT || value > MAX_COLOR_COMPONENT) {
             throw new RangeError(`Color component "${componentName}" must be in the range [0, 1].`);
         }
     }

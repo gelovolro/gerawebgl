@@ -4,6 +4,8 @@ var DEFAULT_DEVICE_PIXEL_RATIO = 1;
 var VIEWPORT_ORIGIN_X = 0;
 var VIEWPORT_ORIGIN_Y = 0;
 var MIN_DRAWING_BUFFER_DIMENSION = 1;
+var MIN_COLOR_COMPONENT = 0;
+var MAX_COLOR_COMPONENT = 1;
 var WebGLContext = class _WebGLContext {
   /** @type {HTMLCanvasElement} */
   #canvas;
@@ -55,35 +57,34 @@ var WebGLContext = class _WebGLContext {
     return this.#webglContext;
   }
   /**
-   * Resizes the underlying canvas drawing buffer to match the current display size
-   * (taking into account device pixel ratio) and updates the WebGL viewport.
+   * Resizes the underlying canvas to match its display size.
    *
-   * By default, the display size is taken from the canvas element CSS size.
-   *
-   * @param {ResizeToDisplaySizeOptions} [options] - Resize options.
+   * @param {ResizeToDisplaySizeOptions} [options] - Optional resize options.
+   * @returns {boolean}                            - True if the canvas was resized, false otherwise.
    */
   resizeToDisplaySize(options = {}) {
     if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError("resizeToDisplaySize expects an options object.");
+      throw new TypeError("WebGLContext.resizeToDisplaySize expects an options object.");
     }
     const { fitToWindow = false } = options;
     if (typeof fitToWindow !== "boolean") {
-      throw new TypeError('resizeToDisplaySize option "fitToWindow" must be a boolean.');
+      throw new TypeError("WebGLContext.resizeToDisplaySize option `fitToWindow` must be a boolean.");
     }
     const pixelRatio = window.devicePixelRatio || DEFAULT_DEVICE_PIXEL_RATIO;
-    let cssWidth = null;
-    let cssHeight = null;
-    if (fitToWindow) {
+    let cssWidth = 0;
+    let cssHeight = 0;
+    if (fitToWindow === true) {
       cssWidth = window.innerWidth;
       cssHeight = window.innerHeight;
     } else {
-      const rect = this.#canvas.getBoundingClientRect();
-      cssWidth = rect.width || this.#canvas.clientWidth;
-      cssHeight = rect.height || this.#canvas.clientHeight;
+      const rectangle = this.#canvas.getBoundingClientRect();
+      cssWidth = rectangle.width || this.#canvas.clientWidth;
+      cssHeight = rectangle.height || this.#canvas.clientHeight;
     }
     const targetWidth = Math.max(MIN_DRAWING_BUFFER_DIMENSION, Math.floor(cssWidth * pixelRatio));
     const targetHeight = Math.max(MIN_DRAWING_BUFFER_DIMENSION, Math.floor(cssHeight * pixelRatio));
-    if (this.#canvas.width !== targetWidth || this.#canvas.height !== targetHeight) {
+    const isResized = this.#canvas.width !== targetWidth || this.#canvas.height !== targetHeight;
+    if (isResized === true) {
       this.#canvas.width = targetWidth;
       this.#canvas.height = targetHeight;
     }
@@ -93,6 +94,7 @@ var WebGLContext = class _WebGLContext {
       this.#canvas.width,
       this.#canvas.height
     );
+    return isResized;
   }
   /**
    * Clears both the color and depth buffers using the current clear color.
@@ -135,8 +137,8 @@ var WebGLContext = class _WebGLContext {
    * Validates that a color component is a number in the [0, 1] range.
    *
    * @param {string} componentName - Name of the component (for error messages).
-   * @param {number} value - Component value to validate.
-   * @throws {TypeError} If value is not a number.
+   * @param {number} value         - Component value to validate.
+   * @throws {TypeError}  If value is not a number.
    * @throws {RangeError} If value is outside the [0, 1] range.
    * @private
    */
@@ -144,7 +146,7 @@ var WebGLContext = class _WebGLContext {
     if (typeof value !== "number" || Number.isNaN(value)) {
       throw new TypeError(`Color component "${componentName}" must be a valid number.`);
     }
-    if (value < 0 || value > 1) {
+    if (value < MIN_COLOR_COMPONENT || value > MAX_COLOR_COMPONENT) {
       throw new RangeError(`Color component "${componentName}" must be in the range [0, 1].`);
     }
   }
@@ -1792,6 +1794,10 @@ var Renderer = class {
   #viewProjectionMatrix;
   /** @type {Float32Array} */
   #finalMatrix;
+  /** @type {Float32Array} */
+  #frameViewProjectionMatrix;
+  /** @type {function(*): void} */
+  #traverseCallback;
   /**
    * @param {WebGLContext} webglContext - Wrapper around the underlying WebGL2 rendering context.
    */
@@ -1803,11 +1809,13 @@ var Renderer = class {
     this.#webglRenderingContext = webglContext.context;
     this.#viewProjectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
     this.#finalMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
+    this.#frameViewProjectionMatrix = this.#viewProjectionMatrix;
+    this.#traverseCallback = (object3d) => this.#renderVisitedObject3D(object3d);
   }
   /**
    * Renders the given scene from the point of view of the given camera.
    *
-   * @param {Scene} scene - Scene graph containing all objects, that should be rendered.
+   * @param {Scene} scene              - Scene graph containing all objects, that should be rendered.
    * @param {PerspectiveCamera} camera - Camera, that defines the view and projection used for rendering.
    */
   render(scene, camera) {
@@ -1825,42 +1833,48 @@ var Renderer = class {
     camera.setAspectRatio(aspectRatio);
     const projectionMatrix = camera.getProjectionMatrix();
     const viewMatrix = camera.getViewMatrix();
-    const viewProjectionMatrix = Matrix4.multiplyTo(
+    this.#frameViewProjectionMatrix = Matrix4.multiplyTo(
       this.#viewProjectionMatrix,
       projectionMatrix,
       viewMatrix
     );
     scene.updateWorldMatrix(null);
-    scene.traverse((object3d) => {
-      if (!(object3d instanceof Mesh)) {
-        return;
-      }
-      const mesh = object3d;
-      if (mesh.isDisposed) {
-        return;
-      }
-      const geometry = mesh.geometry;
-      const material = mesh.material;
-      const worldMatrix = mesh.worldMatrix;
-      const finalMatrix = Matrix4.multiplyTo(
-        this.#finalMatrix,
-        viewProjectionMatrix,
-        worldMatrix
-      );
-      material.use();
-      material.apply(finalMatrix);
-      geometry.bind();
-      const isWireframeEnabled = material.isWireframeEnabled();
-      geometry.bindIndexBuffer(isWireframeEnabled);
-      const mode = isWireframeEnabled ? renderingContext.LINES : renderingContext.TRIANGLES;
-      const indexCount = geometry.getIndexCount(isWireframeEnabled);
-      renderingContext.drawElements(
-        mode,
-        indexCount,
-        renderingContext.UNSIGNED_SHORT,
-        INDEX_BUFFER_OFFSET_BYTES
-      );
-    });
+    scene.traverse(this.#traverseCallback);
+  }
+  /**
+   * @param {*} object3d - Current visited object from scene traversal.
+   * @private
+   */
+  #renderVisitedObject3D(object3d) {
+    if (!(object3d instanceof Mesh)) {
+      return;
+    }
+    const mesh = object3d;
+    if (mesh.isDisposed) {
+      return;
+    }
+    const renderingContext = this.#webglRenderingContext;
+    const geometry = mesh.geometry;
+    const material = mesh.material;
+    const worldMatrix = mesh.worldMatrix;
+    const finalMatrix = Matrix4.multiplyTo(
+      this.#finalMatrix,
+      this.#frameViewProjectionMatrix,
+      worldMatrix
+    );
+    material.use();
+    material.apply(finalMatrix);
+    geometry.bind();
+    const isWireframeEnabled = material.isWireframeEnabled();
+    geometry.bindIndexBuffer(isWireframeEnabled);
+    const mode = isWireframeEnabled ? renderingContext.LINES : renderingContext.TRIANGLES;
+    const indexCount = geometry.getIndexCount(isWireframeEnabled);
+    renderingContext.drawElements(
+      mode,
+      indexCount,
+      renderingContext.UNSIGNED_SHORT,
+      INDEX_BUFFER_OFFSET_BYTES
+    );
   }
 };
 export {
