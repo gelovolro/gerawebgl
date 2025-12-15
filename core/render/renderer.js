@@ -7,6 +7,9 @@ import { WebGLContext }      from '../webgl-context.js';
 /** @type {number} */
 const INDEX_BUFFER_OFFSET_BYTES = 0;
 
+/** @type {number} */
+const MATRIX_4x4_ELEMENT_COUNT = 16;
+
 /**
  * High-level renderer, that draws a scene from the perspective of a camera.
  */
@@ -16,6 +19,12 @@ export class Renderer {
 
     /** @type {WebGL2RenderingContext} */
     #webglRenderingContext;
+
+    /** @type {Float32Array} */
+    #viewProjectionMatrix;
+
+    /** @type {Float32Array} */
+    #finalMatrix;
 
     /**
      * @param {WebGLContext} webglContext - Wrapper around the underlying WebGL2 rendering context.
@@ -27,6 +36,8 @@ export class Renderer {
 
         this.#contextWrapper        = webglContext;
         this.#webglRenderingContext = webglContext.context;
+        this.#viewProjectionMatrix  = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
+        this.#finalMatrix           = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
     }
 
     /**
@@ -54,7 +65,11 @@ export class Renderer {
 
         const projectionMatrix     = camera.getProjectionMatrix();
         const viewMatrix           = camera.getViewMatrix();
-        const viewProjectionMatrix = Matrix4.multiply(projectionMatrix, viewMatrix);
+        const viewProjectionMatrix = Matrix4.multiplyTo(
+            this.#viewProjectionMatrix,
+            projectionMatrix,
+            viewMatrix
+        );
 
         scene.updateWorldMatrix(null);
         scene.traverse((object3d) => {
@@ -71,7 +86,12 @@ export class Renderer {
             const geometry    = mesh.geometry;
             const material    = mesh.material;
             const worldMatrix = mesh.worldMatrix;
-            const finalMatrix = Matrix4.multiply(viewProjectionMatrix, worldMatrix);
+            const finalMatrix = Matrix4.multiplyTo(
+                this.#finalMatrix,
+                viewProjectionMatrix,
+                worldMatrix
+            );
+
             material.use();
             material.apply(finalMatrix);
             geometry.bind();

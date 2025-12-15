@@ -1,4 +1,5 @@
 import { Matrix4 } from '../math/matrix4.js';
+import { Vector3 } from '../math/vector3.js';
 
 /** @type {number} */
 const CHILD_NOT_FOUND_INDEX = -1;
@@ -6,18 +7,21 @@ const CHILD_NOT_FOUND_INDEX = -1;
 /** @type {number} */
 const SINGLE_CHILD_REMOVE_COUNT = 1;
 
+/** @type {number} */
+const MATRIX_4x4_ELEMENT_COUNT = 16;
+
 /**
  * Base class for all objects that live in a scene graph.
  * Stores position, rotation, scale and parent/children relations.
  */
 export class Object3D {
-    /** @type {{ x: number, y: number, z: number }} */
+    /** @type {Vector3} */
     #position;
 
-    /** @type {{ x: number, y: number, z: number }} */
+    /** @type {Vector3} */
     #rotation;
 
-    /** @type {{ x: number, y: number, z: number }} */
+    /** @type {Vector3} */
     #scale;
 
     /** @type {Object3D | null} */
@@ -26,77 +30,64 @@ export class Object3D {
     /** @type {Object3D[]} */
     #children;
 
-    /**
-     * Local transform matrix of this object (position/rotation/scale relative to its parent).
-     * @type {Float32Array}
-     */
+    /** @type {Float32Array} */
     #localMatrix;
 
-    /**
-     * World transform matrix of this object (relative to the scene origin).
-     * @type {Float32Array}
-     */
+    /** @type {Float32Array} */
     #worldMatrix;
 
-    /**
-     * Creates a new transform node with position, rotation and scale.
-     */
+    /** @type {boolean} */
+    #isLocalMatrixDirty = true;
+
+    /** @type {boolean} */
+    #isWorldMatrixDirty = true;
+
     constructor() {
-        this.#position    = { x: 0, y: 0, z: 0 };
-        this.#rotation    = { x: 0, y: 0, z: 0 };
-        this.#scale       = { x: 1, y: 1, z: 1 };
-        this.#parent      = null;
-        this.#children    = [];
-        this.#localMatrix = Matrix4.createIdentity();
-        this.#worldMatrix = Matrix4.createIdentity();
+        this.#parent   = null;
+        this.#children = [];
+
+        this.#localMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
+        this.#worldMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
+        Object3D.#setIdentityMatrix(this.#localMatrix);
+        Object3D.#setIdentityMatrix(this.#worldMatrix);
+
+        this.#position = Vector3.createZero(() => this.#markTransformDirty());
+        this.#rotation = Vector3.createZero(() => this.#markTransformDirty());
+        this.#scale    = Vector3.createUnitScale(() => this.#markTransformDirty());
     }
 
-    /**
-     * @returns {{ x: number, y: number, z: number }} - Local position of this object.
-     */
+    /** @returns {Vector3} */
     get position() {
         return this.#position;
     }
 
-    /**
-     * @returns {{ x: number, y: number, z: number }} - Local rotation of this object in radians.
-     */
+    /** @returns {Vector3} */
     get rotation() {
         return this.#rotation;
     }
 
-    /**
-     * @returns {{ x: number, y: number, z: number }} - Local scale of this object.
-     */
+    /** @returns {Vector3} */
     get scale() {
         return this.#scale;
     }
 
-    /**
-     * @returns {Object3D | null}
-     */
+    /** @returns {Object3D | null} */
     get parent() {
         return this.#parent;
     }
 
-    /**
-     * @returns {Object3D[]}
-     */
+    /** @returns {Object3D[]} */
     get children() {
         return this.#children;
     }
 
-    /**
-     * @returns {Float32Array} - World transform matrix of this object.
-     */
+    /** @returns {Float32Array} */
     get worldMatrix() {
         return this.#worldMatrix;
     }
 
     /**
-     * Adds a child object to this object.
-     *
-     * @param {Object3D} child - Child object to attach to this node in the scene graph.
+     * @param {Object3D} child - Child node to attach to this object (re-parented if it already has a parent).
      */
     add(child) {
         if (!(child instanceof Object3D)) {
@@ -112,13 +103,12 @@ export class Object3D {
         }
 
         child.#parent = this;
+        child.#isWorldMatrixDirty = true;
         this.#children.push(child);
     }
 
     /**
-     * Removes a child from this object.
-     *
-     * @param {Object3D} child - Child object to detach from this node in the scene graph.
+     * @param {Object3D} child - Child node to detach from this object (no-op if the child is not attached here).
      */
     remove(child) {
         if (!(child instanceof Object3D)) {
@@ -133,42 +123,22 @@ export class Object3D {
 
         this.#children.splice(index, SINGLE_CHILD_REMOVE_COUNT);
         child.#parent = null;
+        child.#isWorldMatrixDirty = true;
     }
 
     /**
-     * Updates the world matrix of this object and all its descendants.
-     *
-     * @param {Float32Array | null} parentWorldMatrix - World matrix of the parent object, or null for the root node.
+     * @param {Float32Array | null} parentWorldMatrix - Parent world matrix, or null when updating a root node.
      */
     updateWorldMatrix(parentWorldMatrix) {
         if (parentWorldMatrix !== null && !(parentWorldMatrix instanceof Float32Array)) {
             throw new TypeError('Object3D.updateWorldMatrix expects a Float32Array or null.');
         }
 
-        this.#updateLocalMatrix();
-
-        const newWorldMatrix = parentWorldMatrix !== null
-            ? Matrix4.multiply(parentWorldMatrix, this.#localMatrix)
-            : this.#localMatrix;
-
-        this.#worldMatrix.set(newWorldMatrix);
-
-        for (let index = 0; index < this.#children.length; index += 1) {
-            this.#children[index].updateWorldMatrix(this.#worldMatrix);
-        }
+        this.#updateWorldMatrixRecursive(parentWorldMatrix, false);
     }
 
     /**
-     * Called for each Object3D in the hierarchy.
-     *
-     * @callback Object3DVisitor
-     * @param {Object3D} object - Current object in the traversal.
-     */
-
-    /**
-     * Traverses this object and all its descendants.
-     *
-     * @param {Object3DVisitor} callback - Function called for this object and each of its children in depth-first order.
+     * @param {function(Object3D): void} callback - Visitor function called for this object and all descendants (depth-first).
      */
     traverse(callback) {
         if (typeof callback !== 'function') {
@@ -182,33 +152,117 @@ export class Object3D {
         }
     }
 
+    /** @private */
+    #markTransformDirty() {
+        this.#isLocalMatrixDirty = true;
+        this.#isWorldMatrixDirty = true;
+    }
+
     /**
-     * Recomputes the local matrix from position, rotation and scale.
+     * @param {Float32Array | null} parentWorldMatrix - Parent world matrix, or null for the root.
+     * @param {boolean} parentWorldDirty              - Whether the parent world matrix was recomputed in this update pass.
+     * @private
+     */
+    #updateWorldMatrixRecursive(parentWorldMatrix, parentWorldDirty) {
+        if (this.#isLocalMatrixDirty) {
+            this.#updateLocalMatrix();
+            this.#isLocalMatrixDirty = false;
+            this.#isWorldMatrixDirty = true;
+        }
+
+        const shouldUpdateWorld = this.#isWorldMatrixDirty || parentWorldDirty;
+
+        if (shouldUpdateWorld) {
+            if (parentWorldMatrix !== null) {
+                Matrix4.multiplyTo(this.#worldMatrix, parentWorldMatrix, this.#localMatrix);
+            } else {
+                this.#worldMatrix.set(this.#localMatrix);
+            }
+
+            this.#isWorldMatrixDirty = false;
+        }
+
+        for (let index = 0; index < this.#children.length; index += 1) {
+            this.#children[index].#updateWorldMatrixRecursive(this.#worldMatrix, shouldUpdateWorld);
+        }
+    }
+
+    /**
+     * Recomputes local matrix into existing buffer (no allocations).
      *
      * @private
      */
     #updateLocalMatrix() {
-        const translation = Matrix4.createTranslation(
-            this.#position.x,
-            this.#position.y,
-            this.#position.z
-        );
+        const positionX = this.#position.x;
+        const positionY = this.#position.y;
+        const positionZ = this.#position.z;
 
-        const rotationX = Matrix4.createRotationX(this.#rotation.x);
-        const rotationY = Matrix4.createRotationY(this.#rotation.y);
-        const rotationZ = Matrix4.createRotationZ(this.#rotation.z);
-        const scale     = Matrix4.createScale(
-            this.#scale.x,
-            this.#scale.y,
-            this.#scale.z
-        );
+        const rotationX = this.#rotation.x;
+        const rotationY = this.#rotation.y;
+        const rotationZ = this.#rotation.z;
 
-        this.#localMatrix = Matrix4.multiplyMany(
-            translation,
-            rotationZ,
-            rotationY,
-            rotationX,
-            scale
-        );
+        const scaleX = this.#scale.x;
+        const scaleY = this.#scale.y;
+        const scaleZ = this.#scale.z;
+
+        const cosX = Math.cos(rotationX);
+        const sinX = Math.sin(rotationX);
+        const cosY = Math.cos(rotationY);
+        const sinY = Math.sin(rotationY);
+        const cosZ = Math.cos(rotationZ);
+        const sinZ = Math.sin(rotationZ);
+
+        // Rotation matrix, R = Rz * Ry * Rx:
+        const rot00 = cosZ * cosY;
+        const rot01 = (cosZ * sinY * sinX) - (sinZ * cosX);
+        const rot02 = (cosZ * sinY * cosX) + (sinZ * sinX);
+
+        const rot10 = sinZ * cosY;
+        const rot11 = (sinZ * sinY * sinX) + (cosZ * cosX);
+        const rot12 = (sinZ * sinY * cosX) - (cosZ * sinX);
+
+        const rot20 = -sinY;
+        const rot21 = cosY * sinX;
+        const rot22 = cosY * cosX;
+        const out   = this.#localMatrix;
+
+        // X axis:
+        out[0] = rot00 * scaleX;
+        out[1] = rot10 * scaleX;
+        out[2] = rot20 * scaleX;
+        out[3] = 0;
+
+        // Y axis:
+        out[4] = rot01 * scaleY;
+        out[5] = rot11 * scaleY;
+        out[6] = rot21 * scaleY;
+        out[7] = 0;
+
+        // Z axis:
+        out[8]  = rot02 * scaleZ;
+        out[9]  = rot12 * scaleZ;
+        out[10] = rot22 * scaleZ;
+        out[11] = 0;
+
+        // Translation:
+        out[12] = positionX;
+        out[13] = positionY;
+        out[14] = positionZ;
+        out[15] = 1;
+    }
+
+    /**
+     * @param {Float32Array} out - Output 4x4 matrix buffer that will be overwritten with the identity matrix.
+     * @private
+     */
+    static #setIdentityMatrix(out) {
+        for (let index = 0; index < MATRIX_4x4_ELEMENT_COUNT; index += 1) {
+            out[index] = 0;
+        }
+
+        out[0]  = 1;
+        out[5]  = 1;
+        out[10] = 1;
+        out[15] = 1;
     }
 }

@@ -53,10 +53,6 @@ Stores position, rotation, scale and parent/children relations.</div>
 
 
 
-<div class="description">
-    Creates a new transform node with position, rotation and scale.
-</div>
-
 
 
 
@@ -98,7 +94,7 @@ Stores position, rotation, scale and parent/children relations.</div>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line13">line 13</a>
+        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line17">line 17</a>
     </li></ul></dd>
     
 
@@ -195,7 +191,7 @@ Stores position, rotation, scale and parent/children relations.</div>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line85">line 85</a>
+        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line80">line 80</a>
     </li></ul></dd>
     
 
@@ -253,7 +249,7 @@ Stores position, rotation, scale and parent/children relations.</div>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line78">line 78</a>
+        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line75">line 75</a>
     </li></ul></dd>
     
 
@@ -311,7 +307,7 @@ Stores position, rotation, scale and parent/children relations.</div>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line57">line 57</a>
+        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line60">line 60</a>
     </li></ul></dd>
     
 
@@ -369,7 +365,7 @@ Stores position, rotation, scale and parent/children relations.</div>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line64">line 64</a>
+        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line65">line 65</a>
     </li></ul></dd>
     
 
@@ -427,7 +423,7 @@ Stores position, rotation, scale and parent/children relations.</div>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line71">line 71</a>
+        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line70">line 70</a>
     </li></ul></dd>
     
 
@@ -485,7 +481,7 @@ Stores position, rotation, scale and parent/children relations.</div>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line92">line 92</a>
+        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line85">line 85</a>
     </li></ul></dd>
     
 
@@ -519,10 +515,6 @@ Stores position, rotation, scale and parent/children relations.</div>
     
 
 
-
-<div class="description">
-    Adds a child object to this object.
-</div>
 
 
 
@@ -573,7 +565,7 @@ Stores position, rotation, scale and parent/children relations.</div>
 
             
 
-            <td class="description last">Child object to attach to this node in the scene graph.</td>
+            <td class="description last">Child node to attach to this object (re-parented if it already has a parent).</td>
         </tr>
 
     
@@ -614,7 +606,7 @@ Stores position, rotation, scale and parent/children relations.</div>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line101">line 101</a>
+        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line92">line 92</a>
     </li></ul></dd>
     
 
@@ -657,10 +649,6 @@ Stores position, rotation, scale and parent/children relations.</div>
 
 
 
-<div class="description">
-    Removes a child from this object.
-</div>
-
 
 
 
@@ -710,7 +698,7 @@ Stores position, rotation, scale and parent/children relations.</div>
 
             
 
-            <td class="description last">Child object to detach from this node in the scene graph.</td>
+            <td class="description last">Child node to detach from this object (no-op if the child is not attached here).</td>
         </tr>
 
     
@@ -751,7 +739,7 @@ Stores position, rotation, scale and parent/children relations.</div>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line123">line 123</a>
+        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line113">line 113</a>
     </li></ul></dd>
     
 
@@ -794,10 +782,6 @@ Stores position, rotation, scale and parent/children relations.</div>
 
 
 
-<div class="description">
-    Traverses this object and all its descendants.
-</div>
-
 
 
 
@@ -837,7 +821,7 @@ Stores position, rotation, scale and parent/children relations.</div>
             <td class="type">
             
                 
-<span class="param-type"><a href="global.html#Object3DVisitor">Object3DVisitor</a></span>
+<span class="param-type">function</span>
 
 
             
@@ -847,147 +831,7 @@ Stores position, rotation, scale and parent/children relations.</div>
 
             
 
-            <td class="description last">Function called for this object and each of its children in depth-first order.</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line173">line 173</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="updateWorldMatrix"><span class="type-signature"></span>updateWorldMatrix<span class="signature">(parentWorldMatrix)</span><span class="type-signature"></span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Updates the world matrix of this object and all its descendants.
-</div>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>parentWorldMatrix</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Float32Array</span>
-|
-
-<span class="param-type">null</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">World matrix of the parent object, or null for the root node.</td>
+            <td class="description last">Visitor function called for this object and all descendants (depth-first).</td>
         </tr>
 
     
@@ -1059,6 +903,142 @@ Stores position, rotation, scale and parent/children relations.</div>
 
 
         
+            
+
+    
+
+    
+    <h4 class="name" id="updateWorldMatrix"><span class="type-signature"></span>updateWorldMatrix<span class="signature">(parentWorldMatrix)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>parentWorldMatrix</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Float32Array</span>
+|
+
+<span class="param-type">null</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Parent world matrix, or null when updating a root node.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line132">line 132</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
     
 
     
@@ -1074,13 +1054,13 @@ Stores position, rotation, scale and parent/children relations.</div>
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="BasicMaterial.html">BasicMaterial</a></li><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#MIN_DRAWING_BUFFER_DIMENSION">MIN_DRAWING_BUFFER_DIMENSION</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="BasicMaterial.html">BasicMaterial</a></li><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="Vector3.html">Vector3</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#MIN_DRAWING_BUFFER_DIMENSION">MIN_DRAWING_BUFFER_DIMENSION</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#UNIT_COMPONENT">UNIT_COMPONENT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li><li><a href="global.html#ZERO_COMPONENT">ZERO_COMPONENT</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Sun Dec 14 2025 16:45:08 GMT+0300 (Moscow Standard Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Mon Dec 15 2025 18:15:23 GMT+0300 (Moscow Standard Time)
 </footer>
 
 <script> prettyPrint(); </script>

@@ -424,6 +424,180 @@ var Matrix4 = class _Matrix4 {
   }
 };
 
+// core/math/vector3.js
+var ZERO_COMPONENT = 0;
+var UNIT_COMPONENT = 1;
+var Vector3 = class _Vector3 {
+  /** @type {number} */
+  #x;
+  /** @type {number} */
+  #y;
+  /** @type {number} */
+  #z;
+  /** @type {Function | null} */
+  #onChange;
+  /**
+   * @param {number} [x = 0] - X component.
+   * @param {number} [y = 0] - Y component.
+   * @param {number} [z = 0] - Z component.
+   * @param {Function | null} [onChange = null] - Called when any component changes.
+   */
+  constructor(x = ZERO_COMPONENT, y = ZERO_COMPONENT, z = ZERO_COMPONENT, onChange = null) {
+    if (onChange !== null && typeof onChange !== "function") {
+      throw new TypeError("Vector3 constructor expects `onChange` as a function or null.");
+    }
+    this.#x = ZERO_COMPONENT;
+    this.#y = ZERO_COMPONENT;
+    this.#z = ZERO_COMPONENT;
+    this.#onChange = onChange;
+    this.set(x, y, z);
+  }
+  /**
+   * Creates a new (0, 0, 0) vector.
+   *
+   * @param {Function | null} [onChange=null] - Optional callback invoked when the vector changes, or null to disable change notifications.
+   * @returns {Vector3}                       - A new Vector3 instance with all components set to zero (0, 0, 0).
+   */
+  static createZero(onChange = null) {
+    return new _Vector3(
+      ZERO_COMPONENT,
+      ZERO_COMPONENT,
+      ZERO_COMPONENT,
+      onChange
+    );
+  }
+  /**
+   * Creates a new (1, 1, 1) vector (unit scale vector).
+   *
+   * @param {Function | null} [onChange=null] - Optional callback invoked when the vector changes, or null to disable change notifications.
+   * @returns {Vector3}                       - A new Vector3 instance with all components set to one (1, 1, 1).
+   */
+  static createUnitScale(onChange = null) {
+    return new _Vector3(
+      UNIT_COMPONENT,
+      UNIT_COMPONENT,
+      UNIT_COMPONENT,
+      onChange
+    );
+  }
+  /**
+   * @returns {number} - The current X component value.
+   */
+  get x() {
+    return this.#x;
+  }
+  /**
+   * @param {number} value - New X component value.
+   */
+  set x(value) {
+    _Vector3.#assertNumber(value, "x");
+    if (value === this.#x) {
+      return;
+    }
+    this.#x = value;
+    this.#emitChange();
+  }
+  /**
+   * @returns {number} - The current Y component value.
+   */
+  get y() {
+    return this.#y;
+  }
+  /**
+   * @param {number} value - New Y component value.
+   */
+  set y(value) {
+    _Vector3.#assertNumber(value, "y");
+    if (value === this.#y) {
+      return;
+    }
+    this.#y = value;
+    this.#emitChange();
+  }
+  /**
+   * @returns {number} - The current Z component value.
+   */
+  get z() {
+    return this.#z;
+  }
+  /**
+   * @param {number} value - New Z component value.
+   */
+  set z(value) {
+    _Vector3.#assertNumber(value, "z");
+    if (value === this.#z) {
+      return;
+    }
+    this.#z = value;
+    this.#emitChange();
+  }
+  /**
+   * Sets all components at once.
+   * Calls onChange at most once.
+   *
+   * @param {number} x  - New X component value.
+   * @param {number} y  - New Y component value.
+   * @param {number} z  - New Z component value.
+   * @returns {Vector3} - This vector instance (for chaining).
+   */
+  set(x, y, z) {
+    _Vector3.#assertNumber(x, "x");
+    _Vector3.#assertNumber(y, "y");
+    _Vector3.#assertNumber(z, "z");
+    const changed = x !== this.#x || y !== this.#y || z !== this.#z;
+    this.#x = x;
+    this.#y = y;
+    this.#z = z;
+    if (changed) {
+      this.#emitChange();
+    }
+    return this;
+  }
+  /**
+   * Copies components from another Vector3.
+   *
+   * @param {Vector3} other - Source vector to copy components from.
+   * @returns {Vector3}     - This vector instance after copying components from the source vector (for chaining).
+   */
+  copyFrom(other) {
+    if (!(other instanceof _Vector3)) {
+      throw new TypeError("Vector3.copyFrom expects a Vector3 instance.");
+    }
+    return this.set(other.x, other.y, other.z);
+  }
+  /**
+   * Sets/updates the onChange callback.
+   *
+   * @param {Function | null} onChange - Callback invoked when any component changes, or null to disable change notifications.
+   * @returns {Vector3}                - This vector instance (for chaining).
+   */
+  setOnChange(onChange) {
+    if (onChange !== null && typeof onChange !== "function") {
+      throw new TypeError("Vector3.setOnChange expects a function or null.");
+    }
+    this.#onChange = onChange;
+    return this;
+  }
+  /**
+   * @private
+   */
+  #emitChange() {
+    if (this.#onChange) {
+      this.#onChange();
+    }
+  }
+  /**
+   * @param {number} value - Value to validate (must be a number and not NaN).
+   * @param {string} name  - Component name used in error messages.
+   * @private
+   */
+  static #assertNumber(value, name) {
+    if (typeof value !== "number" || Number.isNaN(value)) {
+      throw new TypeError(`Vector3 component "${name}" must be a valid number.`);
+    }
+  }
+};
+
 // core/geometry/geometry.js
 var POSITION_ATTRIBUTE_LOCATION = 0;
 var POSITION_COMPONENT_COUNT = 3;
@@ -1076,79 +1250,63 @@ var BasicMaterial = class extends Material {
 // core/scene/object3d.js
 var CHILD_NOT_FOUND_INDEX = -1;
 var SINGLE_CHILD_REMOVE_COUNT = 1;
+var MATRIX_4x4_ELEMENT_COUNT3 = 16;
 var Object3D = class _Object3D {
-  /** @type {{ x: number, y: number, z: number }} */
+  /** @type {Vector3} */
   #position;
-  /** @type {{ x: number, y: number, z: number }} */
+  /** @type {Vector3} */
   #rotation;
-  /** @type {{ x: number, y: number, z: number }} */
+  /** @type {Vector3} */
   #scale;
   /** @type {Object3D | null} */
   #parent;
   /** @type {Object3D[]} */
   #children;
-  /**
-   * Local transform matrix of this object (position/rotation/scale relative to its parent).
-   * @type {Float32Array}
-   */
+  /** @type {Float32Array} */
   #localMatrix;
-  /**
-   * World transform matrix of this object (relative to the scene origin).
-   * @type {Float32Array}
-   */
+  /** @type {Float32Array} */
   #worldMatrix;
-  /**
-   * Creates a new transform node with position, rotation and scale.
-   */
+  /** @type {boolean} */
+  #isLocalMatrixDirty = true;
+  /** @type {boolean} */
+  #isWorldMatrixDirty = true;
   constructor() {
-    this.#position = { x: 0, y: 0, z: 0 };
-    this.#rotation = { x: 0, y: 0, z: 0 };
-    this.#scale = { x: 1, y: 1, z: 1 };
     this.#parent = null;
     this.#children = [];
-    this.#localMatrix = Matrix4.createIdentity();
-    this.#worldMatrix = Matrix4.createIdentity();
+    this.#localMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT3);
+    this.#worldMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT3);
+    _Object3D.#setIdentityMatrix(this.#localMatrix);
+    _Object3D.#setIdentityMatrix(this.#worldMatrix);
+    this.#position = Vector3.createZero(() => this.#markTransformDirty());
+    this.#rotation = Vector3.createZero(() => this.#markTransformDirty());
+    this.#scale = Vector3.createUnitScale(() => this.#markTransformDirty());
   }
-  /**
-   * @returns {{ x: number, y: number, z: number }} - Local position of this object.
-   */
+  /** @returns {Vector3} */
   get position() {
     return this.#position;
   }
-  /**
-   * @returns {{ x: number, y: number, z: number }} - Local rotation of this object in radians.
-   */
+  /** @returns {Vector3} */
   get rotation() {
     return this.#rotation;
   }
-  /**
-   * @returns {{ x: number, y: number, z: number }} - Local scale of this object.
-   */
+  /** @returns {Vector3} */
   get scale() {
     return this.#scale;
   }
-  /**
-   * @returns {Object3D | null}
-   */
+  /** @returns {Object3D | null} */
   get parent() {
     return this.#parent;
   }
-  /**
-   * @returns {Object3D[]}
-   */
+  /** @returns {Object3D[]} */
   get children() {
     return this.#children;
   }
-  /**
-   * @returns {Float32Array} - World transform matrix of this object.
-   */
+  /** @returns {Float32Array} */
   get worldMatrix() {
     return this.#worldMatrix;
   }
   /**
-   * Adds a child object to this object.
-   *
-   * @param {Object3D} child - Child object to attach to this node in the scene graph.
+   * @param {Object3D} child - Child node to attach to this object (re-parented if it already has a parent).
    */
   add(child) {
     if (!(child instanceof _Object3D)) {
@@ -1161,12 +1319,11 @@ var Object3D = class _Object3D {
       child.#parent.remove(child);
     }
     child.#parent = this;
+    child.#isWorldMatrixDirty = true;
     this.#children.push(child);
   }
   /**
-   * Removes a child from this object.
-   *
-   * @param {Object3D} child - Child object to detach from this node in the scene graph.
+   * @param {Object3D} child - Child node to detach from this object (no-op if the child is not attached here).
    */
   remove(child) {
     if (!(child instanceof _Object3D)) {
@@ -1178,33 +1335,19 @@ var Object3D = class _Object3D {
     }
     this.#children.splice(index, SINGLE_CHILD_REMOVE_COUNT);
     child.#parent = null;
+    child.#isWorldMatrixDirty = true;
   }
   /**
-   * Updates the world matrix of this object and all its descendants.
-   *
-   * @param {Float32Array | null} parentWorldMatrix - World matrix of the parent object, or null for the root node.
+   * @param {Float32Array | null} parentWorldMatrix - Parent world matrix, or null when updating a root node.
    */
   updateWorldMatrix(parentWorldMatrix) {
     if (parentWorldMatrix !== null && !(parentWorldMatrix instanceof Float32Array)) {
       throw new TypeError("Object3D.updateWorldMatrix expects a Float32Array or null.");
     }
-    this.#updateLocalMatrix();
-    const newWorldMatrix = parentWorldMatrix !== null ? Matrix4.multiply(parentWorldMatrix, this.#localMatrix) : this.#localMatrix;
-    this.#worldMatrix.set(newWorldMatrix);
-    for (let index = 0; index < this.#children.length; index += 1) {
-      this.#children[index].updateWorldMatrix(this.#worldMatrix);
-    }
+    this.#updateWorldMatrixRecursive(parentWorldMatrix, false);
   }
   /**
-   * Called for each Object3D in the hierarchy.
-   *
-   * @callback Object3DVisitor
-   * @param {Object3D} object - Current object in the traversal.
-   */
-  /**
-   * Traverses this object and all its descendants.
-   *
-   * @param {Object3DVisitor} callback - Function called for this object and each of its children in depth-first order.
+   * @param {function(Object3D): void} callback - Visitor function called for this object and all descendants (depth-first).
    */
   traverse(callback) {
     if (typeof callback !== "function") {
@@ -1215,32 +1358,95 @@ var Object3D = class _Object3D {
       this.#children[index].traverse(callback);
     }
   }
+  /** @private */
+  #markTransformDirty() {
+    this.#isLocalMatrixDirty = true;
+    this.#isWorldMatrixDirty = true;
+  }
   /**
-   * Recomputes the local matrix from position, rotation and scale.
+   * @param {Float32Array | null} parentWorldMatrix - Parent world matrix, or null for the root.
+   * @param {boolean} parentWorldDirty              - Whether the parent world matrix was recomputed in this update pass.
+   * @private
+   */
+  #updateWorldMatrixRecursive(parentWorldMatrix, parentWorldDirty) {
+    if (this.#isLocalMatrixDirty) {
+      this.#updateLocalMatrix();
+      this.#isLocalMatrixDirty = false;
+      this.#isWorldMatrixDirty = true;
+    }
+    const shouldUpdateWorld = this.#isWorldMatrixDirty || parentWorldDirty;
+    if (shouldUpdateWorld) {
+      if (parentWorldMatrix !== null) {
+        Matrix4.multiplyTo(this.#worldMatrix, parentWorldMatrix, this.#localMatrix);
+      } else {
+        this.#worldMatrix.set(this.#localMatrix);
+      }
+      this.#isWorldMatrixDirty = false;
+    }
+    for (let index = 0; index < this.#children.length; index += 1) {
+      this.#children[index].#updateWorldMatrixRecursive(this.#worldMatrix, shouldUpdateWorld);
+    }
+  }
+  /**
+   * Recomputes local matrix into existing buffer (no allocations).
    *
    * @private
    */
   #updateLocalMatrix() {
-    const translation = Matrix4.createTranslation(
-      this.#position.x,
-      this.#position.y,
-      this.#position.z
-    );
-    const rotationX = Matrix4.createRotationX(this.#rotation.x);
-    const rotationY = Matrix4.createRotationY(this.#rotation.y);
-    const rotationZ = Matrix4.createRotationZ(this.#rotation.z);
-    const scale = Matrix4.createScale(
-      this.#scale.x,
-      this.#scale.y,
-      this.#scale.z
-    );
-    this.#localMatrix = Matrix4.multiplyMany(
-      translation,
-      rotationZ,
-      rotationY,
-      rotationX,
-      scale
-    );
+    const positionX = this.#position.x;
+    const positionY = this.#position.y;
+    const positionZ = this.#position.z;
+    const rotationX = this.#rotation.x;
+    const rotationY = this.#rotation.y;
+    const rotationZ = this.#rotation.z;
+    const scaleX = this.#scale.x;
+    const scaleY = this.#scale.y;
+    const scaleZ = this.#scale.z;
+    const cosX = Math.cos(rotationX);
+    const sinX = Math.sin(rotationX);
+    const cosY = Math.cos(rotationY);
+    const sinY = Math.sin(rotationY);
+    const cosZ = Math.cos(rotationZ);
+    const sinZ = Math.sin(rotationZ);
+    const rot00 = cosZ * cosY;
+    const rot01 = cosZ * sinY * sinX - sinZ * cosX;
+    const rot02 = cosZ * sinY * cosX + sinZ * sinX;
+    const rot10 = sinZ * cosY;
+    const rot11 = sinZ * sinY * sinX + cosZ * cosX;
+    const rot12 = sinZ * sinY * cosX - cosZ * sinX;
+    const rot20 = -sinY;
+    const rot21 = cosY * sinX;
+    const rot22 = cosY * cosX;
+    const out = this.#localMatrix;
+    out[0] = rot00 * scaleX;
+    out[1] = rot10 * scaleX;
+    out[2] = rot20 * scaleX;
+    out[3] = 0;
+    out[4] = rot01 * scaleY;
+    out[5] = rot11 * scaleY;
+    out[6] = rot21 * scaleY;
+    out[7] = 0;
+    out[8] = rot02 * scaleZ;
+    out[9] = rot12 * scaleZ;
+    out[10] = rot22 * scaleZ;
+    out[11] = 0;
+    out[12] = positionX;
+    out[13] = positionY;
+    out[14] = positionZ;
+    out[15] = 1;
+  }
+  /**
+   * @param {Float32Array} out - Output 4x4 matrix buffer that will be overwritten with the identity matrix.
+   * @private
+   */
+  static #setIdentityMatrix(out) {
+    for (let index = 0; index < MATRIX_4x4_ELEMENT_COUNT3; index += 1) {
+      out[index] = 0;
+    }
+    out[0] = 1;
+    out[5] = 1;
+    out[10] = 1;
+    out[15] = 1;
   }
 };
 
@@ -1402,11 +1608,16 @@ var PerspectiveCamera = class extends Object3D {
 
 // core/render/renderer.js
 var INDEX_BUFFER_OFFSET_BYTES = 0;
+var MATRIX_4x4_ELEMENT_COUNT4 = 16;
 var Renderer = class {
   /** @type {WebGLContext} */
   #contextWrapper;
   /** @type {WebGL2RenderingContext} */
   #webglRenderingContext;
+  /** @type {Float32Array} */
+  #viewProjectionMatrix;
+  /** @type {Float32Array} */
+  #finalMatrix;
   /**
    * @param {WebGLContext} webglContext - Wrapper around the underlying WebGL2 rendering context.
    */
@@ -1416,6 +1627,8 @@ var Renderer = class {
     }
     this.#contextWrapper = webglContext;
     this.#webglRenderingContext = webglContext.context;
+    this.#viewProjectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT4);
+    this.#finalMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT4);
   }
   /**
    * Renders the given scene from the point of view of the given camera.
@@ -1438,7 +1651,11 @@ var Renderer = class {
     camera.setAspectRatio(aspectRatio);
     const projectionMatrix = camera.getProjectionMatrix();
     const viewMatrix = camera.getViewMatrix();
-    const viewProjectionMatrix = Matrix4.multiply(projectionMatrix, viewMatrix);
+    const viewProjectionMatrix = Matrix4.multiplyTo(
+      this.#viewProjectionMatrix,
+      projectionMatrix,
+      viewMatrix
+    );
     scene.updateWorldMatrix(null);
     scene.traverse((object3d) => {
       if (!(object3d instanceof Mesh)) {
@@ -1451,7 +1668,11 @@ var Renderer = class {
       const geometry = mesh.geometry;
       const material = mesh.material;
       const worldMatrix = mesh.worldMatrix;
-      const finalMatrix = Matrix4.multiply(viewProjectionMatrix, worldMatrix);
+      const finalMatrix = Matrix4.multiplyTo(
+        this.#finalMatrix,
+        viewProjectionMatrix,
+        worldMatrix
+      );
       material.use();
       material.apply(finalMatrix);
       geometry.bind();
@@ -1480,6 +1701,7 @@ export {
   Renderer,
   Scene,
   ShaderProgram,
+  Vector3,
   WebGLContext
 };
 //# sourceMappingURL=gerawebgl.js.map

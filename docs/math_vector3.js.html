@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: math/vector3.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: math/vector3.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/** @type {number} */
+const ZERO_COMPONENT = 0;
+
+/** @type {number} */
+const UNIT_COMPONENT = 1;
+
+/**
+ * 3D vector with observable components. Can invoke an onChange callback when x, y, z changes.
+ */
+export class Vector3 {
+    /** @type {number} */
+    #x;
+
+    /** @type {number} */
+    #y;
+
+    /** @type {number} */
+    #z;
+
+    /** @type {Function | null} */
+    #onChange;
+
+    /**
+     * @param {number} [x = 0] - X component.
+     * @param {number} [y = 0] - Y component.
+     * @param {number} [z = 0] - Z component.
+     * @param {Function | null} [onChange = null] - Called when any component changes.
+     */
+    constructor(x = ZERO_COMPONENT, y = ZERO_COMPONENT, z = ZERO_COMPONENT, onChange = null) {
+        if (onChange !== null &amp;&amp; typeof onChange !== 'function') {
+            throw new TypeError('Vector3 constructor expects `onChange` as a function or null.');
+        }
+
+        this.#x = ZERO_COMPONENT;
+        this.#y = ZERO_COMPONENT;
+        this.#z = ZERO_COMPONENT;
+        this.#onChange = onChange;
+        this.set(x, y, z);
+    }
+
+    /**
+     * Creates a new (0, 0, 0) vector.
+     *
+     * @param {Function | null} [onChange=null] - Optional callback invoked when the vector changes, or null to disable change notifications.
+     * @returns {Vector3}                       - A new Vector3 instance with all components set to zero (0, 0, 0).
+     */
+    static createZero(onChange = null) {
+        return new Vector3(
+            ZERO_COMPONENT,
+            ZERO_COMPONENT,
+            ZERO_COMPONENT,
+            onChange
+        );
+    }
+
+    /**
+     * Creates a new (1, 1, 1) vector (unit scale vector).
+     *
+     * @param {Function | null} [onChange=null] - Optional callback invoked when the vector changes, or null to disable change notifications.
+     * @returns {Vector3}                       - A new Vector3 instance with all components set to one (1, 1, 1).
+     */
+    static createUnitScale(onChange = null) {
+        return new Vector3(
+            UNIT_COMPONENT,
+            UNIT_COMPONENT,
+            UNIT_COMPONENT,
+            onChange
+        );
+    }
+
+    /**
+     * @returns {number} - The current X component value.
+     */
+    get x() {
+        return this.#x;
+    }
+
+    /**
+     * @param {number} value - New X component value.
+     */
+    set x(value) {
+        Vector3.#assertNumber(value, 'x');
+
+        if (value === this.#x) {
+            return;
+        }
+
+        this.#x = value;
+        this.#emitChange();
+    }
+
+    /**
+     * @returns {number} - The current Y component value.
+     */
+    get y() {
+        return this.#y;
+    }
+
+    /**
+     * @param {number} value - New Y component value.
+     */
+    set y(value) {
+        Vector3.#assertNumber(value, 'y');
+
+        if (value === this.#y) {
+            return;
+        }
+
+        this.#y = value;
+        this.#emitChange();
+    }
+
+    /**
+     * @returns {number} - The current Z component value.
+     */
+    get z() {
+        return this.#z;
+    }
+
+    /**
+     * @param {number} value - New Z component value.
+     */
+    set z(value) {
+        Vector3.#assertNumber(value, 'z');
+
+        if (value === this.#z) {
+            return;
+        }
+
+        this.#z = value;
+        this.#emitChange();
+    }
+
+    /**
+     * Sets all components at once.
+     * Calls onChange at most once.
+     *
+     * @param {number} x  - New X component value.
+     * @param {number} y  - New Y component value.
+     * @param {number} z  - New Z component value.
+     * @returns {Vector3} - This vector instance (for chaining).
+     */
+    set(x, y, z) {
+        Vector3.#assertNumber(x, 'x');
+        Vector3.#assertNumber(y, 'y');
+        Vector3.#assertNumber(z, 'z');
+
+        const changed = (x !== this.#x) || (y !== this.#y) || (z !== this.#z);
+        this.#x = x;
+        this.#y = y;
+        this.#z = z;
+
+        if (changed) {
+            this.#emitChange();
+        }
+
+        return this;
+    }
+
+    /**
+     * Copies components from another Vector3.
+     *
+     * @param {Vector3} other - Source vector to copy components from.
+     * @returns {Vector3}     - This vector instance after copying components from the source vector (for chaining).
+     */
+    copyFrom(other) {
+        if (!(other instanceof Vector3)) {
+            throw new TypeError('Vector3.copyFrom expects a Vector3 instance.');
+        }
+
+        return this.set(other.x, other.y, other.z);
+    }
+
+    /**
+     * Sets/updates the onChange callback.
+     *
+     * @param {Function | null} onChange - Callback invoked when any component changes, or null to disable change notifications.
+     * @returns {Vector3}                - This vector instance (for chaining).
+     */
+    setOnChange(onChange) {
+        if (onChange !== null &amp;&amp; typeof onChange !== 'function') {
+            throw new TypeError('Vector3.setOnChange expects a function or null.');
+        }
+
+        this.#onChange = onChange;
+        return this;
+    }
+
+    /**
+     * @private
+     */
+    #emitChange() {
+        if (this.#onChange) {
+            this.#onChange();
+        }
+    }
+
+    /**
+     * @param {number} value - Value to validate (must be a number and not NaN).
+     * @param {string} name  - Component name used in error messages.
+     * @private
+     */
+    static #assertNumber(value, name) {
+        if (typeof value !== 'number' || Number.isNaN(value)) {
+            throw new TypeError(`Vector3 component "${name}" must be a valid number.`);
+        }
+    }
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="BasicMaterial.html">BasicMaterial</a></li><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="Vector3.html">Vector3</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#MIN_DRAWING_BUFFER_DIMENSION">MIN_DRAWING_BUFFER_DIMENSION</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#UNIT_COMPONENT">UNIT_COMPONENT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li><li><a href="global.html#ZERO_COMPONENT">ZERO_COMPONENT</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Mon Dec 15 2025 18:15:23 GMT+0300 (Moscow Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

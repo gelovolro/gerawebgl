@@ -13,6 +13,9 @@
     "build:lib:release": "esbuild core/library.js --bundle --minify --format=esm --outfile=docs/demo/gerawebgl.min.js",
     "build": "npm run build:lib:debug && npm run build:lib:release && npm run copy:demo",
     "build:all": "npm run clear:all && npm run build && npm run docs:build",
+    "build:all-and-serve-demo": "npm run build:all && npm run demo:serve",
+    "clear:zip": "rimraf *.zip",
+    "create:zip": "npm run clear:zip && zip -r \"gerawebgl-sources-$(date +%d%m%y%H%M%S).zip\" . -x \"node_modules/*\" \".git/*\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

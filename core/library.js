@@ -1,5 +1,6 @@
 export { WebGLContext }      from './webgl-context.js';
 export { Matrix4 }           from './math/matrix4.js';
+export { Vector3 }           from './math/vector3.js';
 export { Geometry }          from './geometry/geometry.js';
 export { BoxGeometry }       from './geometry/box-geometry.js';
 export { ShaderProgram }     from './shader/shader-program.js';
