@@ -1,34 +1,93 @@
-/** @type {number} */
+/**
+ * Number of elements in a 4x4 matrix.
+ * Used to validate and upload `mat4` uniform values.
+ *
+ * @type {number}
+ */
 const MATRIX_4x4_ELEMENT_COUNT = 16;
+
+/**
+ * Number of elements in a 2-component vector.
+ * Used to validate `vec2` uniform values.
+ *
+ * @type {number}
+ */
+const VECTOR_2_ELEMENT_COUNT = 2;
+
+/**
+ * Number of elements in a 3-component vector.
+ * Used to validate `vec3` uniform values.
+ *
+ * @type {number}
+ */
+const VECTOR_3_ELEMENT_COUNT = 3;
+
+/**
+ * Number of elements in a 4-component vector.
+ * Used to validate `vec4` uniform values.
+ *
+ * @type {number}
+ */
+const VECTOR_4_ELEMENT_COUNT = 4;
+
+/**
+ * WebGL sentinel value for `attribute not found`.
+ * getAttribLocation returns `-1`, when the attribute is not found.
+ *
+ * @type {number}
+ */
+const ATTRIBUTE_LOCATION_NOT_FOUND_VALUE = -1;
 
 /**
  * Thin wrapper around a linked WebGL shader program.
  */
 export class ShaderProgram {
-    /** @type {WebGL2RenderingContext} */
+    /**
+     * Raw WebGL2 rendering context.
+     * Used for all shader program operations (e.g.: compile/link/use, uniforms, attributes).
+     *
+     * @type {WebGL2RenderingContext}
+     * @private
+     */
     #webglRenderingContext;
 
-    /** @type {WebGLProgram | null} */
+    /**
+     * Linked WebGL program instance.
+     *
+     * @type {WebGLProgram | null}
+     * @private
+     */
     #program;
 
-    /** @type {Map<string, WebGLUniformLocation>} */
+    /**
+     * Cache of uniform locations by uniform name.
+     * Avoids repeated calls to getUniformLocation for the same program.
+     *
+     * @type {Map<string, WebGLUniformLocation>}
+     * @private
+     */
     #uniformLocations;
 
-    /** @type {boolean} */
+    /**
+     * Indicates whether this shader program has been disposed.
+     *
+     * @type {boolean}
+     * @private
+     */
     #isDisposed = false;
 
     /**
      * @param {WebGL2RenderingContext} webglRenderingContext - WebGL2 rendering context used to create shaders and the program.
-     * @param {string} vertexSource   - GLSL source code of the vertex shader.
-     * @param {string} fragmentSource - GLSL source code of the fragment shader.
+     * @param {string} vertexSource                          - GLSL source code of the vertex shader.
+     * @param {string} fragmentSource                        - GLSL source code of the fragment shader.
      */
     constructor(webglRenderingContext, vertexSource, fragmentSource) {
         if (!(webglRenderingContext instanceof WebGL2RenderingContext)) {
-            throw new TypeError('ShaderProgram expects a WebGL2RenderingContext.');
+            throw new TypeError('`ShaderProgram` expects a `WebGL2RenderingContext`.');
         }
 
         if (typeof vertexSource !== 'string' || typeof fragmentSource !== 'string') {
-            throw new TypeError('ShaderProgram expects vertex and fragment source as strings.');
+            throw new TypeError('`ShaderProgram` expects vertex and fragment source as strings.');
         }
 
         this.#webglRenderingContext = webglRenderingContext;
@@ -84,6 +143,157 @@ export class ShaderProgram {
     }
 
     /**
+     * Returns the attribute location for the given attribute name.
+     * This is useful for manual `vertexAttribPointer` setups.
+     *
+     * @param {string} name - Attribute name in the linked shader program.
+     * @returns {number}    - Attribute location (0+).
+     */
+    getAttribLocation(name) {
+        this.#assertNotDisposed();
+
+        if (typeof name !== 'string') {
+            throw new TypeError('`ShaderProgram.getAttribLocation` expects attribute name as a string.');
+        }
+
+        const location = this.#webglRenderingContext.getAttribLocation(this.#program, name);
+
+        if (location === ATTRIBUTE_LOCATION_NOT_FOUND_VALUE) {
+            throw new Error(`Attribute "${name}" not found in shader program.`);
+        }
+
+        return location;
+    }
+
+    /**
+     * Returns a cached uniform location.
+     * This can be used for manual `gl.uniform*` calls.
+     *
+     * @param {string} name - Uniform name in the linked shader program.
+     * @returns {WebGLUniformLocation}
+     */
+    getUniformLocation(name) {
+        return this.#getUniformLocation(name);
+    }
+
+    /**
+     * Sets a float uniform.
+     *
+     * @param {string} name  - Name of the uniform variable.
+     * @param {number} value - Float value to upload.
+     */
+    setFloat(name, value) {
+        this.#assertNotDisposed();
+
+        if (typeof name !== 'string') {
+            throw new TypeError('`ShaderProgram.setFloat` expects uniform name as a string.');
+        }
+
+        if (typeof value !== 'number') {
+            throw new TypeError('`ShaderProgram.setFloat` expects value as a number.');
+        }
+
+        const location = this.#getUniformLocation(name);
+        this.#webglRenderingContext.uniform1f(location, value);
+    }
+
+    /**
+     * Sets an integer uniform.
+     *
+     * @param {string} name  - Name of the uniform variable.
+     * @param {number} value - Integer value to upload.
+     */
+    setInt(name, value) {
+        this.#assertNotDisposed();
+
+        if (typeof name !== 'string') {
+            throw new TypeError('`ShaderProgram.setInt` expects uniform name as a string.');
+        }
+
+        if (typeof value !== 'number' || !Number.isInteger(value)) {
+            throw new TypeError('`ShaderProgram.setInt` expects an integer value.');
+        }
+
+        const location = this.#getUniformLocation(name);
+        this.#webglRenderingContext.uniform1i(location, value);
+    }
+
+    /**
+     * Sets a vec2 uniform.
+     *
+     * @param {string} name                   - Name of the uniform variable.
+     * @param {Float32Array | number[]} value - Two numeric components.
+     */
+    setVector2(name, value) {
+        this.#assertNotDisposed();
+
+        if (typeof name !== 'string') {
+            throw new TypeError('`ShaderProgram.setVector2` expects uniform name as a string.');
+        }
+
+        if (!Array.isArray(value) && !(value instanceof Float32Array)) {
+            throw new TypeError('`ShaderProgram.setVector2` expects a number[] or Float32Array.');
+        }
+
+        if (value.length !== VECTOR_2_ELEMENT_COUNT) {
+            throw new TypeError('`ShaderProgram.setVector2` expects exactly 2 components.');
+        }
+
+        const location = this.#getUniformLocation(name);
+        this.#webglRenderingContext.uniform2fv(location, value);
+    }
+
+    /**
+     * Sets a vec3 uniform.
+     *
+     * @param {string} name                   - Name of the uniform variable.
+     * @param {Float32Array | number[]} value - Three numeric components.
+     */
+    setVector3(name, value) {
+        this.#assertNotDisposed();
+
+        if (typeof name !== 'string') {
+            throw new TypeError('`ShaderProgram.setVector3` expects uniform name as a string.');
+        }
+
+        if (!Array.isArray(value) && !(value instanceof Float32Array)) {
+            throw new TypeError('`ShaderProgram.setVector3` expects a number[] or Float32Array.');
+        }
+
+        if (value.length !== VECTOR_3_ELEMENT_COUNT) {
+            throw new TypeError('`ShaderProgram.setVector3` expects exactly 3 components.');
+        }
+
+        const location = this.#getUniformLocation(name);
+        this.#webglRenderingContext.uniform3fv(location, value);
+    }
+
+    /**
+     * Sets a vec4 uniform.
+     *
+     * @param {string} name                   - Name of the uniform variable.
+     * @param {Float32Array | number[]} value - Four numeric components.
+     */
+    setVector4(name, value) {
+        this.#assertNotDisposed();
+
+        if (typeof name !== 'string') {
+            throw new TypeError('`ShaderProgram.setVector4` expects uniform name as a string.');
+        }
+
+        if (!Array.isArray(value) && !(value instanceof Float32Array)) {
+            throw new TypeError('`ShaderProgram.setVector4` expects a number[] or Float32Array.');
+        }
+
+        if (value.length !== VECTOR_4_ELEMENT_COUNT) {
+            throw new TypeError('`ShaderProgram.setVector4` expects exactly 4 components.');
+        }
+
+        const location = this.#getUniformLocation(name);
+        this.#webglRenderingContext.uniform4fv(location, value);
+    }
+
+    /**
      * Sets a 4x4 matrix uniform.
      *
      * @param {string} name         - Name of the uniform variable in the GLSL program.
@@ -93,11 +303,11 @@ export class ShaderProgram {
         this.#assertNotDisposed();
 
         if (typeof name !== 'string') {
-            throw new TypeError('ShaderProgram.setMatrix4 expects uniform name as a string.');
+            throw new TypeError('`ShaderProgram.setMatrix4` expects uniform name as a string.');
         }
 
         if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
-            throw new TypeError('ShaderProgram.setMatrix4 expects a 4x4 Float32Array.');
+            throw new TypeError('`ShaderProgram.setMatrix4` expects a 4x4 Float32Array.');
         }
 
         const location = this.#getUniformLocation(name);
@@ -126,7 +336,7 @@ export class ShaderProgram {
      */
     #assertNotDisposed() {
         if (this.#isDisposed || this.#program === null) {
-            throw new Error('ShaderProgram has been disposed and can no longer be used.');
+            throw new Error('`ShaderProgram` has been disposed and can no longer be used.');
         }
     }
 
@@ -141,7 +351,7 @@ export class ShaderProgram {
         this.#assertNotDisposed();
 
         if (typeof name !== 'string') {
-            throw new TypeError('ShaderProgram.#getUniformLocation expects a string name.');
+            throw new TypeError('`ShaderProgram.#getUniformLocation` expects a string name.');
         }
 
         if (this.#uniformLocations.has(name)) {
@@ -169,17 +379,17 @@ export class ShaderProgram {
      */
     #compileShader(type, source) {
         if (typeof type !== 'number') {
-            throw new TypeError('ShaderProgram.#compileShader expects a numeric shader type.');
+            throw new TypeError('`ShaderProgram.#compileShader` expects a numeric shader type.');
         }
 
         if (typeof source !== 'string') {
-            throw new TypeError('ShaderProgram.#compileShader expects shader source as a string.');
+            throw new TypeError('`ShaderProgram.#compileShader` expects shader source as a string.');
         }
 
         const shader = this.#webglRenderingContext.createShader(type);
 
         if (!shader) {
-            throw new Error('Failed to create WebGL shader.');
+            throw new Error('Failed to create the WebGL shader.');
         }
 
         this.#webglRenderingContext.shaderSource(shader, source);

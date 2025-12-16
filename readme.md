@@ -5,11 +5,112 @@ I first developed my own WebGL library (based on v1.0) back in 2014. Now I’ve 
 - **API reference (JSDoc):** https://gelovolro.github.io/gerawebgl/
 - **Demo:** https://gelovolro.github.io/gerawebgl/demo/
 
+## Quick start
+
+```js
+import { GeraWebGL } from './gerawebgl.js';
+
+const canvas = document.querySelector('#glcanvas');
+const engine = GeraWebGL.createEngine(canvas);
+const cube   = engine.createBoxMesh({ size: 1.0 });
+engine.scene.add(cube);
+
+engine.start((delta) => {
+    cube.rotation.x += delta;
+    cube.rotation.y += delta * 0.7;
+});
+```
+
+## API levels
+
+### High-level
+
+High-level modules are for “get something on screen fast”:
+
+- `Engine` (scene + camera + renderer + render loop)
+- Scene graph        : `Scene`, `Object3D`, `Mesh`, `PerspectiveCamera`
+- Built-in geometry  : `Geometries.BoxGeometry`
+- Built-in materials : `Materials.BasicMaterial`
+
+Example:
+
+```js
+const engine = GeraWebGL.createEngine(canvas);
+const cube   = engine.createBoxMesh({ size: 1.0 });
+engine.scene.add(cube);
+```
+
+### Low-level
+
+Low-level modules are for custom shaders and direct WebGL control. Example:
+
+```js
+import GeraWebGL from './gerawebgl.js';
+
+const canvas       = document.querySelector('#glcanvas');
+const engine       = GeraWebGL.createEngine(canvas);
+const webglContext = engine.webglRenderingContext;
+
+const VERTEX_SHADER_SOURCE = `#version 300 es
+precision mediump float;
+layout(location = 0) in vec3 a_position;
+layout(location = 1) in vec3 a_color;
+uniform mat4 u_matrix;
+out vec3 v_color;
+
+void main() {
+    gl_Position = u_matrix * vec4(a_position, 1.0);
+    v_color = a_color;
+}
+`;
+
+const FRAGMENT_SHADER_SOURCE = `#version 300 es
+precision mediump float;
+in vec3 v_color;
+out vec4 outColor;
+uniform float u_time;
+
+void main() {
+    float pulse = 0.5 + 0.5 * sin(u_time);
+    outColor = vec4(v_color * pulse, 1.0);
+}
+`;
+
+class TimeMaterial extends GeraWebGL.Materials.Material {
+    constructor(webglContext) {
+        const program = new GeraWebGL.LowLevel.ShaderProgram(
+            webglContext,
+            VERTEX_SHADER_SOURCE,
+            FRAGMENT_SHADER_SOURCE
+        );
+
+        super(webglContext, program, { ownsShaderProgram: true });
+    }
+
+    apply(matrix4) {
+        this.shaderProgram.setMatrix4('u_matrix', matrix4);
+        this.shaderProgram.setFloat('u_time', performance.now() * 0.001);
+    }
+}
+
+const geometry = new GeraWebGL.Geometries.BoxGeometry(webglContext, 1.0);
+const material = new TimeMaterial(webglContext);
+const cube     = new GeraWebGL.Mesh(geometry, material);
+engine.scene.add(cube);
+engine.start((delta) => cube.rotation.y += delta);
+```
+
 ## Build & run demo:
 ```bash
+# Restore the dependencies:
 npm install
+
+# Building project and serving the demo:
 npm run build # or npm run build:all
 npm run demo:serve
+
+# Or using a single command:
+npm run build:all-and-serve-demo
 ```
 
 ## Working with linting:

@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: engine/engine.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: engine/engine.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { WebGLContext }      from '../webgl-context.js';
+import { Renderer }          from '../render/renderer.js';
+import { Scene }             from '../scene/scene.js';
+import { PerspectiveCamera } from '../scene/camera.js';
+import { Mesh }              from '../scene/mesh.js';
+import { BoxGeometry }       from '../geometry/box-geometry.js';
+import { BasicMaterial }     from '../material/basic-material.js';
+
+/**
+ * Default camera vertical field of view, in radians.
+ * Used when `EngineOptions.fieldOfViewRadians` is not provided.
+ *
+ * @type {number}
+ */
+const DEFAULT_FIELD_OF_VIEW_RADIANS = Math.PI / 4;
+
+/**
+ * Default near clipping plane distance.
+ * Used when `EngineOptions.near` is not provided.
+ *
+ * @type {number}
+ */
+const DEFAULT_NEAR = 0.1;
+
+/**
+ * Default far clipping plane distance.
+ * Used when `EngineOptions.far` is not provided.
+ *
+ * @type {number}
+ */
+const DEFAULT_FAR = 100.0;
+
+/**
+ * Default initial camera position on the Z axis.
+ * Used when `EngineOptions.initialCameraZ` is not provided.
+ *
+ * @type {number}
+ */
+const DEFAULT_INITIAL_CAMERA_Z = 5.0;
+
+/**
+ * Converts milliseconds to seconds. Used to compute time values.
+ *
+ * @type {number}
+ */
+const MILLISECONDS_TO_SECONDS = 0.001;
+
+/**
+ * Default box size used by `Engine.createBoxMesh()`.
+ * Used when `createBoxMesh options.size` is not provided.
+ *
+ * @type {number}
+ */
+const DEFAULT_BOX_SIZE = 1.0;
+
+/**
+ * Minimal allowed box size for `Engine.createBoxMesh()`.
+ *
+ * @type {number}
+ */
+const MIN_BOX_SIZE = 0;
+
+/**
+ * requestAnimationFrame id reset value.
+ * Zero means - no frame scheduled.
+ *
+ * @type {number}
+ */
+const ENGINE_ANIMATION_FRAME_ID_RESET_VALUE = 0;
+
+/**
+ * Engine time fields reset/uninitialized value (seconds).
+ * Used as a sentinel to detect the first frame.
+ *
+ * @type {number}
+ */
+const ENGINE_TIME_SECONDS_RESET_VALUE = 0;
+
+/**
+ * Initial camera aspect ratio used during Engine construction.
+ * Real aspect ratio is updated on first render based on canvas size.
+ *
+ * @type {number}
+ */
+const INITIAL_CAMERA_ASPECT_RATIO = 1.0;
+
+/**
+ * Exclusive lower bound for numeric parameters.
+ *
+ * @type {number}
+ */
+const MIN_EXCLUSIVE_NUMBER = 0;
+
+/**
+ * Options used by `createEngine` and `Engine`.
+ *
+ * @typedef {Object} EngineOptions
+ * @property {number}  [fieldOfViewRadians=Math.PI / 4] - Vertical field of view in radians.
+ * @property {number}  [near = 0.1]                     - Near clipping plane.
+ * @property {number}  [far  = 100.0]                   - Far clipping plane.
+ * @property {number}  [initialCameraZ = 5.0]           - Initial camera position on the Z axis.
+ * @property {boolean} [fitToWindow    = false]         - When true, the engine will render using `window.innerWidth/innerHeight` as the canvas size source.
+ */
+
+/**
+ * Per-frame callback invoked by `Engine.start`.
+ *
+ * @callback EngineFrameCallback
+ * @param {number} deltaTimeSeconds - Time passed since previous frame, in seconds.
+ * @param {number} timeSeconds      - Time since engine start, in seconds.
+ * @param {Engine} engine           - Current engine instance.
+ */
+
+/**
+ * Options used by Engine.createBoxMesh.
+ *
+ * @typedef {Object} CreateBoxMeshOptions
+ * @property {number} [size = 1.0]      - Edge length of the box.
+ * @property {BasicMaterial} [material] - Optional material instance.
+ */
+
+/**
+ * High-level convenience wrapper that bundles the most common building blocks.
+ */
+export class Engine {
+
+    /**
+     * Wrapper around the underlying WebGL2 rendering context.
+     * Owns resize logic and provides access to raw `WebGL2RenderingContext` via `.context`.
+     *
+     * @type {WebGLContext}
+     * @private
+     */
+    #contextWrapper;
+
+    /**
+     * High-level scene renderer.
+     * Responsible for drawing the current scene using the current camera.
+     *
+     * @type {Renderer}
+     * @private
+     */
+    #renderer;
+
+    /**
+     * Root scene graph node.
+     *
+     * @type {Scene}
+     * @private
+     */
+    #scene;
+
+    /**
+     * Main camera used by the engine render loop.
+     *
+     * @type {PerspectiveCamera}
+     * @private
+     */
+    #camera;
+
+    /**
+     * When true, the engine will resize the canvas to match the browser window.
+     *
+     * @type {boolean}
+     * @private
+     */
+    #fitToWindow;
+
+    /**
+     * Indicates whether the requestAnimationFrame loop is running.
+     *
+     * @type {boolean}
+     * @private
+     */
+    #isRunning = false;
+
+    /**
+     * Current requestAnimationFrame id.
+     * Reset value means "not scheduled".
+     *
+     * @type {number}
+     * @private
+     */
+    #requestAnimationFrameId = ENGINE_ANIMATION_FRAME_ID_RESET_VALUE;
+
+    /**
+     * Previous frame timestamp in seconds (performance.now() / 1000).
+     * Reset value means "not initialized".
+     *
+     * @type {number}
+     * @private
+     */
+    #lastTimeSeconds = ENGINE_TIME_SECONDS_RESET_VALUE;
+
+    /**
+     * First frame timestamp in seconds.
+     * Used to compute time since engine start.
+     *
+     * @type {number}
+     * @private
+     */
+    #startTimeSeconds = ENGINE_TIME_SECONDS_RESET_VALUE;
+
+    /**
+     * Optional callback executed every frame.
+     *
+     * @type {EngineFrameCallback | null}
+     * @private
+     */
+    #frameCallback = null;
+
+    /**
+     * Reused resize options object passed to `Renderer.render()`.
+     * Avoids allocating a new object on every frame.
+     *
+     * @type {{ fitToWindow: boolean }}
+     * @private
+     */
+    #resizeOptions = { fitToWindow: false };
+
+    /**
+     * @param {HTMLCanvasElement} canvas - Canvas used for rendering.
+     * @param {EngineOptions} [options]  - Engine options.
+     */
+    constructor(canvas, options = {}) {
+        if (!(canvas instanceof HTMLCanvasElement)) {
+            throw new TypeError('Engine expects an HTMLCanvasElement.');
+        }
+
+        if (options === null || typeof options !== 'object' || Array.isArray(options)) {
+            throw new TypeError('Engine expects an options object (plain object).');
+        }
+
+        const {
+            fieldOfViewRadians = DEFAULT_FIELD_OF_VIEW_RADIANS,
+            near               = DEFAULT_NEAR,
+            far                = DEFAULT_FAR,
+            initialCameraZ     = DEFAULT_INITIAL_CAMERA_Z,
+            fitToWindow        = false
+        } = options;
+
+        if (typeof fieldOfViewRadians !== 'number' || fieldOfViewRadians &lt;= MIN_EXCLUSIVE_NUMBER) {
+            throw new RangeError('Engine option `fieldOfViewRadians` must be a positive number.');
+        }
+
+        if (typeof near   !== 'number'
+            || typeof far !== 'number'
+            || near &lt;= MIN_EXCLUSIVE_NUMBER
+            || far  &lt;= MIN_EXCLUSIVE_NUMBER
+            || near >= far) {
+            throw new RangeError('Engine options "near" and "far" must be positive numbers and near &lt; far.');
+        }
+
+        if (typeof initialCameraZ !== 'number') {
+            throw new TypeError('Engine option `initialCameraZ` must be a number.');
+        }
+
+        if (typeof fitToWindow !== 'boolean') {
+            throw new TypeError('Engine option `fitToWindow` must be a boolean.');
+        }
+
+        this.#fitToWindow       = fitToWindow;
+        this.#contextWrapper    = new WebGLContext(canvas);
+        this.#renderer          = new Renderer(this.#contextWrapper);
+        this.#scene             = new Scene();
+        this.#camera            = new PerspectiveCamera(fieldOfViewRadians, INITIAL_CAMERA_ASPECT_RATIO, near, far);
+        this.#camera.position.z = initialCameraZ;
+    }
+
+    /**
+     * @returns {WebGLContext}
+     */
+    get context() {
+        return this.#contextWrapper;
+    }
+
+    /**
+     * Returns the underlying WebGL2RenderingContext.
+     *
+     * @returns {WebGL2RenderingContext}
+     */
+    get webglRenderingContext() {
+        return this.#contextWrapper.context;
+    }
+
+    /**
+     * @returns {Renderer}
+     */
+    get renderer() {
+        return this.#renderer;
+    }
+
+    /**
+     * @returns {Scene}
+     */
+    get scene() {
+        return this.#scene;
+    }
+
+    /**
+     * @returns {PerspectiveCamera}
+     */
+    get camera() {
+        return this.#camera;
+    }
+
+    /**
+     * Creates a box mesh using: BoxGeometry + BasicMaterial.
+     *
+     * @param {CreateBoxMeshOptions} [options] - Box mesh options.
+     * @returns {Mesh}
+     */
+    createBoxMesh(options = {}) {
+        if (options === null || typeof options !== 'object' || Array.isArray(options)) {
+            throw new TypeError('`Engine.createBoxMesh` expects an options object (plain object).');
+        }
+
+        const { size = DEFAULT_BOX_SIZE, material } = options;
+
+        if (typeof size !== 'number' || size &lt;= MIN_BOX_SIZE) {
+            throw new RangeError('`Engine.createBoxMesh` option `size` must be a positive number.');
+        }
+
+        if (material !== undefined &amp;&amp; !(material instanceof BasicMaterial)) {
+            throw new TypeError('`Engine.createBoxMesh` option `material` must be a `BasicMaterial` instance.');
+        }
+
+        const geometry     = new BoxGeometry(this.webglRenderingContext, size);
+        const usedMaterial = material || new BasicMaterial(this.webglRenderingContext);
+        return new Mesh(geometry, usedMaterial);
+    }
+
+    /**
+     * Renders a single frame.
+     */
+    render() {
+        this.#resizeOptions.fitToWindow = this.#fitToWindow;
+        this.#renderer.render(this.#scene, this.#camera, this.#resizeOptions);
+    }
+
+    /**
+     * Starts the requestAnimationFrame loop.
+     *
+     * @param {EngineFrameCallback} [frameCallback] - Optional per-frame callback.
+     */
+    start(frameCallback) {
+        if (frameCallback !== undefined &amp;&amp; typeof frameCallback !== 'function') {
+            throw new TypeError('Engine.start expects a function callback or undefined.');
+        }
+
+        if (this.#isRunning) {
+            return;
+        }
+
+        this.#isRunning               = true;
+        this.#frameCallback           = frameCallback || null;
+        this.#lastTimeSeconds         = ENGINE_TIME_SECONDS_RESET_VALUE;
+        this.#startTimeSeconds        = ENGINE_TIME_SECONDS_RESET_VALUE;
+        this.#requestAnimationFrameId = window.requestAnimationFrame((timeMs) => this.#renderFrame(timeMs));
+    }
+
+    /**
+     * Stops the requestAnimationFrame loop.
+     */
+    stop() {
+        if (!this.#isRunning) {
+            return;
+        }
+
+        window.cancelAnimationFrame(this.#requestAnimationFrameId);
+        this.#requestAnimationFrameId = ENGINE_ANIMATION_FRAME_ID_RESET_VALUE;
+        this.#isRunning               = false;
+        this.#frameCallback           = null;
+    }
+
+    /**
+     * @param {number} timeMs
+     * @private
+     */
+    #renderFrame(timeMs) {
+        const timeSeconds = timeMs * MILLISECONDS_TO_SECONDS;
+
+        if (this.#startTimeSeconds === ENGINE_TIME_SECONDS_RESET_VALUE) {
+            this.#startTimeSeconds = timeSeconds;
+            this.#lastTimeSeconds  = timeSeconds;
+        }
+
+        const engineTimeSeconds = timeSeconds - this.#startTimeSeconds;
+        const deltaTimeSeconds  = timeSeconds - this.#lastTimeSeconds;
+        this.#lastTimeSeconds   = timeSeconds;
+
+        if (this.#frameCallback) {
+            this.#frameCallback(deltaTimeSeconds, engineTimeSeconds, this);
+        }
+
+        if (!this.#isRunning) {
+            return;
+        }
+
+        this.render();
+        this.#requestAnimationFrameId = window.requestAnimationFrame((nextTimeMs) => this.#renderFrame(nextTimeMs));
+    }
+}
+
+/**
+ * Factory function for Engine.
+ *
+ * @param {HTMLCanvasElement} canvas - Canvas used for rendering.
+ * @param {EngineOptions} [options]  - Engine options.
+ * @returns {Engine}
+ */
+export function createEngine(canvas, options) {
+    return new Engine(canvas, options);
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Namespaces</h3><ul><li><a href="GeraWebGL.html">GeraWebGL</a></li></ul><h3>Classes</h3><ul><li><a href="BasicMaterial.html">BasicMaterial</a></li><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="CameraMath.html">CameraMath</a></li><li><a href="Engine.html">Engine</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="Vector3.html">Vector3</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_LOCATION_NOT_FOUND_VALUE">ATTRIBUTE_LOCATION_NOT_FOUND_VALUE</a></li><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEFAULT_FAR">DEFAULT_FAR</a></li><li><a href="global.html#DEFAULT_FIELD_OF_VIEW_RADIANS">DEFAULT_FIELD_OF_VIEW_RADIANS</a></li><li><a href="global.html#DEFAULT_INITIAL_CAMERA_Z">DEFAULT_INITIAL_CAMERA_Z</a></li><li><a href="global.html#DEFAULT_NEAR">DEFAULT_NEAR</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#ENGINE_ANIMATION_FRAME_ID_RESET_VALUE">ENGINE_ANIMATION_FRAME_ID_RESET_VALUE</a></li><li><a href="global.html#ENGINE_TIME_SECONDS_RESET_VALUE">ENGINE_TIME_SECONDS_RESET_VALUE</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#INITIAL_CAMERA_ASPECT_RATIO">INITIAL_CAMERA_ASPECT_RATIO</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MAX_COLOR_COMPONENT">MAX_COLOR_COMPONENT</a></li><li><a href="global.html#MILLISECONDS_TO_SECONDS">MILLISECONDS_TO_SECONDS</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#MIN_BOX_SIZE">MIN_BOX_SIZE</a></li><li><a href="global.html#MIN_COLOR_COMPONENT">MIN_COLOR_COMPONENT</a></li><li><a href="global.html#MIN_DRAWING_BUFFER_DIMENSION">MIN_DRAWING_BUFFER_DIMENSION</a></li><li><a href="global.html#MIN_EXCLUSIVE_NUMBER">MIN_EXCLUSIVE_NUMBER</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#UNIT_COMPONENT">UNIT_COMPONENT</a></li><li><a href="global.html#VECTOR_2_ELEMENT_COUNT">VECTOR_2_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_3_ELEMENT_COUNT">VECTOR_3_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_4_ELEMENT_COUNT">VECTOR_4_ELEMENT_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li><li><a href="global.html#ZERO_COMPONENT">ZERO_COMPONENT</a></li><li><a href="global.html#createEngine">createEngine</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Tue Dec 16 2025 19:02:37 GMT+0300 (Moscow Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

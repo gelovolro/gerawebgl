@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Class: Mesh</title>
+    <title>JSDoc: Namespace: GeraWebGL</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Class: Mesh</h1>
+    <h1 class="page-title">Namespace: GeraWebGL</h1>
 
     
 
@@ -28,9 +28,7 @@
 
 <header>
     
-        <h2><span class="attribs"><span class="type-signature"></span></span>Mesh<span class="signature">(geometry, material)</span><span class="type-signature"></span></h2>
-        
-            <div class="class-description">Renderable object that combines geometry and material.</div>
+        <h2>GeraWebGL</h2>
         
     
 </header>
@@ -39,101 +37,17 @@
     <div class="container-overview">
     
         
+            <div class="description">Main public API namespace.
 
-    
-    <h2>Constructor</h2>
-    
+Suggested usage:
 
-    
-    <h4 class="name" id="Mesh"><span class="type-signature"></span>new Mesh<span class="signature">(geometry, material)</span><span class="type-signature"></span></h4>
-    
-
-    
-
-
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
+```js
+import { GeraWebGL } from './gerawebgl.js';
+const engine = GeraWebGL.createEngine(canvas);
+```</div>
         
 
         
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>geometry</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><a href="Geometry.html">Geometry</a></span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">Geometry that provides vertex and index buffers for this mesh.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>material</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><a href="Material.html">Material</a></span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">Material that defines how the geometry should be shaded and rendered.</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
 
 
 <dl class="details">
@@ -165,7 +79,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_mesh.js.html">scene/mesh.js</a>, <a href="scene_mesh.js.html#line8">line 8</a>
+        <a href="library.js.html">library.js</a>, <a href="library.js.html#line29">line 29</a>
     </li></ul></dd>
     
 
@@ -177,24 +91,7 @@
 </dl>
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        
     
     </div>
 
@@ -203,12 +100,7 @@
     
 
     
-        <h3 class="subsection-title">Classes</h3>
 
-        <dl>
-            <dt><a href="Mesh.html">Mesh</a></dt>
-            <dd></dd>
-        </dl>
     
 
     
@@ -217,279 +109,6 @@
 
     
 
-    
-        <h3 class="subsection-title">Members</h3>
-
-        
-            
-<h4 class="name" id="geometry"><span class="type-signature"></span>geometry<span class="type-signature"></span></h4>
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_mesh.js.html">scene/mesh.js</a>, <a href="scene_mesh.js.html#line54">line 54</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="isDisposed"><span class="type-signature"></span>isDisposed<span class="type-signature"></span></h4>
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_mesh.js.html">scene/mesh.js</a>, <a href="scene_mesh.js.html#line68">line 68</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="material"><span class="type-signature"></span>material<span class="type-signature"></span></h4>
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_mesh.js.html">scene/mesh.js</a>, <a href="scene_mesh.js.html#line61">line 61</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-    
-
-    
-        <h3 class="subsection-title">Methods</h3>
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="dispose"><span class="type-signature"></span>dispose<span class="signature">()</span><span class="type-signature"></span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Releases GPU resources owned by this mesh (geometry and material).
-After dispose, the mesh can remain as a scene object, but it should not be rendered.
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_mesh.js.html">scene/mesh.js</a>, <a href="scene_mesh.js.html#line41">line 41</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
     
 
     

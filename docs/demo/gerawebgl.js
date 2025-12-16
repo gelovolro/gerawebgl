@@ -1081,26 +1081,52 @@ var BoxGeometry = class extends Geometry {
 
 // core/shader/shader-program.js
 var MATRIX_4x4_ELEMENT_COUNT3 = 16;
+var VECTOR_2_ELEMENT_COUNT = 2;
+var VECTOR_3_ELEMENT_COUNT = 3;
+var VECTOR_4_ELEMENT_COUNT = 4;
+var ATTRIBUTE_LOCATION_NOT_FOUND_VALUE = -1;
 var ShaderProgram = class {
-  /** @type {WebGL2RenderingContext} */
+  /**
+   * Raw WebGL2 rendering context.
+   * Used for all shader program operations (e.g.: compile/link/use, uniforms, attributes).
+   *
+   * @type {WebGL2RenderingContext}
+   * @private
+   */
   #webglRenderingContext;
-  /** @type {WebGLProgram | null} */
+  /**
+   * Linked WebGL program instance.
+   *
+   * @type {WebGLProgram | null}
+   * @private
+   */
   #program;
-  /** @type {Map<string, WebGLUniformLocation>} */
+  /**
+   * Cache of uniform locations by uniform name.
+   * Avoids repeated calls to getUniformLocation for the same program.
+   *
+   * @type {Map<string, WebGLUniformLocation>}
+   * @private
+   */
   #uniformLocations;
-  /** @type {boolean} */
+  /**
+   * Indicates whether this shader program has been disposed.
+   *
+   * @type {boolean}
+   * @private
+   */
   #isDisposed = false;
   /**
    * @param {WebGL2RenderingContext} webglRenderingContext - WebGL2 rendering context used to create shaders and the program.
-   * @param {string} vertexSource   - GLSL source code of the vertex shader.
-   * @param {string} fragmentSource - GLSL source code of the fragment shader.
+   * @param {string} vertexSource                          - GLSL source code of the vertex shader.
+   * @param {string} fragmentSource                        - GLSL source code of the fragment shader.
    */
   constructor(webglRenderingContext, vertexSource, fragmentSource) {
     if (!(webglRenderingContext instanceof WebGL2RenderingContext)) {
-      throw new TypeError("ShaderProgram expects a WebGL2RenderingContext.");
+      throw new TypeError("`ShaderProgram` expects a `WebGL2RenderingContext`.");
     }
     if (typeof vertexSource !== "string" || typeof fragmentSource !== "string") {
-      throw new TypeError("ShaderProgram expects vertex and fragment source as strings.");
+      throw new TypeError("`ShaderProgram` expects vertex and fragment source as strings.");
     }
     this.#webglRenderingContext = webglRenderingContext;
     this.#uniformLocations = /* @__PURE__ */ new Map();
@@ -1145,6 +1171,128 @@ var ShaderProgram = class {
     this.#webglRenderingContext.useProgram(this.#program);
   }
   /**
+   * Returns the attribute location for the given attribute name.
+   * This is useful for manual `vertexAttribPointer` setups.
+   *
+   * @param {string} name - Attribute name in the linked shader program.
+   * @returns {number}    - Attribute location (0+).
+   */
+  getAttribLocation(name) {
+    this.#assertNotDisposed();
+    if (typeof name !== "string") {
+      throw new TypeError("`ShaderProgram.getAttribLocation` expects attribute name as a string.");
+    }
+    const location = this.#webglRenderingContext.getAttribLocation(this.#program, name);
+    if (location === ATTRIBUTE_LOCATION_NOT_FOUND_VALUE) {
+      throw new Error(`Attribute "${name}" not found in shader program.`);
+    }
+    return location;
+  }
+  /**
+   * Returns a cached uniform location.
+   * This can be used for manual `gl.uniform*` calls.
+   *
+   * @param {string} name - Uniform name in the linked shader program.
+   * @returns {WebGLUniformLocation}
+   */
+  getUniformLocation(name) {
+    return this.#getUniformLocation(name);
+  }
+  /**
+   * Sets a float uniform.
+   *
+   * @param {string} name  - Name of the uniform variable.
+   * @param {number} value - Float value to upload.
+   */
+  setFloat(name, value) {
+    this.#assertNotDisposed();
+    if (typeof name !== "string") {
+      throw new TypeError("`ShaderProgram.setFloat` expects uniform name as a string.");
+    }
+    if (typeof value !== "number") {
+      throw new TypeError("`ShaderProgram.setFloat` expects value as a number.");
+    }
+    const location = this.#getUniformLocation(name);
+    this.#webglRenderingContext.uniform1f(location, value);
+  }
+  /**
+   * Sets an integer uniform.
+   *
+   * @param {string} name  - Name of the uniform variable.
+   * @param {number} value - Integer value to upload.
+   */
+  setInt(name, value) {
+    this.#assertNotDisposed();
+    if (typeof name !== "string") {
+      throw new TypeError("`ShaderProgram.setInt` expects uniform name as a string.");
+    }
+    if (typeof value !== "number" || !Number.isInteger(value)) {
+      throw new TypeError("`ShaderProgram.setInt` expects an integer value.");
+    }
+    const location = this.#getUniformLocation(name);
+    this.#webglRenderingContext.uniform1i(location, value);
+  }
+  /**
+   * Sets a vec2 uniform.
+   *
+   * @param {string} name                   - Name of the uniform variable.
+   * @param {Float32Array | number[]} value - Two numeric components.
+   */
+  setVector2(name, value) {
+    this.#assertNotDisposed();
+    if (typeof name !== "string") {
+      throw new TypeError("`ShaderProgram.setVector2` expects uniform name as a string.");
+    }
+    if (!Array.isArray(value) && !(value instanceof Float32Array)) {
+      throw new TypeError("`ShaderProgram.setVector2` expects a number[] or Float32Array.");
+    }
+    if (value.length !== VECTOR_2_ELEMENT_COUNT) {
+      throw new TypeError("`ShaderProgram.setVector2` expects exactly 2 components.");
+    }
+    const location = this.#getUniformLocation(name);
+    this.#webglRenderingContext.uniform2fv(location, value);
+  }
+  /**
+   * Sets a vec3 uniform.
+   *
+   * @param {string} name                   - Name of the uniform variable.
+   * @param {Float32Array | number[]} value - Three numeric components.
+   */
+  setVector3(name, value) {
+    this.#assertNotDisposed();
+    if (typeof name !== "string") {
+      throw new TypeError("`ShaderProgram.setVector3` expects uniform name as a string.");
+    }
+    if (!Array.isArray(value) && !(value instanceof Float32Array)) {
+      throw new TypeError("`ShaderProgram.setVector3` expects a number[] or Float32Array.");
+    }
+    if (value.length !== VECTOR_3_ELEMENT_COUNT) {
+      throw new TypeError("`ShaderProgram.setVector3` expects exactly 3 components.");
+    }
+    const location = this.#getUniformLocation(name);
+    this.#webglRenderingContext.uniform3fv(location, value);
+  }
+  /**
+   * Sets a vec4 uniform.
+   *
+   * @param {string} name                   - Name of the uniform variable.
+   * @param {Float32Array | number[]} value - Four numeric components.
+   */
+  setVector4(name, value) {
+    this.#assertNotDisposed();
+    if (typeof name !== "string") {
+      throw new TypeError("`ShaderProgram.setVector4` expects uniform name as a string.");
+    }
+    if (!Array.isArray(value) && !(value instanceof Float32Array)) {
+      throw new TypeError("`ShaderProgram.setVector4` expects a number[] or Float32Array.");
+    }
+    if (value.length !== VECTOR_4_ELEMENT_COUNT) {
+      throw new TypeError("`ShaderProgram.setVector4` expects exactly 4 components.");
+    }
+    const location = this.#getUniformLocation(name);
+    this.#webglRenderingContext.uniform4fv(location, value);
+  }
+  /**
    * Sets a 4x4 matrix uniform.
    *
    * @param {string} name         - Name of the uniform variable in the GLSL program.
@@ -1153,10 +1301,10 @@ var ShaderProgram = class {
   setMatrix4(name, matrix) {
     this.#assertNotDisposed();
     if (typeof name !== "string") {
-      throw new TypeError("ShaderProgram.setMatrix4 expects uniform name as a string.");
+      throw new TypeError("`ShaderProgram.setMatrix4` expects uniform name as a string.");
     }
     if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT3) {
-      throw new TypeError("ShaderProgram.setMatrix4 expects a 4x4 Float32Array.");
+      throw new TypeError("`ShaderProgram.setMatrix4` expects a 4x4 Float32Array.");
     }
     const location = this.#getUniformLocation(name);
     this.#webglRenderingContext.uniformMatrix4fv(location, false, matrix);
@@ -1180,7 +1328,7 @@ var ShaderProgram = class {
    */
   #assertNotDisposed() {
     if (this.#isDisposed || this.#program === null) {
-      throw new Error("ShaderProgram has been disposed and can no longer be used.");
+      throw new Error("`ShaderProgram` has been disposed and can no longer be used.");
     }
   }
   /**
@@ -1193,7 +1341,7 @@ var ShaderProgram = class {
   #getUniformLocation(name) {
     this.#assertNotDisposed();
     if (typeof name !== "string") {
-      throw new TypeError("ShaderProgram.#getUniformLocation expects a string name.");
+      throw new TypeError("`ShaderProgram.#getUniformLocation` expects a string name.");
     }
     if (this.#uniformLocations.has(name)) {
       const cachedLocation = this.#uniformLocations.get(name);
@@ -1216,14 +1364,14 @@ var ShaderProgram = class {
    */
   #compileShader(type, source) {
     if (typeof type !== "number") {
-      throw new TypeError("ShaderProgram.#compileShader expects a numeric shader type.");
+      throw new TypeError("`ShaderProgram.#compileShader` expects a numeric shader type.");
     }
     if (typeof source !== "string") {
-      throw new TypeError("ShaderProgram.#compileShader expects shader source as a string.");
+      throw new TypeError("`ShaderProgram.#compileShader` expects shader source as a string.");
     }
     const shader = this.#webglRenderingContext.createShader(type);
     if (!shader) {
-      throw new Error("Failed to create WebGL shader.");
+      throw new Error("Failed to create the WebGL shader.");
     }
     this.#webglRenderingContext.shaderSource(shader, source);
     this.#webglRenderingContext.compileShader(shader);
@@ -1834,10 +1982,11 @@ var Renderer = class {
   /**
    * Renders the given scene from the point of view of the given camera.
    *
-   * @param {Scene} scene              - Scene graph containing all objects that should be rendered.
-   * @param {PerspectiveCamera} camera - Camera defining view and projection used for rendering.
+   * @param {Scene} scene                                - Scene graph containing all objects that should be rendered.
+   * @param {PerspectiveCamera} camera                   - Camera defining view and projection used for rendering.
+   * @param {ResizeToDisplaySizeOptions} [resizeOptions] - Optional canvas resize options.
    */
-  render(scene, camera) {
+  render(scene, camera, resizeOptions) {
     if (!(scene instanceof Scene)) {
       throw new TypeError("Renderer.render expects a Scene instance.");
     }
@@ -1845,7 +1994,7 @@ var Renderer = class {
       throw new TypeError("Renderer.render expects a PerspectiveCamera instance.");
     }
     const renderingContext = this.#webglRenderingContext;
-    this.#contextWrapper.resizeToDisplaySize();
+    this.#contextWrapper.resizeToDisplaySize(resizeOptions);
     this.#contextWrapper.clear();
     const canvas = renderingContext.canvas;
     const aspectRatio = canvas.width / canvas.height;
@@ -1901,20 +2050,290 @@ var Renderer = class {
     );
   }
 };
-export {
-  BasicMaterial,
-  BoxGeometry,
-  CameraMath,
-  Geometry,
-  Material,
-  Matrix4,
-  Mesh,
-  Object3D,
-  PerspectiveCamera,
+
+// core/engine/engine.js
+var DEFAULT_FIELD_OF_VIEW_RADIANS = Math.PI / 4;
+var DEFAULT_NEAR = 0.1;
+var DEFAULT_FAR = 100;
+var DEFAULT_INITIAL_CAMERA_Z = 5;
+var MILLISECONDS_TO_SECONDS = 1e-3;
+var DEFAULT_BOX_SIZE2 = 1;
+var MIN_BOX_SIZE = 0;
+var ENGINE_ANIMATION_FRAME_ID_RESET_VALUE = 0;
+var ENGINE_TIME_SECONDS_RESET_VALUE = 0;
+var INITIAL_CAMERA_ASPECT_RATIO = 1;
+var MIN_EXCLUSIVE_NUMBER = 0;
+var Engine = class {
+  /**
+   * Wrapper around the underlying WebGL2 rendering context.
+   * Owns resize logic and provides access to raw `WebGL2RenderingContext` via `.context`.
+   *
+   * @type {WebGLContext}
+   * @private
+   */
+  #contextWrapper;
+  /**
+   * High-level scene renderer.
+   * Responsible for drawing the current scene using the current camera.
+   *
+   * @type {Renderer}
+   * @private
+   */
+  #renderer;
+  /**
+   * Root scene graph node.
+   *
+   * @type {Scene}
+   * @private
+   */
+  #scene;
+  /**
+   * Main camera used by the engine render loop.
+   *
+   * @type {PerspectiveCamera}
+   * @private
+   */
+  #camera;
+  /**
+   * When true, the engine will resize the canvas to match the browser window.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #fitToWindow;
+  /**
+   * Indicates whether the requestAnimationFrame loop is running.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #isRunning = false;
+  /**
+   * Current requestAnimationFrame id.
+   * Reset value means "not scheduled".
+   *
+   * @type {number}
+   * @private
+   */
+  #requestAnimationFrameId = ENGINE_ANIMATION_FRAME_ID_RESET_VALUE;
+  /**
+   * Previous frame timestamp in seconds (performance.now() / 1000).
+   * Reset value means "not initialized".
+   *
+   * @type {number}
+   * @private
+   */
+  #lastTimeSeconds = ENGINE_TIME_SECONDS_RESET_VALUE;
+  /**
+   * First frame timestamp in seconds.
+   * Used to compute time since engine start.
+   *
+   * @type {number}
+   * @private
+   */
+  #startTimeSeconds = ENGINE_TIME_SECONDS_RESET_VALUE;
+  /**
+   * Optional callback executed every frame.
+   *
+   * @type {EngineFrameCallback | null}
+   * @private
+   */
+  #frameCallback = null;
+  /**
+   * Reused resize options object passed to `Renderer.render()`.
+   * Avoids allocating a new object on every frame.
+   *
+   * @type {{ fitToWindow: boolean }}
+   * @private
+   */
+  #resizeOptions = { fitToWindow: false };
+  /**
+   * @param {HTMLCanvasElement} canvas - Canvas used for rendering.
+   * @param {EngineOptions} [options]  - Engine options.
+   */
+  constructor(canvas, options = {}) {
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      throw new TypeError("Engine expects an HTMLCanvasElement.");
+    }
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("Engine expects an options object (plain object).");
+    }
+    const {
+      fieldOfViewRadians = DEFAULT_FIELD_OF_VIEW_RADIANS,
+      near = DEFAULT_NEAR,
+      far = DEFAULT_FAR,
+      initialCameraZ = DEFAULT_INITIAL_CAMERA_Z,
+      fitToWindow = false
+    } = options;
+    if (typeof fieldOfViewRadians !== "number" || fieldOfViewRadians <= MIN_EXCLUSIVE_NUMBER) {
+      throw new RangeError("Engine option `fieldOfViewRadians` must be a positive number.");
+    }
+    if (typeof near !== "number" || typeof far !== "number" || near <= MIN_EXCLUSIVE_NUMBER || far <= MIN_EXCLUSIVE_NUMBER || near >= far) {
+      throw new RangeError('Engine options "near" and "far" must be positive numbers and near < far.');
+    }
+    if (typeof initialCameraZ !== "number") {
+      throw new TypeError("Engine option `initialCameraZ` must be a number.");
+    }
+    if (typeof fitToWindow !== "boolean") {
+      throw new TypeError("Engine option `fitToWindow` must be a boolean.");
+    }
+    this.#fitToWindow = fitToWindow;
+    this.#contextWrapper = new WebGLContext(canvas);
+    this.#renderer = new Renderer(this.#contextWrapper);
+    this.#scene = new Scene();
+    this.#camera = new PerspectiveCamera(fieldOfViewRadians, INITIAL_CAMERA_ASPECT_RATIO, near, far);
+    this.#camera.position.z = initialCameraZ;
+  }
+  /**
+   * @returns {WebGLContext}
+   */
+  get context() {
+    return this.#contextWrapper;
+  }
+  /**
+   * Returns the underlying WebGL2RenderingContext.
+   *
+   * @returns {WebGL2RenderingContext}
+   */
+  get webglRenderingContext() {
+    return this.#contextWrapper.context;
+  }
+  /**
+   * @returns {Renderer}
+   */
+  get renderer() {
+    return this.#renderer;
+  }
+  /**
+   * @returns {Scene}
+   */
+  get scene() {
+    return this.#scene;
+  }
+  /**
+   * @returns {PerspectiveCamera}
+   */
+  get camera() {
+    return this.#camera;
+  }
+  /**
+   * Creates a box mesh using: BoxGeometry + BasicMaterial.
+   *
+   * @param {CreateBoxMeshOptions} [options] - Box mesh options.
+   * @returns {Mesh}
+   */
+  createBoxMesh(options = {}) {
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("`Engine.createBoxMesh` expects an options object (plain object).");
+    }
+    const { size = DEFAULT_BOX_SIZE2, material } = options;
+    if (typeof size !== "number" || size <= MIN_BOX_SIZE) {
+      throw new RangeError("`Engine.createBoxMesh` option `size` must be a positive number.");
+    }
+    if (material !== void 0 && !(material instanceof BasicMaterial)) {
+      throw new TypeError("`Engine.createBoxMesh` option `material` must be a `BasicMaterial` instance.");
+    }
+    const geometry = new BoxGeometry(this.webglRenderingContext, size);
+    const usedMaterial = material || new BasicMaterial(this.webglRenderingContext);
+    return new Mesh(geometry, usedMaterial);
+  }
+  /**
+   * Renders a single frame.
+   */
+  render() {
+    this.#resizeOptions.fitToWindow = this.#fitToWindow;
+    this.#renderer.render(this.#scene, this.#camera, this.#resizeOptions);
+  }
+  /**
+   * Starts the requestAnimationFrame loop.
+   *
+   * @param {EngineFrameCallback} [frameCallback] - Optional per-frame callback.
+   */
+  start(frameCallback) {
+    if (frameCallback !== void 0 && typeof frameCallback !== "function") {
+      throw new TypeError("Engine.start expects a function callback or undefined.");
+    }
+    if (this.#isRunning) {
+      return;
+    }
+    this.#isRunning = true;
+    this.#frameCallback = frameCallback || null;
+    this.#lastTimeSeconds = ENGINE_TIME_SECONDS_RESET_VALUE;
+    this.#startTimeSeconds = ENGINE_TIME_SECONDS_RESET_VALUE;
+    this.#requestAnimationFrameId = window.requestAnimationFrame((timeMs) => this.#renderFrame(timeMs));
+  }
+  /**
+   * Stops the requestAnimationFrame loop.
+   */
+  stop() {
+    if (!this.#isRunning) {
+      return;
+    }
+    window.cancelAnimationFrame(this.#requestAnimationFrameId);
+    this.#requestAnimationFrameId = ENGINE_ANIMATION_FRAME_ID_RESET_VALUE;
+    this.#isRunning = false;
+    this.#frameCallback = null;
+  }
+  /**
+   * @param {number} timeMs
+   * @private
+   */
+  #renderFrame(timeMs) {
+    const timeSeconds = timeMs * MILLISECONDS_TO_SECONDS;
+    if (this.#startTimeSeconds === ENGINE_TIME_SECONDS_RESET_VALUE) {
+      this.#startTimeSeconds = timeSeconds;
+      this.#lastTimeSeconds = timeSeconds;
+    }
+    const engineTimeSeconds = timeSeconds - this.#startTimeSeconds;
+    const deltaTimeSeconds = timeSeconds - this.#lastTimeSeconds;
+    this.#lastTimeSeconds = timeSeconds;
+    if (this.#frameCallback) {
+      this.#frameCallback(deltaTimeSeconds, engineTimeSeconds, this);
+    }
+    if (!this.#isRunning) {
+      return;
+    }
+    this.render();
+    this.#requestAnimationFrameId = window.requestAnimationFrame((nextTimeMs) => this.#renderFrame(nextTimeMs));
+  }
+};
+function createEngine(canvas, options) {
+  return new Engine(canvas, options);
+}
+
+// core/library.js
+var GeraWebGL = Object.freeze({
+  Engine,
+  createEngine,
+  // High-level building blocks:
+  WebGLContext,
   Renderer,
   Scene,
-  ShaderProgram,
-  Vector3,
-  WebGLContext
+  PerspectiveCamera,
+  Object3D,
+  Mesh,
+  // Grouped namespaces:
+  Math: Object.freeze({
+    Matrix4,
+    Vector3,
+    CameraMath
+  }),
+  Geometries: Object.freeze({
+    Geometry,
+    BoxGeometry
+  }),
+  Materials: Object.freeze({
+    Material,
+    BasicMaterial
+  }),
+  // Low-level access (shaders, manual uniforms/attributes):
+  LowLevel: Object.freeze({
+    ShaderProgram
+  })
+});
+var library_default = GeraWebGL;
+export {
+  GeraWebGL,
+  library_default as default
 };
 //# sourceMappingURL=gerawebgl.js.map

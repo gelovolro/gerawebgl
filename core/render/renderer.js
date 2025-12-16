@@ -12,6 +12,13 @@ const INDEX_BUFFER_OFFSET_BYTES = 0;
 const MATRIX_4x4_ELEMENT_COUNT = 16;
 
 /**
+ * Canvas resize options for WebGLContext.resizeToDisplaySize().
+ *
+ * @typedef {Object} ResizeToDisplaySizeOptions
+ * @property {boolean} [fitToWindow] - If true, resizes canvas to match the window size.
+ */
+
+/**
  * High-level renderer that draws a scene from the perspective of a camera.
  * Keeps per-frame allocations minimal (reuse matrices, reuse traversal callback).
  */
@@ -82,10 +89,11 @@ export class Renderer {
     /**
      * Renders the given scene from the point of view of the given camera.
      *
-     * @param {Scene} scene              - Scene graph containing all objects that should be rendered.
-     * @param {PerspectiveCamera} camera - Camera defining view and projection used for rendering.
+     * @param {Scene} scene                                - Scene graph containing all objects that should be rendered.
+     * @param {PerspectiveCamera} camera                   - Camera defining view and projection used for rendering.
+     * @param {ResizeToDisplaySizeOptions} [resizeOptions] - Optional canvas resize options.
      */
-    render(scene, camera) {
+    render(scene, camera, resizeOptions) {
         if (!(scene instanceof Scene)) {
             throw new TypeError('Renderer.render expects a Scene instance.');
         }
@@ -95,7 +103,7 @@ export class Renderer {
         }
 
         const renderingContext = this.#webglRenderingContext;
-        this.#contextWrapper.resizeToDisplaySize();
+        this.#contextWrapper.resizeToDisplaySize(resizeOptions);
         this.#contextWrapper.clear();
 
         const canvas      = renderingContext.canvas;
