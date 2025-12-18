@@ -11,19 +11,45 @@ import { ShaderProgram } from '../shader/shader-program.js';
  * Base material that owns a shader program and wireframe flag.
  */
 export class Material {
-    /** @type {WebGL2RenderingContext} */
+
+    /**
+     * WebGL2 rendering context used to create and manage GPU resources.
+     *
+     * @type {WebGL2RenderingContext}
+     * @private
+     */
     #webglContext;
 
-    /** @type {ShaderProgram} */
+    /**
+     * Shader program used by this material to render geometry.
+     *
+     * @type {ShaderProgram}
+     * @private
+     */
     #shaderProgram;
 
-    /** @type {boolean} */
+    /**
+     * When enabled, the renderer should draw geometry using wireframe indices (lines) instead of solid triangles.
+     *
+     * @type {boolean}
+     * @private
+     */
     #wireframeEnabled = false;
 
-    /** @type {boolean} */
+    /**
+     * Ownership flag. When true, this material is responsible for disposing the shader program.
+     *
+     * @type {boolean}
+     * @private
+     */
     #ownsShaderProgram = false;
 
-    /** @type {boolean} */
+    /**
+     * Indicates whether the material has been disposed and can no longer be used.
+     *
+     * @type {boolean}
+     * @private
+     */
     #isDisposed = false;
 
     /**
@@ -56,7 +82,7 @@ export class Material {
     }
 
     /**
-     * @returns {WebGL2RenderingContext}
+     * @returns {WebGL2RenderingContext} - WebGL2 rendering context used by this material.
      */
     get webglContext() {
         this.#assertNotDisposed();
@@ -64,11 +90,20 @@ export class Material {
     }
 
     /**
-     * @returns {ShaderProgram}
+     * @returns {ShaderProgram} - Shader program used by this material for rendering.
      */
     get shaderProgram() {
         this.#assertNotDisposed();
         return this.#shaderProgram;
+    }
+
+    /**
+     * Indicates whether this material has been disposed.
+     *
+     * @returns {boolean} - True, when this material has been disposed and can no longer be used.
+     */
+    get isDisposed() {
+        return this.#isDisposed;
     }
 
     /**
@@ -98,7 +133,7 @@ export class Material {
     }
 
     /**
-     * @returns {boolean}
+     * @returns {boolean} - True, when wireframe rendering is enabled and false for solid rendering.
      */
     isWireframeEnabled() {
         this.#assertNotDisposed();

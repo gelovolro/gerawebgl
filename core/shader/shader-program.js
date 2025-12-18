@@ -1,3 +1,5 @@
+import { Texture2D } from '../texture/texture2d.js';
+
 /**
  * Number of elements in a 4x4 matrix.
  * Used to validate and upload `mat4` uniform values.
@@ -37,6 +39,21 @@ const VECTOR_4_ELEMENT_COUNT = 4;
  * @type {number}
  */
 const ATTRIBUTE_LOCATION_NOT_FOUND_VALUE = -1;
+
+/**
+ * Minimum allowed texture unit index.
+ *
+ * @type {number}
+ */
+const MIN_TEXTURE_UNIT_INDEX = 0;
+
+/**
+ * Default texture unit index used by `ShaderProgram.setTexture2D`.
+ * Zero corresponds to `TEXTURE0`.
+ *
+ * @type {number}
+ */
+const DEFAULT_TEXTURE_UNIT_INDEX = 0;
 
 /**
  * Thin wrapper around a linked WebGL shader program.
@@ -219,6 +236,33 @@ export class ShaderProgram {
     }
 
     /**
+     * Sets a `sampler2D` uniform and binds a `Texture2D` to the specified texture unit.
+     *
+     * @param {string} name                   - Name of the uniform variable.
+     * @param {Texture2D} texture             - `Texture2D` instance to bind.
+     * @param {number} [textureUnitIndex = 0] - Texture unit index (0 => N).
+     */
+    setTexture2D(name, texture, textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX) {
+        this.#assertNotDisposed();
+
+        if (typeof name !== 'string') {
+            throw new TypeError('`ShaderProgram.setTexture2D` expects uniform name as a string.');
+        }
+
+        if (!(texture instanceof Texture2D)) {
+            throw new TypeError('`ShaderProgram.setTexture2D` expects texture as Texture2D.');
+        }
+
+        if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < MIN_TEXTURE_UNIT_INDEX) {
+            throw new TypeError('`ShaderProgram.setTexture2D` expects textureUnitIndex as a non-negative integer.');
+        }
+
+        texture.bind(textureUnitIndex);
+        const location = this.#getUniformLocation(name);
+        this.#webglRenderingContext.uniform1i(location, textureUnitIndex);
+    }
+
+    /**
      * Sets a vec2 uniform.
      *
      * @param {string} name                   - Name of the uniform variable.
@@ -269,7 +313,7 @@ export class ShaderProgram {
     }
 
     /**
-     * Sets a vec4 uniform.
+     * Sets a `vec4` uniform.
      *
      * @param {string} name                   - Name of the uniform variable.
      * @param {Float32Array | number[]} value - Four numeric components.
@@ -282,7 +326,7 @@ export class ShaderProgram {
         }
 
         if (!Array.isArray(value) && !(value instanceof Float32Array)) {
-            throw new TypeError('`ShaderProgram.setVector4` expects a number[] or Float32Array.');
+            throw new TypeError('`ShaderProgram.setVector4` expects a number[] or `Float32Array`.');
         }
 
         if (value.length !== VECTOR_4_ELEMENT_COUNT) {

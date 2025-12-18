@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: material/material.js</title>
+    <title>JSDoc: Source: texture/texture2d.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: material/material.js</h1>
+    <h1 class="page-title">Source: texture/texture2d.js</h1>
 
     
 
@@ -26,22 +26,98 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>import { ShaderProgram } from '../shader/shader-program.js';
-
-/**
- * Options used by Material.
+            <pre class="prettyprint source linenums"><code>/**
+ * Default width of a placeholder texture (in pixels).
  *
- * @typedef {Object} MaterialOptions
- * @property {boolean} [ownsShaderProgram=false] - Whether this material owns and disposes the shader program.
+ * @type {number}
  */
+const PLACEHOLDER_TEXTURE_WIDTH = 1;
 
 /**
- * Base material that owns a shader program and wireframe flag.
+ * Default height of a placeholder texture (in pixels).
+ *
+ * @type {number}
  */
-export class Material {
+const PLACEHOLDER_TEXTURE_HEIGHT = 1;
+
+/**
+ * WebGL expects the border parameter of `texImage2D` to be `0`.
+ *
+ * @type {number}
+ */
+const TEXTURE_BORDER_VALUE = 0;
+
+/**
+ * Default mipmap level used by `texImage2D`.
+ *
+ * @type {number}
+ */
+const BASE_MIPMAP_LEVEL = 0;
+
+/**
+ * Placeholder pixel color (magenta).
+ *
+ * @type {Uint8Array}
+ */
+const PLACEHOLDER_PIXEL_RGBA = new Uint8Array([255, 0, 255, 255]);
+
+/**
+ * Integer value, used to represent boolean true in WebGL `pixelStorei` calls.
+ *
+ * @type {number}
+ */
+const WEBGL_TRUE_AS_INTEGER = 1;
+
+/**
+ * Integer value, used to represent boolean false in WebGL `pixelStorei` calls.
+ *
+ * @type {number}
+ */
+const WEBGL_FALSE_AS_INTEGER = 0;
+
+/**
+ * Minimum allowed texture unit index.
+ *
+ * @type {number}
+ */
+const MIN_TEXTURE_UNIT_INDEX = 0;
+
+/**
+ * Minimal allowed string length for required string parameters.
+ *
+ * @type {number}
+ */
+const MIN_REQUIRED_STRING_LENGTH = 1;
+
+/**
+ * Minimal allowed value for `power-of-two` checks.
+ *
+ * @type {number}
+ */
+const MIN_POWER_OF_TWO_VALUE = 1;
+
+/**
+ * Bit mask helper value used by the `power-of-two` check.
+ *
+ * @type {number}
+ */
+const BIT_MASK_ONE = 1;
+
+/**
+ * Bitwise `zero` value used in bit-mask comparisons.
+ *
+ * @type {number}
+ */
+const BITWISE_ZERO = 0;
+
+/**
+ * `Texture2D` is a thin wrapper around a `WebGLTexture`.
+ * It supports a placeholder 1x1 pixel, and can asynchronously upload an image from URL.
+ */
+export class Texture2D {
 
     /**
-     * WebGL2 rendering context used to create and manage GPU resources.
+     * WebGL2 rendering context used to create, upload and dispose the underlying WebGL texture.
      *
      * @type {WebGL2RenderingContext}
      * @private
@@ -49,31 +125,47 @@ export class Material {
     #webglContext;
 
     /**
-     * Shader program used by this material to render geometry.
+     * Underlying WebGL texture handle.
      *
-     * @type {ShaderProgram}
+     * @type {WebGLTexture}
      * @private
      */
-    #shaderProgram;
+    #texture;
 
     /**
-     * When enabled, the renderer should draw geometry using wireframe indices (lines) instead of solid triangles.
-     *
-     * @type {boolean}
-     * @private
-     */
-    #wireframeEnabled = false;
-
-    /**
-     * Ownership flag. When true, this material is responsible for disposing the shader program.
+     * When true, uploaded images are flipped vertically during upload. Applied via `UNPACK_FLIP_Y_WEBGL`.
      *
      * @type {boolean}
      * @private
      */
-    #ownsShaderProgram = false;
+    #flipY;
 
     /**
-     * Indicates whether the material has been disposed and can no longer be used.
+     * Current texture width in pixels. Initialized to placeholder size and updated after a successful upload.
+     *
+     * @type {number}
+     * @private
+     */
+    #width = PLACEHOLDER_TEXTURE_WIDTH;
+
+    /**
+     * Current texture height in pixels. Initialized to placeholder size and updated after a successful upload.
+     *
+     * @type {number}
+     * @private
+     */
+    #height = PLACEHOLDER_TEXTURE_HEIGHT;
+
+    /**
+     * Indicates whether the image has been successfully loaded and uploaded to GPU.
+     *
+     * @type {boolean}
+     * @private
+     */
+    #isLoaded = false;
+
+    /**
+     * Indicates whether this texture instance has been disposed. Disposed textures must not be bound or updated.
      *
      * @type {boolean}
      * @private
@@ -82,106 +174,230 @@ export class Material {
 
     /**
      * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
-     * @param {ShaderProgram} shaderProgram         - Compiled and linked shader program used by this material for rendering.
-     * @param {MaterialOptions} [options]           - Material options.
+     * @param {Object} [options]                    - Optional texture creation options.
+     * @param {boolean} [options.flipY = true]      - Whether to flip the image data vertically on upload.
      */
-    constructor(webglContext, shaderProgram, options = {}) {
+    constructor(webglContext, options = {}) {
         if (!(webglContext instanceof WebGL2RenderingContext)) {
-            throw new TypeError('Material expects a WebGL2RenderingContext.');
+            throw new TypeError('`Texture2D` expects `WebGL2RenderingContext`.');
         }
 
-        if (options === null || typeof options !== 'object' || Array.isArray(options)) {
-            throw new TypeError('Material expects an options object (plain object).');
+        if (options === null || typeof options !== 'object') {
+            throw new TypeError('`Texture2D` expects options as an object.');
         }
 
-        const { ownsShaderProgram = false } = options;
+        const { flipY = true } = options;
 
-        if (typeof ownsShaderProgram !== 'boolean') {
-            throw new TypeError('Material option "ownsShaderProgram" must be a boolean.');
+        if (typeof flipY !== 'boolean') {
+            throw new TypeError('`Texture2D` expects `options.flipY` as boolean.');
         }
 
-        if (!(shaderProgram instanceof ShaderProgram)) {
-            throw new TypeError('Material expects a ShaderProgram instance.');
+        this.#webglContext = webglContext;
+        this.#flipY        = flipY;
+        const texture      = webglContext.createTexture();
+
+        if (!texture) {
+            throw new Error('Failed to create `WebGLTexture`.');
         }
 
-        this.#webglContext      = webglContext;
-        this.#shaderProgram     = shaderProgram;
-        this.#ownsShaderProgram = ownsShaderProgram;
+        this.#texture = texture;
+        this.#bindTexture();
+        webglContext.texImage2D(
+            webglContext.TEXTURE_2D,
+            BASE_MIPMAP_LEVEL,
+            webglContext.RGBA,
+            PLACEHOLDER_TEXTURE_WIDTH,
+            PLACEHOLDER_TEXTURE_HEIGHT,
+            TEXTURE_BORDER_VALUE,
+            webglContext.RGBA,
+            webglContext.UNSIGNED_BYTE,
+            PLACEHOLDER_PIXEL_RGBA
+        );
+
+        webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_WRAP_S, webglContext.CLAMP_TO_EDGE);
+        webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_WRAP_T, webglContext.CLAMP_TO_EDGE);
+        webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_MIN_FILTER, webglContext.LINEAR);
+        webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_MAG_FILTER, webglContext.LINEAR);
+        this.#unbindTexture();
     }
 
     /**
-     * @returns {WebGL2RenderingContext} - WebGL2 rendering context used by this material.
-     */
-    get webglContext() {
-        this.#assertNotDisposed();
-        return this.#webglContext;
-    }
-
-    /**
-     * @returns {ShaderProgram} - Shader program used by this material for rendering.
-     */
-    get shaderProgram() {
-        this.#assertNotDisposed();
-        return this.#shaderProgram;
-    }
-
-    /**
-     * Indicates whether this material has been disposed.
+     * Returns the underlying `WebGLTexture` object.
      *
-     * @returns {boolean} - True, when this material has been disposed and can no longer be used.
+     * @returns {WebGLTexture}
+     */
+    get texture() {
+        this.#assertNotDisposed();
+        return this.#texture;
+    }
+
+    /**
+     * Returns the width of the uploaded image (or placeholder width until loaded).
+     *
+     * @returns {number}
+     */
+    get width() {
+        this.#assertNotDisposed();
+        return this.#width;
+    }
+
+    /**
+     * Returns the height of the uploaded image (or placeholder height until loaded).
+     *
+     * @returns {number}
+     */
+    get height() {
+        this.#assertNotDisposed();
+        return this.#height;
+    }
+
+    /**
+     * Indicates whether the image has been uploaded.
+     *
+     * @returns {boolean}
+     */
+    get isLoaded() {
+        this.#assertNotDisposed();
+        return this.#isLoaded;
+    }
+
+    /**
+     * Indicates whether this instance has been disposed.
+     *
+     * @returns {boolean}
      */
     get isDisposed() {
         return this.#isDisposed;
     }
 
     /**
-     * Makes this material's shader program active.
-     */
-    use() {
-        this.#assertNotDisposed();
-        this.#shaderProgram.use();
-    }
-
-    /**
-     * Enables or disables wireframe rendering.
+     * Binds this texture to a texture unit.
      *
-     * @param {boolean} enabled - When true, switches material to wireframe mode. When false, uses solid rendering.
+     * @param {number} textureUnitIndex - Index of the texture unit (0 => N).
      */
-    setWireframeEnabled(enabled) {
+    bind(textureUnitIndex) {
         this.#assertNotDisposed();
-        this.#wireframeEnabled = Boolean(enabled);
+
+        if (!Number.isInteger(textureUnitIndex) || textureUnitIndex &lt; MIN_TEXTURE_UNIT_INDEX) {
+            throw new TypeError('`Texture2D.bind` expects `textureUnitIndex` as a non-negative integer.');
+        }
+
+        const webglContext = this.#webglContext;
+        webglContext.activeTexture(webglContext.TEXTURE0 + textureUnitIndex);
+        webglContext.bindTexture(webglContext.TEXTURE_2D, this.#texture);
     }
 
     /**
-     * Toggles wireframe mode.
+     * Loads an image from the given URL and uploads it into this WebGL texture.
+     *
+     * @param {string} url      - Image URL (relative or absolute).
+     * @returns {Promise&lt;void>} - Promise that resolves after successful GPU upload, or rejects on `load/decode/upload` error.
      */
-    toggleWireframe() {
+    async loadFromUrl(url) {
         this.#assertNotDisposed();
-        this.#wireframeEnabled = !this.#wireframeEnabled;
+
+        if (typeof url !== 'string' || url.length === MIN_REQUIRED_STRING_LENGTH) {
+            throw new TypeError('`Texture2D.loadFromUrl` expects url as a non-empty string.');
+        }
+
+        const image = await this.#loadImage(url);
+        this.#assertNotDisposed();
+        this.#uploadImage(image);
     }
 
     /**
-     * @returns {boolean} - True, when wireframe rendering is enabled and false for solid rendering.
-     */
-    isWireframeEnabled() {
-        this.#assertNotDisposed();
-        return this.#wireframeEnabled;
-    }
-
-    /**
-     * Releases GPU resources owned by this material.
-     * If ownsShaderProgram is true, the underlying shader program will be disposed as well.
+     * Releases the WebGL texture.
      */
     dispose() {
         if (this.#isDisposed) {
             return;
         }
 
-        if (this.#ownsShaderProgram) {
-            this.#shaderProgram.dispose();
+        this.#webglContext.deleteTexture(this.#texture);
+        this.#isDisposed = true;
+    }
+
+    /**
+     * Loads an `HTMLImageElement` from a URL.
+     *
+     * @param {string} url                  - Image URL.
+     * @returns {Promise&lt;HTMLImageElement>} - Promise, that resolves with a decoded image on `load`, or rejects on `error`.
+     * @private
+     */
+    #loadImage(url) {
+        return new Promise((resolve, reject) => {
+            const image = new Image();
+            image.onload  = () => resolve(image);
+            image.onerror = () => reject(new Error(`Failed to load texture image: ${url}`));
+            image.src = url;
+        });
+    }
+
+    /**
+     * Uploads the given image into the GPU texture.
+     *
+     * @param {HTMLImageElement} image - Loaded image element.
+     * @private
+     */
+    #uploadImage(image) {
+        const webglContext = this.#webglContext;
+
+        this.#bindTexture();
+        webglContext.pixelStorei(
+            webglContext.UNPACK_FLIP_Y_WEBGL,
+            this.#flipY ? WEBGL_TRUE_AS_INTEGER : WEBGL_FALSE_AS_INTEGER
+        );
+
+        webglContext.texImage2D(
+            webglContext.TEXTURE_2D,
+            BASE_MIPMAP_LEVEL,
+            webglContext.RGBA,
+            webglContext.RGBA,
+            webglContext.UNSIGNED_BYTE,
+            image
+        );
+
+        this.#width    = image.width;
+        this.#height   = image.height;
+        this.#isLoaded = true;
+
+        if (this.#isPowerOfTwo(this.#width) &amp;&amp; this.#isPowerOfTwo(this.#height)) {
+            webglContext.generateMipmap(webglContext.TEXTURE_2D);
+            webglContext.texParameteri(
+                webglContext.TEXTURE_2D,
+                webglContext.TEXTURE_MIN_FILTER,
+                webglContext.LINEAR_MIPMAP_LINEAR
+            );
         }
 
-        this.#isDisposed = true;
+        this.#unbindTexture();
+    }
+
+    /**
+     * Checks whether an integer value is a `power-of-two`.
+     *
+     * @param {number} value - Value to check.
+     * @returns {boolean}    - True if value is a `power-of-two` (e.g.: 2, 4, 8, ...), otherwise false.
+     * @private
+     */
+    #isPowerOfTwo(value) {
+        return Number.isInteger(value)
+        &amp;&amp; value >= MIN_POWER_OF_TWO_VALUE
+        &amp;&amp; (value &amp; (value - BIT_MASK_ONE)) === BITWISE_ZERO;
+    }
+
+    /**
+     * @private
+     */
+    #bindTexture() {
+        this.#webglContext.bindTexture(this.#webglContext.TEXTURE_2D, this.#texture);
+    }
+
+    /**
+     * @private
+     */
+    #unbindTexture() {
+        this.#webglContext.bindTexture(this.#webglContext.TEXTURE_2D, null);
     }
 
     /**
@@ -189,7 +405,7 @@ export class Material {
      */
     #assertNotDisposed() {
         if (this.#isDisposed) {
-            throw new Error('Material has been disposed and can no longer be used.');
+            throw new Error('`Texture2D` instance is disposed.');
         }
     }
 }

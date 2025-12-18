@@ -2,7 +2,7 @@ import { Matrix4 }           from '../math/matrix4.js';
 import { Object3D }          from '../scene/object3d.js';
 import { Mesh }              from '../scene/mesh.js';
 import { Scene }             from '../scene/scene.js';
-import { PerspectiveCamera } from '../scene/camera.js';
+import { PerspectiveCamera } from '../scene/perspective-camera.js';
 import { WebGLContext }      from '../webgl-context.js';
 
 /** @type {number} */

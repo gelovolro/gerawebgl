@@ -122,7 +122,7 @@ export class WebGLContext {
     }
 
     /**
-     * Returns the underlying WebGL2RenderingContext for direct low-level access.
+     * Returns the underlying `WebGL2RenderingContext` for direct low-level access.
      *
      * @returns {WebGL2RenderingContext}
      */

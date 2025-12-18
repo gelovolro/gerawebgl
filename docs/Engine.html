@@ -30,7 +30,7 @@
     
         <h2><span class="attribs"><span class="type-signature"></span></span>Engine<span class="signature">(canvas, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h2>
         
-            <div class="class-description">High-level convenience wrapper that bundles the most common building blocks.</div>
+            <div class="class-description">High-level convenience wrapper, that bundles the most common building blocks.</div>
         
     
 </header>
@@ -185,7 +185,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line125">line 125</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line128">line 128</a>
     </li></ul></dd>
     
 
@@ -282,7 +282,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line303">line 303</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line293">line 293</a>
     </li></ul></dd>
     
 
@@ -398,7 +398,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line289">line 289</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line283">line 283</a>
     </li></ul></dd>
     
 
@@ -456,7 +456,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line296">line 296</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line288">line 288</a>
     </li></ul></dd>
     
 
@@ -478,10 +478,6 @@
 
 
 
-
-<div class="description">
-    Returns the underlying WebGL2RenderingContext.
-</div>
 
 
 
@@ -518,7 +514,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line282">line 282</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line278">line 278</a>
     </li></ul></dd>
     
 
@@ -554,7 +550,11 @@
 
 
 <div class="description">
-    Creates a box mesh using: BoxGeometry + BasicMaterial.
+    Creates a box mesh using: `BoxGeometry` + `VertexColorMaterial` by default.
+
+Ownership rules: geometry is created internally => mesh owns geometry.
+Material: if not provided then Mesh owns created `VertexColorMaterial`,
+if provided then Mesh does NOT own the material (shared user resource).
 </div>
 
 
@@ -659,7 +659,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line313">line 313</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line307">line 307</a>
     </li></ul></dd>
     
 
@@ -765,7 +765,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line336">line 336</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line332">line 332</a>
     </li></ul></dd>
     
 
@@ -809,7 +809,7 @@
 
 
 <div class="description">
-    Starts the requestAnimationFrame loop.
+    Starts the `requestAnimationFrame` loop.
 </div>
 
 
@@ -914,7 +914,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line346">line 346</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line342">line 342</a>
     </li></ul></dd>
     
 
@@ -958,7 +958,7 @@
 
 
 <div class="description">
-    Stops the requestAnimationFrame loop.
+    Stops the `requestAnimationFrame` loop.
 </div>
 
 
@@ -1002,7 +1002,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line365">line 365</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line361">line 361</a>
     </li></ul></dd>
     
 
@@ -1048,13 +1048,13 @@
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Namespaces</h3><ul><li><a href="GeraWebGL.html">GeraWebGL</a></li></ul><h3>Classes</h3><ul><li><a href="BasicMaterial.html">BasicMaterial</a></li><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="CameraMath.html">CameraMath</a></li><li><a href="Engine.html">Engine</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="Vector3.html">Vector3</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_LOCATION_NOT_FOUND_VALUE">ATTRIBUTE_LOCATION_NOT_FOUND_VALUE</a></li><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEFAULT_FAR">DEFAULT_FAR</a></li><li><a href="global.html#DEFAULT_FIELD_OF_VIEW_RADIANS">DEFAULT_FIELD_OF_VIEW_RADIANS</a></li><li><a href="global.html#DEFAULT_INITIAL_CAMERA_Z">DEFAULT_INITIAL_CAMERA_Z</a></li><li><a href="global.html#DEFAULT_NEAR">DEFAULT_NEAR</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#ENGINE_ANIMATION_FRAME_ID_RESET_VALUE">ENGINE_ANIMATION_FRAME_ID_RESET_VALUE</a></li><li><a href="global.html#ENGINE_TIME_SECONDS_RESET_VALUE">ENGINE_TIME_SECONDS_RESET_VALUE</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#INITIAL_CAMERA_ASPECT_RATIO">INITIAL_CAMERA_ASPECT_RATIO</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MAX_COLOR_COMPONENT">MAX_COLOR_COMPONENT</a></li><li><a href="global.html#MILLISECONDS_TO_SECONDS">MILLISECONDS_TO_SECONDS</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#MIN_BOX_SIZE">MIN_BOX_SIZE</a></li><li><a href="global.html#MIN_COLOR_COMPONENT">MIN_COLOR_COMPONENT</a></li><li><a href="global.html#MIN_DRAWING_BUFFER_DIMENSION">MIN_DRAWING_BUFFER_DIMENSION</a></li><li><a href="global.html#MIN_EXCLUSIVE_NUMBER">MIN_EXCLUSIVE_NUMBER</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#UNIT_COMPONENT">UNIT_COMPONENT</a></li><li><a href="global.html#VECTOR_2_ELEMENT_COUNT">VECTOR_2_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_3_ELEMENT_COUNT">VECTOR_3_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_4_ELEMENT_COUNT">VECTOR_4_ELEMENT_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li><li><a href="global.html#ZERO_COMPONENT">ZERO_COMPONENT</a></li><li><a href="global.html#createEngine">createEngine</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Namespaces</h3><ul><li><a href="GeraWebGL.html">GeraWebGL</a></li></ul><h3>Classes</h3><ul><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="CameraMath.html">CameraMath</a></li><li><a href="Engine.html">Engine</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="SolidColorMaterial.html">SolidColorMaterial</a></li><li><a href="Texture2D.html">Texture2D</a></li><li><a href="TexturedMaterial.html">TexturedMaterial</a></li><li><a href="Vector3.html">Vector3</a></li><li><a href="VertexColorMaterial.html">VertexColorMaterial</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_LOCATION_NOT_FOUND_VALUE">ATTRIBUTE_LOCATION_NOT_FOUND_VALUE</a></li><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BASE_MIPMAP_LEVEL">BASE_MIPMAP_LEVEL</a></li><li><a href="global.html#BITWISE_ZERO">BITWISE_ZERO</a></li><li><a href="global.html#BIT_MASK_ONE">BIT_MASK_ONE</a></li><li><a href="global.html#BOX_FACE_COUNT">BOX_FACE_COUNT</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#BOX_TRIANGLE_INDEX_COUNT">BOX_TRIANGLE_INDEX_COUNT</a></li><li><a href="global.html#BOX_VERTEX_COUNT">BOX_VERTEX_COUNT</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLORS_PER_FACE_LENGTH">COLORS_PER_FACE_LENGTH</a></li><li><a href="global.html#COLORS_PER_VERTEX_LENGTH">COLORS_PER_VERTEX_LENGTH</a></li><li><a href="global.html#COLORS_UNIFORM_LENGTH">COLORS_UNIFORM_LENGTH</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#COLOR_COMPONENT_INDEX_BLUE">COLOR_COMPONENT_INDEX_BLUE</a></li><li><a href="global.html#COLOR_COMPONENT_INDEX_GREEN">COLOR_COMPONENT_INDEX_GREEN</a></li><li><a href="global.html#COLOR_COMPONENT_INDEX_RED">COLOR_COMPONENT_INDEX_RED</a></li><li><a href="global.html#COLOR_UNIFORM_NAME">COLOR_UNIFORM_NAME</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_COLOR">DEFAULT_COLOR</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEFAULT_FAR">DEFAULT_FAR</a></li><li><a href="global.html#DEFAULT_FIELD_OF_VIEW_RADIANS">DEFAULT_FIELD_OF_VIEW_RADIANS</a></li><li><a href="global.html#DEFAULT_INITIAL_CAMERA_Z">DEFAULT_INITIAL_CAMERA_Z</a></li><li><a href="global.html#DEFAULT_NEAR">DEFAULT_NEAR</a></li><li><a href="global.html#DEFAULT_OWNS_GEOMETRY">DEFAULT_OWNS_GEOMETRY</a></li><li><a href="global.html#DEFAULT_OWNS_MATERIAL">DEFAULT_OWNS_MATERIAL</a></li><li><a href="global.html#DEFAULT_TEXTURE_UNIT_INDEX">DEFAULT_TEXTURE_UNIT_INDEX</a></li><li><a href="global.html#DEFAULT_VERTEX_COLOR">DEFAULT_VERTEX_COLOR</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#DIFFUSE_TEXTURE_UNIFORM_NAME">DIFFUSE_TEXTURE_UNIFORM_NAME</a></li><li><a href="global.html#ENGINE_ANIMATION_FRAME_ID_RESET_VALUE">ENGINE_ANIMATION_FRAME_ID_RESET_VALUE</a></li><li><a href="global.html#ENGINE_TIME_SECONDS_RESET_VALUE">ENGINE_TIME_SECONDS_RESET_VALUE</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#INDICES_SOLID">INDICES_SOLID</a></li><li><a href="global.html#INDICES_WIREFRAME">INDICES_WIREFRAME</a></li><li><a href="global.html#INITIAL_CAMERA_ASPECT_RATIO">INITIAL_CAMERA_ASPECT_RATIO</a></li><li><a href="global.html#LINE_INDEX_COMPONENT_COUNT">LINE_INDEX_COMPONENT_COUNT</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MATRIX_UNIFORM_NAME">MATRIX_UNIFORM_NAME</a></li><li><a href="global.html#MAX_COLOR_COMPONENT">MAX_COLOR_COMPONENT</a></li><li><a href="global.html#MILLISECONDS_TO_SECONDS">MILLISECONDS_TO_SECONDS</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#MIN_BOX_SIZE">MIN_BOX_SIZE</a></li><li><a href="global.html#MIN_COLOR_COMPONENT">MIN_COLOR_COMPONENT</a></li><li><a href="global.html#MIN_DRAWING_BUFFER_DIMENSION">MIN_DRAWING_BUFFER_DIMENSION</a></li><li><a href="global.html#MIN_EXCLUSIVE_NUMBER">MIN_EXCLUSIVE_NUMBER</a></li><li><a href="global.html#MIN_POWER_OF_TWO_VALUE">MIN_POWER_OF_TWO_VALUE</a></li><li><a href="global.html#MIN_REQUIRED_STRING_LENGTH">MIN_REQUIRED_STRING_LENGTH</a></li><li><a href="global.html#MIN_TEXTURE_UNIT_INDEX">MIN_TEXTURE_UNIT_INDEX</a></li><li><a href="global.html#MODULO_ALIGNED_VALUE">MODULO_ALIGNED_VALUE</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#PLACEHOLDER_PIXEL_RGBA">PLACEHOLDER_PIXEL_RGBA</a></li><li><a href="global.html#PLACEHOLDER_TEXTURE_HEIGHT">PLACEHOLDER_TEXTURE_HEIGHT</a></li><li><a href="global.html#PLACEHOLDER_TEXTURE_WIDTH">PLACEHOLDER_TEXTURE_WIDTH</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#TEXTURE_BORDER_VALUE">TEXTURE_BORDER_VALUE</a></li><li><a href="global.html#TRIANGLE_INDEX_COMPONENT_COUNT">TRIANGLE_INDEX_COMPONENT_COUNT</a></li><li><a href="global.html#TRIANGLE_INDEX_COUNT_PER_FACE">TRIANGLE_INDEX_COUNT_PER_FACE</a></li><li><a href="global.html#UNIT_COMPONENT">UNIT_COMPONENT</a></li><li><a href="global.html#UNIT_POSITIONS">UNIT_POSITIONS</a></li><li><a href="global.html#UVS">UVS</a></li><li><a href="global.html#UV_ATTRIBUTE_LOCATION">UV_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#UV_COMPONENT_COUNT">UV_COMPONENT_COUNT</a></li><li><a href="global.html#VECTOR_2_ELEMENT_COUNT">VECTOR_2_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_3_ELEMENT_COUNT">VECTOR_3_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_4_ELEMENT_COUNT">VECTOR_4_ELEMENT_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VERTICES_PER_FACE">VERTICES_PER_FACE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li><li><a href="global.html#WEBGL_FALSE_AS_INTEGER">WEBGL_FALSE_AS_INTEGER</a></li><li><a href="global.html#WEBGL_TRUE_AS_INTEGER">WEBGL_TRUE_AS_INTEGER</a></li><li><a href="global.html#ZERO_COMPONENT">ZERO_COMPONENT</a></li><li><a href="global.html#createEngine">createEngine</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Tue Dec 16 2025 19:02:37 GMT+0300 (Moscow Standard Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Thu Dec 18 2025 03:17:53 GMT+0300 (Moscow Standard Time)
 </footer>
 
 <script> prettyPrint(); </script>

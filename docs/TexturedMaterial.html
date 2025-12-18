@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Class: Material</title>
+    <title>JSDoc: Class: TexturedMaterial</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Class: Material</h1>
+    <h1 class="page-title">Class: TexturedMaterial</h1>
 
     
 
@@ -28,9 +28,9 @@
 
 <header>
     
-        <h2><span class="attribs"><span class="type-signature"></span></span>Material<span class="signature">(webglContext, shaderProgram, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h2>
+        <h2><span class="attribs"><span class="type-signature"></span></span>TexturedMaterial<span class="signature">(webglContext, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h2>
         
-            <div class="class-description">Base material that owns a shader program and wireframe flag.</div>
+            <div class="class-description">`TexturedMaterial` renders geometry using a single diffuse texture (sampler2D) and UV coordinates.</div>
         
     
 </header>
@@ -45,7 +45,7 @@
     
 
     
-    <h4 class="name" id="Material"><span class="type-signature"></span>new Material<span class="signature">(webglContext, shaderProgram, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="TexturedMaterial"><span class="type-signature"></span>new TexturedMaterial<span class="signature">(webglContext, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
     
 
     
@@ -111,38 +111,7 @@
 
             
 
-            <td class="description last">WebGL2 rendering context used to create and manage GPU resources.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>shaderProgram</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><a href="ShaderProgram.html">ShaderProgram</a></span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">Compiled and linked shader program used by this material for rendering.</td>
+            <td class="description last">WebGL2 rendering context used to create shaders and upload uniforms.</td>
         </tr>
 
     
@@ -155,7 +124,7 @@
             <td class="type">
             
                 
-<span class="param-type"><a href="global.html#MaterialOptions">MaterialOptions</a></span>
+<span class="param-type"><a href="global.html#TexturedMaterialOptions">TexturedMaterialOptions</a></span>
 
 
             
@@ -175,7 +144,7 @@
 
             
 
-            <td class="description last">Material options.</td>
+            <td class="description last">Optional configuration for the material.</td>
         </tr>
 
     
@@ -216,7 +185,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="material_material.js.html">material/material.js</a>, <a href="material_material.js.html#line13">line 13</a>
+        <a href="material_textured-material.js.html">material/textured-material.js</a>, <a href="material_textured-material.js.html#line95">line 95</a>
     </li></ul></dd>
     
 
@@ -257,7 +226,7 @@
         <h3 class="subsection-title">Classes</h3>
 
         <dl>
-            <dt><a href="Material.html">Material</a></dt>
+            <dt><a href="TexturedMaterial.html">TexturedMaterial</a></dt>
             <dd></dd>
         </dl>
     
@@ -273,13 +242,13 @@
 
         
             
-<h4 class="name" id="isDisposed"><span class="type-signature"></span>isDisposed<span class="type-signature"></span></h4>
+<h4 class="name" id="diffuseTexture"><span class="type-signature"></span>diffuseTexture<span class="type-signature"></span></h4>
 
 
 
 
 <div class="description">
-    Indicates whether this material has been disposed.
+    Returns the current diffuse texture.
 </div>
 
 
@@ -317,123 +286,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="material_material.js.html">material/material.js</a>, <a href="material_material.js.html#line105">line 105</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="shaderProgram"><span class="type-signature"></span>shaderProgram<span class="type-signature"></span></h4>
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="material_material.js.html">material/material.js</a>, <a href="material_material.js.html#line95">line 95</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="webglContext"><span class="type-signature"></span>webglContext<span class="type-signature"></span></h4>
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="material_material.js.html">material/material.js</a>, <a href="material_material.js.html#line87">line 87</a>
+        <a href="material_textured-material.js.html">material/textured-material.js</a>, <a href="material_textured-material.js.html#line178">line 178</a>
     </li></ul></dd>
     
 
@@ -461,7 +314,7 @@
     
 
     
-    <h4 class="name" id="dispose"><span class="type-signature"></span>dispose<span class="signature">()</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="apply"><span class="type-signature"></span>apply<span class="signature">(matrix4)</span><span class="type-signature"></span></h4>
     
 
     
@@ -469,202 +322,7 @@
 
 
 <div class="description">
-    Releases GPU resources owned by this material.
-If ownsShaderProgram is true, the underlying shader program will be disposed as well.
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="material_material.js.html">material/material.js</a>, <a href="material_material.js.html#line147">line 147</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="isWireframeEnabled"><span class="type-signature"></span>isWireframeEnabled<span class="signature">()</span><span class="type-signature"> &rarr; {boolean}</span></h4>
-    
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="material_material.js.html">material/material.js</a>, <a href="material_material.js.html#line138">line 138</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<h5>Returns:</h5>
-
-        
-<div class="param-desc">
-    - True, when wireframe rendering is enabled and false for solid rendering.
-</div>
-
-
-
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">boolean</span>
-
-
-    </dd>
-</dl>
-
-    
-
-
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="setWireframeEnabled"><span class="type-signature"></span>setWireframeEnabled<span class="signature">(enabled)</span><span class="type-signature"></span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Enables or disables wireframe rendering.
+    Uploads uniforms and binds the texture for a draw call.
 </div>
 
 
@@ -700,13 +358,13 @@ If ownsShaderProgram is true, the underlying shader program will be disposed as 
 
         <tr>
             
-                <td class="name"><code>enabled</code></td>
+                <td class="name"><code>matrix4</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type">boolean</span>
+<span class="param-type">Float32Array</span>
 
 
             
@@ -716,7 +374,7 @@ If ownsShaderProgram is true, the underlying shader program will be disposed as 
 
             
 
-            <td class="description last">When true, switches material to wireframe mode. When false, uses solid rendering.</td>
+            <td class="description last">Model-View-Projection matrix (4x4).</td>
         </tr>
 
     
@@ -757,7 +415,7 @@ If ownsShaderProgram is true, the underlying shader program will be disposed as 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="material_material.js.html">material/material.js</a>, <a href="material_material.js.html#line122">line 122</a>
+        <a href="material_textured-material.js.html">material/textured-material.js</a>, <a href="material_textured-material.js.html#line167">line 167</a>
     </li></ul></dd>
     
 
@@ -793,7 +451,7 @@ If ownsShaderProgram is true, the underlying shader program will be disposed as 
     
 
     
-    <h4 class="name" id="toggleWireframe"><span class="type-signature"></span>toggleWireframe<span class="signature">()</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="dispose"><span class="type-signature"></span>dispose<span class="signature">()</span><span class="type-signature"></span></h4>
     
 
     
@@ -801,7 +459,7 @@ If ownsShaderProgram is true, the underlying shader program will be disposed as 
 
 
 <div class="description">
-    Toggles wireframe mode.
+    Disposes GPU resources owned by the material.
 </div>
 
 
@@ -845,7 +503,7 @@ If ownsShaderProgram is true, the underlying shader program will be disposed as 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="material_material.js.html">material/material.js</a>, <a href="material_material.js.html#line130">line 130</a>
+        <a href="material_textured-material.js.html">material/textured-material.js</a>, <a href="material_textured-material.js.html#line215">line 215</a>
     </li></ul></dd>
     
 
@@ -881,7 +539,7 @@ If ownsShaderProgram is true, the underlying shader program will be disposed as 
     
 
     
-    <h4 class="name" id="use"><span class="type-signature"></span>use<span class="signature">()</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="setDiffuseTexture"><span class="type-signature"></span>setDiffuseTexture<span class="signature">(texture, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
     
 
     
@@ -889,7 +547,7 @@ If ownsShaderProgram is true, the underlying shader program will be disposed as 
 
 
 <div class="description">
-    Makes this material's shader program active.
+    Replaces the diffuse texture.
 </div>
 
 
@@ -898,6 +556,167 @@ If ownsShaderProgram is true, the underlying shader program will be disposed as 
 
 
 
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>texture</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="Texture2D.html">Texture2D</a></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">New texture instance.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Optional ownership configuration.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>ownsTexture</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    false
+                
+                </td>
+            
+
+            <td class="description last">If true, dispose will dispose the texture.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
 
 
 
@@ -933,7 +752,7 @@ If ownsShaderProgram is true, the underlying shader program will be disposed as 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="material_material.js.html">material/material.js</a>, <a href="material_material.js.html#line112">line 112</a>
+        <a href="material_textured-material.js.html">material/textured-material.js</a>, <a href="material_textured-material.js.html#line189">line 189</a>
     </li></ul></dd>
     
 

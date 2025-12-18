@@ -29,8 +29,8 @@ High-level modules are for “get something on screen fast”:
 
 - `Engine` (scene + camera + renderer + render loop)
 - Scene graph        : `Scene`, `Object3D`, `Mesh`, `PerspectiveCamera`
-- Built-in geometry  : `Geometries.BoxGeometry`
-- Built-in materials : `Materials.BasicMaterial`
+- Built-in geometry  : `BoxGeometry`
+- Built-in materials : `SolidColorMaterial`, `VertexColorMaterial`, `TexturedMaterial`
 
 Example:
 
@@ -76,7 +76,7 @@ void main() {
 }
 `;
 
-class TimeMaterial extends GeraWebGL.Materials.Material {
+class TestMaterial extends GeraWebGL.Materials.Material {
     constructor(webglContext) {
         const program = new GeraWebGL.LowLevel.ShaderProgram(
             webglContext,
@@ -94,13 +94,55 @@ class TimeMaterial extends GeraWebGL.Materials.Material {
 }
 
 const geometry = new GeraWebGL.Geometries.BoxGeometry(webglContext, 1.0);
-const material = new TimeMaterial(webglContext);
+const material = new TestMaterial(webglContext);
 const cube     = new GeraWebGL.Mesh(geometry, material);
 engine.scene.add(cube);
 engine.start((delta) => cube.rotation.y += delta);
 ```
 
+## Materials
+
+### VertexColorMaterial
+
+Uses per-vertex colors provided by geometry (`a_color`).
+
+### SolidColorMaterial
+
+Uniform color for the whole mesh:
+
+```js
+const material = new GeraWebGL.Materials.SolidColorMaterial(webglContext, {
+    color: new Float32Array([0.2, 0.9, 0.3]),
+});
+```
+
+### TexturedMaterial
+
+Texture + UVs:
+
+```js
+const texture = new GeraWebGL.Textures.Texture2D(webglContext);
+await texture.loadFromUrl('./assets/test1.jpg');
+
+const material = new GeraWebGL.Materials.TexturedMaterial(webglContext, {
+  texture,
+  ownsTexture: false,
+  textureUnitIndex: 0,
+});
+```
+
+## BoxGeometry colors contract
+
+`BoxGeometry` accepts `options.colors` as a `Float32Array` with one of these exact lengths:
+
+- **3**  => uniform RGB for the whole cube.
+- **18** => per-face RGB (6 faces * 3 components).
+- **72** => per-vertex RGB (24 vertices * 3 components).
+
+Face order for the **18-length** buffer is: **Front, Back, Top, Bottom, Right, Left**.
+
 ## Build & run demo:
+
 ```bash
 # Restore the dependencies:
 npm install
@@ -114,6 +156,7 @@ npm run build:all-and-serve-demo
 ```
 
 ## Working with linting:
+
 ```bash
 # Check:
 npx eslint core
@@ -123,6 +166,7 @@ npx eslint core --fix
 ```
 
 ## Docs generation commands:
+
 ```bash
 npm run docs:build
 npm run docs:serve

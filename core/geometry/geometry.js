@@ -1,53 +1,177 @@
-/** @type {number} */
+/**
+ * Attribute location used by vec3 position.
+ * Must match shader `layout(location = X)` declaration.
+ *
+ * @type {number}
+ */
 const POSITION_ATTRIBUTE_LOCATION = 0;
 
-/** @type {number} */
+/**
+ * Number of float components per vertex position.
+ *
+ * @type {number}
+ */
 const POSITION_COMPONENT_COUNT = 3;
 
-/** @type {number} */
+/**
+ * Attribute location used by vertex color.
+ * Must match shader `layout(location = X)` declaration.
+ *
+ * @type {number}
+ */
 const COLOR_ATTRIBUTE_LOCATION = 1;
 
-/** @type {number} */
+/**
+ * Number of float components per vertex color.
+ *
+ * @type {number}
+ */
 const COLOR_COMPONENT_COUNT = 3;
 
-/** @type {boolean} */
+/**
+ * Attribute location used by the UV coordinates.
+ * Must match shader `layout(location = X)` declaration.
+ *
+ * @type {number}
+ */
+const UV_ATTRIBUTE_LOCATION = 2;
+
+/**
+ * Number of float components per UV coordinate.
+ *
+ * @type {number}
+ */
+const UV_COMPONENT_COUNT = 2;
+
+/**
+ * Flag passed to `vertexAttribPointer()` method.
+ * When false, attribute values are used as-is (no normalization).
+ *
+ * @type {boolean}
+ */
 const ATTRIBUTE_NORMALIZED = false;
 
-/** @type {number} */
+/**
+ * Stride parameter for `vertexAttribPointer()`, when the attribute data is tightly packed.
+ * Zero means: compute stride automatically from attribute size and type.
+ *
+ * @type {number}
+ */
 const ATTRIBUTE_NO_STRIDE = 0;
 
-/** @type {number} */
+/**
+ * Offset parameter for `vertexAttribPointer()` for attributes starting at the beginning of the buffer.
+ *
+ * @type {number}
+ */
 const ATTRIBUTE_NO_OFFSET = 0;
 
 /**
- * Geometry holds vertex buffers and index buffers for rendering.
+ * Modulo result expected for correct component alignment.
+ *
+ * @type {number}
+ */
+const MODULO_ALIGNED_VALUE = 0;
+
+/**
+ * Number of indices, that form a single triangle.
+ *
+ * @type {number}
+ */
+const TRIANGLE_INDEX_COMPONENT_COUNT = 3;
+
+/**
+ * Number of indices, that form a single line segment.
+ *
+ * @type {number}
+ */
+const LINE_INDEX_COMPONENT_COUNT = 2;
+
+/**
+ * Geometry represents a set of vertex buffers + index buffers, grouped under a VAO.
  */
 export class Geometry {
-    /** @type {WebGL2RenderingContext} */
+    /**
+     * WebGL2 rendering context used to create and manage GPU resources.
+     *
+     * @type {WebGL2RenderingContext}
+     * @private
+     */
     #webglContext;
 
-    /** @type {WebGLVertexArrayObject} */
+    /**
+     * Vertex Array Object (VAO) that stores vertex attribute bindings for this geometry.
+     *
+     * @type {WebGLVertexArrayObject}
+     * @private
+     */
     #vertexArrayObject;
 
-    /** @type {WebGLBuffer} */
+    /**
+     * GPU buffer that stores vertex positions.
+     *
+     * @type {WebGLBuffer}
+     * @private
+     */
     #positionBuffer;
 
-    /** @type {WebGLBuffer | null} */
+    /**
+     * Optional GPU buffer, that stores vertex colors.
+     * Used by materials that read `a_color` attribute.
+     *
+     * @type {WebGLBuffer | null}
+     * @private
+     */
     #colorBuffer;
 
-    /** @type {WebGLBuffer} */
+    /**
+     * Optional GPU buffer that stores texture coordinates.
+     * Used by textured materials, that read `a_uv` attribute.
+     *
+     * @type {WebGLBuffer | null}
+     * @private
+     */
+    #uvBuffer;
+
+    /**
+     * Index buffer for solid rendering mode (triangles).
+     *
+     * @type {WebGLBuffer}
+     * @private
+     */
     #indexBufferSolid;
 
-    /** @type {WebGLBuffer} */
+    /**
+     * Index buffer for wireframe rendering mode (lines).
+     *
+     * @type {WebGLBuffer}
+     * @private
+     */
     #indexBufferWireframe;
 
-    /** @type {number} */
+    /**
+     * Number of indices in the solid index buffer.
+     *
+     * @type {number}
+     * @private
+     */
     #solidIndexCount;
 
-    /** @type {number} */
+    /**
+     * Number of indices in the wireframe index buffer.
+     *
+     * @type {number}
+     * @private
+     */
     #wireframeIndexCount;
 
-    /** @type {boolean} */
+    /**
+     * Indicates whether this geometry instance has been disposed.
+     * Disposed geometries must not be used for rendering.
+     *
+     * @type {boolean}
+     * @private
+     */
     #isDisposed = false;
 
     /**
@@ -56,8 +180,9 @@ export class Geometry {
      * @param {Float32Array | null} colors          - [red, green, blue] triples or null.
      * @param {Uint16Array} indicesSolid            - Indices for solid triangles.
      * @param {Uint16Array} indicesWireframe        - Indices for wireframe lines.
+     * @param {Float32Array | null} [uvs = null]    - [u, v] pairs or null.
      */
-    constructor(webglContext, positions, colors, indicesSolid, indicesWireframe) {
+    constructor(webglContext, positions, colors, indicesSolid, indicesWireframe, uvs = null) {
         if (!(webglContext instanceof WebGL2RenderingContext)) {
             throw new TypeError('Geometry expects a WebGL2RenderingContext.');
         }
@@ -70,9 +195,16 @@ export class Geometry {
             throw new TypeError('Geometry expects colors as Float32Array or null.');
         }
 
+        if (uvs !== null && !(uvs instanceof Float32Array)) {
+            throw new TypeError('Geometry expects uvs as Float32Array or null.');
+        }
+
         if (!(indicesSolid instanceof Uint16Array) || !(indicesWireframe instanceof Uint16Array)) {
             throw new TypeError('Geometry expects indices as Uint16Array.');
         }
+
+        this.#validateAttributeSizes(positions, colors, uvs);
+        this.#validateIndexSizes(indicesSolid, indicesWireframe);
 
         this.#webglContext         = webglContext;
         this.#solidIndexCount      = indicesSolid.length;
@@ -80,6 +212,7 @@ export class Geometry {
         this.#vertexArrayObject    = this.#createVertexArrayObject();
         this.#positionBuffer       = this.#createStaticArrayBuffer(positions);
         this.#colorBuffer          = colors ? this.#createStaticArrayBuffer(colors) : null;
+        this.#uvBuffer             = uvs ? this.#createStaticArrayBuffer(uvs) : null;
         this.#indexBufferSolid     = this.#createIndexBuffer(indicesSolid);
         this.#indexBufferWireframe = this.#createIndexBuffer(indicesWireframe);
         this.#configureVertexArray();
@@ -132,19 +265,15 @@ export class Geometry {
             this.#colorBuffer = null;
         }
 
+        if (this.#uvBuffer) {
+            webglContext.deleteBuffer(this.#uvBuffer);
+            this.#uvBuffer = null;
+        }
+
         webglContext.deleteBuffer(this.#indexBufferSolid);
         webglContext.deleteBuffer(this.#indexBufferWireframe);
         webglContext.deleteVertexArray(this.#vertexArrayObject);
         this.#isDisposed = true;
-    }
-
-    /**
-     * @private
-     */
-    #assertNotDisposed() {
-        if (this.#isDisposed) {
-            throw new Error('Geometry has been disposed and can no longer be used.');
-        }
     }
 
     /**
@@ -164,7 +293,7 @@ export class Geometry {
     }
 
     /**
-     * Creates a static ARRAY_BUFFER and uploads the given data.
+     * Creates a static `ARRAY_BUFFER` and uploads the given data.
      *
      * @param {Float32Array} data - Vertex attribute data stored as a flat array of numeric components.
      * @returns {WebGLBuffer}
@@ -174,7 +303,7 @@ export class Geometry {
         const buffer = this.#webglContext.createBuffer();
 
         if (!buffer) {
-            throw new Error('Failed to create ARRAY_BUFFER.');
+            throw new Error('Failed to create `ARRAY_BUFFER`.');
         }
 
         this.#webglContext.bindBuffer(this.#webglContext.ARRAY_BUFFER, buffer);
@@ -183,7 +312,7 @@ export class Geometry {
     }
 
     /**
-     * Creates an ELEMENT_ARRAY_BUFFER and uploads the given index data.
+     * Creates an `ELEMENT_ARRAY_BUFFER` and uploads the given index data.
      *
      * @param {Uint16Array} indices - Index data referencing vertices in the associated vertex buffers.
      * @returns {WebGLBuffer}
@@ -193,7 +322,7 @@ export class Geometry {
         const buffer = this.#webglContext.createBuffer();
 
         if (!buffer) {
-            throw new Error('Failed to create ELEMENT_ARRAY_BUFFER.');
+            throw new Error('Failed to create `ELEMENT_ARRAY_BUFFER`.');
         }
 
         this.#webglContext.bindBuffer(this.#webglContext.ELEMENT_ARRAY_BUFFER, buffer);
@@ -202,19 +331,73 @@ export class Geometry {
     }
 
     /**
-     * Configures the vertex array object (VAO) with position and optional color attributes.
+     * Validates vertex attribute array sizes (positions, colors, uvs).
      *
-     * Attribute layout:
-     * - location 0: vec3 position
-     * - location 1: vec3 color (if present)
+     * @param {Float32Array} positions     - Flat array of vec3 positions: [x, y, z] * vertexCount.
+     * @param {Float32Array | null} colors - Optional flat array of vec3 colors: [red, green, blue] * vertexCount.
+     * @param {Float32Array | null} uvs    - Optional flat array of vec2 UVs: [u, v] * vertexCount.
+     * @private
+     */
+    #validateAttributeSizes(positions, colors, uvs) {
+        if ((positions.length % POSITION_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
+            throw new Error('Geometry positions length must be a multiple of `POSITION_COMPONENT_COUNT`.');
+        }
+
+        const vertexCount = positions.length / POSITION_COMPONENT_COUNT;
+
+        if (colors !== null) {
+            if ((colors.length % COLOR_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
+                throw new Error('Geometry colors length must be a multiple of `COLOR_COMPONENT_COUNT`.');
+            }
+
+            const colorVertexCount = colors.length / COLOR_COMPONENT_COUNT;
+
+            if (colorVertexCount !== vertexCount) {
+                throw new Error('Geometry colors vertex count must match positions vertex count.');
+            }
+        }
+
+        if (uvs !== null) {
+            if ((uvs.length % UV_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
+                throw new Error('Geometry uvs length must be a multiple of `UV_COMPONENT_COUNT`.');
+            }
+
+            const uvVertexCount = uvs.length / UV_COMPONENT_COUNT;
+
+            if (uvVertexCount !== vertexCount) {
+                throw new Error('Geometry uvs vertex count must match positions vertex count.');
+            }
+        }
+    }
+
+    /**
+     * Validates basic index array structure (triangles + lines).
+     *
+     * @param {Uint16Array} indicesSolid     - Triangle index buffer data (3 indices per triangle).
+     * @param {Uint16Array} indicesWireframe - Line index buffer data (2 indices per line segment).
+     * @private
+     */
+    #validateIndexSizes(indicesSolid, indicesWireframe) {
+        if ((indicesSolid.length % TRIANGLE_INDEX_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
+            throw new Error('Geometry solid indices length must be a multiple of `TRIANGLE_INDEX_COMPONENT_COUNT`.');
+        }
+
+        if ((indicesWireframe.length % LINE_INDEX_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
+            throw new Error('Geometry wireframe indices length must be a multiple of `LINE_INDEX_COMPONENT_COUNT`.');
+        }
+    }
+
+    /**
+     * Configures the VAO with position (and optional color/uv) attribute pointers.
      *
      * @private
      */
     #configureVertexArray() {
         const webglContext = this.#webglContext;
+
         webglContext.bindVertexArray(this.#vertexArrayObject);
 
-        // Set position attribute at location = 0:
+        // Positions:
         webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#positionBuffer);
         webglContext.enableVertexAttribArray(POSITION_ATTRIBUTE_LOCATION);
         webglContext.vertexAttribPointer(
@@ -226,7 +409,7 @@ export class Geometry {
             ATTRIBUTE_NO_OFFSET
         );
 
-        // Set color attribute at location = 1, if present:
+        // Colors (optional):
         if (this.#colorBuffer) {
             webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#colorBuffer);
             webglContext.enableVertexAttribArray(COLOR_ATTRIBUTE_LOCATION);
@@ -240,8 +423,31 @@ export class Geometry {
             );
         }
 
+        // UVs (optional):
+        if (this.#uvBuffer) {
+            webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#uvBuffer);
+            webglContext.enableVertexAttribArray(UV_ATTRIBUTE_LOCATION);
+            webglContext.vertexAttribPointer(
+                UV_ATTRIBUTE_LOCATION,
+                UV_COMPONENT_COUNT,
+                webglContext.FLOAT,
+                ATTRIBUTE_NORMALIZED,
+                ATTRIBUTE_NO_STRIDE,
+                ATTRIBUTE_NO_OFFSET
+            );
+        }
+
         // Bind the default index buffer (solid) to the VAO:
         webglContext.bindBuffer(webglContext.ELEMENT_ARRAY_BUFFER, this.#indexBufferSolid);
         webglContext.bindVertexArray(null);
+    }
+
+    /**
+     * @private
+     */
+    #assertNotDisposed() {
+        if (this.#isDisposed) {
+            throw new Error('Geometry has been disposed and can no longer be used.');
+        }
     }
 }

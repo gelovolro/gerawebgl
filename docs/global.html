@@ -153,7 +153,7 @@ getAttribLocation returns `-1`, when the attribute is not found.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="shader_shader-program.js.html">shader/shader-program.js</a>, <a href="shader_shader-program.js.html#line39">line 39</a>
+        <a href="shader_shader-program.js.html">shader/shader-program.js</a>, <a href="shader_shader-program.js.html#line41">line 41</a>
     </li></ul></dd>
     
 
@@ -175,6 +175,11 @@ getAttribLocation returns `-1`, when the attribute is not found.
 
 
 
+
+<div class="description">
+    Flag passed to `vertexAttribPointer()` method.
+When false, attribute values are used as-is (no normalization).
+</div>
 
 
 
@@ -221,7 +226,7 @@ getAttribLocation returns `-1`, when the attribute is not found.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line14">line 14</a>
+        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line52">line 52</a>
     </li></ul></dd>
     
 
@@ -244,6 +249,10 @@ getAttribLocation returns `-1`, when the attribute is not found.
 
 
 
+<div class="description">
+    Offset parameter for `vertexAttribPointer()` for attributes starting at the beginning of the buffer.
+</div>
+
 
 
     <h5>Type:</h5>
@@ -289,7 +298,7 @@ getAttribLocation returns `-1`, when the attribute is not found.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line20">line 20</a>
+        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line67">line 67</a>
     </li></ul></dd>
     
 
@@ -312,6 +321,11 @@ getAttribLocation returns `-1`, when the attribute is not found.
 
 
 
+<div class="description">
+    Stride parameter for `vertexAttribPointer()`, when the attribute data is tightly packed.
+Zero means: compute stride automatically from attribute size and type.
+</div>
+
 
 
     <h5>Type:</h5>
@@ -357,7 +371,295 @@ getAttribLocation returns `-1`, when the attribute is not found.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line17">line 17</a>
+        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line60">line 60</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="BASE_MIPMAP_LEVEL"><span class="type-signature">(constant) </span>BASE_MIPMAP_LEVEL<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Default mipmap level used by `texImage2D`.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line27">line 27</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="BITWISE_ZERO"><span class="type-signature">(constant) </span>BITWISE_ZERO<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Bitwise `zero` value used in bit-mask comparisons.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line83">line 83</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="BIT_MASK_ONE"><span class="type-signature">(constant) </span>BIT_MASK_ONE<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Bit mask helper value used by the `power-of-two` check.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line76">line 76</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="BOX_FACE_COUNT"><span class="type-signature">(constant) </span>BOX_FACE_COUNT<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Number of faces of a box.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line29">line 29</a>
     </li></ul></dd>
     
 
@@ -380,6 +682,10 @@ getAttribLocation returns `-1`, when the attribute is not found.
 
 
 
+<div class="description">
+    Divisor used to compute the half-size from the full size.
+</div>
+
 
 
     <h5>Type:</h5>
@@ -425,7 +731,151 @@ getAttribLocation returns `-1`, when the attribute is not found.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line7">line 7</a>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line15">line 15</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="BOX_TRIANGLE_INDEX_COUNT"><span class="type-signature">(constant) </span>BOX_TRIANGLE_INDEX_COUNT<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Total triangle index count for the box.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line111">line 111</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="BOX_VERTEX_COUNT"><span class="type-signature">(constant) </span>BOX_VERTEX_COUNT<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Total vertex count for the box (faces * vertices per face).
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line43">line 43</a>
     </li></ul></dd>
     
 
@@ -511,10 +961,15 @@ getAttribLocation returns `-1`, when the attribute is not found.
 
         
             
-<h4 class="name" id="COLOR_ATTRIBUTE_LOCATION"><span class="type-signature">(constant) </span>COLOR_ATTRIBUTE_LOCATION<span class="type-signature"> :number</span></h4>
+<h4 class="name" id="COLORS_PER_FACE_LENGTH"><span class="type-signature">(constant) </span>COLORS_PER_FACE_LENGTH<span class="type-signature"> :number</span></h4>
 
 
 
+
+<div class="description">
+    Expected length for per-face RGB color buffer.
+One RGB triplet per face.
+</div>
 
 
 
@@ -561,7 +1016,297 @@ getAttribLocation returns `-1`, when the attribute is not found.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line8">line 8</a>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line65">line 65</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="COLORS_PER_VERTEX_LENGTH"><span class="type-signature">(constant) </span>COLORS_PER_VERTEX_LENGTH<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Expected length for per-vertex RGB color buffer.
+One RGB triplet per vertex.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line73">line 73</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="COLORS_UNIFORM_LENGTH"><span class="type-signature">(constant) </span>COLORS_UNIFORM_LENGTH<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Expected length for a uniform RGB color buffer (single color).
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line57">line 57</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="COLOR_ATTRIBUTE_LOCATION"><span class="type-signature">(constant) </span>COLOR_ATTRIBUTE_LOCATION<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Attribute location used by vertex color.
+Must match shader `layout(location = X)` declaration.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line22">line 22</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="COLOR_ATTRIBUTE_LOCATION"><span class="type-signature">(constant) </span>COLOR_ATTRIBUTE_LOCATION<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Attribute location used by `vec3` color.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_vertex-color-material.js.html">material/vertex-color-material.js</a>, <a href="material_vertex-color-material.js.html#line16">line 16</a>
     </li></ul></dd>
     
 
@@ -584,6 +1329,10 @@ getAttribLocation returns `-1`, when the attribute is not found.
 
 
 
+<div class="description">
+    Number of color components per vertex (RGB).
+</div>
+
 
 
     <h5>Type:</h5>
@@ -629,7 +1378,442 @@ getAttribLocation returns `-1`, when the attribute is not found.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line11">line 11</a>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line50">line 50</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="COLOR_COMPONENT_COUNT"><span class="type-signature">(constant) </span>COLOR_COMPONENT_COUNT<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Number of float components per vertex color.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line29">line 29</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="COLOR_COMPONENT_COUNT"><span class="type-signature">(constant) </span>COLOR_COMPONENT_COUNT<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Number of components in a RGB color.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_solid-color-material.js.html">material/solid-color-material.js</a>, <a href="material_solid-color-material.js.html#line30">line 30</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="COLOR_COMPONENT_INDEX_BLUE"><span class="type-signature">(constant) </span>COLOR_COMPONENT_INDEX_BLUE<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Index of the blue channel in an RGB triplet (red, green, blue).
+Used when reading/writing `Float32Array` color buffers.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line97">line 97</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="COLOR_COMPONENT_INDEX_GREEN"><span class="type-signature">(constant) </span>COLOR_COMPONENT_INDEX_GREEN<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Index of the green channel in an RGB triplet (red, green, blue).
+Used when reading/writing `Float32Array` color buffers.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line89">line 89</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="COLOR_COMPONENT_INDEX_RED"><span class="type-signature">(constant) </span>COLOR_COMPONENT_INDEX_RED<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Index of the red channel in an RGB triplet (red, green, blue).
+Used when reading/writing `Float32Array` color buffers.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line81">line 81</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="COLOR_UNIFORM_NAME"><span class="type-signature">(constant) </span>COLOR_UNIFORM_NAME<span class="type-signature"> :string</span></h4>
+
+
+
+
+<div class="description">
+    Name of the color uniform in the shader.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">string</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_solid-color-material.js.html">material/solid-color-material.js</a>, <a href="material_solid-color-material.js.html#line23">line 23</a>
     </li></ul></dd>
     
 
@@ -702,7 +1886,7 @@ Used when `createBoxMesh options.size` is not provided.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line54">line 54</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line55">line 55</a>
     </li></ul></dd>
     
 
@@ -724,6 +1908,10 @@ Used when `createBoxMesh options.size` is not provided.
 
 
 
+
+<div class="description">
+    Default box edge size.
+</div>
 
 
 
@@ -770,7 +1958,79 @@ Used when `createBoxMesh options.size` is not provided.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line4">line 4</a>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line8">line 8</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="DEFAULT_COLOR"><span class="type-signature">(constant) </span>DEFAULT_COLOR<span class="type-signature"> :Float32Array</span></h4>
+
+
+
+
+<div class="description">
+    Default solid color (white).
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Float32Array</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_solid-color-material.js.html">material/solid-color-material.js</a>, <a href="material_solid-color-material.js.html#line37">line 37</a>
     </li></ul></dd>
     
 
@@ -915,7 +2175,7 @@ Used when `EngineOptions.far` is not provided.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line31">line 31</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line32">line 32</a>
     </li></ul></dd>
     
 
@@ -988,7 +2248,7 @@ Used when `EngineOptions.fieldOfViewRadians` is not provided.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line15">line 15</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line16">line 16</a>
     </li></ul></dd>
     
 
@@ -1061,7 +2321,7 @@ Used when `EngineOptions.initialCameraZ` is not provided.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line39">line 39</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line40">line 40</a>
     </li></ul></dd>
     
 
@@ -1134,7 +2394,370 @@ Used when `EngineOptions.near` is not provided.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line23">line 23</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line24">line 24</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="DEFAULT_OWNS_GEOMETRY"><span class="type-signature">(constant) </span>DEFAULT_OWNS_GEOMETRY<span class="type-signature"> :boolean</span></h4>
+
+
+
+
+<div class="description">
+    Default ownership flag for geometry.
+When true, `Mesh.dispose()` disposes geometry.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">boolean</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="scene_mesh.js.html">scene/mesh.js</a>, <a href="scene_mesh.js.html#line11">line 11</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="DEFAULT_OWNS_MATERIAL"><span class="type-signature">(constant) </span>DEFAULT_OWNS_MATERIAL<span class="type-signature"> :boolean</span></h4>
+
+
+
+
+<div class="description">
+    Default ownership flag for material.
+When true, `Mesh.dispose()` disposes material.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">boolean</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="scene_mesh.js.html">scene/mesh.js</a>, <a href="scene_mesh.js.html#line19">line 19</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="DEFAULT_TEXTURE_UNIT_INDEX"><span class="type-signature">(constant) </span>DEFAULT_TEXTURE_UNIT_INDEX<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Default texture unit index used for binding the diffuse texture.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_textured-material.js.html">material/textured-material.js</a>, <a href="material_textured-material.js.html#line24">line 24</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="DEFAULT_TEXTURE_UNIT_INDEX"><span class="type-signature">(constant) </span>DEFAULT_TEXTURE_UNIT_INDEX<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Default texture unit index used by `ShaderProgram.setTexture2D`.
+Zero corresponds to `TEXTURE0`.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="shader_shader-program.js.html">shader/shader-program.js</a>, <a href="shader_shader-program.js.html#line56">line 56</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="DEFAULT_VERTEX_COLOR"><span class="type-signature">(constant) </span>DEFAULT_VERTEX_COLOR<span class="type-signature"> :Float32Array</span></h4>
+
+
+
+
+<div class="description">
+    Default vertex color (white). Used to keep `VertexColorMaterial` working without providing explicit colors.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Float32Array</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line22">line 22</a>
     </li></ul></dd>
     
 
@@ -1288,13 +2911,85 @@ Used when `EngineOptions.near` is not provided.
 
         
             
+<h4 class="name" id="DIFFUSE_TEXTURE_UNIFORM_NAME"><span class="type-signature">(constant) </span>DIFFUSE_TEXTURE_UNIFORM_NAME<span class="type-signature"> :string</span></h4>
+
+
+
+
+<div class="description">
+    Name of the `sampler2D` uniform in the shader.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">string</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_textured-material.js.html">material/textured-material.js</a>, <a href="material_textured-material.js.html#line46">line 46</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
 <h4 class="name" id="ENGINE_ANIMATION_FRAME_ID_RESET_VALUE"><span class="type-signature">(constant) </span>ENGINE_ANIMATION_FRAME_ID_RESET_VALUE<span class="type-signature"> :number</span></h4>
 
 
 
 
 <div class="description">
-    requestAnimationFrame id reset value.
+    `requestAnimationFrame` id reset value.
 Zero means - no frame scheduled.
 </div>
 
@@ -1343,7 +3038,7 @@ Zero means - no frame scheduled.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line69">line 69</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line70">line 70</a>
     </li></ul></dd>
     
 
@@ -1416,7 +3111,151 @@ Used as a sentinel to detect the first frame.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line77">line 77</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line78">line 78</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="FRAGMENT_SHADER_SOURCE"><span class="type-signature">(constant) </span>FRAGMENT_SHADER_SOURCE<span class="type-signature"> :string</span></h4>
+
+
+
+
+<div class="description">
+    GLSL fragment shader source code.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">string</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_solid-color-material.js.html">material/solid-color-material.js</a>, <a href="material_solid-color-material.js.html#line61">line 61</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="FRAGMENT_SHADER_SOURCE"><span class="type-signature">(constant) </span>FRAGMENT_SHADER_SOURCE<span class="type-signature"> :string</span></h4>
+
+
+
+
+<div class="description">
+    GLSL fragment shader source code.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">string</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_textured-material.js.html">material/textured-material.js</a>, <a href="material_textured-material.js.html#line71">line 71</a>
     </li></ul></dd>
     
 
@@ -1484,7 +3323,7 @@ Used as a sentinel to detect the first frame.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="material_basic-material.js.html">material/basic-material.js</a>, <a href="material_basic-material.js.html#line19">line 19</a>
+        <a href="material_vertex-color-material.js.html">material/vertex-color-material.js</a>, <a href="material_vertex-color-material.js.html#line43">line 43</a>
     </li></ul></dd>
     
 
@@ -1706,13 +3545,157 @@ Used as a sentinel to detect the first frame.
 
         
             
+<h4 class="name" id="INDICES_SOLID"><span class="type-signature">(constant) </span>INDICES_SOLID<span class="type-signature"> :Uint16Array</span></h4>
+
+
+
+
+<div class="description">
+    Solid indices for 24-vertex box (two triangles per face).
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Uint16Array</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line226">line 226</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="INDICES_WIREFRAME"><span class="type-signature">(constant) </span>INDICES_WIREFRAME<span class="type-signature"> :Uint16Array</span></h4>
+
+
+
+
+<div class="description">
+    Wireframe indices reuse the first 8 vertices (front + back corners) to draw the 12 cube edges.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Uint16Array</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line257">line 257</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
 <h4 class="name" id="INITIAL_CAMERA_ASPECT_RATIO"><span class="type-signature">(constant) </span>INITIAL_CAMERA_ASPECT_RATIO<span class="type-signature"> :number</span></h4>
 
 
 
 
 <div class="description">
-    Initial camera aspect ratio used during Engine construction.
+    Initial camera aspect ratio used during `Engine` construction.
 Real aspect ratio is updated on first render based on canvas size.
 </div>
 
@@ -1761,7 +3744,79 @@ Real aspect ratio is updated on first render based on canvas size.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line85">line 85</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line86">line 86</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="LINE_INDEX_COMPONENT_COUNT"><span class="type-signature">(constant) </span>LINE_INDEX_COMPONENT_COUNT<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Number of indices, that form a single line segment.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line88">line 88</a>
     </li></ul></dd>
     
 
@@ -2033,7 +4088,7 @@ Real aspect ratio is updated on first render based on canvas size.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_camera.js.html">scene/camera.js</a>, <a href="scene_camera.js.html#line11">line 11</a>
+        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line11">line 11</a>
     </li></ul></dd>
     
 
@@ -2101,7 +4156,7 @@ Real aspect ratio is updated on first render based on canvas size.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_object3d.js.html">scene/object3d.js</a>, <a href="scene_object3d.js.html#line11">line 11</a>
+        <a href="scene_perspective-camera.js.html">scene/perspective-camera.js</a>, <a href="scene_perspective-camera.js.html#line11">line 11</a>
     </li></ul></dd>
     
 
@@ -2174,7 +4229,7 @@ Used to validate and upload `mat4` uniform values.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="shader_shader-program.js.html">shader/shader-program.js</a>, <a href="shader_shader-program.js.html#line7">line 7</a>
+        <a href="shader_shader-program.js.html">shader/shader-program.js</a>, <a href="shader_shader-program.js.html#line9">line 9</a>
     </li></ul></dd>
     
 
@@ -2396,6 +4451,222 @@ Used to validate and upload `mat4` uniform values.
 
         
             
+<h4 class="name" id="MATRIX_UNIFORM_NAME"><span class="type-signature">(constant) </span>MATRIX_UNIFORM_NAME<span class="type-signature"> :string</span></h4>
+
+
+
+
+<div class="description">
+    Name of the matrix uniform in the shader.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">string</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_solid-color-material.js.html">material/solid-color-material.js</a>, <a href="material_solid-color-material.js.html#line16">line 16</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="MATRIX_UNIFORM_NAME"><span class="type-signature">(constant) </span>MATRIX_UNIFORM_NAME<span class="type-signature"> :string</span></h4>
+
+
+
+
+<div class="description">
+    Name of the matrix uniform in the shader.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">string</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_textured-material.js.html">material/textured-material.js</a>, <a href="material_textured-material.js.html#line39">line 39</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="MATRIX_UNIFORM_NAME"><span class="type-signature">(constant) </span>MATRIX_UNIFORM_NAME<span class="type-signature"> :string</span></h4>
+
+
+
+
+<div class="description">
+    Name of the matrix uniform in the shader.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">string</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_vertex-color-material.js.html">material/vertex-color-material.js</a>, <a href="material_vertex-color-material.js.html#line23">line 23</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
 <h4 class="name" id="MAX_COLOR_COMPONENT"><span class="type-signature">(constant) </span>MAX_COLOR_COMPONENT<span class="type-signature"> :number</span></h4>
 
 
@@ -2523,7 +4794,7 @@ Used to validate clear color inputs in the range [0 -> 1].
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line46">line 46</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line47">line 47</a>
     </li></ul></dd>
     
 
@@ -2659,7 +4930,7 @@ Used to validate clear color inputs in the range [0 -> 1].
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_camera.js.html">scene/camera.js</a>, <a href="scene_camera.js.html#line8">line 8</a>
+        <a href="scene_perspective-camera.js.html">scene/perspective-camera.js</a>, <a href="scene_perspective-camera.js.html#line8">line 8</a>
     </li></ul></dd>
     
 
@@ -2795,7 +5066,7 @@ Used to validate clear color inputs in the range [0 -> 1].
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_camera.js.html">scene/camera.js</a>, <a href="scene_camera.js.html#line5">line 5</a>
+        <a href="scene_perspective-camera.js.html">scene/perspective-camera.js</a>, <a href="scene_perspective-camera.js.html#line5">line 5</a>
     </li></ul></dd>
     
 
@@ -2867,7 +5138,7 @@ Used to validate clear color inputs in the range [0 -> 1].
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line61">line 61</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line62">line 62</a>
     </li></ul></dd>
     
 
@@ -3085,7 +5356,440 @@ Used as a safeguard, when the canvas CSS size is 0.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line92">line 92</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line93">line 93</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="MIN_POWER_OF_TWO_VALUE"><span class="type-signature">(constant) </span>MIN_POWER_OF_TWO_VALUE<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Minimal allowed value for `power-of-two` checks.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line69">line 69</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="MIN_REQUIRED_STRING_LENGTH"><span class="type-signature">(constant) </span>MIN_REQUIRED_STRING_LENGTH<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Minimal allowed string length for required string parameters.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line62">line 62</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="MIN_TEXTURE_UNIT_INDEX"><span class="type-signature">(constant) </span>MIN_TEXTURE_UNIT_INDEX<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Minimal allowed texture unit index.
+Zero corresponds to `TEXTURE0`.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_textured-material.js.html">material/textured-material.js</a>, <a href="material_textured-material.js.html#line32">line 32</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="MIN_TEXTURE_UNIT_INDEX"><span class="type-signature">(constant) </span>MIN_TEXTURE_UNIT_INDEX<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Minimum allowed texture unit index.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="shader_shader-program.js.html">shader/shader-program.js</a>, <a href="shader_shader-program.js.html#line48">line 48</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="MIN_TEXTURE_UNIT_INDEX"><span class="type-signature">(constant) </span>MIN_TEXTURE_UNIT_INDEX<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Minimum allowed texture unit index.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line55">line 55</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="MODULO_ALIGNED_VALUE"><span class="type-signature">(constant) </span>MODULO_ALIGNED_VALUE<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Modulo result expected for correct component alignment.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line74">line 74</a>
     </li></ul></dd>
     
 
@@ -3375,10 +6079,86 @@ Used as a safeguard, when the canvas CSS size is 0.
 
         
             
-<h4 class="name" id="POSITION_ATTRIBUTE_LOCATION"><span class="type-signature">(constant) </span>POSITION_ATTRIBUTE_LOCATION<span class="type-signature"> :number</span></h4>
+<h4 class="name" id="PLACEHOLDER_PIXEL_RGBA"><span class="type-signature">(constant) </span>PLACEHOLDER_PIXEL_RGBA<span class="type-signature"> :Uint8Array</span></h4>
 
 
 
+
+<div class="description">
+    Placeholder pixel color (magenta).
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Uint8Array</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line34">line 34</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="PLACEHOLDER_TEXTURE_HEIGHT"><span class="type-signature">(constant) </span>PLACEHOLDER_TEXTURE_HEIGHT<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Default height of a placeholder texture (in pixels).
+</div>
 
 
 
@@ -3425,7 +6205,368 @@ Used as a safeguard, when the canvas CSS size is 0.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line2">line 2</a>
+        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line13">line 13</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="PLACEHOLDER_TEXTURE_WIDTH"><span class="type-signature">(constant) </span>PLACEHOLDER_TEXTURE_WIDTH<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Default width of a placeholder texture (in pixels).
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line6">line 6</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="POSITION_ATTRIBUTE_LOCATION"><span class="type-signature">(constant) </span>POSITION_ATTRIBUTE_LOCATION<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Attribute location used by vec3 position.
+Must match shader `layout(location = X)` declaration.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line7">line 7</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="POSITION_ATTRIBUTE_LOCATION"><span class="type-signature">(constant) </span>POSITION_ATTRIBUTE_LOCATION<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Attribute location used by vec3 position.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_solid-color-material.js.html">material/solid-color-material.js</a>, <a href="material_solid-color-material.js.html#line9">line 9</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="POSITION_ATTRIBUTE_LOCATION"><span class="type-signature">(constant) </span>POSITION_ATTRIBUTE_LOCATION<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Attribute location used by vec3 position.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_textured-material.js.html">material/textured-material.js</a>, <a href="material_textured-material.js.html#line10">line 10</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="POSITION_ATTRIBUTE_LOCATION"><span class="type-signature">(constant) </span>POSITION_ATTRIBUTE_LOCATION<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Attribute location used by `vec3` position.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_vertex-color-material.js.html">material/vertex-color-material.js</a>, <a href="material_vertex-color-material.js.html#line9">line 9</a>
     </li></ul></dd>
     
 
@@ -3448,6 +6589,10 @@ Used as a safeguard, when the canvas CSS size is 0.
 
 
 
+<div class="description">
+    Number of float components per vertex position.
+</div>
+
 
 
     <h5>Type:</h5>
@@ -3493,7 +6638,7 @@ Used as a safeguard, when the canvas CSS size is 0.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line5">line 5</a>
+        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line14">line 14</a>
     </li></ul></dd>
     
 
@@ -3783,6 +6928,222 @@ Used as a safeguard, when the canvas CSS size is 0.
 
         
             
+<h4 class="name" id="TEXTURE_BORDER_VALUE"><span class="type-signature">(constant) </span>TEXTURE_BORDER_VALUE<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    WebGL expects the border parameter of `texImage2D` to be `0`.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line20">line 20</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="TRIANGLE_INDEX_COMPONENT_COUNT"><span class="type-signature">(constant) </span>TRIANGLE_INDEX_COMPONENT_COUNT<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Number of indices, that form a single triangle.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line81">line 81</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="TRIANGLE_INDEX_COUNT_PER_FACE"><span class="type-signature">(constant) </span>TRIANGLE_INDEX_COUNT_PER_FACE<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Number of indices per face for triangles (2 triangles = 6 indices).
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line104">line 104</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
 <h4 class="name" id="UNIT_COMPONENT"><span class="type-signature">(constant) </span>UNIT_COMPONENT<span class="type-signature"> :number</span></h4>
 
 
@@ -3834,6 +7195,376 @@ Used as a safeguard, when the canvas CSS size is 0.
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
         <a href="math_vector3.js.html">math/vector3.js</a>, <a href="math_vector3.js.html#line5">line 5</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="UNIT_POSITIONS"><span class="type-signature">(constant) </span>UNIT_POSITIONS<span class="type-signature"> :Float32Array</span></h4>
+
+
+
+
+<div class="description">
+    Unit cube positions for 24-vertex representation (per-face vertices).
+These are scaled by `halfSize` at runtime.
+
+Face order:
+0: Front  (+Z)
+1: Back   (-Z)
+2: Top    (+Y)
+3: Bottom (-Y)
+4: Right  (+X)
+5: Left   (-X)
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Float32Array</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line138">line 138</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="UVS"><span class="type-signature">(constant) </span>UVS<span class="type-signature"> :Float32Array</span></h4>
+
+
+
+
+<div class="description">
+    UVs for 24-vertex representation (per-face UVs).
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Float32Array</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line183">line 183</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="UV_ATTRIBUTE_LOCATION"><span class="type-signature">(constant) </span>UV_ATTRIBUTE_LOCATION<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Attribute location used by the UV coordinates.
+Must match shader `layout(location = X)` declaration.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line37">line 37</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="UV_ATTRIBUTE_LOCATION"><span class="type-signature">(constant) </span>UV_ATTRIBUTE_LOCATION<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Attribute location used by vec2 UV coordinates.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_textured-material.js.html">material/textured-material.js</a>, <a href="material_textured-material.js.html#line17">line 17</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="UV_COMPONENT_COUNT"><span class="type-signature">(constant) </span>UV_COMPONENT_COUNT<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Number of float components per UV coordinate.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_geometry.js.html">geometry/geometry.js</a>, <a href="geometry_geometry.js.html#line44">line 44</a>
     </li></ul></dd>
     
 
@@ -3906,7 +7637,7 @@ Used to validate `vec2` uniform values.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="shader_shader-program.js.html">shader/shader-program.js</a>, <a href="shader_shader-program.js.html#line15">line 15</a>
+        <a href="shader_shader-program.js.html">shader/shader-program.js</a>, <a href="shader_shader-program.js.html#line17">line 17</a>
     </li></ul></dd>
     
 
@@ -3979,7 +7710,7 @@ Used to validate `vec3` uniform values.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="shader_shader-program.js.html">shader/shader-program.js</a>, <a href="shader_shader-program.js.html#line23">line 23</a>
+        <a href="shader_shader-program.js.html">shader/shader-program.js</a>, <a href="shader_shader-program.js.html#line25">line 25</a>
     </li></ul></dd>
     
 
@@ -4052,7 +7783,151 @@ Used to validate `vec4` uniform values.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="shader_shader-program.js.html">shader/shader-program.js</a>, <a href="shader_shader-program.js.html#line31">line 31</a>
+        <a href="shader_shader-program.js.html">shader/shader-program.js</a>, <a href="shader_shader-program.js.html#line33">line 33</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="VERTEX_SHADER_SOURCE"><span class="type-signature">(constant) </span>VERTEX_SHADER_SOURCE<span class="type-signature"> :string</span></h4>
+
+
+
+
+<div class="description">
+    GLSL vertex shader source code.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">string</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_solid-color-material.js.html">material/solid-color-material.js</a>, <a href="material_solid-color-material.js.html#line44">line 44</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="VERTEX_SHADER_SOURCE"><span class="type-signature">(constant) </span>VERTEX_SHADER_SOURCE<span class="type-signature"> :string</span></h4>
+
+
+
+
+<div class="description">
+    GLSL vertex shader source code.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">string</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_textured-material.js.html">material/textured-material.js</a>, <a href="material_textured-material.js.html#line53">line 53</a>
     </li></ul></dd>
     
 
@@ -4120,7 +7995,79 @@ Used to validate `vec4` uniform values.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="material_basic-material.js.html">material/basic-material.js</a>, <a href="material_basic-material.js.html#line5">line 5</a>
+        <a href="material_vertex-color-material.js.html">material/vertex-color-material.js</a>, <a href="material_vertex-color-material.js.html#line26">line 26</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="VERTICES_PER_FACE"><span class="type-signature">(constant) </span>VERTICES_PER_FACE<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Number of vertices per face.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line36">line 36</a>
     </li></ul></dd>
     
 
@@ -4354,6 +8301,150 @@ Used to validate `vec4` uniform values.
 
         
             
+<h4 class="name" id="WEBGL_FALSE_AS_INTEGER"><span class="type-signature">(constant) </span>WEBGL_FALSE_AS_INTEGER<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Integer value, used to represent boolean false in WebGL `pixelStorei` calls.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line48">line 48</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="WEBGL_TRUE_AS_INTEGER"><span class="type-signature">(constant) </span>WEBGL_TRUE_AS_INTEGER<span class="type-signature"> :number</span></h4>
+
+
+
+
+<div class="description">
+    Integer value, used to represent boolean true in WebGL `pixelStorei` calls.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">number</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line41">line 41</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
 <h4 class="name" id="ZERO_COMPONENT"><span class="type-signature">(constant) </span>ZERO_COMPONENT<span class="type-signature"> :number</span></h4>
 
 
@@ -4440,7 +8531,7 @@ Used to validate `vec4` uniform values.
 
 
 <div class="description">
-    Factory function for Engine.
+    Factory function for `Engine`.
 </div>
 
 
@@ -4576,7 +8667,7 @@ Used to validate `vec4` uniform values.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line412">line 412</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line408">line 408</a>
     </li></ul></dd>
     
 
@@ -4632,13 +8723,195 @@ Used to validate `vec4` uniform values.
 
         
                 
+<h4 class="name" id="BoxGeometryOptions">BoxGeometryOptions</h4>
+
+
+
+
+<div class="description">
+    Options used by `BoxGeometry` constructor:
+- length = 3  => uniform RGB applied to all vertices.
+- length = 18 => per-face RGB (6 faces * 3).
+- length = 72 => per-vertex RGB (24 vertices * 3).
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>size</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    1.0
+                
+                </td>
+            
+
+            <td class="description last">Edge size of the cube.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>colors</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Float32Array</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">Color source buffer (3 / 18 / 72 length).</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_box-geometry.js.html">geometry/box-geometry.js</a>, <a href="geometry_box-geometry.js.html#line113">line 113</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
 <h4 class="name" id="CreateBoxMeshOptions">CreateBoxMeshOptions</h4>
 
 
 
 
 <div class="description">
-    Options used by Engine.createBoxMesh.
+    Options used by `Engine.createBoxMesh`.
+
+Ownership rule: if `material` is provided by the user, created `Mesh` must NOT own it.
 </div>
 
 
@@ -4730,7 +9003,7 @@ Used to validate `vec4` uniform values.
             <td class="type">
             
                 
-<span class="param-type"><a href="BasicMaterial.html">BasicMaterial</a></span>
+<span class="param-type"><a href="Material.html">Material</a></span>
 
 
             
@@ -4752,7 +9025,7 @@ Used to validate `vec4` uniform values.
                 </td>
             
 
-            <td class="description last">Optional material instance.</td>
+            <td class="description last">Optional material instance (shared).</td>
         </tr>
 
     
@@ -4791,7 +9064,7 @@ Used to validate `vec4` uniform values.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line114">line 114</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line115">line 115</a>
     </li></ul></dd>
     
 
@@ -4960,7 +9233,7 @@ Used to validate `vec4` uniform values.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line105">line 105</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line106">line 106</a>
     </li></ul></dd>
     
 
@@ -5264,7 +9537,7 @@ Used to validate `vec4` uniform values.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line94">line 94</a>
+        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line95">line 95</a>
     </li></ul></dd>
     
 
@@ -5407,6 +9680,185 @@ Used to validate `vec4` uniform values.
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
         <a href="material_material.js.html">material/material.js</a>, <a href="material_material.js.html#line3">line 3</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="MeshOwnershipOptions">MeshOwnershipOptions</h4>
+
+
+
+
+<div class="description">
+    Ownership options for Mesh.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>ownsGeometry</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    true
+                
+                </td>
+            
+
+            <td class="description last">When true, `Mesh.dispose()` disposes geometry.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>ownsMaterial</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    true
+                
+                </td>
+            
+
+            <td class="description last">When true, `Mesh.dispose()` disposes material.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="scene_mesh.js.html">scene/mesh.js</a>, <a href="scene_mesh.js.html#line21">line 21</a>
     </li></ul></dd>
     
 
@@ -5773,6 +10225,394 @@ When false, uses the canvas CSS size (client size) and updates the drawing buffe
 
 
             
+                
+<h4 class="name" id="SolidColorMaterialOptions">SolidColorMaterialOptions</h4>
+
+
+
+
+<div class="description">
+    Options used by SolidColorMaterial.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>color</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Float32Array</span>
+|
+
+<span class="param-type">Array.&lt;number></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">RGB color [r,g,b] in 0..1 range.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_solid-color-material.js.html">material/solid-color-material.js</a>, <a href="material_solid-color-material.js.html#line73">line 73</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="TexturedMaterialOptions">TexturedMaterialOptions</h4>
+
+
+
+
+<div class="description">
+    Options used by `TexturedMaterial` constructor.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>texture</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="Texture2D.html">Texture2D</a></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">Optional `Texture2D` instance.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>textureUnitIndex</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    0
+                
+                </td>
+            
+
+            <td class="description last">Texture unit index used for binding.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>ownsTexture</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    false
+                
+                </td>
+            
+
+            <td class="description last">If true, dispose will dispose the texture.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>ownsShaderProgram</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    true
+                
+                </td>
+            
+
+            <td class="description last">If true, dispose will dispose the shader program.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_textured-material.js.html">material/textured-material.js</a>, <a href="material_textured-material.js.html#line82">line 82</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
     
 
     
@@ -5786,13 +10626,13 @@ When false, uses the canvas CSS size (client size) and updates the drawing buffe
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Namespaces</h3><ul><li><a href="GeraWebGL.html">GeraWebGL</a></li></ul><h3>Classes</h3><ul><li><a href="BasicMaterial.html">BasicMaterial</a></li><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="CameraMath.html">CameraMath</a></li><li><a href="Engine.html">Engine</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="Vector3.html">Vector3</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_LOCATION_NOT_FOUND_VALUE">ATTRIBUTE_LOCATION_NOT_FOUND_VALUE</a></li><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEFAULT_FAR">DEFAULT_FAR</a></li><li><a href="global.html#DEFAULT_FIELD_OF_VIEW_RADIANS">DEFAULT_FIELD_OF_VIEW_RADIANS</a></li><li><a href="global.html#DEFAULT_INITIAL_CAMERA_Z">DEFAULT_INITIAL_CAMERA_Z</a></li><li><a href="global.html#DEFAULT_NEAR">DEFAULT_NEAR</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#ENGINE_ANIMATION_FRAME_ID_RESET_VALUE">ENGINE_ANIMATION_FRAME_ID_RESET_VALUE</a></li><li><a href="global.html#ENGINE_TIME_SECONDS_RESET_VALUE">ENGINE_TIME_SECONDS_RESET_VALUE</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#INITIAL_CAMERA_ASPECT_RATIO">INITIAL_CAMERA_ASPECT_RATIO</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MAX_COLOR_COMPONENT">MAX_COLOR_COMPONENT</a></li><li><a href="global.html#MILLISECONDS_TO_SECONDS">MILLISECONDS_TO_SECONDS</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#MIN_BOX_SIZE">MIN_BOX_SIZE</a></li><li><a href="global.html#MIN_COLOR_COMPONENT">MIN_COLOR_COMPONENT</a></li><li><a href="global.html#MIN_DRAWING_BUFFER_DIMENSION">MIN_DRAWING_BUFFER_DIMENSION</a></li><li><a href="global.html#MIN_EXCLUSIVE_NUMBER">MIN_EXCLUSIVE_NUMBER</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#UNIT_COMPONENT">UNIT_COMPONENT</a></li><li><a href="global.html#VECTOR_2_ELEMENT_COUNT">VECTOR_2_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_3_ELEMENT_COUNT">VECTOR_3_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_4_ELEMENT_COUNT">VECTOR_4_ELEMENT_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li><li><a href="global.html#ZERO_COMPONENT">ZERO_COMPONENT</a></li><li><a href="global.html#createEngine">createEngine</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Namespaces</h3><ul><li><a href="GeraWebGL.html">GeraWebGL</a></li></ul><h3>Classes</h3><ul><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="CameraMath.html">CameraMath</a></li><li><a href="Engine.html">Engine</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="SolidColorMaterial.html">SolidColorMaterial</a></li><li><a href="Texture2D.html">Texture2D</a></li><li><a href="TexturedMaterial.html">TexturedMaterial</a></li><li><a href="Vector3.html">Vector3</a></li><li><a href="VertexColorMaterial.html">VertexColorMaterial</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_LOCATION_NOT_FOUND_VALUE">ATTRIBUTE_LOCATION_NOT_FOUND_VALUE</a></li><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BASE_MIPMAP_LEVEL">BASE_MIPMAP_LEVEL</a></li><li><a href="global.html#BITWISE_ZERO">BITWISE_ZERO</a></li><li><a href="global.html#BIT_MASK_ONE">BIT_MASK_ONE</a></li><li><a href="global.html#BOX_FACE_COUNT">BOX_FACE_COUNT</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#BOX_TRIANGLE_INDEX_COUNT">BOX_TRIANGLE_INDEX_COUNT</a></li><li><a href="global.html#BOX_VERTEX_COUNT">BOX_VERTEX_COUNT</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLORS_PER_FACE_LENGTH">COLORS_PER_FACE_LENGTH</a></li><li><a href="global.html#COLORS_PER_VERTEX_LENGTH">COLORS_PER_VERTEX_LENGTH</a></li><li><a href="global.html#COLORS_UNIFORM_LENGTH">COLORS_UNIFORM_LENGTH</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#COLOR_COMPONENT_INDEX_BLUE">COLOR_COMPONENT_INDEX_BLUE</a></li><li><a href="global.html#COLOR_COMPONENT_INDEX_GREEN">COLOR_COMPONENT_INDEX_GREEN</a></li><li><a href="global.html#COLOR_COMPONENT_INDEX_RED">COLOR_COMPONENT_INDEX_RED</a></li><li><a href="global.html#COLOR_UNIFORM_NAME">COLOR_UNIFORM_NAME</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_COLOR">DEFAULT_COLOR</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEFAULT_FAR">DEFAULT_FAR</a></li><li><a href="global.html#DEFAULT_FIELD_OF_VIEW_RADIANS">DEFAULT_FIELD_OF_VIEW_RADIANS</a></li><li><a href="global.html#DEFAULT_INITIAL_CAMERA_Z">DEFAULT_INITIAL_CAMERA_Z</a></li><li><a href="global.html#DEFAULT_NEAR">DEFAULT_NEAR</a></li><li><a href="global.html#DEFAULT_OWNS_GEOMETRY">DEFAULT_OWNS_GEOMETRY</a></li><li><a href="global.html#DEFAULT_OWNS_MATERIAL">DEFAULT_OWNS_MATERIAL</a></li><li><a href="global.html#DEFAULT_TEXTURE_UNIT_INDEX">DEFAULT_TEXTURE_UNIT_INDEX</a></li><li><a href="global.html#DEFAULT_VERTEX_COLOR">DEFAULT_VERTEX_COLOR</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#DIFFUSE_TEXTURE_UNIFORM_NAME">DIFFUSE_TEXTURE_UNIFORM_NAME</a></li><li><a href="global.html#ENGINE_ANIMATION_FRAME_ID_RESET_VALUE">ENGINE_ANIMATION_FRAME_ID_RESET_VALUE</a></li><li><a href="global.html#ENGINE_TIME_SECONDS_RESET_VALUE">ENGINE_TIME_SECONDS_RESET_VALUE</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#INDICES_SOLID">INDICES_SOLID</a></li><li><a href="global.html#INDICES_WIREFRAME">INDICES_WIREFRAME</a></li><li><a href="global.html#INITIAL_CAMERA_ASPECT_RATIO">INITIAL_CAMERA_ASPECT_RATIO</a></li><li><a href="global.html#LINE_INDEX_COMPONENT_COUNT">LINE_INDEX_COMPONENT_COUNT</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MATRIX_UNIFORM_NAME">MATRIX_UNIFORM_NAME</a></li><li><a href="global.html#MAX_COLOR_COMPONENT">MAX_COLOR_COMPONENT</a></li><li><a href="global.html#MILLISECONDS_TO_SECONDS">MILLISECONDS_TO_SECONDS</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#MIN_BOX_SIZE">MIN_BOX_SIZE</a></li><li><a href="global.html#MIN_COLOR_COMPONENT">MIN_COLOR_COMPONENT</a></li><li><a href="global.html#MIN_DRAWING_BUFFER_DIMENSION">MIN_DRAWING_BUFFER_DIMENSION</a></li><li><a href="global.html#MIN_EXCLUSIVE_NUMBER">MIN_EXCLUSIVE_NUMBER</a></li><li><a href="global.html#MIN_POWER_OF_TWO_VALUE">MIN_POWER_OF_TWO_VALUE</a></li><li><a href="global.html#MIN_REQUIRED_STRING_LENGTH">MIN_REQUIRED_STRING_LENGTH</a></li><li><a href="global.html#MIN_TEXTURE_UNIT_INDEX">MIN_TEXTURE_UNIT_INDEX</a></li><li><a href="global.html#MODULO_ALIGNED_VALUE">MODULO_ALIGNED_VALUE</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#PLACEHOLDER_PIXEL_RGBA">PLACEHOLDER_PIXEL_RGBA</a></li><li><a href="global.html#PLACEHOLDER_TEXTURE_HEIGHT">PLACEHOLDER_TEXTURE_HEIGHT</a></li><li><a href="global.html#PLACEHOLDER_TEXTURE_WIDTH">PLACEHOLDER_TEXTURE_WIDTH</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#TEXTURE_BORDER_VALUE">TEXTURE_BORDER_VALUE</a></li><li><a href="global.html#TRIANGLE_INDEX_COMPONENT_COUNT">TRIANGLE_INDEX_COMPONENT_COUNT</a></li><li><a href="global.html#TRIANGLE_INDEX_COUNT_PER_FACE">TRIANGLE_INDEX_COUNT_PER_FACE</a></li><li><a href="global.html#UNIT_COMPONENT">UNIT_COMPONENT</a></li><li><a href="global.html#UNIT_POSITIONS">UNIT_POSITIONS</a></li><li><a href="global.html#UVS">UVS</a></li><li><a href="global.html#UV_ATTRIBUTE_LOCATION">UV_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#UV_COMPONENT_COUNT">UV_COMPONENT_COUNT</a></li><li><a href="global.html#VECTOR_2_ELEMENT_COUNT">VECTOR_2_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_3_ELEMENT_COUNT">VECTOR_3_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_4_ELEMENT_COUNT">VECTOR_4_ELEMENT_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VERTICES_PER_FACE">VERTICES_PER_FACE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li><li><a href="global.html#WEBGL_FALSE_AS_INTEGER">WEBGL_FALSE_AS_INTEGER</a></li><li><a href="global.html#WEBGL_TRUE_AS_INTEGER">WEBGL_TRUE_AS_INTEGER</a></li><li><a href="global.html#ZERO_COMPONENT">ZERO_COMPONENT</a></li><li><a href="global.html#createEngine">createEngine</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Tue Dec 16 2025 19:02:37 GMT+0300 (Moscow Standard Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Thu Dec 18 2025 03:17:53 GMT+0300 (Moscow Standard Time)
 </footer>
 
 <script> prettyPrint(); </script>

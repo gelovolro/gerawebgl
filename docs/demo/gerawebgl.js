@@ -49,7 +49,7 @@ var WebGLContext = class _WebGLContext {
     webglContext.clearColor(red, green, blue, alpha);
   }
   /**
-   * Returns the underlying WebGL2RenderingContext for direct low-level access.
+   * Returns the underlying `WebGL2RenderingContext` for direct low-level access.
    *
    * @returns {WebGL2RenderingContext}
    */
@@ -735,27 +735,87 @@ var POSITION_ATTRIBUTE_LOCATION = 0;
 var POSITION_COMPONENT_COUNT = 3;
 var COLOR_ATTRIBUTE_LOCATION = 1;
 var COLOR_COMPONENT_COUNT = 3;
+var UV_ATTRIBUTE_LOCATION = 2;
+var UV_COMPONENT_COUNT = 2;
 var ATTRIBUTE_NORMALIZED = false;
 var ATTRIBUTE_NO_STRIDE = 0;
 var ATTRIBUTE_NO_OFFSET = 0;
+var MODULO_ALIGNED_VALUE = 0;
+var TRIANGLE_INDEX_COMPONENT_COUNT = 3;
+var LINE_INDEX_COMPONENT_COUNT = 2;
 var Geometry = class {
-  /** @type {WebGL2RenderingContext} */
+  /**
+   * WebGL2 rendering context used to create and manage GPU resources.
+   *
+   * @type {WebGL2RenderingContext}
+   * @private
+   */
   #webglContext;
-  /** @type {WebGLVertexArrayObject} */
+  /**
+   * Vertex Array Object (VAO) that stores vertex attribute bindings for this geometry.
+   *
+   * @type {WebGLVertexArrayObject}
+   * @private
+   */
   #vertexArrayObject;
-  /** @type {WebGLBuffer} */
+  /**
+   * GPU buffer that stores vertex positions.
+   *
+   * @type {WebGLBuffer}
+   * @private
+   */
   #positionBuffer;
-  /** @type {WebGLBuffer | null} */
+  /**
+   * Optional GPU buffer, that stores vertex colors.
+   * Used by materials that read `a_color` attribute.
+   *
+   * @type {WebGLBuffer | null}
+   * @private
+   */
   #colorBuffer;
-  /** @type {WebGLBuffer} */
+  /**
+   * Optional GPU buffer that stores texture coordinates.
+   * Used by textured materials, that read `a_uv` attribute.
+   *
+   * @type {WebGLBuffer | null}
+   * @private
+   */
+  #uvBuffer;
+  /**
+   * Index buffer for solid rendering mode (triangles).
+   *
+   * @type {WebGLBuffer}
+   * @private
+   */
   #indexBufferSolid;
-  /** @type {WebGLBuffer} */
+  /**
+   * Index buffer for wireframe rendering mode (lines).
+   *
+   * @type {WebGLBuffer}
+   * @private
+   */
   #indexBufferWireframe;
-  /** @type {number} */
+  /**
+   * Number of indices in the solid index buffer.
+   *
+   * @type {number}
+   * @private
+   */
   #solidIndexCount;
-  /** @type {number} */
+  /**
+   * Number of indices in the wireframe index buffer.
+   *
+   * @type {number}
+   * @private
+   */
   #wireframeIndexCount;
-  /** @type {boolean} */
+  /**
+   * Indicates whether this geometry instance has been disposed.
+   * Disposed geometries must not be used for rendering.
+   *
+   * @type {boolean}
+   * @private
+   */
   #isDisposed = false;
   /**
    * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
@@ -763,8 +823,9 @@ var Geometry = class {
    * @param {Float32Array | null} colors          - [red, green, blue] triples or null.
    * @param {Uint16Array} indicesSolid            - Indices for solid triangles.
    * @param {Uint16Array} indicesWireframe        - Indices for wireframe lines.
+   * @param {Float32Array | null} [uvs = null]    - [u, v] pairs or null.
    */
-  constructor(webglContext, positions, colors, indicesSolid, indicesWireframe) {
+  constructor(webglContext, positions, colors, indicesSolid, indicesWireframe, uvs = null) {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
       throw new TypeError("Geometry expects a WebGL2RenderingContext.");
     }
@@ -774,15 +835,21 @@ var Geometry = class {
     if (colors !== null && !(colors instanceof Float32Array)) {
       throw new TypeError("Geometry expects colors as Float32Array or null.");
     }
+    if (uvs !== null && !(uvs instanceof Float32Array)) {
+      throw new TypeError("Geometry expects uvs as Float32Array or null.");
+    }
     if (!(indicesSolid instanceof Uint16Array) || !(indicesWireframe instanceof Uint16Array)) {
       throw new TypeError("Geometry expects indices as Uint16Array.");
     }
+    this.#validateAttributeSizes(positions, colors, uvs);
+    this.#validateIndexSizes(indicesSolid, indicesWireframe);
     this.#webglContext = webglContext;
     this.#solidIndexCount = indicesSolid.length;
     this.#wireframeIndexCount = indicesWireframe.length;
     this.#vertexArrayObject = this.#createVertexArrayObject();
     this.#positionBuffer = this.#createStaticArrayBuffer(positions);
     this.#colorBuffer = colors ? this.#createStaticArrayBuffer(colors) : null;
+    this.#uvBuffer = uvs ? this.#createStaticArrayBuffer(uvs) : null;
     this.#indexBufferSolid = this.#createIndexBuffer(indicesSolid);
     this.#indexBufferWireframe = this.#createIndexBuffer(indicesWireframe);
     this.#configureVertexArray();
@@ -828,18 +895,14 @@ var Geometry = class {
       webglContext.deleteBuffer(this.#colorBuffer);
       this.#colorBuffer = null;
     }
+    if (this.#uvBuffer) {
+      webglContext.deleteBuffer(this.#uvBuffer);
+      this.#uvBuffer = null;
+    }
     webglContext.deleteBuffer(this.#indexBufferSolid);
     webglContext.deleteBuffer(this.#indexBufferWireframe);
     webglContext.deleteVertexArray(this.#vertexArrayObject);
     this.#isDisposed = true;
-  }
-  /**
-   * @private
-   */
-  #assertNotDisposed() {
-    if (this.#isDisposed) {
-      throw new Error("Geometry has been disposed and can no longer be used.");
-    }
   }
   /**
    * Creates a vertex array object (VAO).
@@ -855,7 +918,7 @@ var Geometry = class {
     return vao;
   }
   /**
-   * Creates a static ARRAY_BUFFER and uploads the given data.
+   * Creates a static `ARRAY_BUFFER` and uploads the given data.
    *
    * @param {Float32Array} data - Vertex attribute data stored as a flat array of numeric components.
    * @returns {WebGLBuffer}
@@ -864,14 +927,14 @@ var Geometry = class {
   #createStaticArrayBuffer(data) {
     const buffer = this.#webglContext.createBuffer();
     if (!buffer) {
-      throw new Error("Failed to create ARRAY_BUFFER.");
+      throw new Error("Failed to create `ARRAY_BUFFER`.");
     }
     this.#webglContext.bindBuffer(this.#webglContext.ARRAY_BUFFER, buffer);
     this.#webglContext.bufferData(this.#webglContext.ARRAY_BUFFER, data, this.#webglContext.STATIC_DRAW);
     return buffer;
   }
   /**
-   * Creates an ELEMENT_ARRAY_BUFFER and uploads the given index data.
+   * Creates an `ELEMENT_ARRAY_BUFFER` and uploads the given index data.
    *
    * @param {Uint16Array} indices - Index data referencing vertices in the associated vertex buffers.
    * @returns {WebGLBuffer}
@@ -880,18 +943,61 @@ var Geometry = class {
   #createIndexBuffer(indices) {
     const buffer = this.#webglContext.createBuffer();
     if (!buffer) {
-      throw new Error("Failed to create ELEMENT_ARRAY_BUFFER.");
+      throw new Error("Failed to create `ELEMENT_ARRAY_BUFFER`.");
     }
     this.#webglContext.bindBuffer(this.#webglContext.ELEMENT_ARRAY_BUFFER, buffer);
     this.#webglContext.bufferData(this.#webglContext.ELEMENT_ARRAY_BUFFER, indices, this.#webglContext.STATIC_DRAW);
     return buffer;
   }
   /**
-   * Configures the vertex array object (VAO) with position and optional color attributes.
+   * Validates vertex attribute array sizes (positions, colors, uvs).
    *
-   * Attribute layout:
-   * - location 0: vec3 position
-   * - location 1: vec3 color (if present)
+   * @param {Float32Array} positions     - Flat array of vec3 positions: [x, y, z] * vertexCount.
+   * @param {Float32Array | null} colors - Optional flat array of vec3 colors: [red, green, blue] * vertexCount.
+   * @param {Float32Array | null} uvs    - Optional flat array of vec2 UVs: [u, v] * vertexCount.
+   * @private
+   */
+  #validateAttributeSizes(positions, colors, uvs) {
+    if (positions.length % POSITION_COMPONENT_COUNT !== MODULO_ALIGNED_VALUE) {
+      throw new Error("Geometry positions length must be a multiple of `POSITION_COMPONENT_COUNT`.");
+    }
+    const vertexCount = positions.length / POSITION_COMPONENT_COUNT;
+    if (colors !== null) {
+      if (colors.length % COLOR_COMPONENT_COUNT !== MODULO_ALIGNED_VALUE) {
+        throw new Error("Geometry colors length must be a multiple of `COLOR_COMPONENT_COUNT`.");
+      }
+      const colorVertexCount = colors.length / COLOR_COMPONENT_COUNT;
+      if (colorVertexCount !== vertexCount) {
+        throw new Error("Geometry colors vertex count must match positions vertex count.");
+      }
+    }
+    if (uvs !== null) {
+      if (uvs.length % UV_COMPONENT_COUNT !== MODULO_ALIGNED_VALUE) {
+        throw new Error("Geometry uvs length must be a multiple of `UV_COMPONENT_COUNT`.");
+      }
+      const uvVertexCount = uvs.length / UV_COMPONENT_COUNT;
+      if (uvVertexCount !== vertexCount) {
+        throw new Error("Geometry uvs vertex count must match positions vertex count.");
+      }
+    }
+  }
+  /**
+   * Validates basic index array structure (triangles + lines).
+   *
+   * @param {Uint16Array} indicesSolid     - Triangle index buffer data (3 indices per triangle).
+   * @param {Uint16Array} indicesWireframe - Line index buffer data (2 indices per line segment).
+   * @private
+   */
+  #validateIndexSizes(indicesSolid, indicesWireframe) {
+    if (indicesSolid.length % TRIANGLE_INDEX_COMPONENT_COUNT !== MODULO_ALIGNED_VALUE) {
+      throw new Error("Geometry solid indices length must be a multiple of `TRIANGLE_INDEX_COMPONENT_COUNT`.");
+    }
+    if (indicesWireframe.length % LINE_INDEX_COMPONENT_COUNT !== MODULO_ALIGNED_VALUE) {
+      throw new Error("Geometry wireframe indices length must be a multiple of `LINE_INDEX_COMPONENT_COUNT`.");
+    }
+  }
+  /**
+   * Configures the VAO with position (and optional color/uv) attribute pointers.
    *
    * @private
    */
@@ -920,162 +1026,643 @@ var Geometry = class {
         ATTRIBUTE_NO_OFFSET
       );
     }
+    if (this.#uvBuffer) {
+      webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#uvBuffer);
+      webglContext.enableVertexAttribArray(UV_ATTRIBUTE_LOCATION);
+      webglContext.vertexAttribPointer(
+        UV_ATTRIBUTE_LOCATION,
+        UV_COMPONENT_COUNT,
+        webglContext.FLOAT,
+        ATTRIBUTE_NORMALIZED,
+        ATTRIBUTE_NO_STRIDE,
+        ATTRIBUTE_NO_OFFSET
+      );
+    }
     webglContext.bindBuffer(webglContext.ELEMENT_ARRAY_BUFFER, this.#indexBufferSolid);
     webglContext.bindVertexArray(null);
+  }
+  /**
+   * @private
+   */
+  #assertNotDisposed() {
+    if (this.#isDisposed) {
+      throw new Error("Geometry has been disposed and can no longer be used.");
+    }
   }
 };
 
 // core/geometry/box-geometry.js
 var DEFAULT_BOX_SIZE = 1;
 var BOX_HALF_SIZE_DIVISOR = 2;
-var BoxGeometry = class extends Geometry {
+var DEFAULT_VERTEX_COLOR = new Float32Array([1, 1, 1]);
+var BOX_FACE_COUNT = 6;
+var VERTICES_PER_FACE = 4;
+var BOX_VERTEX_COUNT = BOX_FACE_COUNT * VERTICES_PER_FACE;
+var COLOR_COMPONENT_COUNT2 = DEFAULT_VERTEX_COLOR.length;
+var COLORS_UNIFORM_LENGTH = COLOR_COMPONENT_COUNT2;
+var COLORS_PER_FACE_LENGTH = BOX_FACE_COUNT * COLOR_COMPONENT_COUNT2;
+var COLORS_PER_VERTEX_LENGTH = BOX_VERTEX_COUNT * COLOR_COMPONENT_COUNT2;
+var COLOR_COMPONENT_INDEX_RED = 0;
+var COLOR_COMPONENT_INDEX_GREEN = 1;
+var COLOR_COMPONENT_INDEX_BLUE = 2;
+var TRIANGLE_INDEX_COUNT_PER_FACE = 6;
+var BOX_TRIANGLE_INDEX_COUNT = BOX_FACE_COUNT * TRIANGLE_INDEX_COUNT_PER_FACE;
+var UNIT_POSITIONS = new Float32Array([
+  /* eslint-disable indent */
+  // Front (+Z):
+  -1,
+  -1,
+  1,
+  1,
+  -1,
+  1,
+  1,
+  1,
+  1,
+  -1,
+  1,
+  1,
+  // Back (-Z):
+  1,
+  -1,
+  -1,
+  -1,
+  -1,
+  -1,
+  -1,
+  1,
+  -1,
+  1,
+  1,
+  -1,
+  // Top (+Y):
+  -1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  -1,
+  -1,
+  1,
+  -1,
+  // Bottom (-Y):
+  -1,
+  -1,
+  -1,
+  1,
+  -1,
+  -1,
+  1,
+  -1,
+  1,
+  -1,
+  -1,
+  1,
+  // Right (+X):
+  1,
+  -1,
+  1,
+  1,
+  -1,
+  -1,
+  1,
+  1,
+  -1,
+  1,
+  1,
+  1,
+  // Left (-X):
+  -1,
+  -1,
+  -1,
+  -1,
+  -1,
+  1,
+  -1,
+  1,
+  1,
+  -1,
+  1,
+  -1
+  /* eslint-enable indent */
+]);
+var UVS = new Float32Array([
+  // Front:
+  0,
+  0,
+  1,
+  0,
+  1,
+  1,
+  0,
+  1,
+  // Back (flip `U` to avoid the mirrored appearance):
+  1,
+  0,
+  0,
+  0,
+  0,
+  1,
+  1,
+  1,
+  // Top:
+  0,
+  0,
+  1,
+  0,
+  1,
+  1,
+  0,
+  1,
+  // Bottom:
+  0,
+  0,
+  1,
+  0,
+  1,
+  1,
+  0,
+  1,
+  // Right:
+  0,
+  0,
+  1,
+  0,
+  1,
+  1,
+  0,
+  1,
+  // Left:
+  0,
+  0,
+  1,
+  0,
+  1,
+  1,
+  0,
+  1
+]);
+var INDICES_SOLID = new Uint16Array([
+  // Front (0-3):
+  0,
+  1,
+  2,
+  2,
+  3,
+  0,
+  // Back (4-7):
+  4,
+  5,
+  6,
+  6,
+  7,
+  4,
+  // Top (8-11):
+  8,
+  9,
+  10,
+  10,
+  11,
+  8,
+  // Bottom (12-15):
+  12,
+  13,
+  14,
+  14,
+  15,
+  12,
+  // Right (16-19):
+  16,
+  17,
+  18,
+  18,
+  19,
+  16,
+  // Left (20-23):
+  20,
+  21,
+  22,
+  22,
+  23,
+  20
+]);
+var INDICES_WIREFRAME = new Uint16Array([
+  // Front edges:
+  0,
+  1,
+  1,
+  2,
+  2,
+  3,
+  3,
+  0,
+  // Back edges:
+  4,
+  5,
+  5,
+  6,
+  6,
+  7,
+  7,
+  4,
+  // Side edges:
+  0,
+  5,
+  1,
+  4,
+  2,
+  7,
+  3,
+  6
+]);
+var BoxGeometry = class _BoxGeometry extends Geometry {
+  /**
+   * @param {WebGL2RenderingContext} webglContext         - WebGL2 rendering context.
+   * @param {BoxGeometryOptions | number} [optionsOrSize] - Options object or numeric size.
+   */
+  constructor(webglContext, optionsOrSize = {}) {
+    const options = _BoxGeometry.#normalizeOptions(optionsOrSize);
+    const { size, colors: colorsSpec } = options;
+    const halfSize = size / BOX_HALF_SIZE_DIVISOR;
+    const positions = _BoxGeometry.#createPositions(halfSize);
+    const colors = _BoxGeometry.#createColors(colorsSpec);
+    const uvs = UVS;
+    if (INDICES_SOLID.length !== BOX_TRIANGLE_INDEX_COUNT) {
+      throw new Error("BoxGeometry internal error: unexpected triangle index count.");
+    }
+    super(webglContext, positions, colors, INDICES_SOLID, INDICES_WIREFRAME, uvs);
+  }
+  /**
+   * Normalizes constructor input to a `BoxGeometryOptions` object.
+   *
+   * @param {BoxGeometryOptions | number} optionsOrSize - Options object or numeric size.
+   * @returns {{ size: number, colors: Float32Array }}  - Normalized options.
+   * @private
+   */
+  static #normalizeOptions(optionsOrSize) {
+    if (typeof optionsOrSize === "number") {
+      return { size: optionsOrSize, colors: DEFAULT_VERTEX_COLOR };
+    }
+    if (optionsOrSize === null || typeof optionsOrSize !== "object") {
+      throw new TypeError("`BoxGeometry` expects options as an object or a number.");
+    }
+    const { size = DEFAULT_BOX_SIZE, colors = DEFAULT_VERTEX_COLOR } = optionsOrSize;
+    if (typeof size !== "number") {
+      throw new TypeError("`BoxGeometry` expects size as a number.");
+    }
+    if (!(colors instanceof Float32Array)) {
+      throw new TypeError("`BoxGeometry` expects colors as a `Float32Array`.");
+    }
+    if (colors.length !== COLORS_UNIFORM_LENGTH && colors.length !== COLORS_PER_FACE_LENGTH && colors.length !== COLORS_PER_VERTEX_LENGTH) {
+      throw new TypeError(
+        "`BoxGeometry` expects `colors` length to be `{uniform}` (uniform), `{face}` (per-face), or `{vertex}` (per-vertex).".replace("{uniform}", String(COLORS_UNIFORM_LENGTH)).replace("{face}", String(COLORS_PER_FACE_LENGTH)).replace("{vertex}", String(COLORS_PER_VERTEX_LENGTH))
+      );
+    }
+    return { size, colors };
+  }
+  /**
+   * Creates scaled positions for the box.
+   * `UNIT_POSITIONS` contains `-1/+1` cube coordinates, scaling them by `halfSize`.
+   *
+   * @param {number} halfSize - Half of the cube edge size.
+   * @returns {Float32Array}  - Scaled positions buffer.
+   * @private
+   */
+  static #createPositions(halfSize) {
+    const positions = new Float32Array(UNIT_POSITIONS.length);
+    for (let i = 0; i < UNIT_POSITIONS.length; i += 1) {
+      positions[i] = UNIT_POSITIONS[i] * halfSize;
+    }
+    return positions;
+  }
+  /**
+   * Converts `colors` input (uniform/per-face/per-vertex) into a per-vertex RGB buffer.
+   *
+   * @param {Float32Array} colorsSpec - Color buffer that follows 3/18/72 proportion length.
+   * @returns {Float32Array}          - Per-vertex RGB colors buffer (length = 72).
+   * @private
+   */
+  static #createColors(colorsSpec) {
+    if (colorsSpec.length === COLORS_PER_VERTEX_LENGTH) {
+      return new Float32Array(colorsSpec);
+    }
+    if (colorsSpec.length === COLORS_UNIFORM_LENGTH) {
+      return _BoxGeometry.#createUniformColors(colorsSpec);
+    }
+    return _BoxGeometry.#createPerFaceColors(colorsSpec);
+  }
+  /**
+   * Creates a uniform per-vertex color buffer from a single RGB triplet.
+   *
+   * @param {Float32Array} uniformColor - Float32Array([red, green, blue]).
+   * @returns {Float32Array}            - Per-vertex RGB buffer.
+   * @private
+   */
+  static #createUniformColors(uniformColor) {
+    const colors = new Float32Array(COLORS_PER_VERTEX_LENGTH);
+    for (let vertexIndex = 0; vertexIndex < BOX_VERTEX_COUNT; vertexIndex += 1) {
+      const baseIndex = vertexIndex * COLOR_COMPONENT_COUNT2;
+      colors[baseIndex + COLOR_COMPONENT_INDEX_RED] = uniformColor[COLOR_COMPONENT_INDEX_RED];
+      colors[baseIndex + COLOR_COMPONENT_INDEX_GREEN] = uniformColor[COLOR_COMPONENT_INDEX_GREEN];
+      colors[baseIndex + COLOR_COMPONENT_INDEX_BLUE] = uniformColor[COLOR_COMPONENT_INDEX_BLUE];
+    }
+    return colors;
+  }
+  /**
+   * Creates a per-vertex color buffer from per-face RGB colors.
+   * Each face color is applied to all 4 vertices of that face.
+   *
+   * @param {Float32Array} perFaceColors - Float32Array length = 18 (6 faces * 3 RGB).
+   * @returns {Float32Array}             - Per-vertex RGB buffer (length = 72).
+   * @private
+   */
+  static #createPerFaceColors(perFaceColors) {
+    const colors = new Float32Array(COLORS_PER_VERTEX_LENGTH);
+    for (let faceIndex = 0; faceIndex < BOX_FACE_COUNT; faceIndex += 1) {
+      const faceColorBaseIndex = faceIndex * COLOR_COMPONENT_COUNT2;
+      const faceRed = perFaceColors[faceColorBaseIndex + COLOR_COMPONENT_INDEX_RED];
+      const faceGreen = perFaceColors[faceColorBaseIndex + COLOR_COMPONENT_INDEX_GREEN];
+      const faceBlue = perFaceColors[faceColorBaseIndex + COLOR_COMPONENT_INDEX_BLUE];
+      for (let vertexOnFace = 0; vertexOnFace < VERTICES_PER_FACE; vertexOnFace += 1) {
+        const vertexIndex = faceIndex * VERTICES_PER_FACE + vertexOnFace;
+        const vertexBaseIndex = vertexIndex * COLOR_COMPONENT_COUNT2;
+        colors[vertexBaseIndex + COLOR_COMPONENT_INDEX_RED] = faceRed;
+        colors[vertexBaseIndex + COLOR_COMPONENT_INDEX_GREEN] = faceGreen;
+        colors[vertexBaseIndex + COLOR_COMPONENT_INDEX_BLUE] = faceBlue;
+      }
+    }
+    return colors;
+  }
+};
+
+// core/texture/texture2d.js
+var PLACEHOLDER_TEXTURE_WIDTH = 1;
+var PLACEHOLDER_TEXTURE_HEIGHT = 1;
+var TEXTURE_BORDER_VALUE = 0;
+var BASE_MIPMAP_LEVEL = 0;
+var PLACEHOLDER_PIXEL_RGBA = new Uint8Array([255, 0, 255, 255]);
+var WEBGL_TRUE_AS_INTEGER = 1;
+var WEBGL_FALSE_AS_INTEGER = 0;
+var MIN_TEXTURE_UNIT_INDEX = 0;
+var MIN_REQUIRED_STRING_LENGTH = 1;
+var MIN_POWER_OF_TWO_VALUE = 1;
+var BIT_MASK_ONE = 1;
+var BITWISE_ZERO = 0;
+var Texture2D = class {
+  /**
+   * WebGL2 rendering context used to create, upload and dispose the underlying WebGL texture.
+   *
+   * @type {WebGL2RenderingContext}
+   * @private
+   */
+  #webglContext;
+  /**
+   * Underlying WebGL texture handle.
+   *
+   * @type {WebGLTexture}
+   * @private
+   */
+  #texture;
+  /**
+   * When true, uploaded images are flipped vertically during upload. Applied via `UNPACK_FLIP_Y_WEBGL`.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #flipY;
+  /**
+   * Current texture width in pixels. Initialized to placeholder size and updated after a successful upload.
+   *
+   * @type {number}
+   * @private
+   */
+  #width = PLACEHOLDER_TEXTURE_WIDTH;
+  /**
+   * Current texture height in pixels. Initialized to placeholder size and updated after a successful upload.
+   *
+   * @type {number}
+   * @private
+   */
+  #height = PLACEHOLDER_TEXTURE_HEIGHT;
+  /**
+   * Indicates whether the image has been successfully loaded and uploaded to GPU.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #isLoaded = false;
+  /**
+   * Indicates whether this texture instance has been disposed. Disposed textures must not be bound or updated.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #isDisposed = false;
   /**
    * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
-   * @param {number} size - Edge length of the box.
+   * @param {Object} [options]                    - Optional texture creation options.
+   * @param {boolean} [options.flipY = true]      - Whether to flip the image data vertically on upload.
    */
-  constructor(webglContext, size = DEFAULT_BOX_SIZE) {
-    if (typeof size !== "number" || size <= 0) {
-      throw new RangeError("BoxGeometry expects a positive size.");
+  constructor(webglContext, options = {}) {
+    if (!(webglContext instanceof WebGL2RenderingContext)) {
+      throw new TypeError("`Texture2D` expects `WebGL2RenderingContext`.");
     }
-    const halfSize = size / BOX_HALF_SIZE_DIVISOR;
-    const positions = new Float32Array([
-      // Front face
-      -halfSize,
-      -halfSize,
-      halfSize,
-      // 0
-      halfSize,
-      -halfSize,
-      halfSize,
-      // 1
-      halfSize,
-      halfSize,
-      halfSize,
-      // 2
-      -halfSize,
-      halfSize,
-      halfSize,
-      // 3
-      // Back face
-      -halfSize,
-      -halfSize,
-      -halfSize,
-      // 4
-      halfSize,
-      -halfSize,
-      -halfSize,
-      // 5
-      halfSize,
-      halfSize,
-      -halfSize,
-      // 6
-      -halfSize,
-      halfSize,
-      -halfSize
-      // 7
-    ]);
-    const colors = new Float32Array([
-      // Front vertices (0-3) - red
-      1,
-      0,
-      0,
-      1,
-      0,
-      0,
-      1,
-      0,
-      0,
-      1,
-      0,
-      0,
-      // Back vertices (4-7) - blue
-      0,
-      0,
-      1,
-      0,
-      0,
-      1,
-      0,
-      0,
-      1,
-      0,
-      0,
-      1
-    ]);
-    const indicesSolid = new Uint16Array([
-      // Front face
-      0,
-      1,
-      2,
-      2,
-      3,
-      0,
-      // Back face
-      5,
-      4,
-      7,
-      7,
-      6,
-      5,
-      // Top face
-      3,
-      2,
-      6,
-      6,
-      7,
-      3,
-      // Bottom face
-      4,
-      5,
-      1,
-      1,
-      0,
-      4,
-      // Right face
-      1,
-      5,
-      6,
-      6,
-      2,
-      1,
-      // Left face
-      4,
-      0,
-      3,
-      3,
-      7,
-      4
-    ]);
-    const indicesWireframe = new Uint16Array([
-      // Front face edges
-      0,
-      1,
-      1,
-      2,
-      2,
-      3,
-      3,
-      0,
-      // Back face edges
-      4,
-      5,
-      5,
-      6,
-      6,
-      7,
-      7,
-      4,
-      // Side edges
-      0,
-      4,
-      1,
-      5,
-      2,
-      6,
-      3,
-      7
-    ]);
-    super(webglContext, positions, colors, indicesSolid, indicesWireframe);
+    if (options === null || typeof options !== "object") {
+      throw new TypeError("`Texture2D` expects options as an object.");
+    }
+    const { flipY = true } = options;
+    if (typeof flipY !== "boolean") {
+      throw new TypeError("`Texture2D` expects `options.flipY` as boolean.");
+    }
+    this.#webglContext = webglContext;
+    this.#flipY = flipY;
+    const texture = webglContext.createTexture();
+    if (!texture) {
+      throw new Error("Failed to create `WebGLTexture`.");
+    }
+    this.#texture = texture;
+    this.#bindTexture();
+    webglContext.texImage2D(
+      webglContext.TEXTURE_2D,
+      BASE_MIPMAP_LEVEL,
+      webglContext.RGBA,
+      PLACEHOLDER_TEXTURE_WIDTH,
+      PLACEHOLDER_TEXTURE_HEIGHT,
+      TEXTURE_BORDER_VALUE,
+      webglContext.RGBA,
+      webglContext.UNSIGNED_BYTE,
+      PLACEHOLDER_PIXEL_RGBA
+    );
+    webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_WRAP_S, webglContext.CLAMP_TO_EDGE);
+    webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_WRAP_T, webglContext.CLAMP_TO_EDGE);
+    webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_MIN_FILTER, webglContext.LINEAR);
+    webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_MAG_FILTER, webglContext.LINEAR);
+    this.#unbindTexture();
+  }
+  /**
+   * Returns the underlying `WebGLTexture` object.
+   *
+   * @returns {WebGLTexture}
+   */
+  get texture() {
+    this.#assertNotDisposed();
+    return this.#texture;
+  }
+  /**
+   * Returns the width of the uploaded image (or placeholder width until loaded).
+   *
+   * @returns {number}
+   */
+  get width() {
+    this.#assertNotDisposed();
+    return this.#width;
+  }
+  /**
+   * Returns the height of the uploaded image (or placeholder height until loaded).
+   *
+   * @returns {number}
+   */
+  get height() {
+    this.#assertNotDisposed();
+    return this.#height;
+  }
+  /**
+   * Indicates whether the image has been uploaded.
+   *
+   * @returns {boolean}
+   */
+  get isLoaded() {
+    this.#assertNotDisposed();
+    return this.#isLoaded;
+  }
+  /**
+   * Indicates whether this instance has been disposed.
+   *
+   * @returns {boolean}
+   */
+  get isDisposed() {
+    return this.#isDisposed;
+  }
+  /**
+   * Binds this texture to a texture unit.
+   *
+   * @param {number} textureUnitIndex - Index of the texture unit (0 => N).
+   */
+  bind(textureUnitIndex) {
+    this.#assertNotDisposed();
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < MIN_TEXTURE_UNIT_INDEX) {
+      throw new TypeError("`Texture2D.bind` expects `textureUnitIndex` as a non-negative integer.");
+    }
+    const webglContext = this.#webglContext;
+    webglContext.activeTexture(webglContext.TEXTURE0 + textureUnitIndex);
+    webglContext.bindTexture(webglContext.TEXTURE_2D, this.#texture);
+  }
+  /**
+   * Loads an image from the given URL and uploads it into this WebGL texture.
+   *
+   * @param {string} url      - Image URL (relative or absolute).
+   * @returns {Promise<void>} - Promise that resolves after successful GPU upload, or rejects on `load/decode/upload` error.
+   */
+  async loadFromUrl(url) {
+    this.#assertNotDisposed();
+    if (typeof url !== "string" || url.length === MIN_REQUIRED_STRING_LENGTH) {
+      throw new TypeError("`Texture2D.loadFromUrl` expects url as a non-empty string.");
+    }
+    const image = await this.#loadImage(url);
+    this.#assertNotDisposed();
+    this.#uploadImage(image);
+  }
+  /**
+   * Releases the WebGL texture.
+   */
+  dispose() {
+    if (this.#isDisposed) {
+      return;
+    }
+    this.#webglContext.deleteTexture(this.#texture);
+    this.#isDisposed = true;
+  }
+  /**
+   * Loads an `HTMLImageElement` from a URL.
+   *
+   * @param {string} url                  - Image URL.
+   * @returns {Promise<HTMLImageElement>} - Promise, that resolves with a decoded image on `load`, or rejects on `error`.
+   * @private
+   */
+  #loadImage(url) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error(`Failed to load texture image: ${url}`));
+      image.src = url;
+    });
+  }
+  /**
+   * Uploads the given image into the GPU texture.
+   *
+   * @param {HTMLImageElement} image - Loaded image element.
+   * @private
+   */
+  #uploadImage(image) {
+    const webglContext = this.#webglContext;
+    this.#bindTexture();
+    webglContext.pixelStorei(
+      webglContext.UNPACK_FLIP_Y_WEBGL,
+      this.#flipY ? WEBGL_TRUE_AS_INTEGER : WEBGL_FALSE_AS_INTEGER
+    );
+    webglContext.texImage2D(
+      webglContext.TEXTURE_2D,
+      BASE_MIPMAP_LEVEL,
+      webglContext.RGBA,
+      webglContext.RGBA,
+      webglContext.UNSIGNED_BYTE,
+      image
+    );
+    this.#width = image.width;
+    this.#height = image.height;
+    this.#isLoaded = true;
+    if (this.#isPowerOfTwo(this.#width) && this.#isPowerOfTwo(this.#height)) {
+      webglContext.generateMipmap(webglContext.TEXTURE_2D);
+      webglContext.texParameteri(
+        webglContext.TEXTURE_2D,
+        webglContext.TEXTURE_MIN_FILTER,
+        webglContext.LINEAR_MIPMAP_LINEAR
+      );
+    }
+    this.#unbindTexture();
+  }
+  /**
+   * Checks whether an integer value is a `power-of-two`.
+   *
+   * @param {number} value - Value to check.
+   * @returns {boolean}    - True if value is a `power-of-two` (e.g.: 2, 4, 8, ...), otherwise false.
+   * @private
+   */
+  #isPowerOfTwo(value) {
+    return Number.isInteger(value) && value >= MIN_POWER_OF_TWO_VALUE && (value & value - BIT_MASK_ONE) === BITWISE_ZERO;
+  }
+  /**
+   * @private
+   */
+  #bindTexture() {
+    this.#webglContext.bindTexture(this.#webglContext.TEXTURE_2D, this.#texture);
+  }
+  /**
+   * @private
+   */
+  #unbindTexture() {
+    this.#webglContext.bindTexture(this.#webglContext.TEXTURE_2D, null);
+  }
+  /**
+   * @private
+   */
+  #assertNotDisposed() {
+    if (this.#isDisposed) {
+      throw new Error("`Texture2D` instance is disposed.");
+    }
   }
 };
 
@@ -1085,6 +1672,8 @@ var VECTOR_2_ELEMENT_COUNT = 2;
 var VECTOR_3_ELEMENT_COUNT = 3;
 var VECTOR_4_ELEMENT_COUNT = 4;
 var ATTRIBUTE_LOCATION_NOT_FOUND_VALUE = -1;
+var MIN_TEXTURE_UNIT_INDEX2 = 0;
+var DEFAULT_TEXTURE_UNIT_INDEX = 0;
 var ShaderProgram = class {
   /**
    * Raw WebGL2 rendering context.
@@ -1233,6 +1822,28 @@ var ShaderProgram = class {
     this.#webglRenderingContext.uniform1i(location, value);
   }
   /**
+   * Sets a `sampler2D` uniform and binds a `Texture2D` to the specified texture unit.
+   *
+   * @param {string} name                   - Name of the uniform variable.
+   * @param {Texture2D} texture             - `Texture2D` instance to bind.
+   * @param {number} [textureUnitIndex = 0] - Texture unit index (0 => N).
+   */
+  setTexture2D(name, texture, textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX) {
+    this.#assertNotDisposed();
+    if (typeof name !== "string") {
+      throw new TypeError("`ShaderProgram.setTexture2D` expects uniform name as a string.");
+    }
+    if (!(texture instanceof Texture2D)) {
+      throw new TypeError("`ShaderProgram.setTexture2D` expects texture as Texture2D.");
+    }
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < MIN_TEXTURE_UNIT_INDEX2) {
+      throw new TypeError("`ShaderProgram.setTexture2D` expects textureUnitIndex as a non-negative integer.");
+    }
+    texture.bind(textureUnitIndex);
+    const location = this.#getUniformLocation(name);
+    this.#webglRenderingContext.uniform1i(location, textureUnitIndex);
+  }
+  /**
    * Sets a vec2 uniform.
    *
    * @param {string} name                   - Name of the uniform variable.
@@ -1273,7 +1884,7 @@ var ShaderProgram = class {
     this.#webglRenderingContext.uniform3fv(location, value);
   }
   /**
-   * Sets a vec4 uniform.
+   * Sets a `vec4` uniform.
    *
    * @param {string} name                   - Name of the uniform variable.
    * @param {Float32Array | number[]} value - Four numeric components.
@@ -1284,7 +1895,7 @@ var ShaderProgram = class {
       throw new TypeError("`ShaderProgram.setVector4` expects uniform name as a string.");
     }
     if (!Array.isArray(value) && !(value instanceof Float32Array)) {
-      throw new TypeError("`ShaderProgram.setVector4` expects a number[] or Float32Array.");
+      throw new TypeError("`ShaderProgram.setVector4` expects a number[] or `Float32Array`.");
     }
     if (value.length !== VECTOR_4_ELEMENT_COUNT) {
       throw new TypeError("`ShaderProgram.setVector4` expects exactly 4 components.");
@@ -1387,15 +1998,40 @@ var ShaderProgram = class {
 
 // core/material/material.js
 var Material = class {
-  /** @type {WebGL2RenderingContext} */
+  /**
+   * WebGL2 rendering context used to create and manage GPU resources.
+   *
+   * @type {WebGL2RenderingContext}
+   * @private
+   */
   #webglContext;
-  /** @type {ShaderProgram} */
+  /**
+   * Shader program used by this material to render geometry.
+   *
+   * @type {ShaderProgram}
+   * @private
+   */
   #shaderProgram;
-  /** @type {boolean} */
+  /**
+   * When enabled, the renderer should draw geometry using wireframe indices (lines) instead of solid triangles.
+   *
+   * @type {boolean}
+   * @private
+   */
   #wireframeEnabled = false;
-  /** @type {boolean} */
+  /**
+   * Ownership flag. When true, this material is responsible for disposing the shader program.
+   *
+   * @type {boolean}
+   * @private
+   */
   #ownsShaderProgram = false;
-  /** @type {boolean} */
+  /**
+   * Indicates whether the material has been disposed and can no longer be used.
+   *
+   * @type {boolean}
+   * @private
+   */
   #isDisposed = false;
   /**
    * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
@@ -1421,18 +2057,26 @@ var Material = class {
     this.#ownsShaderProgram = ownsShaderProgram;
   }
   /**
-   * @returns {WebGL2RenderingContext}
+   * @returns {WebGL2RenderingContext} - WebGL2 rendering context used by this material.
    */
   get webglContext() {
     this.#assertNotDisposed();
     return this.#webglContext;
   }
   /**
-   * @returns {ShaderProgram}
+   * @returns {ShaderProgram} - Shader program used by this material for rendering.
    */
   get shaderProgram() {
     this.#assertNotDisposed();
     return this.#shaderProgram;
+  }
+  /**
+   * Indicates whether this material has been disposed.
+   *
+   * @returns {boolean} - True, when this material has been disposed and can no longer be used.
+   */
+  get isDisposed() {
+    return this.#isDisposed;
   }
   /**
    * Makes this material's shader program active.
@@ -1458,7 +2102,7 @@ var Material = class {
     this.#wireframeEnabled = !this.#wireframeEnabled;
   }
   /**
-   * @returns {boolean}
+   * @returns {boolean} - True, when wireframe rendering is enabled and false for solid rendering.
    */
   isWireframeEnabled() {
     this.#assertNotDisposed();
@@ -1487,31 +2131,39 @@ var Material = class {
   }
 };
 
-// core/material/basic-material.js
+// core/material/vertex-color-material.js
+var POSITION_ATTRIBUTE_LOCATION2 = 0;
+var COLOR_ATTRIBUTE_LOCATION2 = 1;
+var MATRIX_UNIFORM_NAME = "u_matrix";
 var VERTEX_SHADER_SOURCE = `#version 300 es
 precision mediump float;
-layout(location = 0) in vec3 a_position;
-layout(location = 1) in vec3 a_color;
-uniform mat4 u_matrix;
+
+layout(location = ${POSITION_ATTRIBUTE_LOCATION2}) in vec3 a_position;
+layout(location = ${COLOR_ATTRIBUTE_LOCATION2}) in vec3 a_color;
+
+uniform mat4 ${MATRIX_UNIFORM_NAME};
+
 out vec3 v_color;
 
 void main() {
-    gl_Position = u_matrix * vec4(a_position, 1.0);
+    gl_Position = ${MATRIX_UNIFORM_NAME} * vec4(a_position, 1.0);
     v_color = a_color;
 }
 `;
 var FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision mediump float;
+
 in vec3 v_color;
+
 out vec4 outColor;
 
 void main() {
     outColor = vec4(v_color, 1.0);
 }
 `;
-var BasicMaterial = class extends Material {
+var VertexColorMaterial = class extends Material {
   /**
-   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to compile shaders.
    */
   constructor(webglContext) {
     const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
@@ -1520,10 +2172,238 @@ var BasicMaterial = class extends Material {
   /**
    * Applies per-object uniforms.
    *
+   * @param {Float32Array} matrix4 - Transformation matrix passed as `u_matrix`.
+   */
+  apply(matrix4) {
+    this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME, matrix4);
+  }
+};
+
+// core/material/solid-color-material.js
+var POSITION_ATTRIBUTE_LOCATION3 = 0;
+var MATRIX_UNIFORM_NAME2 = "u_matrix";
+var COLOR_UNIFORM_NAME = "u_color";
+var COLOR_COMPONENT_COUNT3 = 3;
+var DEFAULT_COLOR = new Float32Array([1, 1, 1]);
+var VERTEX_SHADER_SOURCE2 = `#version 300 es
+precision mediump float;
+
+layout(location = ${POSITION_ATTRIBUTE_LOCATION3}) in vec3 a_position;
+
+uniform mat4 ${MATRIX_UNIFORM_NAME2};
+
+void main() {
+    gl_Position = ${MATRIX_UNIFORM_NAME2} * vec4(a_position, 1.0);
+}
+`;
+var FRAGMENT_SHADER_SOURCE2 = `#version 300 es
+precision mediump float;
+
+uniform vec3 ${COLOR_UNIFORM_NAME};
+
+out vec4 outColor;
+
+void main() {
+    outColor = vec4(${COLOR_UNIFORM_NAME}, 1.0);
+}
+`;
+var SolidColorMaterial = class extends Material {
+  /**
+   * Current RGB color stored as Float32Array([r, g, b]).
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #color = new Float32Array(DEFAULT_COLOR);
+  /**
+   * @param {WebGL2RenderingContext} webglContext         - WebGL2 rendering context used to compile shaders.
+   * @param {SolidColorMaterialOptions} [options]         - Material options.
+   */
+  constructor(webglContext, options = {}) {
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("SolidColorMaterial expects an options object (plain object).");
+    }
+    const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE2, FRAGMENT_SHADER_SOURCE2);
+    super(webglContext, shaderProgram, { ownsShaderProgram: true });
+    const { color } = options;
+    if (color !== void 0) {
+      this.setColor(color);
+    }
+  }
+  /**
+   * Applies per-object uniforms.
+   *
    * @param {Float32Array} matrix4 - Transformation matrix passed as u_matrix.
    */
   apply(matrix4) {
-    this.shaderProgram.setMatrix4("u_matrix", matrix4);
+    this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME2, matrix4);
+    this.shaderProgram.setVector3(COLOR_UNIFORM_NAME, this.#color);
+  }
+  /**
+   * Sets the RGB color.
+   *
+   * @param {Float32Array | number[]} color - [r, g, b] in 0..1 range.
+   */
+  setColor(color) {
+    if (!Array.isArray(color) && !(color instanceof Float32Array)) {
+      throw new TypeError("SolidColorMaterial.setColor expects a number[] or Float32Array.");
+    }
+    if (color.length !== COLOR_COMPONENT_COUNT3) {
+      throw new TypeError("SolidColorMaterial.setColor expects exactly 3 components [r, g, b].");
+    }
+    this.#color[0] = color[0];
+    this.#color[1] = color[1];
+    this.#color[2] = color[2];
+  }
+  /**
+   * Returns the internal color buffer.
+   * Note: returned Float32Array is mutable.
+   *
+   * @returns {Float32Array}
+   */
+  get color() {
+    return this.#color;
+  }
+};
+
+// core/material/textured-material.js
+var POSITION_ATTRIBUTE_LOCATION4 = 0;
+var UV_ATTRIBUTE_LOCATION2 = 2;
+var DEFAULT_TEXTURE_UNIT_INDEX2 = 0;
+var MIN_TEXTURE_UNIT_INDEX3 = 0;
+var MATRIX_UNIFORM_NAME3 = "u_matrix";
+var DIFFUSE_TEXTURE_UNIFORM_NAME = "u_diffuseTexture";
+var VERTEX_SHADER_SOURCE3 = `#version 300 es
+precision mediump float;
+layout(location = ${POSITION_ATTRIBUTE_LOCATION4}) in vec3 a_position;
+layout(location = ${UV_ATTRIBUTE_LOCATION2}) in vec2 a_uv;
+uniform mat4 ${MATRIX_UNIFORM_NAME3};
+out vec2 v_uv;
+
+void main() {
+    gl_Position = ${MATRIX_UNIFORM_NAME3} * vec4(a_position, 1.0);
+    v_uv = a_uv;
+}
+`;
+var FRAGMENT_SHADER_SOURCE3 = `#version 300 es
+precision mediump float;
+in vec2 v_uv;
+uniform sampler2D ${DIFFUSE_TEXTURE_UNIFORM_NAME};
+out vec4 outColor;
+
+void main() {
+    outColor = texture(${DIFFUSE_TEXTURE_UNIFORM_NAME}, v_uv);
+}
+`;
+var TexturedMaterial = class extends Material {
+  /**
+   * Diffuse texture bound to the shader sampler.
+   *
+   * @type {Texture2D}
+   * @private
+   */
+  #diffuseTexture;
+  /**
+   * WebGL texture unit index used to bind the diffuse texture (TEXTURE0 + unitIndex).
+   *
+   * @type {number}
+   * @private
+   */
+  #textureUnitIndex;
+  /**
+   * Indicates whether this material owns the diffuse texture resource.
+   * When true, `TexturedMaterial.dispose()` will dispose the texture.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #ownsDiffuseTexture = false;
+  /**
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create shaders and upload uniforms.
+   * @param {TexturedMaterialOptions} [options]   - Optional configuration for the material.
+   */
+  constructor(webglContext, options = {}) {
+    if (options === null || typeof options !== "object") {
+      throw new TypeError("TexturedMaterial expects options as an object.");
+    }
+    const {
+      texture,
+      textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX2,
+      ownsTexture = false,
+      ownsShaderProgram = true
+    } = options;
+    if (texture !== void 0 && !(texture instanceof Texture2D)) {
+      throw new TypeError("`TexturedMaterial` expects `options.texture` as `Texture2D`.");
+    }
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < MIN_TEXTURE_UNIT_INDEX3) {
+      throw new TypeError("`TexturedMaterial` expects `options.textureUnitIndex` as a non-negative integer.");
+    }
+    if (typeof ownsTexture !== "boolean") {
+      throw new TypeError("`TexturedMaterial` expects `options.ownsTexture` as boolean.");
+    }
+    if (typeof ownsShaderProgram !== "boolean") {
+      throw new TypeError("`TexturedMaterial` expects `options.ownsShaderProgram` as boolean.");
+    }
+    const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE3, FRAGMENT_SHADER_SOURCE3);
+    super(webglContext, shaderProgram, { ownsShaderProgram });
+    this.#diffuseTexture = texture || new Texture2D(webglContext);
+    this.#textureUnitIndex = textureUnitIndex;
+    this.#ownsDiffuseTexture = ownsTexture || !texture;
+  }
+  /**
+   * Uploads uniforms and binds the texture for a draw call.
+   *
+   * @param {Float32Array} matrix4 - Model-View-Projection matrix (4x4).
+   */
+  apply(matrix4) {
+    this.use();
+    this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME3, matrix4);
+    this.shaderProgram.setTexture2D(DIFFUSE_TEXTURE_UNIFORM_NAME, this.#diffuseTexture, this.#textureUnitIndex);
+  }
+  /**
+   * Returns the current diffuse texture.
+   *
+   * @returns {Texture2D}
+   */
+  get diffuseTexture() {
+    return this.#diffuseTexture;
+  }
+  /**
+   * Replaces the diffuse texture.
+   *
+   * @param {Texture2D} texture                     - New texture instance.
+   * @param {Object} [options]                      - Optional ownership configuration.
+   * @param {boolean} [options.ownsTexture = false] - If true, dispose will dispose the texture.
+   */
+  setDiffuseTexture(texture, options = {}) {
+    if (!(texture instanceof Texture2D)) {
+      throw new TypeError("`TexturedMaterial.setDiffuseTexture` expects texture as `Texture2D`.");
+    }
+    if (options === null || typeof options !== "object") {
+      throw new TypeError("`TexturedMaterial.setDiffuseTexture` expects options as an object.");
+    }
+    const { ownsTexture = false } = options;
+    if (typeof ownsTexture !== "boolean") {
+      throw new TypeError("`TexturedMaterial.setDiffuseTexture` expects options.ownsTexture as boolean.");
+    }
+    if (this.#ownsDiffuseTexture) {
+      this.#diffuseTexture.dispose();
+    }
+    this.#diffuseTexture = texture;
+    this.#ownsDiffuseTexture = ownsTexture;
+  }
+  /**
+   * Disposes GPU resources owned by the material.
+   */
+  dispose() {
+    if (this.isDisposed) {
+      return;
+    }
+    if (this.#ownsDiffuseTexture) {
+      this.#diffuseTexture.dispose();
+      this.#ownsDiffuseTexture = false;
+    }
+    super.dispose();
   }
 };
 
@@ -1731,18 +2611,51 @@ var Object3D = class _Object3D {
 };
 
 // core/scene/mesh.js
+var DEFAULT_OWNS_GEOMETRY = true;
+var DEFAULT_OWNS_MATERIAL = true;
 var Mesh = class extends Object3D {
-  /** @type {Geometry} */
+  /**
+   * Geometry used by this mesh (vertex/index buffers, VAO).
+   *
+   * @type {Geometry}
+   * @private
+   */
   #geometry;
-  /** @type {Material} */
+  /**
+   * Material used by this mesh (shader program + render state + uniforms).
+   *
+   * @type {Material}
+   * @private
+   */
   #material;
-  /** @type {boolean} */
+  /**
+   * When true, `Mesh.dispose()` will dispose the geometry. Use false for shared geometries.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #ownsGeometry;
+  /**
+   * When true, `Mesh.dispose()` will dispose the material.
+   * Use false when material (and its textures) is shared between meshes.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #ownsMaterial;
+  /**
+   * Indicates whether this mesh has been disposed. Disposed meshes should not be rendered.
+   *
+   * @type {boolean}
+   * @private
+   */
   #isDisposed = false;
   /**
-   * @param {Geometry} geometry - Geometry that provides vertex and index buffers for this mesh.
-   * @param {Material} material - Material that defines how the geometry should be shaded and rendered.
+   * @param {Geometry} geometry                       - Geometry, that provides vertex and index buffers for this mesh.
+   * @param {Material} material                       - Material, that defines how the geometry should be shaded and rendered.
+   * @param {MeshOwnershipOptions} [ownershipOptions] - Ownership flags for geometry/material.
    */
-  constructor(geometry, material) {
+  constructor(geometry, material, ownershipOptions = {}) {
     super();
     if (!(geometry instanceof Geometry)) {
       throw new TypeError("Mesh constructor expects a Geometry instance.");
@@ -1750,19 +2663,39 @@ var Mesh = class extends Object3D {
     if (!(material instanceof Material)) {
       throw new TypeError("Mesh constructor expects a Material instance.");
     }
+    if (ownershipOptions === null || typeof ownershipOptions !== "object" || Array.isArray(ownershipOptions)) {
+      throw new TypeError("Mesh constructor expects `ownershipOptions` as a plain object.");
+    }
+    const {
+      ownsGeometry = DEFAULT_OWNS_GEOMETRY,
+      ownsMaterial = DEFAULT_OWNS_MATERIAL
+    } = ownershipOptions;
+    if (typeof ownsGeometry !== "boolean") {
+      throw new TypeError("Mesh constructor option `ownsGeometry` must be a boolean.");
+    }
+    if (typeof ownsMaterial !== "boolean") {
+      throw new TypeError("Mesh constructor option `ownsMaterial` must be a boolean.");
+    }
     this.#geometry = geometry;
     this.#material = material;
+    this.#ownsGeometry = ownsGeometry;
+    this.#ownsMaterial = ownsMaterial;
   }
   /**
-   * Releases GPU resources owned by this mesh (geometry and material).
+   * Releases GPU resources owned by this mesh (geometry and/or material).
    * After dispose, the mesh can remain as a scene object, but it should not be rendered.
+   * Important ownership rule, if `ownsMaterial=false`, `Mesh.dispose()` must NOT dispose the material (and its textures).
    */
   dispose() {
     if (this.#isDisposed) {
       return;
     }
-    this.#geometry.dispose();
-    this.#material.dispose();
+    if (this.#ownsGeometry) {
+      this.#geometry.dispose();
+    }
+    if (this.#ownsMaterial) {
+      this.#material.dispose();
+    }
     this.#isDisposed = true;
   }
   /**
@@ -1780,6 +2713,18 @@ var Mesh = class extends Object3D {
   /**
    * @returns {boolean}
    */
+  get ownsGeometry() {
+    return this.#ownsGeometry;
+  }
+  /**
+   * @returns {boolean}
+   */
+  get ownsMaterial() {
+    return this.#ownsMaterial;
+  }
+  /**
+   * @returns {boolean}
+   */
   get isDisposed() {
     return this.#isDisposed;
   }
@@ -1792,7 +2737,7 @@ var Scene = class extends Object3D {
   }
 };
 
-// core/scene/camera.js
+// core/scene/perspective-camera.js
 var MINIMUM_NEAR_CLIP_DISTANCE2 = 0;
 var MINIMUM_ASPECT_RATIO2 = 0;
 var MATRIX_4x4_ELEMENT_COUNT5 = 16;
@@ -2065,83 +3010,82 @@ var INITIAL_CAMERA_ASPECT_RATIO = 1;
 var MIN_EXCLUSIVE_NUMBER = 0;
 var Engine = class {
   /**
-   * Wrapper around the underlying WebGL2 rendering context.
-   * Owns resize logic and provides access to raw `WebGL2RenderingContext` via `.context`.
+   * WebGL context wrapper used by the engine.
    *
    * @type {WebGLContext}
    * @private
    */
   #contextWrapper;
   /**
-   * High-level scene renderer.
-   * Responsible for drawing the current scene using the current camera.
+   * Renderer instance used to draw the scene.
    *
    * @type {Renderer}
    * @private
    */
   #renderer;
   /**
-   * Root scene graph node.
+   * Root scene node used by the engine.
    *
    * @type {Scene}
    * @private
    */
   #scene;
   /**
-   * Main camera used by the engine render loop.
+   * Active camera used by the engine renderer.
    *
    * @type {PerspectiveCamera}
    * @private
    */
   #camera;
   /**
-   * When true, the engine will resize the canvas to match the browser window.
+   * When true, the engine uses the browser window size as the render target size source.
+   * This is passed to the renderer via resize options on each frame.
    *
    * @type {boolean}
    * @private
    */
   #fitToWindow;
   /**
-   * Indicates whether the requestAnimationFrame loop is running.
+   * Indicates whether the `requestAnimationFrame` loop is currently running.
    *
    * @type {boolean}
    * @private
    */
   #isRunning = false;
   /**
-   * Current requestAnimationFrame id.
-   * Reset value means "not scheduled".
+   * Stores the active requestAnimationFrame id.
+   * A reset value (usually `0`) indicates, that no frame is currently scheduled.
    *
    * @type {number}
    * @private
    */
   #requestAnimationFrameId = ENGINE_ANIMATION_FRAME_ID_RESET_VALUE;
   /**
-   * Previous frame timestamp in seconds (performance.now() / 1000).
-   * Reset value means "not initialized".
+   * Timestamp (in seconds) of the previous frame.
+   * Used to compute deltaTimeSeconds.
    *
    * @type {number}
    * @private
    */
   #lastTimeSeconds = ENGINE_TIME_SECONDS_RESET_VALUE;
   /**
-   * First frame timestamp in seconds.
-   * Used to compute time since engine start.
+   * Start timestamp (in seconds) of the engine loop.
+   * Used to compute `engineTimeSeconds`.
    *
    * @type {number}
    * @private
    */
   #startTimeSeconds = ENGINE_TIME_SECONDS_RESET_VALUE;
   /**
-   * Optional callback executed every frame.
+   * Optional per-frame callback invoked by `Engine.start(callback)`.
    *
    * @type {EngineFrameCallback | null}
    * @private
    */
   #frameCallback = null;
   /**
-   * Reused resize options object passed to `Renderer.render()`.
-   * Avoids allocating a new object on every frame.
+   * Cached resize options object passed to the renderer.
+   * Reused between frames to avoid unnecessary allocations.
    *
    * @type {{ fitToWindow: boolean }}
    * @private
@@ -2169,7 +3113,7 @@ var Engine = class {
       throw new RangeError("Engine option `fieldOfViewRadians` must be a positive number.");
     }
     if (typeof near !== "number" || typeof far !== "number" || near <= MIN_EXCLUSIVE_NUMBER || far <= MIN_EXCLUSIVE_NUMBER || near >= far) {
-      throw new RangeError('Engine options "near" and "far" must be positive numbers and near < far.');
+      throw new RangeError("Engine options `near` and `far` must be positive numbers and near < far.");
     }
     if (typeof initialCameraZ !== "number") {
       throw new TypeError("Engine option `initialCameraZ` must be a number.");
@@ -2184,40 +3128,32 @@ var Engine = class {
     this.#camera = new PerspectiveCamera(fieldOfViewRadians, INITIAL_CAMERA_ASPECT_RATIO, near, far);
     this.#camera.position.z = initialCameraZ;
   }
-  /**
-   * @returns {WebGLContext}
-   */
+  /** @returns {WebGLContext} */
   get context() {
     return this.#contextWrapper;
   }
-  /**
-   * Returns the underlying WebGL2RenderingContext.
-   *
-   * @returns {WebGL2RenderingContext}
-   */
+  /** @returns {WebGL2RenderingContext} */
   get webglRenderingContext() {
     return this.#contextWrapper.context;
   }
-  /**
-   * @returns {Renderer}
-   */
+  /** @returns {Renderer} */
   get renderer() {
     return this.#renderer;
   }
-  /**
-   * @returns {Scene}
-   */
+  /** @returns {Scene} */
   get scene() {
     return this.#scene;
   }
-  /**
-   * @returns {PerspectiveCamera}
-   */
+  /** @returns {PerspectiveCamera} */
   get camera() {
     return this.#camera;
   }
   /**
-   * Creates a box mesh using: BoxGeometry + BasicMaterial.
+   * Creates a box mesh using: `BoxGeometry` + `VertexColorMaterial` by default.
+   *
+   * Ownership rules: geometry is created internally => mesh owns geometry.
+   * Material: if not provided then Mesh owns created `VertexColorMaterial`,
+   * if provided then Mesh does NOT own the material (shared user resource).
    *
    * @param {CreateBoxMeshOptions} [options] - Box mesh options.
    * @returns {Mesh}
@@ -2230,12 +3166,14 @@ var Engine = class {
     if (typeof size !== "number" || size <= MIN_BOX_SIZE) {
       throw new RangeError("`Engine.createBoxMesh` option `size` must be a positive number.");
     }
-    if (material !== void 0 && !(material instanceof BasicMaterial)) {
-      throw new TypeError("`Engine.createBoxMesh` option `material` must be a `BasicMaterial` instance.");
+    if (material !== void 0 && !(material instanceof Material)) {
+      throw new TypeError("`Engine.createBoxMesh` option `material` must be a `Material` instance.");
     }
-    const geometry = new BoxGeometry(this.webglRenderingContext, size);
-    const usedMaterial = material || new BasicMaterial(this.webglRenderingContext);
-    return new Mesh(geometry, usedMaterial);
+    const geometry = new BoxGeometry(this.webglRenderingContext, { size });
+    const isUserMaterial = material !== void 0;
+    const usedMaterial = isUserMaterial ? material : new VertexColorMaterial(this.webglRenderingContext);
+    const meshOwnershipFlags = { ownsGeometry: true, ownsMaterial: !isUserMaterial };
+    return new Mesh(geometry, usedMaterial, meshOwnershipFlags);
   }
   /**
    * Renders a single frame.
@@ -2245,7 +3183,7 @@ var Engine = class {
     this.#renderer.render(this.#scene, this.#camera, this.#resizeOptions);
   }
   /**
-   * Starts the requestAnimationFrame loop.
+   * Starts the `requestAnimationFrame` loop.
    *
    * @param {EngineFrameCallback} [frameCallback] - Optional per-frame callback.
    */
@@ -2263,7 +3201,7 @@ var Engine = class {
     this.#requestAnimationFrameId = window.requestAnimationFrame((timeMs) => this.#renderFrame(timeMs));
   }
   /**
-   * Stops the requestAnimationFrame loop.
+   * Stops the `requestAnimationFrame` loop.
    */
   stop() {
     if (!this.#isRunning) {
@@ -2275,7 +3213,7 @@ var Engine = class {
     this.#frameCallback = null;
   }
   /**
-   * @param {number} timeMs
+   * @param {number} timeMs - `requestAnimationFrame` timestamp in milliseconds.
    * @private
    */
   #renderFrame(timeMs) {
@@ -2322,9 +3260,14 @@ var GeraWebGL = Object.freeze({
     Geometry,
     BoxGeometry
   }),
+  Textures: Object.freeze({
+    Texture2D
+  }),
   Materials: Object.freeze({
     Material,
-    BasicMaterial
+    VertexColorMaterial,
+    SolidColorMaterial,
+    TexturedMaterial
   }),
   // Low-level access (shaders, manual uniforms/attributes):
   LowLevel: Object.freeze({

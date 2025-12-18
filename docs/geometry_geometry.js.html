@@ -26,56 +26,180 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>/** @type {number} */
+            <pre class="prettyprint source linenums"><code>/**
+ * Attribute location used by vec3 position.
+ * Must match shader `layout(location = X)` declaration.
+ *
+ * @type {number}
+ */
 const POSITION_ATTRIBUTE_LOCATION = 0;
 
-/** @type {number} */
+/**
+ * Number of float components per vertex position.
+ *
+ * @type {number}
+ */
 const POSITION_COMPONENT_COUNT = 3;
 
-/** @type {number} */
+/**
+ * Attribute location used by vertex color.
+ * Must match shader `layout(location = X)` declaration.
+ *
+ * @type {number}
+ */
 const COLOR_ATTRIBUTE_LOCATION = 1;
 
-/** @type {number} */
+/**
+ * Number of float components per vertex color.
+ *
+ * @type {number}
+ */
 const COLOR_COMPONENT_COUNT = 3;
 
-/** @type {boolean} */
+/**
+ * Attribute location used by the UV coordinates.
+ * Must match shader `layout(location = X)` declaration.
+ *
+ * @type {number}
+ */
+const UV_ATTRIBUTE_LOCATION = 2;
+
+/**
+ * Number of float components per UV coordinate.
+ *
+ * @type {number}
+ */
+const UV_COMPONENT_COUNT = 2;
+
+/**
+ * Flag passed to `vertexAttribPointer()` method.
+ * When false, attribute values are used as-is (no normalization).
+ *
+ * @type {boolean}
+ */
 const ATTRIBUTE_NORMALIZED = false;
 
-/** @type {number} */
+/**
+ * Stride parameter for `vertexAttribPointer()`, when the attribute data is tightly packed.
+ * Zero means: compute stride automatically from attribute size and type.
+ *
+ * @type {number}
+ */
 const ATTRIBUTE_NO_STRIDE = 0;
 
-/** @type {number} */
+/**
+ * Offset parameter for `vertexAttribPointer()` for attributes starting at the beginning of the buffer.
+ *
+ * @type {number}
+ */
 const ATTRIBUTE_NO_OFFSET = 0;
 
 /**
- * Geometry holds vertex buffers and index buffers for rendering.
+ * Modulo result expected for correct component alignment.
+ *
+ * @type {number}
+ */
+const MODULO_ALIGNED_VALUE = 0;
+
+/**
+ * Number of indices, that form a single triangle.
+ *
+ * @type {number}
+ */
+const TRIANGLE_INDEX_COMPONENT_COUNT = 3;
+
+/**
+ * Number of indices, that form a single line segment.
+ *
+ * @type {number}
+ */
+const LINE_INDEX_COMPONENT_COUNT = 2;
+
+/**
+ * Geometry represents a set of vertex buffers + index buffers, grouped under a VAO.
  */
 export class Geometry {
-    /** @type {WebGL2RenderingContext} */
+    /**
+     * WebGL2 rendering context used to create and manage GPU resources.
+     *
+     * @type {WebGL2RenderingContext}
+     * @private
+     */
     #webglContext;
 
-    /** @type {WebGLVertexArrayObject} */
+    /**
+     * Vertex Array Object (VAO) that stores vertex attribute bindings for this geometry.
+     *
+     * @type {WebGLVertexArrayObject}
+     * @private
+     */
     #vertexArrayObject;
 
-    /** @type {WebGLBuffer} */
+    /**
+     * GPU buffer that stores vertex positions.
+     *
+     * @type {WebGLBuffer}
+     * @private
+     */
     #positionBuffer;
 
-    /** @type {WebGLBuffer | null} */
+    /**
+     * Optional GPU buffer, that stores vertex colors.
+     * Used by materials that read `a_color` attribute.
+     *
+     * @type {WebGLBuffer | null}
+     * @private
+     */
     #colorBuffer;
 
-    /** @type {WebGLBuffer} */
+    /**
+     * Optional GPU buffer that stores texture coordinates.
+     * Used by textured materials, that read `a_uv` attribute.
+     *
+     * @type {WebGLBuffer | null}
+     * @private
+     */
+    #uvBuffer;
+
+    /**
+     * Index buffer for solid rendering mode (triangles).
+     *
+     * @type {WebGLBuffer}
+     * @private
+     */
     #indexBufferSolid;
 
-    /** @type {WebGLBuffer} */
+    /**
+     * Index buffer for wireframe rendering mode (lines).
+     *
+     * @type {WebGLBuffer}
+     * @private
+     */
     #indexBufferWireframe;
 
-    /** @type {number} */
+    /**
+     * Number of indices in the solid index buffer.
+     *
+     * @type {number}
+     * @private
+     */
     #solidIndexCount;
 
-    /** @type {number} */
+    /**
+     * Number of indices in the wireframe index buffer.
+     *
+     * @type {number}
+     * @private
+     */
     #wireframeIndexCount;
 
-    /** @type {boolean} */
+    /**
+     * Indicates whether this geometry instance has been disposed.
+     * Disposed geometries must not be used for rendering.
+     *
+     * @type {boolean}
+     * @private
+     */
     #isDisposed = false;
 
     /**
@@ -84,8 +208,9 @@ export class Geometry {
      * @param {Float32Array | null} colors          - [red, green, blue] triples or null.
      * @param {Uint16Array} indicesSolid            - Indices for solid triangles.
      * @param {Uint16Array} indicesWireframe        - Indices for wireframe lines.
+     * @param {Float32Array | null} [uvs = null]    - [u, v] pairs or null.
      */
-    constructor(webglContext, positions, colors, indicesSolid, indicesWireframe) {
+    constructor(webglContext, positions, colors, indicesSolid, indicesWireframe, uvs = null) {
         if (!(webglContext instanceof WebGL2RenderingContext)) {
             throw new TypeError('Geometry expects a WebGL2RenderingContext.');
         }
@@ -98,9 +223,16 @@ export class Geometry {
             throw new TypeError('Geometry expects colors as Float32Array or null.');
         }
 
+        if (uvs !== null &amp;&amp; !(uvs instanceof Float32Array)) {
+            throw new TypeError('Geometry expects uvs as Float32Array or null.');
+        }
+
         if (!(indicesSolid instanceof Uint16Array) || !(indicesWireframe instanceof Uint16Array)) {
             throw new TypeError('Geometry expects indices as Uint16Array.');
         }
+
+        this.#validateAttributeSizes(positions, colors, uvs);
+        this.#validateIndexSizes(indicesSolid, indicesWireframe);
 
         this.#webglContext         = webglContext;
         this.#solidIndexCount      = indicesSolid.length;
@@ -108,6 +240,7 @@ export class Geometry {
         this.#vertexArrayObject    = this.#createVertexArrayObject();
         this.#positionBuffer       = this.#createStaticArrayBuffer(positions);
         this.#colorBuffer          = colors ? this.#createStaticArrayBuffer(colors) : null;
+        this.#uvBuffer             = uvs ? this.#createStaticArrayBuffer(uvs) : null;
         this.#indexBufferSolid     = this.#createIndexBuffer(indicesSolid);
         this.#indexBufferWireframe = this.#createIndexBuffer(indicesWireframe);
         this.#configureVertexArray();
@@ -160,19 +293,15 @@ export class Geometry {
             this.#colorBuffer = null;
         }
 
+        if (this.#uvBuffer) {
+            webglContext.deleteBuffer(this.#uvBuffer);
+            this.#uvBuffer = null;
+        }
+
         webglContext.deleteBuffer(this.#indexBufferSolid);
         webglContext.deleteBuffer(this.#indexBufferWireframe);
         webglContext.deleteVertexArray(this.#vertexArrayObject);
         this.#isDisposed = true;
-    }
-
-    /**
-     * @private
-     */
-    #assertNotDisposed() {
-        if (this.#isDisposed) {
-            throw new Error('Geometry has been disposed and can no longer be used.');
-        }
     }
 
     /**
@@ -192,7 +321,7 @@ export class Geometry {
     }
 
     /**
-     * Creates a static ARRAY_BUFFER and uploads the given data.
+     * Creates a static `ARRAY_BUFFER` and uploads the given data.
      *
      * @param {Float32Array} data - Vertex attribute data stored as a flat array of numeric components.
      * @returns {WebGLBuffer}
@@ -202,7 +331,7 @@ export class Geometry {
         const buffer = this.#webglContext.createBuffer();
 
         if (!buffer) {
-            throw new Error('Failed to create ARRAY_BUFFER.');
+            throw new Error('Failed to create `ARRAY_BUFFER`.');
         }
 
         this.#webglContext.bindBuffer(this.#webglContext.ARRAY_BUFFER, buffer);
@@ -211,7 +340,7 @@ export class Geometry {
     }
 
     /**
-     * Creates an ELEMENT_ARRAY_BUFFER and uploads the given index data.
+     * Creates an `ELEMENT_ARRAY_BUFFER` and uploads the given index data.
      *
      * @param {Uint16Array} indices - Index data referencing vertices in the associated vertex buffers.
      * @returns {WebGLBuffer}
@@ -221,7 +350,7 @@ export class Geometry {
         const buffer = this.#webglContext.createBuffer();
 
         if (!buffer) {
-            throw new Error('Failed to create ELEMENT_ARRAY_BUFFER.');
+            throw new Error('Failed to create `ELEMENT_ARRAY_BUFFER`.');
         }
 
         this.#webglContext.bindBuffer(this.#webglContext.ELEMENT_ARRAY_BUFFER, buffer);
@@ -230,19 +359,73 @@ export class Geometry {
     }
 
     /**
-     * Configures the vertex array object (VAO) with position and optional color attributes.
+     * Validates vertex attribute array sizes (positions, colors, uvs).
      *
-     * Attribute layout:
-     * - location 0: vec3 position
-     * - location 1: vec3 color (if present)
+     * @param {Float32Array} positions     - Flat array of vec3 positions: [x, y, z] * vertexCount.
+     * @param {Float32Array | null} colors - Optional flat array of vec3 colors: [red, green, blue] * vertexCount.
+     * @param {Float32Array | null} uvs    - Optional flat array of vec2 UVs: [u, v] * vertexCount.
+     * @private
+     */
+    #validateAttributeSizes(positions, colors, uvs) {
+        if ((positions.length % POSITION_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
+            throw new Error('Geometry positions length must be a multiple of `POSITION_COMPONENT_COUNT`.');
+        }
+
+        const vertexCount = positions.length / POSITION_COMPONENT_COUNT;
+
+        if (colors !== null) {
+            if ((colors.length % COLOR_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
+                throw new Error('Geometry colors length must be a multiple of `COLOR_COMPONENT_COUNT`.');
+            }
+
+            const colorVertexCount = colors.length / COLOR_COMPONENT_COUNT;
+
+            if (colorVertexCount !== vertexCount) {
+                throw new Error('Geometry colors vertex count must match positions vertex count.');
+            }
+        }
+
+        if (uvs !== null) {
+            if ((uvs.length % UV_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
+                throw new Error('Geometry uvs length must be a multiple of `UV_COMPONENT_COUNT`.');
+            }
+
+            const uvVertexCount = uvs.length / UV_COMPONENT_COUNT;
+
+            if (uvVertexCount !== vertexCount) {
+                throw new Error('Geometry uvs vertex count must match positions vertex count.');
+            }
+        }
+    }
+
+    /**
+     * Validates basic index array structure (triangles + lines).
+     *
+     * @param {Uint16Array} indicesSolid     - Triangle index buffer data (3 indices per triangle).
+     * @param {Uint16Array} indicesWireframe - Line index buffer data (2 indices per line segment).
+     * @private
+     */
+    #validateIndexSizes(indicesSolid, indicesWireframe) {
+        if ((indicesSolid.length % TRIANGLE_INDEX_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
+            throw new Error('Geometry solid indices length must be a multiple of `TRIANGLE_INDEX_COMPONENT_COUNT`.');
+        }
+
+        if ((indicesWireframe.length % LINE_INDEX_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
+            throw new Error('Geometry wireframe indices length must be a multiple of `LINE_INDEX_COMPONENT_COUNT`.');
+        }
+    }
+
+    /**
+     * Configures the VAO with position (and optional color/uv) attribute pointers.
      *
      * @private
      */
     #configureVertexArray() {
         const webglContext = this.#webglContext;
+
         webglContext.bindVertexArray(this.#vertexArrayObject);
 
-        // Set position attribute at location = 0:
+        // Positions:
         webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#positionBuffer);
         webglContext.enableVertexAttribArray(POSITION_ATTRIBUTE_LOCATION);
         webglContext.vertexAttribPointer(
@@ -254,7 +437,7 @@ export class Geometry {
             ATTRIBUTE_NO_OFFSET
         );
 
-        // Set color attribute at location = 1, if present:
+        // Colors (optional):
         if (this.#colorBuffer) {
             webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#colorBuffer);
             webglContext.enableVertexAttribArray(COLOR_ATTRIBUTE_LOCATION);
@@ -268,9 +451,32 @@ export class Geometry {
             );
         }
 
+        // UVs (optional):
+        if (this.#uvBuffer) {
+            webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#uvBuffer);
+            webglContext.enableVertexAttribArray(UV_ATTRIBUTE_LOCATION);
+            webglContext.vertexAttribPointer(
+                UV_ATTRIBUTE_LOCATION,
+                UV_COMPONENT_COUNT,
+                webglContext.FLOAT,
+                ATTRIBUTE_NORMALIZED,
+                ATTRIBUTE_NO_STRIDE,
+                ATTRIBUTE_NO_OFFSET
+            );
+        }
+
         // Bind the default index buffer (solid) to the VAO:
         webglContext.bindBuffer(webglContext.ELEMENT_ARRAY_BUFFER, this.#indexBufferSolid);
         webglContext.bindVertexArray(null);
+    }
+
+    /**
+     * @private
+     */
+    #assertNotDisposed() {
+        if (this.#isDisposed) {
+            throw new Error('Geometry has been disposed and can no longer be used.');
+        }
     }
 }
 </code></pre>
@@ -283,13 +489,13 @@ export class Geometry {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Namespaces</h3><ul><li><a href="GeraWebGL.html">GeraWebGL</a></li></ul><h3>Classes</h3><ul><li><a href="BasicMaterial.html">BasicMaterial</a></li><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="CameraMath.html">CameraMath</a></li><li><a href="Engine.html">Engine</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="Vector3.html">Vector3</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_LOCATION_NOT_FOUND_VALUE">ATTRIBUTE_LOCATION_NOT_FOUND_VALUE</a></li><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEFAULT_FAR">DEFAULT_FAR</a></li><li><a href="global.html#DEFAULT_FIELD_OF_VIEW_RADIANS">DEFAULT_FIELD_OF_VIEW_RADIANS</a></li><li><a href="global.html#DEFAULT_INITIAL_CAMERA_Z">DEFAULT_INITIAL_CAMERA_Z</a></li><li><a href="global.html#DEFAULT_NEAR">DEFAULT_NEAR</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#ENGINE_ANIMATION_FRAME_ID_RESET_VALUE">ENGINE_ANIMATION_FRAME_ID_RESET_VALUE</a></li><li><a href="global.html#ENGINE_TIME_SECONDS_RESET_VALUE">ENGINE_TIME_SECONDS_RESET_VALUE</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#INITIAL_CAMERA_ASPECT_RATIO">INITIAL_CAMERA_ASPECT_RATIO</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MAX_COLOR_COMPONENT">MAX_COLOR_COMPONENT</a></li><li><a href="global.html#MILLISECONDS_TO_SECONDS">MILLISECONDS_TO_SECONDS</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#MIN_BOX_SIZE">MIN_BOX_SIZE</a></li><li><a href="global.html#MIN_COLOR_COMPONENT">MIN_COLOR_COMPONENT</a></li><li><a href="global.html#MIN_DRAWING_BUFFER_DIMENSION">MIN_DRAWING_BUFFER_DIMENSION</a></li><li><a href="global.html#MIN_EXCLUSIVE_NUMBER">MIN_EXCLUSIVE_NUMBER</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#UNIT_COMPONENT">UNIT_COMPONENT</a></li><li><a href="global.html#VECTOR_2_ELEMENT_COUNT">VECTOR_2_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_3_ELEMENT_COUNT">VECTOR_3_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_4_ELEMENT_COUNT">VECTOR_4_ELEMENT_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li><li><a href="global.html#ZERO_COMPONENT">ZERO_COMPONENT</a></li><li><a href="global.html#createEngine">createEngine</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Namespaces</h3><ul><li><a href="GeraWebGL.html">GeraWebGL</a></li></ul><h3>Classes</h3><ul><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="CameraMath.html">CameraMath</a></li><li><a href="Engine.html">Engine</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="SolidColorMaterial.html">SolidColorMaterial</a></li><li><a href="Texture2D.html">Texture2D</a></li><li><a href="TexturedMaterial.html">TexturedMaterial</a></li><li><a href="Vector3.html">Vector3</a></li><li><a href="VertexColorMaterial.html">VertexColorMaterial</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_LOCATION_NOT_FOUND_VALUE">ATTRIBUTE_LOCATION_NOT_FOUND_VALUE</a></li><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BASE_MIPMAP_LEVEL">BASE_MIPMAP_LEVEL</a></li><li><a href="global.html#BITWISE_ZERO">BITWISE_ZERO</a></li><li><a href="global.html#BIT_MASK_ONE">BIT_MASK_ONE</a></li><li><a href="global.html#BOX_FACE_COUNT">BOX_FACE_COUNT</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#BOX_TRIANGLE_INDEX_COUNT">BOX_TRIANGLE_INDEX_COUNT</a></li><li><a href="global.html#BOX_VERTEX_COUNT">BOX_VERTEX_COUNT</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLORS_PER_FACE_LENGTH">COLORS_PER_FACE_LENGTH</a></li><li><a href="global.html#COLORS_PER_VERTEX_LENGTH">COLORS_PER_VERTEX_LENGTH</a></li><li><a href="global.html#COLORS_UNIFORM_LENGTH">COLORS_UNIFORM_LENGTH</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#COLOR_COMPONENT_INDEX_BLUE">COLOR_COMPONENT_INDEX_BLUE</a></li><li><a href="global.html#COLOR_COMPONENT_INDEX_GREEN">COLOR_COMPONENT_INDEX_GREEN</a></li><li><a href="global.html#COLOR_COMPONENT_INDEX_RED">COLOR_COMPONENT_INDEX_RED</a></li><li><a href="global.html#COLOR_UNIFORM_NAME">COLOR_UNIFORM_NAME</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_COLOR">DEFAULT_COLOR</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEFAULT_FAR">DEFAULT_FAR</a></li><li><a href="global.html#DEFAULT_FIELD_OF_VIEW_RADIANS">DEFAULT_FIELD_OF_VIEW_RADIANS</a></li><li><a href="global.html#DEFAULT_INITIAL_CAMERA_Z">DEFAULT_INITIAL_CAMERA_Z</a></li><li><a href="global.html#DEFAULT_NEAR">DEFAULT_NEAR</a></li><li><a href="global.html#DEFAULT_OWNS_GEOMETRY">DEFAULT_OWNS_GEOMETRY</a></li><li><a href="global.html#DEFAULT_OWNS_MATERIAL">DEFAULT_OWNS_MATERIAL</a></li><li><a href="global.html#DEFAULT_TEXTURE_UNIT_INDEX">DEFAULT_TEXTURE_UNIT_INDEX</a></li><li><a href="global.html#DEFAULT_VERTEX_COLOR">DEFAULT_VERTEX_COLOR</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#DIFFUSE_TEXTURE_UNIFORM_NAME">DIFFUSE_TEXTURE_UNIFORM_NAME</a></li><li><a href="global.html#ENGINE_ANIMATION_FRAME_ID_RESET_VALUE">ENGINE_ANIMATION_FRAME_ID_RESET_VALUE</a></li><li><a href="global.html#ENGINE_TIME_SECONDS_RESET_VALUE">ENGINE_TIME_SECONDS_RESET_VALUE</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#INDICES_SOLID">INDICES_SOLID</a></li><li><a href="global.html#INDICES_WIREFRAME">INDICES_WIREFRAME</a></li><li><a href="global.html#INITIAL_CAMERA_ASPECT_RATIO">INITIAL_CAMERA_ASPECT_RATIO</a></li><li><a href="global.html#LINE_INDEX_COMPONENT_COUNT">LINE_INDEX_COMPONENT_COUNT</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MATRIX_UNIFORM_NAME">MATRIX_UNIFORM_NAME</a></li><li><a href="global.html#MAX_COLOR_COMPONENT">MAX_COLOR_COMPONENT</a></li><li><a href="global.html#MILLISECONDS_TO_SECONDS">MILLISECONDS_TO_SECONDS</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#MIN_BOX_SIZE">MIN_BOX_SIZE</a></li><li><a href="global.html#MIN_COLOR_COMPONENT">MIN_COLOR_COMPONENT</a></li><li><a href="global.html#MIN_DRAWING_BUFFER_DIMENSION">MIN_DRAWING_BUFFER_DIMENSION</a></li><li><a href="global.html#MIN_EXCLUSIVE_NUMBER">MIN_EXCLUSIVE_NUMBER</a></li><li><a href="global.html#MIN_POWER_OF_TWO_VALUE">MIN_POWER_OF_TWO_VALUE</a></li><li><a href="global.html#MIN_REQUIRED_STRING_LENGTH">MIN_REQUIRED_STRING_LENGTH</a></li><li><a href="global.html#MIN_TEXTURE_UNIT_INDEX">MIN_TEXTURE_UNIT_INDEX</a></li><li><a href="global.html#MODULO_ALIGNED_VALUE">MODULO_ALIGNED_VALUE</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#PLACEHOLDER_PIXEL_RGBA">PLACEHOLDER_PIXEL_RGBA</a></li><li><a href="global.html#PLACEHOLDER_TEXTURE_HEIGHT">PLACEHOLDER_TEXTURE_HEIGHT</a></li><li><a href="global.html#PLACEHOLDER_TEXTURE_WIDTH">PLACEHOLDER_TEXTURE_WIDTH</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#TEXTURE_BORDER_VALUE">TEXTURE_BORDER_VALUE</a></li><li><a href="global.html#TRIANGLE_INDEX_COMPONENT_COUNT">TRIANGLE_INDEX_COMPONENT_COUNT</a></li><li><a href="global.html#TRIANGLE_INDEX_COUNT_PER_FACE">TRIANGLE_INDEX_COUNT_PER_FACE</a></li><li><a href="global.html#UNIT_COMPONENT">UNIT_COMPONENT</a></li><li><a href="global.html#UNIT_POSITIONS">UNIT_POSITIONS</a></li><li><a href="global.html#UVS">UVS</a></li><li><a href="global.html#UV_ATTRIBUTE_LOCATION">UV_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#UV_COMPONENT_COUNT">UV_COMPONENT_COUNT</a></li><li><a href="global.html#VECTOR_2_ELEMENT_COUNT">VECTOR_2_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_3_ELEMENT_COUNT">VECTOR_3_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_4_ELEMENT_COUNT">VECTOR_4_ELEMENT_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VERTICES_PER_FACE">VERTICES_PER_FACE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li><li><a href="global.html#WEBGL_FALSE_AS_INTEGER">WEBGL_FALSE_AS_INTEGER</a></li><li><a href="global.html#WEBGL_TRUE_AS_INTEGER">WEBGL_TRUE_AS_INTEGER</a></li><li><a href="global.html#ZERO_COMPONENT">ZERO_COMPONENT</a></li><li><a href="global.html#createEngine">createEngine</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Tue Dec 16 2025 19:02:37 GMT+0300 (Moscow Standard Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Thu Dec 18 2025 03:17:53 GMT+0300 (Moscow Standard Time)
 </footer>
 
 <script> prettyPrint(); </script>

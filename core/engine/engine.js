@@ -1,10 +1,11 @@
-import { WebGLContext }      from '../webgl-context.js';
-import { Renderer }          from '../render/renderer.js';
-import { Scene }             from '../scene/scene.js';
-import { PerspectiveCamera } from '../scene/camera.js';
-import { Mesh }              from '../scene/mesh.js';
-import { BoxGeometry }       from '../geometry/box-geometry.js';
-import { BasicMaterial }     from '../material/basic-material.js';
+import { WebGLContext }        from '../webgl-context.js';
+import { Renderer }            from '../render/renderer.js';
+import { Scene }               from '../scene/scene.js';
+import { PerspectiveCamera }   from '../scene/perspective-camera.js';
+import { Mesh }                from '../scene/mesh.js';
+import { BoxGeometry }         from '../geometry/box-geometry.js';
+import { Material }            from '../material/material.js';
+import { VertexColorMaterial } from '../material/vertex-color-material.js';
 
 /**
  * Default camera vertical field of view, in radians.
@@ -61,7 +62,7 @@ const DEFAULT_BOX_SIZE = 1.0;
 const MIN_BOX_SIZE = 0;
 
 /**
- * requestAnimationFrame id reset value.
+ * `requestAnimationFrame` id reset value.
  * Zero means - no frame scheduled.
  *
  * @type {number}
@@ -77,7 +78,7 @@ const ENGINE_ANIMATION_FRAME_ID_RESET_VALUE = 0;
 const ENGINE_TIME_SECONDS_RESET_VALUE = 0;
 
 /**
- * Initial camera aspect ratio used during Engine construction.
+ * Initial camera aspect ratio used during `Engine` construction.
  * Real aspect ratio is updated on first render based on canvas size.
  *
  * @type {number}
@@ -112,21 +113,22 @@ const MIN_EXCLUSIVE_NUMBER = 0;
  */
 
 /**
- * Options used by Engine.createBoxMesh.
+ * Options used by `Engine.createBoxMesh`.
+ *
+ * Ownership rule: if `material` is provided by the user, created `Mesh` must NOT own it.
  *
  * @typedef {Object} CreateBoxMeshOptions
- * @property {number} [size = 1.0]      - Edge length of the box.
- * @property {BasicMaterial} [material] - Optional material instance.
+ * @property {number}   [size = 1.0] - Edge length of the box.
+ * @property {Material} [material]   - Optional material instance (shared).
  */
 
 /**
- * High-level convenience wrapper that bundles the most common building blocks.
+ * High-level convenience wrapper, that bundles the most common building blocks.
  */
 export class Engine {
 
     /**
-     * Wrapper around the underlying WebGL2 rendering context.
-     * Owns resize logic and provides access to raw `WebGL2RenderingContext` via `.context`.
+     * WebGL context wrapper used by the engine.
      *
      * @type {WebGLContext}
      * @private
@@ -134,8 +136,7 @@ export class Engine {
     #contextWrapper;
 
     /**
-     * High-level scene renderer.
-     * Responsible for drawing the current scene using the current camera.
+     * Renderer instance used to draw the scene.
      *
      * @type {Renderer}
      * @private
@@ -143,7 +144,7 @@ export class Engine {
     #renderer;
 
     /**
-     * Root scene graph node.
+     * Root scene node used by the engine.
      *
      * @type {Scene}
      * @private
@@ -151,7 +152,7 @@ export class Engine {
     #scene;
 
     /**
-     * Main camera used by the engine render loop.
+     * Active camera used by the engine renderer.
      *
      * @type {PerspectiveCamera}
      * @private
@@ -159,7 +160,8 @@ export class Engine {
     #camera;
 
     /**
-     * When true, the engine will resize the canvas to match the browser window.
+     * When true, the engine uses the browser window size as the render target size source.
+     * This is passed to the renderer via resize options on each frame.
      *
      * @type {boolean}
      * @private
@@ -167,7 +169,7 @@ export class Engine {
     #fitToWindow;
 
     /**
-     * Indicates whether the requestAnimationFrame loop is running.
+     * Indicates whether the `requestAnimationFrame` loop is currently running.
      *
      * @type {boolean}
      * @private
@@ -175,8 +177,8 @@ export class Engine {
     #isRunning = false;
 
     /**
-     * Current requestAnimationFrame id.
-     * Reset value means "not scheduled".
+     * Stores the active requestAnimationFrame id.
+     * A reset value (usually `0`) indicates, that no frame is currently scheduled.
      *
      * @type {number}
      * @private
@@ -184,8 +186,8 @@ export class Engine {
     #requestAnimationFrameId = ENGINE_ANIMATION_FRAME_ID_RESET_VALUE;
 
     /**
-     * Previous frame timestamp in seconds (performance.now() / 1000).
-     * Reset value means "not initialized".
+     * Timestamp (in seconds) of the previous frame.
+     * Used to compute deltaTimeSeconds.
      *
      * @type {number}
      * @private
@@ -193,8 +195,8 @@ export class Engine {
     #lastTimeSeconds = ENGINE_TIME_SECONDS_RESET_VALUE;
 
     /**
-     * First frame timestamp in seconds.
-     * Used to compute time since engine start.
+     * Start timestamp (in seconds) of the engine loop.
+     * Used to compute `engineTimeSeconds`.
      *
      * @type {number}
      * @private
@@ -202,7 +204,7 @@ export class Engine {
     #startTimeSeconds = ENGINE_TIME_SECONDS_RESET_VALUE;
 
     /**
-     * Optional callback executed every frame.
+     * Optional per-frame callback invoked by `Engine.start(callback)`.
      *
      * @type {EngineFrameCallback | null}
      * @private
@@ -210,8 +212,8 @@ export class Engine {
     #frameCallback = null;
 
     /**
-     * Reused resize options object passed to `Renderer.render()`.
-     * Avoids allocating a new object on every frame.
+     * Cached resize options object passed to the renderer.
+     * Reused between frames to avoid unnecessary allocations.
      *
      * @type {{ fitToWindow: boolean }}
      * @private
@@ -248,7 +250,7 @@ export class Engine {
             || near <= MIN_EXCLUSIVE_NUMBER
             || far  <= MIN_EXCLUSIVE_NUMBER
             || near >= far) {
-            throw new RangeError('Engine options "near" and "far" must be positive numbers and near < far.');
+            throw new RangeError('Engine options `near` and `far` must be positive numbers and near < far.');
         }
 
         if (typeof initialCameraZ !== 'number') {
@@ -267,45 +269,37 @@ export class Engine {
         this.#camera.position.z = initialCameraZ;
     }
 
-    /**
-     * @returns {WebGLContext}
-     */
+    /** @returns {WebGLContext} */
     get context() {
         return this.#contextWrapper;
     }
 
-    /**
-     * Returns the underlying WebGL2RenderingContext.
-     *
-     * @returns {WebGL2RenderingContext}
-     */
+    /** @returns {WebGL2RenderingContext} */
     get webglRenderingContext() {
         return this.#contextWrapper.context;
     }
 
-    /**
-     * @returns {Renderer}
-     */
+    /** @returns {Renderer} */
     get renderer() {
         return this.#renderer;
     }
 
-    /**
-     * @returns {Scene}
-     */
+    /** @returns {Scene} */
     get scene() {
         return this.#scene;
     }
 
-    /**
-     * @returns {PerspectiveCamera}
-     */
+    /** @returns {PerspectiveCamera} */
     get camera() {
         return this.#camera;
     }
 
     /**
-     * Creates a box mesh using: BoxGeometry + BasicMaterial.
+     * Creates a box mesh using: `BoxGeometry` + `VertexColorMaterial` by default.
+     *
+     * Ownership rules: geometry is created internally => mesh owns geometry.
+     * Material: if not provided then Mesh owns created `VertexColorMaterial`,
+     * if provided then Mesh does NOT own the material (shared user resource).
      *
      * @param {CreateBoxMeshOptions} [options] - Box mesh options.
      * @returns {Mesh}
@@ -321,13 +315,15 @@ export class Engine {
             throw new RangeError('`Engine.createBoxMesh` option `size` must be a positive number.');
         }
 
-        if (material !== undefined && !(material instanceof BasicMaterial)) {
-            throw new TypeError('`Engine.createBoxMesh` option `material` must be a `BasicMaterial` instance.');
+        if (material !== undefined && !(material instanceof Material)) {
+            throw new TypeError('`Engine.createBoxMesh` option `material` must be a `Material` instance.');
         }
 
-        const geometry     = new BoxGeometry(this.webglRenderingContext, size);
-        const usedMaterial = material || new BasicMaterial(this.webglRenderingContext);
-        return new Mesh(geometry, usedMaterial);
+        const geometry           = new BoxGeometry(this.webglRenderingContext, {size});
+        const isUserMaterial     = material !== undefined;
+        const usedMaterial       = isUserMaterial ? material : new VertexColorMaterial(this.webglRenderingContext);
+        const meshOwnershipFlags = { ownsGeometry: true, ownsMaterial: !isUserMaterial };
+        return new Mesh(geometry, usedMaterial, meshOwnershipFlags);
     }
 
     /**
@@ -339,7 +335,7 @@ export class Engine {
     }
 
     /**
-     * Starts the requestAnimationFrame loop.
+     * Starts the `requestAnimationFrame` loop.
      *
      * @param {EngineFrameCallback} [frameCallback] - Optional per-frame callback.
      */
@@ -360,7 +356,7 @@ export class Engine {
     }
 
     /**
-     * Stops the requestAnimationFrame loop.
+     * Stops the `requestAnimationFrame` loop.
      */
     stop() {
         if (!this.#isRunning) {
@@ -374,7 +370,7 @@ export class Engine {
     }
 
     /**
-     * @param {number} timeMs
+     * @param {number} timeMs - `requestAnimationFrame` timestamp in milliseconds.
      * @private
      */
     #renderFrame(timeMs) {
@@ -403,7 +399,7 @@ export class Engine {
 }
 
 /**
- * Factory function for Engine.
+ * Factory function for `Engine`.
  *
  * @param {HTMLCanvasElement} canvas - Canvas used for rendering.
  * @param {EngineOptions} [options]  - Engine options.
