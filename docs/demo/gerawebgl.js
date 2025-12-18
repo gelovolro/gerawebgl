@@ -3191,6 +3191,10 @@ var PerspectiveCamera = class extends Object3D {
 // core/render/renderer.js
 var INDEX_BUFFER_OFFSET_BYTES = 0;
 var MATRIX_4x4_ELEMENT_COUNT6 = 16;
+var VECTOR3_ELEMENT_COUNT = 3;
+var MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT = 2;
+var MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT = 3;
+var MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT = 4;
 var Renderer = class {
   /**
    * Wrapper around the underlying WebGL2 rendering context.
@@ -3217,6 +3221,30 @@ var Renderer = class {
    */
   #finalMatrix;
   /**
+   * Reused buffer for per-mesh inverse world matrix (world^-1).
+   * Only computed when the current material requires normal-matrix support.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #worldMatrixInverse;
+  /**
+   * Reused buffer for per-mesh world inverse transpose matrix ((world^-1)^T).
+   * Used for correct normal transformation under non-uniform scale.
+   * Only computed when the current material requires normal-matrix support.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #worldInverseTransposeMatrix;
+  /**
+   * Reused buffer for the camera position (vec3) of the current frame.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #cameraPosition;
+  /**
    * Reference to the view-projection matrix of the current frame.
    * This is a pointer to a reused Float32Array (no allocations per frame).
    *
@@ -3224,6 +3252,14 @@ var Renderer = class {
    * @private
    */
   #frameViewProjectionMatrix;
+  /**
+   * Reference to the camera position (vec3) of the current frame.
+   * This is a pointer to a reused Float32Array (no allocations per frame).
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #frameCameraPosition;
   /**
    * Cached traversal callback to avoid allocating an inline function every frame.
    *
@@ -3242,7 +3278,11 @@ var Renderer = class {
     this.#webglRenderingContext = webglContext.context;
     this.#viewProjectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
     this.#finalMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
+    this.#worldMatrixInverse = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
+    this.#worldInverseTransposeMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
+    this.#cameraPosition = new Float32Array(VECTOR3_ELEMENT_COUNT);
     this.#frameViewProjectionMatrix = this.#viewProjectionMatrix;
+    this.#frameCameraPosition = this.#cameraPosition;
     this.#traverseCallback = (x) => this.#renderVisitedObject(x);
   }
   /**
@@ -3272,6 +3312,11 @@ var Renderer = class {
       projectionMatrix,
       viewMatrix
     );
+    const cameraPosition = camera.position;
+    this.#cameraPosition[0] = cameraPosition.x;
+    this.#cameraPosition[1] = cameraPosition.y;
+    this.#cameraPosition[2] = cameraPosition.z;
+    this.#frameCameraPosition = this.#cameraPosition;
     scene.updateWorldMatrix(null);
     scene.traverse(this.#traverseCallback);
   }
@@ -3302,7 +3347,23 @@ var Renderer = class {
       worldMatrix
     );
     material.use();
-    material.apply(this.#finalMatrix);
+    const applyParameterCount = material.apply.length;
+    const wantsWorldMatrix = applyParameterCount >= MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT;
+    const wantsNormalMatrix = applyParameterCount >= MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT;
+    const wantsCameraPosition = applyParameterCount >= MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT;
+    if (!wantsWorldMatrix) {
+      material.apply(this.#finalMatrix);
+    } else if (!wantsNormalMatrix) {
+      material.apply(this.#finalMatrix, worldMatrix);
+    } else {
+      Matrix4.invertTo(this.#worldMatrixInverse, worldMatrix);
+      Matrix4.transposeTo(this.#worldInverseTransposeMatrix, this.#worldMatrixInverse);
+      if (!wantsCameraPosition) {
+        material.apply(this.#finalMatrix, worldMatrix, this.#worldInverseTransposeMatrix);
+      } else {
+        material.apply(this.#finalMatrix, worldMatrix, this.#worldInverseTransposeMatrix, this.#frameCameraPosition);
+      }
+    }
     geometry.bind();
     const isWireframeEnabled = material.isWireframeEnabled();
     geometry.bindIndexBuffer(isWireframeEnabled);

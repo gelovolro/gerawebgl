@@ -5,11 +5,51 @@ import { Scene }             from '../scene/scene.js';
 import { PerspectiveCamera } from '../scene/perspective-camera.js';
 import { WebGLContext }      from '../webgl-context.js';
 
-/** @type {number} */
+/**
+ * Byte offset passed to `webglRenderingContext.drawElements()` call.
+ * Indices always start at the beginning of the currently bound index buffer.
+ *
+ * @type {number}
+ */
 const INDEX_BUFFER_OFFSET_BYTES = 0;
 
-/** @type {number} */
+/**
+ * Element count for a 4x4 matrix stored in a flat array.
+ * Used for allocating reusable `Float32Array(16)` buffers.
+ *
+ * @type {number}
+ */
 const MATRIX_4x4_ELEMENT_COUNT = 16;
+
+/**
+ * Element count for a 3D vector stored in a flat array (x, y, z).
+ * Used for allocating reusable `Float32Array(3)` buffers (e.g. camera position).
+ *
+ * @type {number}
+ */
+const VECTOR3_ELEMENT_COUNT = 3;
+
+/**
+ * `Material.apply()` parameter count, when it expects: finalMatrix, worldMatrix.
+ *
+ * @type {number}
+ */
+const MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT = 2;
+
+/**
+ * `Material.apply()` parameter count when it expects: finalMatrix, worldMatrix, worldInverseTransposeMatrix.
+ *
+ * @type {number}
+ */
+const MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT = 3;
+
+/**
+ * `Material.apply()` parameter count when it expects:
+ * finalMatrix, worldMatrix, worldInverseTransposeMatrix, cameraPosition.
+ *
+ * @type {number}
+ */
+const MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT = 4;
 
 /**
  * Canvas resize options for WebGLContext.resizeToDisplaySize().
@@ -19,7 +59,7 @@ const MATRIX_4x4_ELEMENT_COUNT = 16;
  */
 
 /**
- * High-level renderer that draws a scene from the perspective of a camera.
+ * High-level renderer, that draws a scene from the perspective of a camera.
  * Keeps per-frame allocations minimal (reuse matrices, reuse traversal callback).
  */
 export class Renderer {
@@ -52,6 +92,33 @@ export class Renderer {
     #finalMatrix;
 
     /**
+     * Reused buffer for per-mesh inverse world matrix (world^-1).
+     * Only computed when the current material requires normal-matrix support.
+     *
+     * @type {Float32Array}
+     * @private
+     */
+    #worldMatrixInverse;
+
+    /**
+     * Reused buffer for per-mesh world inverse transpose matrix ((world^-1)^T).
+     * Used for correct normal transformation under non-uniform scale.
+     * Only computed when the current material requires normal-matrix support.
+     *
+     * @type {Float32Array}
+     * @private
+     */
+    #worldInverseTransposeMatrix;
+
+    /**
+     * Reused buffer for the camera position (vec3) of the current frame.
+     *
+     * @type {Float32Array}
+     * @private
+     */
+    #cameraPosition;
+
+    /**
      * Reference to the view-projection matrix of the current frame.
      * This is a pointer to a reused Float32Array (no allocations per frame).
      *
@@ -59,6 +126,15 @@ export class Renderer {
      * @private
      */
     #frameViewProjectionMatrix;
+
+    /**
+     * Reference to the camera position (vec3) of the current frame.
+     * This is a pointer to a reused Float32Array (no allocations per frame).
+     *
+     * @type {Float32Array}
+     * @private
+     */
+    #frameCameraPosition;
 
     /**
      * Cached traversal callback to avoid allocating an inline function every frame.
@@ -76,11 +152,15 @@ export class Renderer {
             throw new TypeError('Renderer expects a WebGLContext instance.');
         }
 
-        this.#contextWrapper            = webglContext;
-        this.#webglRenderingContext     = webglContext.context;
-        this.#viewProjectionMatrix      = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
-        this.#finalMatrix               = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
-        this.#frameViewProjectionMatrix = this.#viewProjectionMatrix;
+        this.#contextWrapper              = webglContext;
+        this.#webglRenderingContext       = webglContext.context;
+        this.#viewProjectionMatrix        = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
+        this.#finalMatrix                 = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
+        this.#worldMatrixInverse          = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
+        this.#worldInverseTransposeMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
+        this.#cameraPosition              = new Float32Array(VECTOR3_ELEMENT_COUNT);
+        this.#frameViewProjectionMatrix   = this.#viewProjectionMatrix;
+        this.#frameCameraPosition         = this.#cameraPosition;
 
         // Allocate the traverse callback once (no per-frame function allocations):
         this.#traverseCallback = (x) => this.#renderVisitedObject(x);
@@ -119,6 +199,11 @@ export class Renderer {
             viewMatrix
         );
 
+        const cameraPosition      = camera.position;
+        this.#cameraPosition[0]   = cameraPosition.x;
+        this.#cameraPosition[1]   = cameraPosition.y;
+        this.#cameraPosition[2]   = cameraPosition.z;
+        this.#frameCameraPosition = this.#cameraPosition;
         scene.updateWorldMatrix(null);
         scene.traverse(this.#traverseCallback);
     }
@@ -148,7 +233,6 @@ export class Renderer {
         const geometry         = mesh.geometry;
         const material         = mesh.material;
         const worldMatrix      = mesh.worldMatrix;
-
         Matrix4.multiplyTo(
             this.#finalMatrix,
             this.#frameViewProjectionMatrix,
@@ -156,15 +240,32 @@ export class Renderer {
         );
 
         material.use();
-        material.apply(this.#finalMatrix);
-        geometry.bind();
+        const applyParameterCount = material.apply.length;
+        const wantsWorldMatrix    = applyParameterCount >= MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT;
+        const wantsNormalMatrix   = applyParameterCount >= MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT;
+        const wantsCameraPosition = applyParameterCount >= MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT;
 
+        if (!wantsWorldMatrix) {
+            material.apply(this.#finalMatrix);
+        } else if (!wantsNormalMatrix) {
+            material.apply(this.#finalMatrix, worldMatrix);
+        } else {
+            Matrix4.invertTo(this.#worldMatrixInverse, worldMatrix);
+            Matrix4.transposeTo(this.#worldInverseTransposeMatrix, this.#worldMatrixInverse);
+
+            if (!wantsCameraPosition) {
+                material.apply(this.#finalMatrix, worldMatrix, this.#worldInverseTransposeMatrix);
+            } else {
+                material.apply(this.#finalMatrix, worldMatrix, this.#worldInverseTransposeMatrix, this.#frameCameraPosition);
+            }
+        }
+
+        geometry.bind();
         const isWireframeEnabled = material.isWireframeEnabled();
         geometry.bindIndexBuffer(isWireframeEnabled);
 
         const mode       = isWireframeEnabled ? renderingContext.LINES : renderingContext.TRIANGLES;
         const indexCount = geometry.getIndexCount(isWireframeEnabled);
-
         renderingContext.drawElements(
             mode,
             indexCount,
