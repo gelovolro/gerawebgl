@@ -55,7 +55,7 @@ const WEBGL_FALSE_AS_INTEGER = 0;
 const MIN_TEXTURE_UNIT_INDEX = 0;
 
 /**
- * Minimal allowed string length for required string parameters.
+ * Minimal allowed string length for required input url, used in `loadFromUrl()` method.
  *
  * @type {number}
  */
@@ -268,7 +268,7 @@ export class Texture2D {
     async loadFromUrl(url) {
         this.#assertNotDisposed();
 
-        if (typeof url !== 'string' || url.length === MIN_REQUIRED_STRING_LENGTH) {
+        if (typeof url !== 'string' || url.length < MIN_REQUIRED_STRING_LENGTH) {
             throw new TypeError('`Texture2D.loadFromUrl` expects url as a non-empty string.');
         }
 

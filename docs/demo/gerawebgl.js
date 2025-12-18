@@ -1568,7 +1568,7 @@ var Texture2D = class {
    */
   async loadFromUrl(url) {
     this.#assertNotDisposed();
-    if (typeof url !== "string" || url.length === MIN_REQUIRED_STRING_LENGTH) {
+    if (typeof url !== "string" || url.length < MIN_REQUIRED_STRING_LENGTH) {
       throw new TypeError("`Texture2D.loadFromUrl` expects url as a non-empty string.");
     }
     const image = await this.#loadImage(url);
