@@ -92,7 +92,7 @@ export class Renderer {
     #finalMatrix;
 
     /**
-     * Reused buffer for per-mesh inverse world matrix (world^-1).
+     * Reused buffer for per-mesh inverse world matrix (world ^ -1).
      * Only computed when the current material requires normal-matrix support.
      *
      * @type {Float32Array}
@@ -101,7 +101,7 @@ export class Renderer {
     #worldMatrixInverse;
 
     /**
-     * Reused buffer for per-mesh world inverse transpose matrix ((world^-1)^T).
+     * Reused buffer for per-mesh world inverse transpose matrix ((world ^ -1) ^ T).
      * Used for correct normal transformation under non-uniform scale.
      * Only computed when the current material requires normal-matrix support.
      *
@@ -111,7 +111,7 @@ export class Renderer {
     #worldInverseTransposeMatrix;
 
     /**
-     * Reused buffer for the camera position (vec3) of the current frame.
+     * Reused buffer for the camera position of the current frame.
      *
      * @type {Float32Array}
      * @private
@@ -120,7 +120,7 @@ export class Renderer {
 
     /**
      * Reference to the view-projection matrix of the current frame.
-     * This is a pointer to a reused Float32Array (no allocations per frame).
+     * This is a pointer to a reused `Float32Array`.
      *
      * @type {Float32Array}
      * @private
@@ -128,8 +128,8 @@ export class Renderer {
     #frameViewProjectionMatrix;
 
     /**
-     * Reference to the camera position (vec3) of the current frame.
-     * This is a pointer to a reused Float32Array (no allocations per frame).
+     * Reference to the camera position of the current frame.
+     * This is a pointer to a reused `Float32Array`.
      *
      * @type {Float32Array}
      * @private
