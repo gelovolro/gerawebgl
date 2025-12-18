@@ -29,6 +29,13 @@ const MATERIAL_MODE_SELECT_ID = 'materialModeSelect';
 const RECREATE_MESH_BUTTON_ID = 'recreateMeshButton';
 
 /**
+ * Material mode identifier for the normal visualization material.
+ *
+ * @type {string}
+ */
+const MATERIAL_MODE_NORMAL = 'NORMAL';
+
+/**
  * Demo texture asset path (served from `docs/demo/`).
  *
  * @type {string}
@@ -354,6 +361,14 @@ class DemoApp {
     #sharedTexturedMaterial = null;
 
     /**
+     * Shared normal visualization material.
+     *
+     * @type {GeraWebGL.Materials.NormalMaterial}
+     * @private
+     */
+    #sharedNormalMaterial;
+
+    /**
      * Per-face colors for VertexColor mode (expanded by `BoxGeometry` internally).
      * Stored as `Float32Array` length = 18 (6 faces * 3 RGB).
      *
@@ -377,6 +392,8 @@ class DemoApp {
         const webglContext              = this.#engine.webglRenderingContext;
         this.#sharedVertexColorMaterial = new GeraWebGL.Materials.VertexColorMaterial(webglContext);
         this.#sharedSolidColorMaterial  = new GeraWebGL.Materials.SolidColorMaterial(webglContext, { color: DEFAULT_SOLID_COLOR });
+        this.#sharedNormalMaterial      = new GeraWebGL.Materials.NormalMaterial(webglContext);
+
         this.#applyWireframeStateToSharedMaterials();
         this.#vertexModePerFaceColors = DemoApp.#createAlternatingPerFaceColors(
             DEMO_FACE_COLOR_RED,
@@ -438,7 +455,6 @@ class DemoApp {
     #toggleWireframe() {
         this.#isWireframeEnabled = !this.#isWireframeEnabled;
         this.#applyWireframeStateToSharedMaterials();
-        this.#cube.material.setWireframeEnabled(this.#isWireframeEnabled);
         this.#updateWireframeButtonLabel();
     }
 
@@ -469,14 +485,15 @@ class DemoApp {
     /**
      * Switches the current material mode.
      *
-     * @param {string} mode     - One of: `VERTEX_COLOR | TEXTURED | SOLID_COLOR`.
+     * @param {string} mode     - One of: `VERTEX_COLOR | TEXTURED | SOLID_COLOR | NORMAL`.
      * @returns {Promise<void>} - Resolves, when the mode is applied and the cube mesh is replaced.
      * @private
      */
     async #setMaterialMode(mode) {
         if (mode !== MATERIAL_MODE_VERTEX_COLOR
             && mode !== MATERIAL_MODE_TEXTURED
-            && mode !== MATERIAL_MODE_SOLID_COLOR) {
+            && mode !== MATERIAL_MODE_SOLID_COLOR
+            && mode !== MATERIAL_MODE_NORMAL) {
             throw new Error(`DemoApp: unknown material mode ${mode}.`);
         }
 
@@ -562,7 +579,6 @@ class DemoApp {
 
         this.#cube = this.#createCubeForCurrentMode();
         DemoApp.#applyTransform(this.#cube, transformSnapshot);
-        this.#cube.material.setWireframeEnabled(this.#isWireframeEnabled);
         this.#engine.scene.add(this.#cube);
 
         if (shouldIncrementRecreateCount) {
@@ -596,6 +612,10 @@ class DemoApp {
                 }
 
                 material = this.#sharedTexturedMaterial;
+                break;
+
+            case MATERIAL_MODE_NORMAL:
+                material = this.#sharedNormalMaterial;
                 break;
 
             default:
@@ -655,6 +675,7 @@ class DemoApp {
     #applyWireframeStateToSharedMaterials() {
         this.#sharedVertexColorMaterial.setWireframeEnabled(this.#isWireframeEnabled);
         this.#sharedSolidColorMaterial.setWireframeEnabled(this.#isWireframeEnabled);
+        this.#sharedNormalMaterial.setWireframeEnabled(this.#isWireframeEnabled);
 
         if (this.#sharedTexturedMaterial) {
             this.#sharedTexturedMaterial.setWireframeEnabled(this.#isWireframeEnabled);
