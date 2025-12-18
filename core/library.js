@@ -9,6 +9,7 @@ import { Material }             from './material/material.js';
 import { VertexColorMaterial }  from './material/vertex-color-material.js';
 import { SolidColorMaterial }   from './material/solid-color-material.js';
 import { TexturedMaterial }     from './material/textured-material.js';
+import { NormalMaterial }       from './material/normal-material.js';
 import { Texture2D }            from './texture/texture2d.js';
 import { Object3D }             from './scene/object3d.js';
 import { Mesh }                 from './scene/mesh.js';
@@ -61,7 +62,8 @@ export const GeraWebGL = Object.freeze({
         Material,
         VertexColorMaterial,
         SolidColorMaterial,
-        TexturedMaterial
+        TexturedMaterial,
+        NormalMaterial
     }),
 
     // Low-level access (shaders, manual uniforms/attributes):

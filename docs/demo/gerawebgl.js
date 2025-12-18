@@ -2529,6 +2529,54 @@ var TexturedMaterial = class extends Material {
   }
 };
 
+// core/material/normal-material.js
+var POSITION_ATTRIBUTE_LOCATION5 = 0;
+var NORMAL_ATTRIBUTE_LOCATION2 = 3;
+var MATRIX_UNIFORM_NAME4 = "u_matrix";
+var NORMAL_COLOR_SCALE = 0.5;
+var NORMAL_COLOR_BIAS = 0.5;
+var OUTPUT_ALPHA = 1;
+var VERTEX_SHADER_SOURCE4 = `#version 300 es
+precision mediump float;
+layout(location = ${POSITION_ATTRIBUTE_LOCATION5}) in vec3 a_position;
+layout(location = ${NORMAL_ATTRIBUTE_LOCATION2}) in vec3 a_normal;
+uniform mat4 ${MATRIX_UNIFORM_NAME4};
+out vec3 v_normal;
+
+void main() {
+    gl_Position = ${MATRIX_UNIFORM_NAME4} * vec4(a_position, 1.0);
+    v_normal = a_normal;
+}
+`;
+var FRAGMENT_SHADER_SOURCE4 = `#version 300 es
+precision mediump float;
+in vec3 v_normal;
+out vec4 outColor;
+
+void main() {
+    vec3 normalizedNormal = normalize(v_normal);
+    vec3 normalColor = (normalizedNormal * ${NORMAL_COLOR_SCALE}) + ${NORMAL_COLOR_BIAS};
+    outColor = vec4(normalColor, ${OUTPUT_ALPHA});
+}
+`;
+var NormalMaterial = class extends Material {
+  /**
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to compile shaders.
+   */
+  constructor(webglContext) {
+    const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE4, FRAGMENT_SHADER_SOURCE4);
+    super(webglContext, shaderProgram, { ownsShaderProgram: true });
+  }
+  /**
+   * Applies per-object uniforms.
+   *
+   * @param {Float32Array} matrix4 - Transformation matrix passed as `u_matrix`.
+   */
+  apply(matrix4) {
+    this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME4, matrix4);
+  }
+};
+
 // core/scene/object3d.js
 var CHILD_NOT_FOUND_INDEX = -1;
 var SINGLE_CHILD_REMOVE_COUNT = 1;
@@ -3389,7 +3437,8 @@ var GeraWebGL = Object.freeze({
     Material,
     VertexColorMaterial,
     SolidColorMaterial,
-    TexturedMaterial
+    TexturedMaterial,
+    NormalMaterial
   }),
   // Low-level access (shaders, manual uniforms/attributes):
   LowLevel: Object.freeze({
