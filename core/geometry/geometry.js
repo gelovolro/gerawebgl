@@ -44,6 +44,21 @@ const UV_ATTRIBUTE_LOCATION = 2;
 const UV_COMPONENT_COUNT = 2;
 
 /**
+ * Attribute location used by the normals.
+ * Must match shader `layout(location = X)` declaration.
+ *
+ * @type {number}
+ */
+const NORMAL_ATTRIBUTE_LOCATION = 3;
+
+/**
+ * Number of float components per vertex normal.
+ *
+ * @type {number}
+ */
+const NORMAL_COMPONENT_COUNT = 3;
+
+/**
  * Flag passed to `vertexAttribPointer()` method.
  * When false, attribute values are used as-is (no normalization).
  *
@@ -134,6 +149,15 @@ export class Geometry {
     #uvBuffer;
 
     /**
+     * Optional GPU buffer, that stores the vertex normals.
+     * Used by lit materials, that read `a_normal` attribute.
+     *
+     * @type {WebGLBuffer | null}
+     * @private
+     */
+    #normalBuffer;
+
+    /**
      * Index buffer for solid rendering mode (triangles).
      *
      * @type {WebGLBuffer}
@@ -175,35 +199,40 @@ export class Geometry {
     #isDisposed = false;
 
     /**
-     * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
-     * @param {Float32Array} positions              - [x, y, z] triples.
-     * @param {Float32Array | null} colors          - [red, green, blue] triples or null.
-     * @param {Uint16Array} indicesSolid            - Indices for solid triangles.
-     * @param {Uint16Array} indicesWireframe        - Indices for wireframe lines.
-     * @param {Float32Array | null} [uvs = null]    - [u, v] pairs or null.
+     * @param {WebGL2RenderingContext} webglContext  - WebGL2 rendering context used to create and manage GPU resources.
+     * @param {Float32Array} positions               - [x, y, z] triples.
+     * @param {Float32Array | null} colors           - [red, green, blue] triples or null.
+     * @param {Uint16Array} indicesSolid             - Indices for solid triangles.
+     * @param {Uint16Array} indicesWireframe         - Indices for wireframe lines.
+     * @param {Float32Array | null} [uvs = null]     - [u, v] pairs or null.
+     * @param {Float32Array | null} [normals = null] - [x, y, z] triples or null.
      */
-    constructor(webglContext, positions, colors, indicesSolid, indicesWireframe, uvs = null) {
+    constructor(webglContext, positions, colors, indicesSolid, indicesWireframe, uvs = null, normals = null) {
         if (!(webglContext instanceof WebGL2RenderingContext)) {
-            throw new TypeError('Geometry expects a WebGL2RenderingContext.');
+            throw new TypeError('`Geometry` expects a `WebGL2RenderingContext`.');
         }
 
         if (!(positions instanceof Float32Array)) {
-            throw new TypeError('Geometry expects positions as Float32Array.');
+            throw new TypeError('`Geometry` expects positions as `Float32Array`.');
         }
 
         if (colors !== null && !(colors instanceof Float32Array)) {
-            throw new TypeError('Geometry expects colors as Float32Array or null.');
+            throw new TypeError('`Geometry` expects colors as `Float32Array` or null.');
         }
 
         if (uvs !== null && !(uvs instanceof Float32Array)) {
-            throw new TypeError('Geometry expects uvs as Float32Array or null.');
+            throw new TypeError('`Geometry` expects uvs as `Float32Array` or null.');
+        }
+
+        if (normals !== null && !(normals instanceof Float32Array)) {
+            throw new TypeError('`Geometry` expects normals as `Float32Array` or null.');
         }
 
         if (!(indicesSolid instanceof Uint16Array) || !(indicesWireframe instanceof Uint16Array)) {
-            throw new TypeError('Geometry expects indices as Uint16Array.');
+            throw new TypeError('`Geometry` expects indices as `Uint16Array`.');
         }
 
-        this.#validateAttributeSizes(positions, colors, uvs);
+        this.#validateAttributeSizes(positions, colors, uvs, normals);
         this.#validateIndexSizes(indicesSolid, indicesWireframe);
 
         this.#webglContext         = webglContext;
@@ -213,6 +242,7 @@ export class Geometry {
         this.#positionBuffer       = this.#createStaticArrayBuffer(positions);
         this.#colorBuffer          = colors ? this.#createStaticArrayBuffer(colors) : null;
         this.#uvBuffer             = uvs ? this.#createStaticArrayBuffer(uvs) : null;
+        this.#normalBuffer         = normals ? this.#createStaticArrayBuffer(normals) : null;
         this.#indexBufferSolid     = this.#createIndexBuffer(indicesSolid);
         this.#indexBufferWireframe = this.#createIndexBuffer(indicesWireframe);
         this.#configureVertexArray();
@@ -268,6 +298,11 @@ export class Geometry {
         if (this.#uvBuffer) {
             webglContext.deleteBuffer(this.#uvBuffer);
             this.#uvBuffer = null;
+        }
+
+        if (this.#normalBuffer) {
+            webglContext.deleteBuffer(this.#normalBuffer);
+            this.#normalBuffer = null;
         }
 
         webglContext.deleteBuffer(this.#indexBufferSolid);
@@ -331,14 +366,15 @@ export class Geometry {
     }
 
     /**
-     * Validates vertex attribute array sizes (positions, colors, uvs).
+     * Validates vertex attribute array sizes (positions, colors, uvs, normals).
      *
-     * @param {Float32Array} positions     - Flat array of vec3 positions: [x, y, z] * vertexCount.
-     * @param {Float32Array | null} colors - Optional flat array of vec3 colors: [red, green, blue] * vertexCount.
-     * @param {Float32Array | null} uvs    - Optional flat array of vec2 UVs: [u, v] * vertexCount.
+     * @param {Float32Array} positions      - Flat array of vec3 positions: [x, y, z] * vertexCount.
+     * @param {Float32Array | null} colors  - Optional flat array of vec3 colors: [red, green, blue] * vertexCount.
+     * @param {Float32Array | null} uvs     - Optional flat array of vec2 UVs: [u, v] * vertexCount.
+     * @param {Float32Array | null} normals - Optional flat array of vec3 normals: [x, y, z] * vertexCount.
      * @private
      */
-    #validateAttributeSizes(positions, colors, uvs) {
+    #validateAttributeSizes(positions, colors, uvs, normals) {
         if ((positions.length % POSITION_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
             throw new Error('Geometry positions length must be a multiple of `POSITION_COMPONENT_COUNT`.');
         }
@@ -366,6 +402,18 @@ export class Geometry {
 
             if (uvVertexCount !== vertexCount) {
                 throw new Error('Geometry uvs vertex count must match positions vertex count.');
+            }
+        }
+
+        if (normals !== null) {
+            if ((normals.length % NORMAL_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
+                throw new Error('Geometry normals length must be a multiple of `NORMAL_COMPONENT_COUNT`.');
+            }
+
+            const normalVertexCount = normals.length / NORMAL_COMPONENT_COUNT;
+
+            if (normalVertexCount !== vertexCount) {
+                throw new Error('Geometry normals vertex count must match positions vertex count.');
             }
         }
     }
@@ -430,6 +478,20 @@ export class Geometry {
             webglContext.vertexAttribPointer(
                 UV_ATTRIBUTE_LOCATION,
                 UV_COMPONENT_COUNT,
+                webglContext.FLOAT,
+                ATTRIBUTE_NORMALIZED,
+                ATTRIBUTE_NO_STRIDE,
+                ATTRIBUTE_NO_OFFSET
+            );
+        }
+
+        // Normals (optional):
+        if (this.#normalBuffer) {
+            webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#normalBuffer);
+            webglContext.enableVertexAttribArray(NORMAL_ATTRIBUTE_LOCATION);
+            webglContext.vertexAttribPointer(
+                NORMAL_ATTRIBUTE_LOCATION,
+                NORMAL_COMPONENT_COUNT,
                 webglContext.FLOAT,
                 ATTRIBUTE_NORMALIZED,
                 ATTRIBUTE_NO_STRIDE,

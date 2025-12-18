@@ -737,6 +737,8 @@ var COLOR_ATTRIBUTE_LOCATION = 1;
 var COLOR_COMPONENT_COUNT = 3;
 var UV_ATTRIBUTE_LOCATION = 2;
 var UV_COMPONENT_COUNT = 2;
+var NORMAL_ATTRIBUTE_LOCATION = 3;
+var NORMAL_COMPONENT_COUNT = 3;
 var ATTRIBUTE_NORMALIZED = false;
 var ATTRIBUTE_NO_STRIDE = 0;
 var ATTRIBUTE_NO_OFFSET = 0;
@@ -782,6 +784,14 @@ var Geometry = class {
    */
   #uvBuffer;
   /**
+   * Optional GPU buffer, that stores the vertex normals.
+   * Used by lit materials, that read `a_normal` attribute.
+   *
+   * @type {WebGLBuffer | null}
+   * @private
+   */
+  #normalBuffer;
+  /**
    * Index buffer for solid rendering mode (triangles).
    *
    * @type {WebGLBuffer}
@@ -818,30 +828,34 @@ var Geometry = class {
    */
   #isDisposed = false;
   /**
-   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
-   * @param {Float32Array} positions              - [x, y, z] triples.
-   * @param {Float32Array | null} colors          - [red, green, blue] triples or null.
-   * @param {Uint16Array} indicesSolid            - Indices for solid triangles.
-   * @param {Uint16Array} indicesWireframe        - Indices for wireframe lines.
-   * @param {Float32Array | null} [uvs = null]    - [u, v] pairs or null.
+   * @param {WebGL2RenderingContext} webglContext  - WebGL2 rendering context used to create and manage GPU resources.
+   * @param {Float32Array} positions               - [x, y, z] triples.
+   * @param {Float32Array | null} colors           - [red, green, blue] triples or null.
+   * @param {Uint16Array} indicesSolid             - Indices for solid triangles.
+   * @param {Uint16Array} indicesWireframe         - Indices for wireframe lines.
+   * @param {Float32Array | null} [uvs = null]     - [u, v] pairs or null.
+   * @param {Float32Array | null} [normals = null] - [x, y, z] triples or null.
    */
-  constructor(webglContext, positions, colors, indicesSolid, indicesWireframe, uvs = null) {
+  constructor(webglContext, positions, colors, indicesSolid, indicesWireframe, uvs = null, normals = null) {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
-      throw new TypeError("Geometry expects a WebGL2RenderingContext.");
+      throw new TypeError("`Geometry` expects a `WebGL2RenderingContext`.");
     }
     if (!(positions instanceof Float32Array)) {
-      throw new TypeError("Geometry expects positions as Float32Array.");
+      throw new TypeError("`Geometry` expects positions as `Float32Array`.");
     }
     if (colors !== null && !(colors instanceof Float32Array)) {
-      throw new TypeError("Geometry expects colors as Float32Array or null.");
+      throw new TypeError("`Geometry` expects colors as `Float32Array` or null.");
     }
     if (uvs !== null && !(uvs instanceof Float32Array)) {
-      throw new TypeError("Geometry expects uvs as Float32Array or null.");
+      throw new TypeError("`Geometry` expects uvs as `Float32Array` or null.");
+    }
+    if (normals !== null && !(normals instanceof Float32Array)) {
+      throw new TypeError("`Geometry` expects normals as `Float32Array` or null.");
     }
     if (!(indicesSolid instanceof Uint16Array) || !(indicesWireframe instanceof Uint16Array)) {
-      throw new TypeError("Geometry expects indices as Uint16Array.");
+      throw new TypeError("`Geometry` expects indices as `Uint16Array`.");
     }
-    this.#validateAttributeSizes(positions, colors, uvs);
+    this.#validateAttributeSizes(positions, colors, uvs, normals);
     this.#validateIndexSizes(indicesSolid, indicesWireframe);
     this.#webglContext = webglContext;
     this.#solidIndexCount = indicesSolid.length;
@@ -850,6 +864,7 @@ var Geometry = class {
     this.#positionBuffer = this.#createStaticArrayBuffer(positions);
     this.#colorBuffer = colors ? this.#createStaticArrayBuffer(colors) : null;
     this.#uvBuffer = uvs ? this.#createStaticArrayBuffer(uvs) : null;
+    this.#normalBuffer = normals ? this.#createStaticArrayBuffer(normals) : null;
     this.#indexBufferSolid = this.#createIndexBuffer(indicesSolid);
     this.#indexBufferWireframe = this.#createIndexBuffer(indicesWireframe);
     this.#configureVertexArray();
@@ -898,6 +913,10 @@ var Geometry = class {
     if (this.#uvBuffer) {
       webglContext.deleteBuffer(this.#uvBuffer);
       this.#uvBuffer = null;
+    }
+    if (this.#normalBuffer) {
+      webglContext.deleteBuffer(this.#normalBuffer);
+      this.#normalBuffer = null;
     }
     webglContext.deleteBuffer(this.#indexBufferSolid);
     webglContext.deleteBuffer(this.#indexBufferWireframe);
@@ -950,14 +969,15 @@ var Geometry = class {
     return buffer;
   }
   /**
-   * Validates vertex attribute array sizes (positions, colors, uvs).
+   * Validates vertex attribute array sizes (positions, colors, uvs, normals).
    *
-   * @param {Float32Array} positions     - Flat array of vec3 positions: [x, y, z] * vertexCount.
-   * @param {Float32Array | null} colors - Optional flat array of vec3 colors: [red, green, blue] * vertexCount.
-   * @param {Float32Array | null} uvs    - Optional flat array of vec2 UVs: [u, v] * vertexCount.
+   * @param {Float32Array} positions      - Flat array of vec3 positions: [x, y, z] * vertexCount.
+   * @param {Float32Array | null} colors  - Optional flat array of vec3 colors: [red, green, blue] * vertexCount.
+   * @param {Float32Array | null} uvs     - Optional flat array of vec2 UVs: [u, v] * vertexCount.
+   * @param {Float32Array | null} normals - Optional flat array of vec3 normals: [x, y, z] * vertexCount.
    * @private
    */
-  #validateAttributeSizes(positions, colors, uvs) {
+  #validateAttributeSizes(positions, colors, uvs, normals) {
     if (positions.length % POSITION_COMPONENT_COUNT !== MODULO_ALIGNED_VALUE) {
       throw new Error("Geometry positions length must be a multiple of `POSITION_COMPONENT_COUNT`.");
     }
@@ -978,6 +998,15 @@ var Geometry = class {
       const uvVertexCount = uvs.length / UV_COMPONENT_COUNT;
       if (uvVertexCount !== vertexCount) {
         throw new Error("Geometry uvs vertex count must match positions vertex count.");
+      }
+    }
+    if (normals !== null) {
+      if (normals.length % NORMAL_COMPONENT_COUNT !== MODULO_ALIGNED_VALUE) {
+        throw new Error("Geometry normals length must be a multiple of `NORMAL_COMPONENT_COUNT`.");
+      }
+      const normalVertexCount = normals.length / NORMAL_COMPONENT_COUNT;
+      if (normalVertexCount !== vertexCount) {
+        throw new Error("Geometry normals vertex count must match positions vertex count.");
       }
     }
   }
@@ -1032,6 +1061,18 @@ var Geometry = class {
       webglContext.vertexAttribPointer(
         UV_ATTRIBUTE_LOCATION,
         UV_COMPONENT_COUNT,
+        webglContext.FLOAT,
+        ATTRIBUTE_NORMALIZED,
+        ATTRIBUTE_NO_STRIDE,
+        ATTRIBUTE_NO_OFFSET
+      );
+    }
+    if (this.#normalBuffer) {
+      webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#normalBuffer);
+      webglContext.enableVertexAttribArray(NORMAL_ATTRIBUTE_LOCATION);
+      webglContext.vertexAttribPointer(
+        NORMAL_ATTRIBUTE_LOCATION,
+        NORMAL_COMPONENT_COUNT,
         webglContext.FLOAT,
         ATTRIBUTE_NORMALIZED,
         ATTRIBUTE_NO_STRIDE,
@@ -1149,7 +1190,7 @@ var UNIT_POSITIONS = new Float32Array([
   -1
   /* eslint-enable indent */
 ]);
-var UVS = new Float32Array([
+var BOX_FACE_UVS = new Float32Array([
   // Front:
   0,
   0,
@@ -1204,6 +1245,86 @@ var UVS = new Float32Array([
   1,
   0,
   1
+]);
+var BOX_FACE_NORMALS = new Float32Array([
+  // Front (+Z):
+  0,
+  0,
+  1,
+  0,
+  0,
+  1,
+  0,
+  0,
+  1,
+  0,
+  0,
+  1,
+  // Back (-Z):
+  0,
+  0,
+  -1,
+  0,
+  0,
+  -1,
+  0,
+  0,
+  -1,
+  0,
+  0,
+  -1,
+  // Top (+Y):
+  0,
+  1,
+  0,
+  0,
+  1,
+  0,
+  0,
+  1,
+  0,
+  0,
+  1,
+  0,
+  // Bottom (-Y):
+  0,
+  -1,
+  0,
+  0,
+  -1,
+  0,
+  0,
+  -1,
+  0,
+  0,
+  -1,
+  0,
+  // Right (+X):
+  1,
+  0,
+  0,
+  1,
+  0,
+  0,
+  1,
+  0,
+  0,
+  1,
+  0,
+  0,
+  // Left (-X):
+  -1,
+  0,
+  0,
+  -1,
+  0,
+  0,
+  -1,
+  0,
+  0,
+  -1,
+  0,
+  0
 ]);
 var INDICES_SOLID = new Uint16Array([
   // Front (0-3):
@@ -1289,11 +1410,12 @@ var BoxGeometry = class _BoxGeometry extends Geometry {
     const halfSize = size / BOX_HALF_SIZE_DIVISOR;
     const positions = _BoxGeometry.#createPositions(halfSize);
     const colors = _BoxGeometry.#createColors(colorsSpec);
-    const uvs = UVS;
+    const uvs = BOX_FACE_UVS;
+    const normals = BOX_FACE_NORMALS;
     if (INDICES_SOLID.length !== BOX_TRIANGLE_INDEX_COUNT) {
-      throw new Error("BoxGeometry internal error: unexpected triangle index count.");
+      throw new Error("`BoxGeometry` internal error: unexpected triangle index count.");
     }
-    super(webglContext, positions, colors, INDICES_SOLID, INDICES_WIREFRAME, uvs);
+    super(webglContext, positions, colors, INDICES_SOLID, INDICES_WIREFRAME, uvs, normals);
   }
   /**
    * Normalizes constructor input to a `BoxGeometryOptions` object.

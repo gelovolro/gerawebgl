@@ -180,7 +180,7 @@ const UNIT_POSITIONS = new Float32Array([
  *
  * @type {Float32Array}
  */
-const UVS = new Float32Array([
+const BOX_FACE_UVS = new Float32Array([
     // Front:
     0.0, 0.0,
     1.0, 0.0,
@@ -216,6 +216,58 @@ const UVS = new Float32Array([
     1.0, 0.0,
     1.0, 1.0,
     0.0, 1.0
+]);
+
+/**
+ * Per-face normals for 24-vertex representation.
+ * Each face uses 4 duplicated vertices, so the normal is constant per face.
+ *
+ * Face order matches `UNIT_POSITIONS`:
+ * 0: Front  (+Z)
+ * 1: Back   (-Z)
+ * 2: Top    (+Y)
+ * 3: Bottom (-Y)
+ * 4: Right  (+X)
+ * 5: Left   (-X)
+ *
+ * @type {Float32Array}
+ */
+const BOX_FACE_NORMALS = new Float32Array([
+    // Front (+Z):
+    0.0, 0.0,  1.0,
+    0.0, 0.0,  1.0,
+    0.0, 0.0,  1.0,
+    0.0, 0.0,  1.0,
+
+    // Back (-Z):
+    0.0, 0.0, -1.0,
+    0.0, 0.0, -1.0,
+    0.0, 0.0, -1.0,
+    0.0, 0.0, -1.0,
+
+    // Top (+Y):
+    0.0,  1.0, 0.0,
+    0.0,  1.0, 0.0,
+    0.0,  1.0, 0.0,
+    0.0,  1.0, 0.0,
+
+    // Bottom (-Y):
+    0.0, -1.0, 0.0,
+    0.0, -1.0, 0.0,
+    0.0, -1.0, 0.0,
+    0.0, -1.0, 0.0,
+
+    // Right (+X):
+    1.0, 0.0,  0.0,
+    1.0, 0.0,  0.0,
+    1.0, 0.0,  0.0,
+    1.0, 0.0,  0.0,
+
+    // Left (-X):
+    -1.0, 0.0, 0.0,
+    -1.0, 0.0, 0.0,
+    -1.0, 0.0, 0.0,
+    -1.0, 0.0, 0.0
 ]);
 
 /**
@@ -290,13 +342,14 @@ export class BoxGeometry extends Geometry {
         const halfSize  = size / BOX_HALF_SIZE_DIVISOR;
         const positions = BoxGeometry.#createPositions(halfSize);
         const colors    = BoxGeometry.#createColors(colorsSpec);
-        const uvs       = UVS;
+        const uvs       = BOX_FACE_UVS;
+        const normals   = BOX_FACE_NORMALS;
 
         if (INDICES_SOLID.length !== BOX_TRIANGLE_INDEX_COUNT) {
-            throw new Error('BoxGeometry internal error: unexpected triangle index count.');
+            throw new Error('`BoxGeometry` internal error: unexpected triangle index count.');
         }
 
-        super(webglContext, positions, colors, INDICES_SOLID, INDICES_WIREFRAME, uvs);
+        super(webglContext, positions, colors, INDICES_SOLID, INDICES_WIREFRAME, uvs, normals);
     }
 
     /**
