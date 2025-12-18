@@ -154,6 +154,8 @@ var MATRIX_4x4_ELEMENT_COUNT = 16;
 var MATRIX_COLUMN_COUNT = 4;
 var MATRIX_ROW_COUNT = 4;
 var MATRIX_STRIDE = 4;
+var MIN_INVERTIBLE_DETERMINANT_ABS = 1e-12;
+var INVERSE_DETERMINANT_NUMERATOR = 1;
 var Matrix4 = class _Matrix4 {
   /**
    * Creates a new 4x4 identity matrix.
@@ -389,6 +391,68 @@ var Matrix4 = class _Matrix4 {
     return result;
   }
   /**
+   * Transposes a 4x4 matrix.
+   *
+   * @param {Float32Array} matrix - Input 4x4 matrix.
+   * @returns {Float32Array}      - A new transposed matrix.
+   */
+  static transpose(matrix) {
+    if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+      throw new TypeError("`Matrix4.transpose` expects a 4x4 `Float32Array` matrix.");
+    }
+    const out = _Matrix4.#createEmpty();
+    return _Matrix4.#transposeIntoUnchecked(out, matrix);
+  }
+  /**
+   * Transposes a 4x4 matrix into an existing output matrix.
+   *
+   * Notes: out must not be the same object as matrix.
+   *
+   * @param {Float32Array} out    - Output 4x4 matrix.
+   * @param {Float32Array} matrix - Input 4x4 matrix.
+   * @returns {Float32Array}      - The output matrix (out).
+   */
+  static transposeTo(out, matrix) {
+    if (!(out instanceof Float32Array) || out.length !== MATRIX_4x4_ELEMENT_COUNT || !(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+      throw new TypeError("`Matrix4.transposeTo` expects two 4x4 `Float32Array` matrices.");
+    }
+    if (out === matrix) {
+      throw new Error("`Matrix4.transposeTo` does not support in-place transpose. Use a separate output matrix.");
+    }
+    return _Matrix4.#transposeIntoUnchecked(out, matrix);
+  }
+  /**
+   * Inverts a 4x4 matrix.
+   *
+   * @param {Float32Array} matrix - Input 4x4 matrix.
+   * @returns {Float32Array}      - A new inverted matrix.
+   */
+  static invert(matrix) {
+    if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+      throw new TypeError("`Matrix4.invert` expects a 4x4 `Float32Array` matrix.");
+    }
+    const out = _Matrix4.#createEmpty();
+    return _Matrix4.#invertIntoUnchecked(out, matrix);
+  }
+  /**
+   * Inverts a 4x4 matrix into an existing output matrix.
+   *
+   * Notes: out must not be the same object as matrix.
+   *
+   * @param {Float32Array} out    - Output 4x4 matrix.
+   * @param {Float32Array} matrix - Input 4x4 matrix.
+   * @returns {Float32Array}      - The output matrix (out).
+   */
+  static invertTo(out, matrix) {
+    if (!(out instanceof Float32Array) || out.length !== MATRIX_4x4_ELEMENT_COUNT || !(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+      throw new TypeError("`Matrix4.invertTo` expects two 4x4 `Float32Array` matrices.");
+    }
+    if (out === matrix) {
+      throw new Error("`Matrix4.invertTo` does not support in-place inversion.");
+    }
+    return _Matrix4.#invertIntoUnchecked(out, matrix);
+  }
+  /**
    * Multiplies two 4x4 matrices into out without validation.
    *
    * @param {Float32Array} out         - Output 4x4 matrix that will receive the result.
@@ -405,6 +469,93 @@ var Matrix4 = class _Matrix4 {
         out[resultIndex] = leftMatrix[0 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 0] + leftMatrix[1 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 1] + leftMatrix[2 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 2] + leftMatrix[3 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 3];
       }
     }
+    return out;
+  }
+  /**
+   * Transposes a 4x4 matrix into out without validation.
+   *
+   * @param {Float32Array} out    - Output 4x4 matrix, that will receive the result.
+   * @param {Float32Array} matrix - Input 4x4 matrix.
+   * @returns {Float32Array}      - The output matrix (out).
+   * @private
+   */
+  static #transposeIntoUnchecked(out, matrix) {
+    out[0] = matrix[0];
+    out[1] = matrix[4];
+    out[2] = matrix[8];
+    out[3] = matrix[12];
+    out[4] = matrix[1];
+    out[5] = matrix[5];
+    out[6] = matrix[9];
+    out[7] = matrix[13];
+    out[8] = matrix[2];
+    out[9] = matrix[6];
+    out[10] = matrix[10];
+    out[11] = matrix[14];
+    out[12] = matrix[3];
+    out[13] = matrix[7];
+    out[14] = matrix[11];
+    out[15] = matrix[15];
+    return out;
+  }
+  /**
+   * Inverts a 4x4 matrix into out without validation. Throws when the matrix is not invertible.
+   *
+   * @param {Float32Array} out    - Output 4x4 matrix, that will receive the result.
+   * @param {Float32Array} matrix - Input 4x4 matrix.
+   * @returns {Float32Array}      - The output matrix (out).
+   * @private
+   */
+  static #invertIntoUnchecked(out, matrix) {
+    const a00 = matrix[0];
+    const a01 = matrix[1];
+    const a02 = matrix[2];
+    const a03 = matrix[3];
+    const a10 = matrix[4];
+    const a11 = matrix[5];
+    const a12 = matrix[6];
+    const a13 = matrix[7];
+    const a20 = matrix[8];
+    const a21 = matrix[9];
+    const a22 = matrix[10];
+    const a23 = matrix[11];
+    const a30 = matrix[12];
+    const a31 = matrix[13];
+    const a32 = matrix[14];
+    const a33 = matrix[15];
+    const b00 = a00 * a11 - a01 * a10;
+    const b01 = a00 * a12 - a02 * a10;
+    const b02 = a00 * a13 - a03 * a10;
+    const b03 = a01 * a12 - a02 * a11;
+    const b04 = a01 * a13 - a03 * a11;
+    const b05 = a02 * a13 - a03 * a12;
+    const b06 = a20 * a31 - a21 * a30;
+    const b07 = a20 * a32 - a22 * a30;
+    const b08 = a20 * a33 - a23 * a30;
+    const b09 = a21 * a32 - a22 * a31;
+    const b10 = a21 * a33 - a23 * a31;
+    const b11 = a22 * a33 - a23 * a32;
+    const determinant = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+    if (Math.abs(determinant) < MIN_INVERTIBLE_DETERMINANT_ABS) {
+      throw new Error("`Matrix4.invertTo`: matrix is not invertible.");
+    }
+    const inverseDeterminant = INVERSE_DETERMINANT_NUMERATOR / determinant;
+    out[0] = (a11 * b11 - a12 * b10 + a13 * b09) * inverseDeterminant;
+    out[1] = (a02 * b10 - a01 * b11 - a03 * b09) * inverseDeterminant;
+    out[2] = (a31 * b05 - a32 * b04 + a33 * b03) * inverseDeterminant;
+    out[3] = (a22 * b04 - a21 * b05 - a23 * b03) * inverseDeterminant;
+    out[4] = (a12 * b08 - a10 * b11 - a13 * b07) * inverseDeterminant;
+    out[5] = (a00 * b11 - a02 * b08 + a03 * b07) * inverseDeterminant;
+    out[6] = (a32 * b02 - a30 * b05 - a33 * b01) * inverseDeterminant;
+    out[7] = (a20 * b05 - a22 * b02 + a23 * b01) * inverseDeterminant;
+    out[8] = (a10 * b10 - a11 * b08 + a13 * b06) * inverseDeterminant;
+    out[9] = (a01 * b08 - a00 * b10 - a03 * b06) * inverseDeterminant;
+    out[10] = (a30 * b04 - a31 * b02 + a33 * b00) * inverseDeterminant;
+    out[11] = (a21 * b02 - a20 * b04 - a23 * b00) * inverseDeterminant;
+    out[12] = (a11 * b07 - a10 * b09 - a12 * b06) * inverseDeterminant;
+    out[13] = (a00 * b09 - a01 * b07 + a02 * b06) * inverseDeterminant;
+    out[14] = (a31 * b01 - a30 * b03 - a32 * b00) * inverseDeterminant;
+    out[15] = (a20 * b03 - a21 * b01 + a22 * b00) * inverseDeterminant;
     return out;
   }
   /**

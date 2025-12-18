@@ -53,6 +53,12 @@ const MATRIX_ROW_COUNT = 4;
 /** @type {number} */
 const MATRIX_STRIDE = 4;
 
+/** @type {number} */
+const MIN_INVERTIBLE_DETERMINANT_ABS = 1e-12;
+
+/** @type {number} */
+const INVERSE_DETERMINANT_NUMERATOR = 1.0;
+
 /**
  * Utility class for working with 4x4 matrices in column-major order.
  *
@@ -353,6 +359,84 @@ export class Matrix4 {
     }
 
     /**
+     * Transposes a 4x4 matrix.
+     *
+     * @param {Float32Array} matrix - Input 4x4 matrix.
+     * @returns {Float32Array}      - A new transposed matrix.
+     */
+    static transpose(matrix) {
+        if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+            throw new TypeError('`Matrix4.transpose` expects a 4x4 `Float32Array` matrix.');
+        }
+
+        const out = Matrix4.#createEmpty();
+        return Matrix4.#transposeIntoUnchecked(out, matrix);
+    }
+
+    /**
+     * Transposes a 4x4 matrix into an existing output matrix.
+     *
+     * Notes: out must not be the same object as matrix.
+     *
+     * @param {Float32Array} out    - Output 4x4 matrix.
+     * @param {Float32Array} matrix - Input 4x4 matrix.
+     * @returns {Float32Array}      - The output matrix (out).
+     */
+    static transposeTo(out, matrix) {
+        if (!(out instanceof Float32Array)
+            || out.length !== MATRIX_4x4_ELEMENT_COUNT
+            || !(matrix instanceof Float32Array)
+            || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+            throw new TypeError('`Matrix4.transposeTo` expects two 4x4 `Float32Array` matrices.');
+        }
+
+        if (out === matrix) {
+            throw new Error('`Matrix4.transposeTo` does not support in-place transpose. Use a separate output matrix.');
+        }
+
+        return Matrix4.#transposeIntoUnchecked(out, matrix);
+    }
+
+    /**
+     * Inverts a 4x4 matrix.
+     *
+     * @param {Float32Array} matrix - Input 4x4 matrix.
+     * @returns {Float32Array}      - A new inverted matrix.
+     */
+    static invert(matrix) {
+        if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+            throw new TypeError('`Matrix4.invert` expects a 4x4 `Float32Array` matrix.');
+        }
+
+        const out = Matrix4.#createEmpty();
+        return Matrix4.#invertIntoUnchecked(out, matrix);
+    }
+
+    /**
+     * Inverts a 4x4 matrix into an existing output matrix.
+     *
+     * Notes: out must not be the same object as matrix.
+     *
+     * @param {Float32Array} out    - Output 4x4 matrix.
+     * @param {Float32Array} matrix - Input 4x4 matrix.
+     * @returns {Float32Array}      - The output matrix (out).
+     */
+    static invertTo(out, matrix) {
+        if (!(out instanceof Float32Array)
+            || out.length !== MATRIX_4x4_ELEMENT_COUNT
+            || !(matrix instanceof Float32Array)
+            || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+            throw new TypeError('`Matrix4.invertTo` expects two 4x4 `Float32Array` matrices.');
+        }
+
+        if (out === matrix) {
+            throw new Error('`Matrix4.invertTo` does not support in-place inversion.');
+        }
+
+        return Matrix4.#invertIntoUnchecked(out, matrix);
+    }
+
+    /**
      * Multiplies two 4x4 matrices into out without validation.
      *
      * @param {Float32Array} out         - Output 4x4 matrix that will receive the result.
@@ -380,6 +464,117 @@ export class Matrix4 {
     }
 
     /**
+     * Transposes a 4x4 matrix into out without validation.
+     *
+     * @param {Float32Array} out    - Output 4x4 matrix, that will receive the result.
+     * @param {Float32Array} matrix - Input 4x4 matrix.
+     * @returns {Float32Array}      - The output matrix (out).
+     * @private
+     */
+    static #transposeIntoUnchecked(out, matrix) {
+        out[0]  = matrix[0];
+        out[1]  = matrix[4];
+        out[2]  = matrix[8];
+        out[3]  = matrix[12];
+
+        out[4]  = matrix[1];
+        out[5]  = matrix[5];
+        out[6]  = matrix[9];
+        out[7]  = matrix[13];
+
+        out[8]  = matrix[2];
+        out[9]  = matrix[6];
+        out[10] = matrix[10];
+        out[11] = matrix[14];
+
+        out[12] = matrix[3];
+        out[13] = matrix[7];
+        out[14] = matrix[11];
+        out[15] = matrix[15];
+
+        return out;
+    }
+
+    /**
+     * Inverts a 4x4 matrix into out without validation. Throws when the matrix is not invertible.
+     *
+     * @param {Float32Array} out    - Output 4x4 matrix, that will receive the result.
+     * @param {Float32Array} matrix - Input 4x4 matrix.
+     * @returns {Float32Array}      - The output matrix (out).
+     * @private
+     */
+    static #invertIntoUnchecked(out, matrix) {
+        const a00 = matrix[0];
+        const a01 = matrix[1];
+        const a02 = matrix[2];
+        const a03 = matrix[3];
+
+        const a10 = matrix[4];
+        const a11 = matrix[5];
+        const a12 = matrix[6];
+        const a13 = matrix[7];
+
+        const a20 = matrix[8];
+        const a21 = matrix[9];
+        const a22 = matrix[10];
+        const a23 = matrix[11];
+
+        const a30 = matrix[12];
+        const a31 = matrix[13];
+        const a32 = matrix[14];
+        const a33 = matrix[15];
+
+        const b00 = a00 * a11 - a01 * a10;
+        const b01 = a00 * a12 - a02 * a10;
+        const b02 = a00 * a13 - a03 * a10;
+        const b03 = a01 * a12 - a02 * a11;
+        const b04 = a01 * a13 - a03 * a11;
+        const b05 = a02 * a13 - a03 * a12;
+        const b06 = a20 * a31 - a21 * a30;
+        const b07 = a20 * a32 - a22 * a30;
+        const b08 = a20 * a33 - a23 * a30;
+        const b09 = a21 * a32 - a22 * a31;
+        const b10 = a21 * a33 - a23 * a31;
+        const b11 = a22 * a33 - a23 * a32;
+
+        const determinant =
+          b00 * b11
+        - b01 * b10
+        + b02 * b09
+        + b03 * b08
+        - b04 * b07
+        + b05 * b06;
+
+        if (Math.abs(determinant) &lt; MIN_INVERTIBLE_DETERMINANT_ABS) {
+            throw new Error('`Matrix4.invertTo`: matrix is not invertible.');
+        }
+
+        const inverseDeterminant = INVERSE_DETERMINANT_NUMERATOR / determinant;
+
+        out[0]  = (a11 * b11 - a12 * b10 + a13 * b09) * inverseDeterminant;
+        out[1]  = (a02 * b10 - a01 * b11 - a03 * b09) * inverseDeterminant;
+        out[2]  = (a31 * b05 - a32 * b04 + a33 * b03) * inverseDeterminant;
+        out[3]  = (a22 * b04 - a21 * b05 - a23 * b03) * inverseDeterminant;
+
+        out[4]  = (a12 * b08 - a10 * b11 - a13 * b07) * inverseDeterminant;
+        out[5]  = (a00 * b11 - a02 * b08 + a03 * b07) * inverseDeterminant;
+        out[6]  = (a32 * b02 - a30 * b05 - a33 * b01) * inverseDeterminant;
+        out[7]  = (a20 * b05 - a22 * b02 + a23 * b01) * inverseDeterminant;
+
+        out[8]  = (a10 * b10 - a11 * b08 + a13 * b06) * inverseDeterminant;
+        out[9]  = (a01 * b08 - a00 * b10 - a03 * b06) * inverseDeterminant;
+        out[10] = (a30 * b04 - a31 * b02 + a33 * b00) * inverseDeterminant;
+        out[11] = (a21 * b02 - a20 * b04 - a23 * b00) * inverseDeterminant;
+
+        out[12] = (a11 * b07 - a10 * b09 - a12 * b06) * inverseDeterminant;
+        out[13] = (a00 * b09 - a01 * b07 + a02 * b06) * inverseDeterminant;
+        out[14] = (a31 * b01 - a30 * b03 - a32 * b00) * inverseDeterminant;
+        out[15] = (a20 * b03 - a21 * b01 + a22 * b00) * inverseDeterminant;
+
+        return out;
+    }
+
+    /**
      * Internal helper to create a zero-filled 4x4 matrix.
      *
      * @returns {Float32Array} - A new zero-filled 4x4 matrix (length 16).
@@ -399,13 +594,13 @@ export class Matrix4 {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Namespaces</h3><ul><li><a href="GeraWebGL.html">GeraWebGL</a></li></ul><h3>Classes</h3><ul><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="CameraMath.html">CameraMath</a></li><li><a href="Engine.html">Engine</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="NormalMaterial.html">NormalMaterial</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="SolidColorMaterial.html">SolidColorMaterial</a></li><li><a href="Texture2D.html">Texture2D</a></li><li><a href="TexturedMaterial.html">TexturedMaterial</a></li><li><a href="Vector3.html">Vector3</a></li><li><a href="VertexColorMaterial.html">VertexColorMaterial</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_LOCATION_NOT_FOUND_VALUE">ATTRIBUTE_LOCATION_NOT_FOUND_VALUE</a></li><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BASE_MIPMAP_LEVEL">BASE_MIPMAP_LEVEL</a></li><li><a href="global.html#BITWISE_ZERO">BITWISE_ZERO</a></li><li><a href="global.html#BIT_MASK_ONE">BIT_MASK_ONE</a></li><li><a href="global.html#BOX_FACE_COUNT">BOX_FACE_COUNT</a></li><li><a href="global.html#BOX_FACE_NORMALS">BOX_FACE_NORMALS</a></li><li><a href="global.html#BOX_FACE_UVS">BOX_FACE_UVS</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#BOX_TRIANGLE_INDEX_COUNT">BOX_TRIANGLE_INDEX_COUNT</a></li><li><a href="global.html#BOX_VERTEX_COUNT">BOX_VERTEX_COUNT</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLORS_PER_FACE_LENGTH">COLORS_PER_FACE_LENGTH</a></li><li><a href="global.html#COLORS_PER_VERTEX_LENGTH">COLORS_PER_VERTEX_LENGTH</a></li><li><a href="global.html#COLORS_UNIFORM_LENGTH">COLORS_UNIFORM_LENGTH</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#COLOR_COMPONENT_INDEX_BLUE">COLOR_COMPONENT_INDEX_BLUE</a></li><li><a href="global.html#COLOR_COMPONENT_INDEX_GREEN">COLOR_COMPONENT_INDEX_GREEN</a></li><li><a href="global.html#COLOR_COMPONENT_INDEX_RED">COLOR_COMPONENT_INDEX_RED</a></li><li><a href="global.html#COLOR_UNIFORM_NAME">COLOR_UNIFORM_NAME</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_COLOR">DEFAULT_COLOR</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEFAULT_FAR">DEFAULT_FAR</a></li><li><a href="global.html#DEFAULT_FIELD_OF_VIEW_RADIANS">DEFAULT_FIELD_OF_VIEW_RADIANS</a></li><li><a href="global.html#DEFAULT_INITIAL_CAMERA_Z">DEFAULT_INITIAL_CAMERA_Z</a></li><li><a href="global.html#DEFAULT_NEAR">DEFAULT_NEAR</a></li><li><a href="global.html#DEFAULT_OWNS_GEOMETRY">DEFAULT_OWNS_GEOMETRY</a></li><li><a href="global.html#DEFAULT_OWNS_MATERIAL">DEFAULT_OWNS_MATERIAL</a></li><li><a href="global.html#DEFAULT_TEXTURE_UNIT_INDEX">DEFAULT_TEXTURE_UNIT_INDEX</a></li><li><a href="global.html#DEFAULT_VERTEX_COLOR">DEFAULT_VERTEX_COLOR</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#DIFFUSE_TEXTURE_UNIFORM_NAME">DIFFUSE_TEXTURE_UNIFORM_NAME</a></li><li><a href="global.html#ENGINE_ANIMATION_FRAME_ID_RESET_VALUE">ENGINE_ANIMATION_FRAME_ID_RESET_VALUE</a></li><li><a href="global.html#ENGINE_TIME_SECONDS_RESET_VALUE">ENGINE_TIME_SECONDS_RESET_VALUE</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#INDICES_SOLID">INDICES_SOLID</a></li><li><a href="global.html#INDICES_WIREFRAME">INDICES_WIREFRAME</a></li><li><a href="global.html#INITIAL_CAMERA_ASPECT_RATIO">INITIAL_CAMERA_ASPECT_RATIO</a></li><li><a href="global.html#LINE_INDEX_COMPONENT_COUNT">LINE_INDEX_COMPONENT_COUNT</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MATRIX_UNIFORM_NAME">MATRIX_UNIFORM_NAME</a></li><li><a href="global.html#MAX_COLOR_COMPONENT">MAX_COLOR_COMPONENT</a></li><li><a href="global.html#MILLISECONDS_TO_SECONDS">MILLISECONDS_TO_SECONDS</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#MIN_BOX_SIZE">MIN_BOX_SIZE</a></li><li><a href="global.html#MIN_COLOR_COMPONENT">MIN_COLOR_COMPONENT</a></li><li><a href="global.html#MIN_DRAWING_BUFFER_DIMENSION">MIN_DRAWING_BUFFER_DIMENSION</a></li><li><a href="global.html#MIN_EXCLUSIVE_NUMBER">MIN_EXCLUSIVE_NUMBER</a></li><li><a href="global.html#MIN_POWER_OF_TWO_VALUE">MIN_POWER_OF_TWO_VALUE</a></li><li><a href="global.html#MIN_REQUIRED_STRING_LENGTH">MIN_REQUIRED_STRING_LENGTH</a></li><li><a href="global.html#MIN_TEXTURE_UNIT_INDEX">MIN_TEXTURE_UNIT_INDEX</a></li><li><a href="global.html#MODULO_ALIGNED_VALUE">MODULO_ALIGNED_VALUE</a></li><li><a href="global.html#NORMAL_ATTRIBUTE_LOCATION">NORMAL_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#NORMAL_COLOR_BIAS">NORMAL_COLOR_BIAS</a></li><li><a href="global.html#NORMAL_COLOR_SCALE">NORMAL_COLOR_SCALE</a></li><li><a href="global.html#NORMAL_COMPONENT_COUNT">NORMAL_COMPONENT_COUNT</a></li><li><a href="global.html#OUTPUT_ALPHA">OUTPUT_ALPHA</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#PLACEHOLDER_PIXEL_RGBA">PLACEHOLDER_PIXEL_RGBA</a></li><li><a href="global.html#PLACEHOLDER_TEXTURE_HEIGHT">PLACEHOLDER_TEXTURE_HEIGHT</a></li><li><a href="global.html#PLACEHOLDER_TEXTURE_WIDTH">PLACEHOLDER_TEXTURE_WIDTH</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#TEXTURE_BORDER_VALUE">TEXTURE_BORDER_VALUE</a></li><li><a href="global.html#TRIANGLE_INDEX_COMPONENT_COUNT">TRIANGLE_INDEX_COMPONENT_COUNT</a></li><li><a href="global.html#TRIANGLE_INDEX_COUNT_PER_FACE">TRIANGLE_INDEX_COUNT_PER_FACE</a></li><li><a href="global.html#UNIT_COMPONENT">UNIT_COMPONENT</a></li><li><a href="global.html#UNIT_POSITIONS">UNIT_POSITIONS</a></li><li><a href="global.html#UV_ATTRIBUTE_LOCATION">UV_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#UV_COMPONENT_COUNT">UV_COMPONENT_COUNT</a></li><li><a href="global.html#VECTOR_2_ELEMENT_COUNT">VECTOR_2_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_3_ELEMENT_COUNT">VECTOR_3_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_4_ELEMENT_COUNT">VECTOR_4_ELEMENT_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VERTICES_PER_FACE">VERTICES_PER_FACE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li><li><a href="global.html#WEBGL_FALSE_AS_INTEGER">WEBGL_FALSE_AS_INTEGER</a></li><li><a href="global.html#WEBGL_TRUE_AS_INTEGER">WEBGL_TRUE_AS_INTEGER</a></li><li><a href="global.html#ZERO_COMPONENT">ZERO_COMPONENT</a></li><li><a href="global.html#createEngine">createEngine</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Namespaces</h3><ul><li><a href="GeraWebGL.html">GeraWebGL</a></li></ul><h3>Classes</h3><ul><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="CameraMath.html">CameraMath</a></li><li><a href="Engine.html">Engine</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="NormalMaterial.html">NormalMaterial</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="SolidColorMaterial.html">SolidColorMaterial</a></li><li><a href="Texture2D.html">Texture2D</a></li><li><a href="TexturedMaterial.html">TexturedMaterial</a></li><li><a href="Vector3.html">Vector3</a></li><li><a href="VertexColorMaterial.html">VertexColorMaterial</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ATTRIBUTE_LOCATION_NOT_FOUND_VALUE">ATTRIBUTE_LOCATION_NOT_FOUND_VALUE</a></li><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BASE_MIPMAP_LEVEL">BASE_MIPMAP_LEVEL</a></li><li><a href="global.html#BITWISE_ZERO">BITWISE_ZERO</a></li><li><a href="global.html#BIT_MASK_ONE">BIT_MASK_ONE</a></li><li><a href="global.html#BOX_FACE_COUNT">BOX_FACE_COUNT</a></li><li><a href="global.html#BOX_FACE_NORMALS">BOX_FACE_NORMALS</a></li><li><a href="global.html#BOX_FACE_UVS">BOX_FACE_UVS</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#BOX_TRIANGLE_INDEX_COUNT">BOX_TRIANGLE_INDEX_COUNT</a></li><li><a href="global.html#BOX_VERTEX_COUNT">BOX_VERTEX_COUNT</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLORS_PER_FACE_LENGTH">COLORS_PER_FACE_LENGTH</a></li><li><a href="global.html#COLORS_PER_VERTEX_LENGTH">COLORS_PER_VERTEX_LENGTH</a></li><li><a href="global.html#COLORS_UNIFORM_LENGTH">COLORS_UNIFORM_LENGTH</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#COLOR_COMPONENT_INDEX_BLUE">COLOR_COMPONENT_INDEX_BLUE</a></li><li><a href="global.html#COLOR_COMPONENT_INDEX_GREEN">COLOR_COMPONENT_INDEX_GREEN</a></li><li><a href="global.html#COLOR_COMPONENT_INDEX_RED">COLOR_COMPONENT_INDEX_RED</a></li><li><a href="global.html#COLOR_UNIFORM_NAME">COLOR_UNIFORM_NAME</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_COLOR">DEFAULT_COLOR</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEFAULT_FAR">DEFAULT_FAR</a></li><li><a href="global.html#DEFAULT_FIELD_OF_VIEW_RADIANS">DEFAULT_FIELD_OF_VIEW_RADIANS</a></li><li><a href="global.html#DEFAULT_INITIAL_CAMERA_Z">DEFAULT_INITIAL_CAMERA_Z</a></li><li><a href="global.html#DEFAULT_NEAR">DEFAULT_NEAR</a></li><li><a href="global.html#DEFAULT_OWNS_GEOMETRY">DEFAULT_OWNS_GEOMETRY</a></li><li><a href="global.html#DEFAULT_OWNS_MATERIAL">DEFAULT_OWNS_MATERIAL</a></li><li><a href="global.html#DEFAULT_TEXTURE_UNIT_INDEX">DEFAULT_TEXTURE_UNIT_INDEX</a></li><li><a href="global.html#DEFAULT_VERTEX_COLOR">DEFAULT_VERTEX_COLOR</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#DIFFUSE_TEXTURE_UNIFORM_NAME">DIFFUSE_TEXTURE_UNIFORM_NAME</a></li><li><a href="global.html#ENGINE_ANIMATION_FRAME_ID_RESET_VALUE">ENGINE_ANIMATION_FRAME_ID_RESET_VALUE</a></li><li><a href="global.html#ENGINE_TIME_SECONDS_RESET_VALUE">ENGINE_TIME_SECONDS_RESET_VALUE</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#INDICES_SOLID">INDICES_SOLID</a></li><li><a href="global.html#INDICES_WIREFRAME">INDICES_WIREFRAME</a></li><li><a href="global.html#INITIAL_CAMERA_ASPECT_RATIO">INITIAL_CAMERA_ASPECT_RATIO</a></li><li><a href="global.html#INVERSE_DETERMINANT_NUMERATOR">INVERSE_DETERMINANT_NUMERATOR</a></li><li><a href="global.html#LINE_INDEX_COMPONENT_COUNT">LINE_INDEX_COMPONENT_COUNT</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MATRIX_UNIFORM_NAME">MATRIX_UNIFORM_NAME</a></li><li><a href="global.html#MAX_COLOR_COMPONENT">MAX_COLOR_COMPONENT</a></li><li><a href="global.html#MILLISECONDS_TO_SECONDS">MILLISECONDS_TO_SECONDS</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#MIN_BOX_SIZE">MIN_BOX_SIZE</a></li><li><a href="global.html#MIN_COLOR_COMPONENT">MIN_COLOR_COMPONENT</a></li><li><a href="global.html#MIN_DRAWING_BUFFER_DIMENSION">MIN_DRAWING_BUFFER_DIMENSION</a></li><li><a href="global.html#MIN_EXCLUSIVE_NUMBER">MIN_EXCLUSIVE_NUMBER</a></li><li><a href="global.html#MIN_INVERTIBLE_DETERMINANT_ABS">MIN_INVERTIBLE_DETERMINANT_ABS</a></li><li><a href="global.html#MIN_POWER_OF_TWO_VALUE">MIN_POWER_OF_TWO_VALUE</a></li><li><a href="global.html#MIN_REQUIRED_STRING_LENGTH">MIN_REQUIRED_STRING_LENGTH</a></li><li><a href="global.html#MIN_TEXTURE_UNIT_INDEX">MIN_TEXTURE_UNIT_INDEX</a></li><li><a href="global.html#MODULO_ALIGNED_VALUE">MODULO_ALIGNED_VALUE</a></li><li><a href="global.html#NORMAL_ATTRIBUTE_LOCATION">NORMAL_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#NORMAL_COLOR_BIAS">NORMAL_COLOR_BIAS</a></li><li><a href="global.html#NORMAL_COLOR_SCALE">NORMAL_COLOR_SCALE</a></li><li><a href="global.html#NORMAL_COMPONENT_COUNT">NORMAL_COMPONENT_COUNT</a></li><li><a href="global.html#OUTPUT_ALPHA">OUTPUT_ALPHA</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#PLACEHOLDER_PIXEL_RGBA">PLACEHOLDER_PIXEL_RGBA</a></li><li><a href="global.html#PLACEHOLDER_TEXTURE_HEIGHT">PLACEHOLDER_TEXTURE_HEIGHT</a></li><li><a href="global.html#PLACEHOLDER_TEXTURE_WIDTH">PLACEHOLDER_TEXTURE_WIDTH</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#TEXTURE_BORDER_VALUE">TEXTURE_BORDER_VALUE</a></li><li><a href="global.html#TRIANGLE_INDEX_COMPONENT_COUNT">TRIANGLE_INDEX_COMPONENT_COUNT</a></li><li><a href="global.html#TRIANGLE_INDEX_COUNT_PER_FACE">TRIANGLE_INDEX_COUNT_PER_FACE</a></li><li><a href="global.html#UNIT_COMPONENT">UNIT_COMPONENT</a></li><li><a href="global.html#UNIT_POSITIONS">UNIT_POSITIONS</a></li><li><a href="global.html#UV_ATTRIBUTE_LOCATION">UV_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#UV_COMPONENT_COUNT">UV_COMPONENT_COUNT</a></li><li><a href="global.html#VECTOR_2_ELEMENT_COUNT">VECTOR_2_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_3_ELEMENT_COUNT">VECTOR_3_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_4_ELEMENT_COUNT">VECTOR_4_ELEMENT_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VERTICES_PER_FACE">VERTICES_PER_FACE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li><li><a href="global.html#WEBGL_FALSE_AS_INTEGER">WEBGL_FALSE_AS_INTEGER</a></li><li><a href="global.html#WEBGL_TRUE_AS_INTEGER">WEBGL_TRUE_AS_INTEGER</a></li><li><a href="global.html#ZERO_COMPONENT">ZERO_COMPONENT</a></li><li><a href="global.html#createEngine">createEngine</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Thu Dec 18 2025 18:02:07 GMT+0300 (Moscow Standard Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Thu Dec 18 2025 18:34:19 GMT+0300 (Moscow Standard Time)
 </footer>
 
 <script> prettyPrint(); </script>
