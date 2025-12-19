@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Class: Texture2D</title>
+    <title>JSDoc: Class: LambertMaterial</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Class: Texture2D</h1>
+    <h1 class="page-title">Class: LambertMaterial</h1>
 
     
 
@@ -28,10 +28,10 @@
 
 <header>
     
-        <h2><span class="attribs"><span class="type-signature"></span></span>Texture2D<span class="signature">(webglContext, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h2>
+        <h2><span class="attribs"><span class="type-signature"></span></span>LambertMaterial<span class="signature">(webglContext, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h2>
         
-            <div class="class-description">`Texture2D` is a thin wrapper around a `WebGLTexture`.
-It supports a placeholder 1x1 pixel, and can asynchronously upload an image from URL.</div>
+            <div class="class-description">Simple Lambert (diffuse) material with one directional light.
+This material expects geometry to provide normals (attribute location 3).</div>
         
     
 </header>
@@ -46,12 +46,16 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
     
 
     
-    <h4 class="name" id="Texture2D"><span class="type-signature"></span>new Texture2D<span class="signature">(webglContext, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="LambertMaterial"><span class="type-signature"></span>new LambertMaterial<span class="signature">(webglContext, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
     
 
     
 
 
+
+<div class="description">
+    Creates a new `LambertMaterial`.
+</div>
 
 
 
@@ -112,7 +116,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
             
 
-            <td class="description last">WebGL2 rendering context used to create and manage GPU resources.</td>
+            <td class="description last">WebGL2 rendering context used to compile shaders.</td>
         </tr>
 
     
@@ -125,7 +129,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
             <td class="type">
             
                 
-<span class="param-type">Object</span>
+<span class="param-type"><a href="global.html#LambertMaterialOptions">LambertMaterialOptions</a></span>
 
 
             
@@ -145,76 +149,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
             
 
-            <td class="description last">Optional texture creation options.
-                <h6>Properties</h6>
-                
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-        <th>Attributes</th>
-        
-
-        
-        <th>Default</th>
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>flipY</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">boolean</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
-
-            
-                <td class="default">
-                
-                    true
-                
-                </td>
-            
-
-            <td class="description last">Whether to flip the image data vertically on upload.</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-            </td>
+            <td class="description last">Material options.</td>
         </tr>
 
     
@@ -255,7 +190,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line89">line 89</a>
+        <a href="material_lambert-material.js.html">material/lambert-material.js</a>, <a href="material_lambert-material.js.html#line160">line 160</a>
     </li></ul></dd>
     
 
@@ -296,7 +231,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
         <h3 class="subsection-title">Classes</h3>
 
         <dl>
-            <dt><a href="Texture2D.html">Texture2D</a></dt>
+            <dt><a href="LambertMaterial.html">LambertMaterial</a></dt>
             <dd></dd>
         </dl>
     
@@ -312,14 +247,10 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
         
             
-<h4 class="name" id="height"><span class="type-signature"></span>height<span class="type-signature"></span></h4>
+<h4 class="name" id="ambientStrength"><span class="type-signature"></span>ambientStrength<span class="type-signature"></span></h4>
 
 
 
-
-<div class="description">
-    Returns the height of the uploaded image (or placeholder height until loaded).
-</div>
 
 
 
@@ -356,7 +287,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line221">line 221</a>
+        <a href="material_lambert-material.js.html">material/lambert-material.js</a>, <a href="material_lambert-material.js.html#line304">line 304</a>
     </li></ul></dd>
     
 
@@ -374,13 +305,13 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
         
             
-<h4 class="name" id="isDisposed"><span class="type-signature"></span>isDisposed<span class="type-signature"></span></h4>
+<h4 class="name" id="color"><span class="type-signature"></span>color<span class="type-signature"></span></h4>
 
 
 
 
 <div class="description">
-    Indicates whether this instance has been disposed.
+    Returns the internal diffuse color buffer.
 </div>
 
 
@@ -418,7 +349,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line241">line 241</a>
+        <a href="material_lambert-material.js.html">material/lambert-material.js</a>, <a href="material_lambert-material.js.html#line288">line 288</a>
     </li></ul></dd>
     
 
@@ -436,13 +367,13 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
         
             
-<h4 class="name" id="isLoaded"><span class="type-signature"></span>isLoaded<span class="type-signature"></span></h4>
+<h4 class="name" id="lightDirection"><span class="type-signature"></span>lightDirection<span class="type-signature"></span></h4>
 
 
 
 
 <div class="description">
-    Indicates whether the image has been uploaded.
+    Returns the internal normalized light direction buffer.
 </div>
 
 
@@ -480,131 +411,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line231">line 231</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="texture"><span class="type-signature"></span>texture<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    Returns the underlying `WebGLTexture` object.
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line201">line 201</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="width"><span class="type-signature"></span>width<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    Returns the width of the uploaded image (or placeholder width until loaded).
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line211">line 211</a>
+        <a href="material_lambert-material.js.html">material/lambert-material.js</a>, <a href="material_lambert-material.js.html#line297">line 297</a>
     </li></ul></dd>
     
 
@@ -632,7 +439,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
     
 
     
-    <h4 class="name" id="bind"><span class="type-signature"></span>bind<span class="signature">(textureUnitIndex)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="apply"><span class="type-signature"></span>apply<span class="signature">(finalMatrix, worldInverseTransposeMatrix)</span><span class="type-signature"></span></h4>
     
 
     
@@ -640,7 +447,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
 
 <div class="description">
-    Binds this texture to a texture unit.
+    Uploads per-object uniforms for a draw call.
 </div>
 
 
@@ -676,7 +483,167 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
         <tr>
             
-                <td class="name"><code>textureUnitIndex</code></td>
+                <td class="name"><code>finalMatrix</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Float32Array</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">view projection * world matrix.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>worldInverseTransposeMatrix</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Float32Array</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">(world ^ -1) ^ T, used to transform normals.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_lambert-material.js.html">material/lambert-material.js</a>, <a href="material_lambert-material.js.html#line224">line 224</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="setAmbientStrength"><span class="type-signature"></span>setAmbientStrength<span class="signature">(value)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Sets ambient strength multiplier.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>value</code></td>
             
 
             <td class="type">
@@ -692,7 +659,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
             
 
-            <td class="description last">Index of the texture unit (0 => N).</td>
+            <td class="description last">Ambient multiplier.</td>
         </tr>
 
     
@@ -733,7 +700,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line250">line 250</a>
+        <a href="material_lambert-material.js.html">material/lambert-material.js</a>, <a href="material_lambert-material.js.html#line275">line 275</a>
     </li></ul></dd>
     
 
@@ -769,7 +736,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
     
 
     
-    <h4 class="name" id="dispose"><span class="type-signature"></span>dispose<span class="signature">()</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="setColor"><span class="type-signature"></span>setColor<span class="signature">(color)</span><span class="type-signature"></span></h4>
     
 
     
@@ -777,95 +744,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
 
 <div class="description">
-    Releases the WebGL texture.
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line283">line 283</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="loadFromUrl"><span class="type-signature">(async) </span>loadFromUrl<span class="signature">(url)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Loads an image from the given URL and uploads it into this WebGL texture.
+    Sets the diffuse RGB color.
 </div>
 
 
@@ -901,13 +780,16 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
         <tr>
             
-                <td class="name"><code>url</code></td>
+                <td class="name"><code>color</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type">string</span>
+<span class="param-type">Float32Array</span>
+|
+
+<span class="param-type">Array.&lt;number></span>
 
 
             
@@ -917,7 +799,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
             
 
-            <td class="description last">Image URL (relative or absolute).</td>
+            <td class="description last">[red, green, blue] in [0..1] range.</td>
         </tr>
 
     
@@ -958,7 +840,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line268">line 268</a>
+        <a href="material_lambert-material.js.html">material/lambert-material.js</a>, <a href="material_lambert-material.js.html#line237">line 237</a>
     </li></ul></dd>
     
 
@@ -983,28 +865,146 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
 
 
-<h5>Returns:</h5>
+
+
+
+
 
         
-<div class="param-desc">
-    - Promise that resolves after successful GPU upload, or rejects on `load/decode/upload` error.
+            
+
+    
+
+    
+    <h4 class="name" id="setLightDirection"><span class="type-signature"></span>setLightDirection<span class="signature">(direction)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Sets the light direction (world space). The direction is normalized internally.
 </div>
 
 
 
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
         
-<span class="param-type">Promise.&lt;void></span>
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>direction</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Float32Array</span>
+|
+
+<span class="param-type">Array.&lt;number></span>
 
 
-    </dd>
-</dl>
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">[x, y, z] direction vector (non-zero).</td>
+        </tr>
 
     
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="material_lambert-material.js.html">material/lambert-material.js</a>, <a href="material_lambert-material.js.html#line249">line 249</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

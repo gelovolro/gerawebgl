@@ -2410,12 +2410,9 @@ var COLOR_ATTRIBUTE_LOCATION2 = 1;
 var MATRIX_UNIFORM_NAME = "u_matrix";
 var VERTEX_SHADER_SOURCE = `#version 300 es
 precision mediump float;
-
 layout(location = ${POSITION_ATTRIBUTE_LOCATION2}) in vec3 a_position;
 layout(location = ${COLOR_ATTRIBUTE_LOCATION2}) in vec3 a_color;
-
 uniform mat4 ${MATRIX_UNIFORM_NAME};
-
 out vec3 v_color;
 
 void main() {
@@ -2425,9 +2422,7 @@ void main() {
 `;
 var FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision mediump float;
-
 in vec3 v_color;
-
 out vec4 outColor;
 
 void main() {
@@ -2460,9 +2455,7 @@ var COLOR_COMPONENT_COUNT3 = 3;
 var DEFAULT_COLOR = new Float32Array([1, 1, 1]);
 var VERTEX_SHADER_SOURCE2 = `#version 300 es
 precision mediump float;
-
 layout(location = ${POSITION_ATTRIBUTE_LOCATION3}) in vec3 a_position;
-
 uniform mat4 ${MATRIX_UNIFORM_NAME2};
 
 void main() {
@@ -2471,9 +2464,7 @@ void main() {
 `;
 var FRAGMENT_SHADER_SOURCE2 = `#version 300 es
 precision mediump float;
-
 uniform vec3 ${COLOR_UNIFORM_NAME};
-
 out vec4 outColor;
 
 void main() {
@@ -2725,6 +2716,513 @@ var NormalMaterial = class extends Material {
    */
   apply(matrix4) {
     this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME4, matrix4);
+  }
+};
+
+// core/material/lambert-material.js
+var POSITION_ATTRIBUTE_LOCATION6 = 0;
+var NORMAL_ATTRIBUTE_LOCATION3 = 3;
+var FINAL_MATRIX_UNIFORM_NAME = "u_matrix";
+var WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME = "u_worldInverseTranspose";
+var COLOR_UNIFORM_NAME2 = "u_color";
+var LIGHT_DIRECTION_UNIFORM_NAME = "u_lightDirection";
+var AMBIENT_STRENGTH_UNIFORM_NAME = "u_ambientStrength";
+var VECTOR3_ELEMENT_COUNT = 3;
+var DEFAULT_COLOR2 = new Float32Array([0.85, 0.85, 0.85]);
+var DEFAULT_LIGHT_DIRECTION = new Float32Array([0.5, 0.7, 1]);
+var DEFAULT_AMBIENT_STRENGTH = 0.2;
+var MIN_DIRECTION_LENGTH_SQUARED = 0;
+var INVERSE_LENGTH_NUMERATOR = 1;
+var VERTEX_SHADER_SOURCE5 = `#version 300 es
+precision mediump float;
+layout(location = ${POSITION_ATTRIBUTE_LOCATION6}) in vec3 a_position;
+layout(location = ${NORMAL_ATTRIBUTE_LOCATION3}) in vec3 a_normal;
+uniform mat4 ${FINAL_MATRIX_UNIFORM_NAME};
+uniform mat4 ${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME};
+out vec3 v_normal;
+
+void main() {
+    gl_Position = ${FINAL_MATRIX_UNIFORM_NAME} * vec4(a_position, 1.0);
+    v_normal = (${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME} * vec4(a_normal, 0.0)).xyz;
+}
+`;
+var FRAGMENT_SHADER_SOURCE5 = `#version 300 es
+precision mediump float;
+in vec3 v_normal;
+uniform vec3  ${COLOR_UNIFORM_NAME2};
+uniform vec3  ${LIGHT_DIRECTION_UNIFORM_NAME};
+uniform float ${AMBIENT_STRENGTH_UNIFORM_NAME};
+out vec4 outColor;
+
+void main() {
+    vec3 surface_normal = normalize(v_normal);
+    vec3 light_direction = normalize(${LIGHT_DIRECTION_UNIFORM_NAME});
+    float diffuse = max(dot(surface_normal, light_direction), 0.0);
+    float light = clamp(${AMBIENT_STRENGTH_UNIFORM_NAME} + diffuse, 0.0, 1.0);
+    outColor = vec4(${COLOR_UNIFORM_NAME2} * light, 1.0);
+}
+`;
+var LambertMaterial = class _LambertMaterial extends Material {
+  /**
+   * Diffuse color (RGB).
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #color = new Float32Array(VECTOR3_ELEMENT_COUNT);
+  /**
+   * Directional light direction (world space, normalized).
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #lightDirection = new Float32Array(VECTOR3_ELEMENT_COUNT);
+  /**
+   * Ambient term multiplier.
+   *
+   * @type {number}
+   * @private
+   */
+  #ambientStrength = DEFAULT_AMBIENT_STRENGTH;
+  /**
+   * Creates a new `LambertMaterial`.
+   *
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to compile shaders.
+   * @param {LambertMaterialOptions} [options]    - Material options.
+   */
+  constructor(webglContext, options = {}) {
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("`LambertMaterial` expects an options object (plain object).");
+    }
+    const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE5, FRAGMENT_SHADER_SOURCE5);
+    super(webglContext, shaderProgram, { ownsShaderProgram: true });
+    this.#color.set(DEFAULT_COLOR2);
+    this.setLightDirection(DEFAULT_LIGHT_DIRECTION);
+    this.#ambientStrength = DEFAULT_AMBIENT_STRENGTH;
+    const { color, lightDirection, ambientStrength } = options;
+    if (color !== void 0) {
+      this.setColor(color);
+    }
+    if (lightDirection !== void 0) {
+      this.setLightDirection(lightDirection);
+    }
+    if (ambientStrength !== void 0) {
+      this.setAmbientStrength(ambientStrength);
+    }
+  }
+  /**
+   * Uploads per-object uniforms for a draw call.
+   *
+   * @param {Float32Array} finalMatrix                 - view projection * world matrix.
+   * @param {Float32Array} worldInverseTransposeMatrix - (world ^ -1) ^ T, used to transform normals.
+   */
+  apply(finalMatrix, worldInverseTransposeMatrix) {
+    this.shaderProgram.setMatrix4(FINAL_MATRIX_UNIFORM_NAME, finalMatrix);
+    this.shaderProgram.setMatrix4(WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME, worldInverseTransposeMatrix);
+    this.shaderProgram.setVector3(COLOR_UNIFORM_NAME2, this.#color);
+    this.shaderProgram.setVector3(LIGHT_DIRECTION_UNIFORM_NAME, this.#lightDirection);
+    this.shaderProgram.setFloat(AMBIENT_STRENGTH_UNIFORM_NAME, this.#ambientStrength);
+  }
+  /**
+   * Sets the diffuse RGB color.
+   *
+   * @param {Float32Array | number[]} color - [red, green, blue] in [0..1] range.
+   */
+  setColor(color) {
+    _LambertMaterial.#assertVector3("`LambertMaterial.setColor`", color);
+    this.#color[0] = color[0];
+    this.#color[1] = color[1];
+    this.#color[2] = color[2];
+  }
+  /**
+   * Sets the light direction (world space). The direction is normalized internally.
+   *
+   * @param {Float32Array | number[]} direction - [x, y, z] direction vector (non-zero).
+   */
+  setLightDirection(direction) {
+    _LambertMaterial.#assertVector3("`LambertMaterial.setLightDirection`", direction);
+    const directionX = direction[0];
+    const directionY = direction[1];
+    const directionZ = direction[2];
+    const directionLengthSquared = directionX * directionX + directionY * directionY + directionZ * directionZ;
+    if (!Number.isFinite(directionLengthSquared) || directionLengthSquared <= MIN_DIRECTION_LENGTH_SQUARED) {
+      throw new TypeError("`LambertMaterial.setLightDirection` expects a non-zero finite vector.");
+    }
+    const inverseDirectionLength = INVERSE_LENGTH_NUMERATOR / Math.sqrt(directionLengthSquared);
+    this.#lightDirection[0] = directionX * inverseDirectionLength;
+    this.#lightDirection[1] = directionY * inverseDirectionLength;
+    this.#lightDirection[2] = directionZ * inverseDirectionLength;
+  }
+  /**
+   * Sets ambient strength multiplier.
+   *
+   * @param {number} value - Ambient multiplier.
+   */
+  setAmbientStrength(value) {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new TypeError("`LambertMaterial.setAmbientStrength` expects a finite number.");
+    }
+    this.#ambientStrength = value;
+  }
+  /**
+   * Returns the internal diffuse color buffer.
+   *
+   * @returns {Float32Array}
+   */
+  get color() {
+    return this.#color;
+  }
+  /**
+   * Returns the internal normalized light direction buffer.
+   *
+   * @returns {Float32Array}
+   */
+  get lightDirection() {
+    return this.#lightDirection;
+  }
+  /**
+   * @returns {number} Ambient strength multiplier.
+   */
+  get ambientStrength() {
+    return this.#ambientStrength;
+  }
+  /**
+   * Validates a vector3-like input.
+   *
+   * @param {string} methodName               - Method name for error messages.
+   * @param {Float32Array | number[]} vector3 - Vector to validate.
+   * @private
+   */
+  static #assertVector3(methodName, vector3) {
+    if (!Array.isArray(vector3) && !(vector3 instanceof Float32Array)) {
+      throw new TypeError(`${methodName} expects a number[] or Float32Array.`);
+    }
+    if (vector3.length !== VECTOR3_ELEMENT_COUNT) {
+      throw new TypeError(`${methodName} expects exactly 3 components [x, y, z].`);
+    }
+    if (!Number.isFinite(vector3[0]) || !Number.isFinite(vector3[1]) || !Number.isFinite(vector3[2])) {
+      throw new TypeError(`${methodName} expects all components to be finite numbers.`);
+    }
+  }
+};
+
+// core/material/phong-material.js
+var POSITION_ATTRIBUTE_LOCATION7 = 0;
+var NORMAL_ATTRIBUTE_LOCATION4 = 3;
+var FINAL_MATRIX_UNIFORM_NAME2 = "u_matrix";
+var WORLD_MATRIX_UNIFORM_NAME = "u_worldMatrix";
+var WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME2 = "u_worldInverseTranspose";
+var COLOR_UNIFORM_NAME3 = "u_color";
+var SPECULAR_COLOR_UNIFORM_NAME = "u_specularColor";
+var LIGHT_DIRECTION_UNIFORM_NAME2 = "u_lightDirection";
+var CAMERA_POSITION_UNIFORM_NAME = "u_cameraPosition";
+var AMBIENT_STRENGTH_UNIFORM_NAME2 = "u_ambientStrength";
+var SPECULAR_STRENGTH_UNIFORM_NAME = "u_specularStrength";
+var SHININESS_UNIFORM_NAME = "u_shininess";
+var VECTOR3_ELEMENT_COUNT2 = 3;
+var DEFAULT_COLOR3 = new Float32Array([0.85, 0.85, 0.85]);
+var DEFAULT_SPECULAR_COLOR = new Float32Array([1, 1, 1]);
+var DEFAULT_LIGHT_DIRECTION2 = new Float32Array([0.5, 0.7, 1]);
+var DEFAULT_AMBIENT_STRENGTH2 = 0.2;
+var DEFAULT_SPECULAR_STRENGTH = 0.6;
+var DEFAULT_SHININESS = 32;
+var MIN_DIRECTION_LENGTH_SQUARED2 = 0;
+var INVERSE_LENGTH_NUMERATOR2 = 1;
+var VERTEX_SHADER_SOURCE6 = `#version 300 es
+layout(location = ${POSITION_ATTRIBUTE_LOCATION7}) in vec3 a_position;
+layout(location = ${NORMAL_ATTRIBUTE_LOCATION4}) in vec3 a_normal;
+uniform mat4 ${FINAL_MATRIX_UNIFORM_NAME2};
+uniform mat4 ${WORLD_MATRIX_UNIFORM_NAME};
+uniform mat4 ${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME2};
+out vec3 v_worldPosition;
+out vec3 v_normal;
+
+void main() {
+    vec4 worldPosition = ${WORLD_MATRIX_UNIFORM_NAME} * vec4(a_position, 1.0);
+    v_worldPosition = worldPosition.xyz;
+    // Normal is transformed by inverse-transpose of the world matrix.
+    v_normal = (${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME2} * vec4(a_normal, 0.0)).xyz;
+    gl_Position = ${FINAL_MATRIX_UNIFORM_NAME2} * vec4(a_position, 1.0);
+}
+`;
+var FRAGMENT_SHADER_SOURCE6 = `#version 300 es
+precision mediump float;
+in vec3 v_worldPosition;
+in vec3 v_normal;
+uniform vec3  ${COLOR_UNIFORM_NAME3};
+uniform vec3  ${SPECULAR_COLOR_UNIFORM_NAME};
+uniform vec3  ${LIGHT_DIRECTION_UNIFORM_NAME2};
+uniform vec3  ${CAMERA_POSITION_UNIFORM_NAME};
+uniform float ${AMBIENT_STRENGTH_UNIFORM_NAME2};
+uniform float ${SPECULAR_STRENGTH_UNIFORM_NAME};
+uniform float ${SHININESS_UNIFORM_NAME};
+out vec4 outColor;
+
+void main() {
+    vec3 n = normalize(v_normal);
+    vec3 l = normalize(${LIGHT_DIRECTION_UNIFORM_NAME2});
+    vec3 v = normalize(${CAMERA_POSITION_UNIFORM_NAME} - v_worldPosition);
+
+    // Diffuse term:
+    float diff = max(dot(n, l), 0.0);
+
+    // Specular term:
+    float spec = 0.0;
+
+    if (diff > 0.0) {
+        vec3 r = reflect(-l, n);
+        float specBase = max(dot(v, r), 0.0);
+        spec = pow(specBase, ${SHININESS_UNIFORM_NAME});
+    }
+
+    vec3 ambient  = ${COLOR_UNIFORM_NAME3} * ${AMBIENT_STRENGTH_UNIFORM_NAME2};
+    vec3 diffuse  = ${COLOR_UNIFORM_NAME3} * diff;
+    vec3 specular = ${SPECULAR_COLOR_UNIFORM_NAME} * (spec * ${SPECULAR_STRENGTH_UNIFORM_NAME});
+    vec3 rgb      = ambient + diffuse + specular;
+    outColor      = vec4(rgb, 1.0);
+}
+`;
+var PhongMaterial = class _PhongMaterial extends Material {
+  /**
+   * Diffuse color (RGB).
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #color = new Float32Array(VECTOR3_ELEMENT_COUNT2);
+  /**
+   * Specular color (RGB).
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #specularColor = new Float32Array(VECTOR3_ELEMENT_COUNT2);
+  /**
+   * Directional light direction (world space, normalized).
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #lightDirection = new Float32Array(VECTOR3_ELEMENT_COUNT2);
+  /**
+   * Ambient term multiplier.
+   *
+   * @type {number}
+   * @private
+   */
+  #ambientStrength = DEFAULT_AMBIENT_STRENGTH2;
+  /**
+   * Specular term multiplier.
+   *
+   * @type {number}
+   * @private
+   */
+  #specularStrength = DEFAULT_SPECULAR_STRENGTH;
+  /**
+   * Specular exponent.
+   *
+   * @type {number}
+   * @private
+   */
+  #shininess = DEFAULT_SHININESS;
+  /**
+   * Creates a new `PhongMaterial`.
+   *
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to compile the shaders.
+   * @param {PhongMaterialOptions} [options]      - Material options.
+   */
+  constructor(webglContext, options = {}) {
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("`PhongMaterial` expects an options object (plain object).");
+    }
+    const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE6, FRAGMENT_SHADER_SOURCE6);
+    super(webglContext, shaderProgram, { ownsShaderProgram: true });
+    this.#color.set(DEFAULT_COLOR3);
+    this.#specularColor.set(DEFAULT_SPECULAR_COLOR);
+    this.setLightDirection(DEFAULT_LIGHT_DIRECTION2);
+    this.#ambientStrength = DEFAULT_AMBIENT_STRENGTH2;
+    this.#specularStrength = DEFAULT_SPECULAR_STRENGTH;
+    this.#shininess = DEFAULT_SHININESS;
+    const {
+      color,
+      specularColor,
+      lightDirection,
+      ambientStrength,
+      specularStrength,
+      shininess
+    } = options;
+    if (color !== void 0) {
+      this.setColor(color);
+    }
+    if (specularColor !== void 0) {
+      this.setSpecularColor(specularColor);
+    }
+    if (lightDirection !== void 0) {
+      this.setLightDirection(lightDirection);
+    }
+    if (ambientStrength !== void 0) {
+      this.setAmbientStrength(ambientStrength);
+    }
+    if (specularStrength !== void 0) {
+      this.setSpecularStrength(specularStrength);
+    }
+    if (shininess !== void 0) {
+      this.setShininess(shininess);
+    }
+  }
+  /**
+   * Uploads per-object uniforms for a draw call.
+   *
+   * @param {Float32Array} finalMatrix                 - view projection * world matrix.
+   * @param {Float32Array} worldMatrix                 - world matrix.
+   * @param {Float32Array} worldInverseTransposeMatrix - (world ^ -1) ^ T, used to transform normals.
+   * @param {Float32Array} cameraPosition              - Camera position (vec3), world space.
+   */
+  apply(finalMatrix, worldMatrix, worldInverseTransposeMatrix, cameraPosition) {
+    this.shaderProgram.setMatrix4(FINAL_MATRIX_UNIFORM_NAME2, finalMatrix);
+    this.shaderProgram.setMatrix4(WORLD_MATRIX_UNIFORM_NAME, worldMatrix);
+    this.shaderProgram.setMatrix4(WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME2, worldInverseTransposeMatrix);
+    this.shaderProgram.setVector3(COLOR_UNIFORM_NAME3, this.#color);
+    this.shaderProgram.setVector3(SPECULAR_COLOR_UNIFORM_NAME, this.#specularColor);
+    this.shaderProgram.setVector3(LIGHT_DIRECTION_UNIFORM_NAME2, this.#lightDirection);
+    this.shaderProgram.setVector3(CAMERA_POSITION_UNIFORM_NAME, cameraPosition);
+    this.shaderProgram.setFloat(AMBIENT_STRENGTH_UNIFORM_NAME2, this.#ambientStrength);
+    this.shaderProgram.setFloat(SPECULAR_STRENGTH_UNIFORM_NAME, this.#specularStrength);
+    this.shaderProgram.setFloat(SHININESS_UNIFORM_NAME, this.#shininess);
+  }
+  /**
+   * Sets the diffuse RGB color.
+   *
+   * @param {Float32Array | number[]} color - [red, green, blue] in [0..1] range.
+   */
+  setColor(color) {
+    _PhongMaterial.#assertVector3("`PhongMaterial.setColor`", color);
+    this.#color[0] = color[0];
+    this.#color[1] = color[1];
+    this.#color[2] = color[2];
+  }
+  /**
+   * Sets the specular RGB color.
+   *
+   * @param {Float32Array | number[]} color - [red, green, blue] in [0..1] range.
+   */
+  setSpecularColor(color) {
+    _PhongMaterial.#assertVector3("`PhongMaterial.setSpecularColor`", color);
+    this.#specularColor[0] = color[0];
+    this.#specularColor[1] = color[1];
+    this.#specularColor[2] = color[2];
+  }
+  /**
+   * Sets the light direction (world space). The direction is normalized internally.
+   *
+   * @param {Float32Array | number[]} direction - [x, y, z] direction vector (non-zero).
+   */
+  setLightDirection(direction) {
+    _PhongMaterial.#assertVector3("`PhongMaterial.setLightDirection`", direction);
+    const directionX = direction[0];
+    const directionY = direction[1];
+    const directionZ = direction[2];
+    const directionLengthSquared = directionX * directionX + directionY * directionY + directionZ * directionZ;
+    if (!Number.isFinite(directionLengthSquared) || directionLengthSquared <= MIN_DIRECTION_LENGTH_SQUARED2) {
+      throw new TypeError("`PhongMaterial.setLightDirection` expects a non-zero finite vector.");
+    }
+    const inverseDirectionLength = INVERSE_LENGTH_NUMERATOR2 / Math.sqrt(directionLengthSquared);
+    this.#lightDirection[0] = directionX * inverseDirectionLength;
+    this.#lightDirection[1] = directionY * inverseDirectionLength;
+    this.#lightDirection[2] = directionZ * inverseDirectionLength;
+  }
+  /**
+   * Sets ambient strength multiplier.
+   *
+   * @param {number} value - Ambient multiplier.
+   */
+  setAmbientStrength(value) {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new TypeError("`PhongMaterial.setAmbientStrength` expects a finite number.");
+    }
+    this.#ambientStrength = value;
+  }
+  /**
+   * Sets specular strength multiplier.
+   *
+   * @param {number} value - Specular multiplier.
+   */
+  setSpecularStrength(value) {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new TypeError("`PhongMaterial.setSpecularStrength` expects a finite number.");
+    }
+    this.#specularStrength = value;
+  }
+  /**
+   * Sets shininess exponent.
+   *
+   * @param {number} value - Specular exponent.
+   */
+  setShininess(value) {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new TypeError("PhongMaterial.setShininess` expects a finite number.");
+    }
+    this.#shininess = value;
+  }
+  /**
+   * Returns the internal diffuse color buffer.
+   *
+   * @returns {Float32Array}
+   */
+  get color() {
+    return this.#color;
+  }
+  /**
+   * Returns the internal specular color buffer.
+   *
+   * @returns {Float32Array}
+   */
+  get specularColor() {
+    return this.#specularColor;
+  }
+  /**
+   * Returns the internal normalized light direction buffer.
+   *
+   * @returns {Float32Array}
+   */
+  get lightDirection() {
+    return this.#lightDirection;
+  }
+  /**
+   * @returns {number} Ambient strength multiplier.
+   */
+  get ambientStrength() {
+    return this.#ambientStrength;
+  }
+  /**
+   * @returns {number} Specular strength multiplier.
+   */
+  get specularStrength() {
+    return this.#specularStrength;
+  }
+  /**
+   * @returns {number} Shininess exponent.
+   */
+  get shininess() {
+    return this.#shininess;
+  }
+  /**
+   * Validates a vector3-like input.
+   *
+   * @param {string} methodName               - Method name for error messages.
+   * @param {Float32Array | number[]} vector3 - Vector to validate.
+   * @private
+   */
+  static #assertVector3(methodName, vector3) {
+    if (!Array.isArray(vector3) && !(vector3 instanceof Float32Array)) {
+      throw new TypeError(`${methodName} expects a number[] or Float32Array.`);
+    }
+    if (vector3.length !== VECTOR3_ELEMENT_COUNT2) {
+      throw new TypeError(`${methodName} expects exactly 3 components [x, y, z].`);
+    }
+    if (!Number.isFinite(vector3[0]) || !Number.isFinite(vector3[1]) || !Number.isFinite(vector3[2])) {
+      throw new TypeError(`${methodName} expects all components to be finite numbers.`);
+    }
   }
 };
 
@@ -3191,7 +3689,7 @@ var PerspectiveCamera = class extends Object3D {
 // core/render/renderer.js
 var INDEX_BUFFER_OFFSET_BYTES = 0;
 var MATRIX_4x4_ELEMENT_COUNT6 = 16;
-var VECTOR3_ELEMENT_COUNT = 3;
+var VECTOR3_ELEMENT_COUNT3 = 3;
 var MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT = 2;
 var MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT = 3;
 var MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT = 4;
@@ -3280,7 +3778,7 @@ var Renderer = class {
     this.#finalMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
     this.#worldMatrixInverse = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
     this.#worldInverseTransposeMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
-    this.#cameraPosition = new Float32Array(VECTOR3_ELEMENT_COUNT);
+    this.#cameraPosition = new Float32Array(VECTOR3_ELEMENT_COUNT3);
     this.#frameViewProjectionMatrix = this.#viewProjectionMatrix;
     this.#frameCameraPosition = this.#cameraPosition;
     this.#traverseCallback = (x) => this.#renderVisitedObject(x);
@@ -3650,7 +4148,9 @@ var GeraWebGL = Object.freeze({
     VertexColorMaterial,
     SolidColorMaterial,
     TexturedMaterial,
-    NormalMaterial
+    NormalMaterial,
+    LambertMaterial,
+    PhongMaterial
   }),
   // Low-level access (shaders, manual uniforms/attributes):
   LowLevel: Object.freeze({

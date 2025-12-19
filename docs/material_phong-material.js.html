@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: material/phong-material.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: material/phong-material.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { Material }      from './material.js';
+import { ShaderProgram } from '../shader/shader-program.js';
+
+/**
+ * Attribute location used by `vec3` position.
+ * Must match geometry's `POSITION_ATTRIBUTE_LOCATION`.
+ *
+ * @type {number}
+ */
+const POSITION_ATTRIBUTE_LOCATION = 0;
+
+/**
+ * Attribute location used by `vec3` normal.
+ * Must match geometry's `NORMAL_ATTRIBUTE_LOCATION`.
+ *
+ * @type {number}
+ */
+const NORMAL_ATTRIBUTE_LOCATION = 3;
+
+/**
+ * Name of the final transformation matrix uniform (view projection * world).
+ *
+ * @type {string}
+ */
+const FINAL_MATRIX_UNIFORM_NAME = 'u_matrix';
+
+/**
+ * Name of the world matrix uniform (world).
+ *
+ * @type {string}
+ */
+const WORLD_MATRIX_UNIFORM_NAME = 'u_worldMatrix';
+
+/**
+ * Name of the world inverse transpose matrix uniform ((world ^ -1) ^ T).
+ *
+ * @type {string}
+ */
+const WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME = 'u_worldInverseTranspose';
+
+/**
+ * Diffuse color uniform name.
+ *
+ * @type {string}
+ */
+const COLOR_UNIFORM_NAME = 'u_color';
+
+/**
+ * Specular color uniform name.
+ *
+ * @type {string}
+ */
+const SPECULAR_COLOR_UNIFORM_NAME = 'u_specularColor';
+
+/**
+ * Directional light direction uniform name (world space).
+ * Vector points from surface to the light (towards the light).
+ *
+ * @type {string}
+ */
+const LIGHT_DIRECTION_UNIFORM_NAME = 'u_lightDirection';
+
+/**
+ * Camera position uniform name (world space).
+ *
+ * @type {string}
+ */
+const CAMERA_POSITION_UNIFORM_NAME = 'u_cameraPosition';
+
+/**
+ * Ambient strength uniform name.
+ *
+ * @type {string}
+ */
+const AMBIENT_STRENGTH_UNIFORM_NAME = 'u_ambientStrength';
+
+/**
+ * Specular strength uniform name.
+ *
+ * @type {string}
+ */
+const SPECULAR_STRENGTH_UNIFORM_NAME = 'u_specularStrength';
+
+/**
+ * Shininess (specular exponent) uniform name.
+ *
+ * @type {string}
+ */
+const SHININESS_UNIFORM_NAME = 'u_shininess';
+
+/**
+ * Vector3 length (component count).
+ *
+ * @type {number}
+ */
+const VECTOR3_ELEMENT_COUNT = 3;
+
+/**
+ * Default diffuse color (RGB).
+ *
+ * @type {Float32Array}
+ */
+const DEFAULT_COLOR = new Float32Array([0.85, 0.85, 0.85]);
+
+/**
+ * Default specular color (RGB).
+ *
+ * @type {Float32Array}
+ */
+const DEFAULT_SPECULAR_COLOR = new Float32Array([1.0, 1.0, 1.0]);
+
+/**
+ * Default directional light direction in world space. Points from surface to light.
+ *
+ * @type {Float32Array}
+ */
+const DEFAULT_LIGHT_DIRECTION = new Float32Array([0.5, 0.7, 1.0]);
+
+/**
+ * Default ambient term strength [0..1].
+ *
+ * @type {number}
+ */
+const DEFAULT_AMBIENT_STRENGTH = 0.2;
+
+/**
+ * Default specular intensity multiplier [0..1+].
+ *
+ * @type {number}
+ */
+const DEFAULT_SPECULAR_STRENGTH = 0.6;
+
+/**
+ * Default shininess exponent.
+ *
+ * @type {number}
+ */
+const DEFAULT_SHININESS = 32.0;
+
+/**
+ * Minimum allowed squared length for a direction vector.
+ * Used to reject a zero-length direction.
+ *
+ * @type {number}
+ */
+const MIN_DIRECTION_LENGTH_SQUARED = 0.0;
+
+/**
+ * Numerator used, when computing inverse vector length: `1 / sqrt(lengthSquared)`.
+ *
+ * @type {number}
+ */
+const INVERSE_LENGTH_NUMERATOR = 1.0;
+
+/**
+ * GLSL vertex shader source code.
+ *
+ * Requires:
+ * - position attribute at location 0
+ * - normal attribute at location 3
+ *
+ * Provides:
+ * - v_worldPosition (world space)
+ * - v_normal (world space, not normalized in fragment yet)
+ *
+ * @type {string}
+ */
+const VERTEX_SHADER_SOURCE = `#version 300 es
+layout(location = ${POSITION_ATTRIBUTE_LOCATION}) in vec3 a_position;
+layout(location = ${NORMAL_ATTRIBUTE_LOCATION}) in vec3 a_normal;
+uniform mat4 ${FINAL_MATRIX_UNIFORM_NAME};
+uniform mat4 ${WORLD_MATRIX_UNIFORM_NAME};
+uniform mat4 ${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME};
+out vec3 v_worldPosition;
+out vec3 v_normal;
+
+void main() {
+    vec4 worldPosition = ${WORLD_MATRIX_UNIFORM_NAME} * vec4(a_position, 1.0);
+    v_worldPosition = worldPosition.xyz;
+    // Normal is transformed by inverse-transpose of the world matrix.
+    v_normal = (${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME} * vec4(a_normal, 0.0)).xyz;
+    gl_Position = ${FINAL_MATRIX_UNIFORM_NAME} * vec4(a_position, 1.0);
+}
+`;
+
+/**
+ * GLSL fragment shader source code.
+ *
+ * Implements classic Phong lighting: ambient + diffuse + specular
+ *
+ * @type {string}
+ */
+const FRAGMENT_SHADER_SOURCE = `#version 300 es
+precision mediump float;
+in vec3 v_worldPosition;
+in vec3 v_normal;
+uniform vec3  ${COLOR_UNIFORM_NAME};
+uniform vec3  ${SPECULAR_COLOR_UNIFORM_NAME};
+uniform vec3  ${LIGHT_DIRECTION_UNIFORM_NAME};
+uniform vec3  ${CAMERA_POSITION_UNIFORM_NAME};
+uniform float ${AMBIENT_STRENGTH_UNIFORM_NAME};
+uniform float ${SPECULAR_STRENGTH_UNIFORM_NAME};
+uniform float ${SHININESS_UNIFORM_NAME};
+out vec4 outColor;
+
+void main() {
+    vec3 n = normalize(v_normal);
+    vec3 l = normalize(${LIGHT_DIRECTION_UNIFORM_NAME});
+    vec3 v = normalize(${CAMERA_POSITION_UNIFORM_NAME} - v_worldPosition);
+
+    // Diffuse term:
+    float diff = max(dot(n, l), 0.0);
+
+    // Specular term:
+    float spec = 0.0;
+
+    if (diff > 0.0) {
+        vec3 r = reflect(-l, n);
+        float specBase = max(dot(v, r), 0.0);
+        spec = pow(specBase, ${SHININESS_UNIFORM_NAME});
+    }
+
+    vec3 ambient  = ${COLOR_UNIFORM_NAME} * ${AMBIENT_STRENGTH_UNIFORM_NAME};
+    vec3 diffuse  = ${COLOR_UNIFORM_NAME} * diff;
+    vec3 specular = ${SPECULAR_COLOR_UNIFORM_NAME} * (spec * ${SPECULAR_STRENGTH_UNIFORM_NAME});
+    vec3 rgb      = ambient + diffuse + specular;
+    outColor      = vec4(rgb, 1.0);
+}
+`;
+
+/**
+ * Options used by `PhongMaterial`.
+ *
+ * @typedef {Object} PhongMaterialOptions
+ * @property {Float32Array | number[]} [color]          - Diffuse RGB color [red, green, blue] in [0..1] range.
+ * @property {Float32Array | number[]} [specularColor]  - Specular RGB color [red, green, blue] in [0..1] range.
+ * @property {Float32Array | number[]} [lightDirection] - Directional light direction (world space), will be normalized.
+ * @property {number} [ambientStrength]                 - Ambient term multiplier.
+ * @property {number} [specularStrength]                - Specular term multiplier.
+ * @property {number} [shininess]                       - Specular exponent.
+ */
+
+/**
+ * Classic Phong shading material with a single directional light.
+ * This material expects geometry to provide normals (attribute location 3).
+ */
+export class PhongMaterial extends Material {
+
+    /**
+     * Diffuse color (RGB).
+     *
+     * @type {Float32Array}
+     * @private
+     */
+    #color = new Float32Array(VECTOR3_ELEMENT_COUNT);
+
+    /**
+     * Specular color (RGB).
+     *
+     * @type {Float32Array}
+     * @private
+     */
+    #specularColor = new Float32Array(VECTOR3_ELEMENT_COUNT);
+
+    /**
+     * Directional light direction (world space, normalized).
+     *
+     * @type {Float32Array}
+     * @private
+     */
+    #lightDirection = new Float32Array(VECTOR3_ELEMENT_COUNT);
+
+    /**
+     * Ambient term multiplier.
+     *
+     * @type {number}
+     * @private
+     */
+    #ambientStrength = DEFAULT_AMBIENT_STRENGTH;
+
+    /**
+     * Specular term multiplier.
+     *
+     * @type {number}
+     * @private
+     */
+    #specularStrength = DEFAULT_SPECULAR_STRENGTH;
+
+    /**
+     * Specular exponent.
+     *
+     * @type {number}
+     * @private
+     */
+    #shininess = DEFAULT_SHININESS;
+
+    /**
+     * Creates a new `PhongMaterial`.
+     *
+     * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to compile the shaders.
+     * @param {PhongMaterialOptions} [options]      - Material options.
+     */
+    constructor(webglContext, options = {}) {
+        if (options === null || typeof options !== 'object' || Array.isArray(options)) {
+            throw new TypeError('`PhongMaterial` expects an options object (plain object).');
+        }
+
+        const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
+        super(webglContext, shaderProgram, { ownsShaderProgram: true });
+
+        this.#color.set(DEFAULT_COLOR);
+        this.#specularColor.set(DEFAULT_SPECULAR_COLOR);
+        this.setLightDirection(DEFAULT_LIGHT_DIRECTION);
+        this.#ambientStrength  = DEFAULT_AMBIENT_STRENGTH;
+        this.#specularStrength = DEFAULT_SPECULAR_STRENGTH;
+        this.#shininess        = DEFAULT_SHININESS;
+
+        const {
+            color,
+            specularColor,
+            lightDirection,
+            ambientStrength,
+            specularStrength,
+            shininess,
+        } = options;
+
+        if (color !== undefined) {
+            this.setColor(color);
+        }
+
+        if (specularColor !== undefined) {
+            this.setSpecularColor(specularColor);
+        }
+
+        if (lightDirection !== undefined) {
+            this.setLightDirection(lightDirection);
+        }
+
+        if (ambientStrength !== undefined) {
+            this.setAmbientStrength(ambientStrength);
+        }
+
+        if (specularStrength !== undefined) {
+            this.setSpecularStrength(specularStrength);
+        }
+
+        if (shininess !== undefined) {
+            this.setShininess(shininess);
+        }
+    }
+
+    /**
+     * Uploads per-object uniforms for a draw call.
+     *
+     * @param {Float32Array} finalMatrix                 - view projection * world matrix.
+     * @param {Float32Array} worldMatrix                 - world matrix.
+     * @param {Float32Array} worldInverseTransposeMatrix - (world ^ -1) ^ T, used to transform normals.
+     * @param {Float32Array} cameraPosition              - Camera position (vec3), world space.
+     */
+    apply(finalMatrix, worldMatrix, worldInverseTransposeMatrix, cameraPosition) {
+        this.shaderProgram.setMatrix4(FINAL_MATRIX_UNIFORM_NAME, finalMatrix);
+        this.shaderProgram.setMatrix4(WORLD_MATRIX_UNIFORM_NAME, worldMatrix);
+        this.shaderProgram.setMatrix4(WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME, worldInverseTransposeMatrix);
+        this.shaderProgram.setVector3(COLOR_UNIFORM_NAME, this.#color);
+        this.shaderProgram.setVector3(SPECULAR_COLOR_UNIFORM_NAME, this.#specularColor);
+        this.shaderProgram.setVector3(LIGHT_DIRECTION_UNIFORM_NAME, this.#lightDirection);
+        this.shaderProgram.setVector3(CAMERA_POSITION_UNIFORM_NAME, cameraPosition);
+        this.shaderProgram.setFloat(AMBIENT_STRENGTH_UNIFORM_NAME, this.#ambientStrength);
+        this.shaderProgram.setFloat(SPECULAR_STRENGTH_UNIFORM_NAME, this.#specularStrength);
+        this.shaderProgram.setFloat(SHININESS_UNIFORM_NAME, this.#shininess);
+    }
+
+    /**
+     * Sets the diffuse RGB color.
+     *
+     * @param {Float32Array | number[]} color - [red, green, blue] in [0..1] range.
+     */
+    setColor(color) {
+        PhongMaterial.#assertVector3('`PhongMaterial.setColor`', color);
+        this.#color[0] = color[0];
+        this.#color[1] = color[1];
+        this.#color[2] = color[2];
+    }
+
+    /**
+     * Sets the specular RGB color.
+     *
+     * @param {Float32Array | number[]} color - [red, green, blue] in [0..1] range.
+     */
+    setSpecularColor(color) {
+        PhongMaterial.#assertVector3('`PhongMaterial.setSpecularColor`', color);
+        this.#specularColor[0] = color[0];
+        this.#specularColor[1] = color[1];
+        this.#specularColor[2] = color[2];
+    }
+
+    /**
+     * Sets the light direction (world space). The direction is normalized internally.
+     *
+     * @param {Float32Array | number[]} direction - [x, y, z] direction vector (non-zero).
+     */
+    setLightDirection(direction) {
+        PhongMaterial.#assertVector3('`PhongMaterial.setLightDirection`', direction);
+        const directionX = direction[0];
+        const directionY = direction[1];
+        const directionZ = direction[2];
+
+        const directionLengthSquared =
+            directionX * directionX +
+            directionY * directionY +
+            directionZ * directionZ;
+
+        if (!Number.isFinite(directionLengthSquared) || directionLengthSquared &lt;= MIN_DIRECTION_LENGTH_SQUARED) {
+            throw new TypeError('`PhongMaterial.setLightDirection` expects a non-zero finite vector.');
+        }
+
+        const inverseDirectionLength = INVERSE_LENGTH_NUMERATOR / Math.sqrt(directionLengthSquared);
+        this.#lightDirection[0] = directionX * inverseDirectionLength;
+        this.#lightDirection[1] = directionY * inverseDirectionLength;
+        this.#lightDirection[2] = directionZ * inverseDirectionLength;
+    }
+
+    /**
+     * Sets ambient strength multiplier.
+     *
+     * @param {number} value - Ambient multiplier.
+     */
+    setAmbientStrength(value) {
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+            throw new TypeError('`PhongMaterial.setAmbientStrength` expects a finite number.');
+        }
+
+        this.#ambientStrength = value;
+    }
+
+    /**
+     * Sets specular strength multiplier.
+     *
+     * @param {number} value - Specular multiplier.
+     */
+    setSpecularStrength(value) {
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+            throw new TypeError('`PhongMaterial.setSpecularStrength` expects a finite number.');
+        }
+
+        this.#specularStrength = value;
+    }
+
+    /**
+     * Sets shininess exponent.
+     *
+     * @param {number} value - Specular exponent.
+     */
+    setShininess(value) {
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+            throw new TypeError('PhongMaterial.setShininess` expects a finite number.');
+        }
+
+        this.#shininess = value;
+    }
+
+    /**
+     * Returns the internal diffuse color buffer.
+     *
+     * @returns {Float32Array}
+     */
+    get color() {
+        return this.#color;
+    }
+
+    /**
+     * Returns the internal specular color buffer.
+     *
+     * @returns {Float32Array}
+     */
+    get specularColor() {
+        return this.#specularColor;
+    }
+
+    /**
+     * Returns the internal normalized light direction buffer.
+     *
+     * @returns {Float32Array}
+     */
+    get lightDirection() {
+        return this.#lightDirection;
+    }
+
+    /**
+     * @returns {number} Ambient strength multiplier.
+     */
+    get ambientStrength() {
+        return this.#ambientStrength;
+    }
+
+    /**
+     * @returns {number} Specular strength multiplier.
+     */
+    get specularStrength() {
+        return this.#specularStrength;
+    }
+
+    /**
+     * @returns {number} Shininess exponent.
+     */
+    get shininess() {
+        return this.#shininess;
+    }
+
+    /**
+     * Validates a vector3-like input.
+     *
+     * @param {string} methodName               - Method name for error messages.
+     * @param {Float32Array | number[]} vector3 - Vector to validate.
+     * @private
+     */
+    static #assertVector3(methodName, vector3) {
+        if (!Array.isArray(vector3) &amp;&amp; !(vector3 instanceof Float32Array)) {
+            throw new TypeError(`${methodName} expects a number[] or Float32Array.`);
+        }
+
+        if (vector3.length !== VECTOR3_ELEMENT_COUNT) {
+            throw new TypeError(`${methodName} expects exactly 3 components [x, y, z].`);
+        }
+
+        if (!Number.isFinite(vector3[0]) || !Number.isFinite(vector3[1]) || !Number.isFinite(vector3[2])) {
+            throw new TypeError(`${methodName} expects all components to be finite numbers.`);
+        }
+    }
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Namespaces</h3><ul><li><a href="GeraWebGL.html">GeraWebGL</a></li></ul><h3>Classes</h3><ul><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="CameraMath.html">CameraMath</a></li><li><a href="Engine.html">Engine</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="LambertMaterial.html">LambertMaterial</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="NormalMaterial.html">NormalMaterial</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="PhongMaterial.html">PhongMaterial</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="SolidColorMaterial.html">SolidColorMaterial</a></li><li><a href="Texture2D.html">Texture2D</a></li><li><a href="TexturedMaterial.html">TexturedMaterial</a></li><li><a href="Vector3.html">Vector3</a></li><li><a href="VertexColorMaterial.html">VertexColorMaterial</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#AMBIENT_STRENGTH_UNIFORM_NAME">AMBIENT_STRENGTH_UNIFORM_NAME</a></li><li><a href="global.html#ATTRIBUTE_LOCATION_NOT_FOUND_VALUE">ATTRIBUTE_LOCATION_NOT_FOUND_VALUE</a></li><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#BASE_MIPMAP_LEVEL">BASE_MIPMAP_LEVEL</a></li><li><a href="global.html#BITWISE_ZERO">BITWISE_ZERO</a></li><li><a href="global.html#BIT_MASK_ONE">BIT_MASK_ONE</a></li><li><a href="global.html#BOX_FACE_COUNT">BOX_FACE_COUNT</a></li><li><a href="global.html#BOX_FACE_NORMALS">BOX_FACE_NORMALS</a></li><li><a href="global.html#BOX_FACE_UVS">BOX_FACE_UVS</a></li><li><a href="global.html#BOX_HALF_SIZE_DIVISOR">BOX_HALF_SIZE_DIVISOR</a></li><li><a href="global.html#BOX_TRIANGLE_INDEX_COUNT">BOX_TRIANGLE_INDEX_COUNT</a></li><li><a href="global.html#BOX_VERTEX_COUNT">BOX_VERTEX_COUNT</a></li><li><a href="global.html#CAMERA_POSITION_UNIFORM_NAME">CAMERA_POSITION_UNIFORM_NAME</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLORS_PER_FACE_LENGTH">COLORS_PER_FACE_LENGTH</a></li><li><a href="global.html#COLORS_PER_VERTEX_LENGTH">COLORS_PER_VERTEX_LENGTH</a></li><li><a href="global.html#COLORS_UNIFORM_LENGTH">COLORS_UNIFORM_LENGTH</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#COLOR_COMPONENT_INDEX_BLUE">COLOR_COMPONENT_INDEX_BLUE</a></li><li><a href="global.html#COLOR_COMPONENT_INDEX_GREEN">COLOR_COMPONENT_INDEX_GREEN</a></li><li><a href="global.html#COLOR_COMPONENT_INDEX_RED">COLOR_COMPONENT_INDEX_RED</a></li><li><a href="global.html#COLOR_UNIFORM_NAME">COLOR_UNIFORM_NAME</a></li><li><a href="global.html#DEFAULT_AMBIENT_STRENGTH">DEFAULT_AMBIENT_STRENGTH</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_COLOR">DEFAULT_COLOR</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEFAULT_FAR">DEFAULT_FAR</a></li><li><a href="global.html#DEFAULT_FIELD_OF_VIEW_RADIANS">DEFAULT_FIELD_OF_VIEW_RADIANS</a></li><li><a href="global.html#DEFAULT_INITIAL_CAMERA_Z">DEFAULT_INITIAL_CAMERA_Z</a></li><li><a href="global.html#DEFAULT_LIGHT_DIRECTION">DEFAULT_LIGHT_DIRECTION</a></li><li><a href="global.html#DEFAULT_NEAR">DEFAULT_NEAR</a></li><li><a href="global.html#DEFAULT_OWNS_GEOMETRY">DEFAULT_OWNS_GEOMETRY</a></li><li><a href="global.html#DEFAULT_OWNS_MATERIAL">DEFAULT_OWNS_MATERIAL</a></li><li><a href="global.html#DEFAULT_SHININESS">DEFAULT_SHININESS</a></li><li><a href="global.html#DEFAULT_SPECULAR_COLOR">DEFAULT_SPECULAR_COLOR</a></li><li><a href="global.html#DEFAULT_SPECULAR_STRENGTH">DEFAULT_SPECULAR_STRENGTH</a></li><li><a href="global.html#DEFAULT_TEXTURE_UNIT_INDEX">DEFAULT_TEXTURE_UNIT_INDEX</a></li><li><a href="global.html#DEFAULT_VERTEX_COLOR">DEFAULT_VERTEX_COLOR</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#DIFFUSE_TEXTURE_UNIFORM_NAME">DIFFUSE_TEXTURE_UNIFORM_NAME</a></li><li><a href="global.html#ENGINE_ANIMATION_FRAME_ID_RESET_VALUE">ENGINE_ANIMATION_FRAME_ID_RESET_VALUE</a></li><li><a href="global.html#ENGINE_TIME_SECONDS_RESET_VALUE">ENGINE_TIME_SECONDS_RESET_VALUE</a></li><li><a href="global.html#FINAL_MATRIX_UNIFORM_NAME">FINAL_MATRIX_UNIFORM_NAME</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#INDICES_SOLID">INDICES_SOLID</a></li><li><a href="global.html#INDICES_WIREFRAME">INDICES_WIREFRAME</a></li><li><a href="global.html#INITIAL_CAMERA_ASPECT_RATIO">INITIAL_CAMERA_ASPECT_RATIO</a></li><li><a href="global.html#INVERSE_DETERMINANT_NUMERATOR">INVERSE_DETERMINANT_NUMERATOR</a></li><li><a href="global.html#INVERSE_LENGTH_NUMERATOR">INVERSE_LENGTH_NUMERATOR</a></li><li><a href="global.html#LIGHT_DIRECTION_UNIFORM_NAME">LIGHT_DIRECTION_UNIFORM_NAME</a></li><li><a href="global.html#LINE_INDEX_COMPONENT_COUNT">LINE_INDEX_COMPONENT_COUNT</a></li><li><a href="global.html#MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT">MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT</a></li><li><a href="global.html#MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT">MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT</a></li><li><a href="global.html#MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT">MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MATRIX_UNIFORM_NAME">MATRIX_UNIFORM_NAME</a></li><li><a href="global.html#MAX_COLOR_COMPONENT">MAX_COLOR_COMPONENT</a></li><li><a href="global.html#MILLISECONDS_TO_SECONDS">MILLISECONDS_TO_SECONDS</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#MIN_BOX_SIZE">MIN_BOX_SIZE</a></li><li><a href="global.html#MIN_COLOR_COMPONENT">MIN_COLOR_COMPONENT</a></li><li><a href="global.html#MIN_DIRECTION_LENGTH_SQUARED">MIN_DIRECTION_LENGTH_SQUARED</a></li><li><a href="global.html#MIN_DRAWING_BUFFER_DIMENSION">MIN_DRAWING_BUFFER_DIMENSION</a></li><li><a href="global.html#MIN_EXCLUSIVE_NUMBER">MIN_EXCLUSIVE_NUMBER</a></li><li><a href="global.html#MIN_INVERTIBLE_DETERMINANT_ABS">MIN_INVERTIBLE_DETERMINANT_ABS</a></li><li><a href="global.html#MIN_POWER_OF_TWO_VALUE">MIN_POWER_OF_TWO_VALUE</a></li><li><a href="global.html#MIN_REQUIRED_STRING_LENGTH">MIN_REQUIRED_STRING_LENGTH</a></li><li><a href="global.html#MIN_TEXTURE_UNIT_INDEX">MIN_TEXTURE_UNIT_INDEX</a></li><li><a href="global.html#MODULO_ALIGNED_VALUE">MODULO_ALIGNED_VALUE</a></li><li><a href="global.html#NORMAL_ATTRIBUTE_LOCATION">NORMAL_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#NORMAL_COLOR_BIAS">NORMAL_COLOR_BIAS</a></li><li><a href="global.html#NORMAL_COLOR_SCALE">NORMAL_COLOR_SCALE</a></li><li><a href="global.html#NORMAL_COMPONENT_COUNT">NORMAL_COMPONENT_COUNT</a></li><li><a href="global.html#OUTPUT_ALPHA">OUTPUT_ALPHA</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#PLACEHOLDER_PIXEL_RGBA">PLACEHOLDER_PIXEL_RGBA</a></li><li><a href="global.html#PLACEHOLDER_TEXTURE_HEIGHT">PLACEHOLDER_TEXTURE_HEIGHT</a></li><li><a href="global.html#PLACEHOLDER_TEXTURE_WIDTH">PLACEHOLDER_TEXTURE_WIDTH</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SHININESS_UNIFORM_NAME">SHININESS_UNIFORM_NAME</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#SPECULAR_COLOR_UNIFORM_NAME">SPECULAR_COLOR_UNIFORM_NAME</a></li><li><a href="global.html#SPECULAR_STRENGTH_UNIFORM_NAME">SPECULAR_STRENGTH_UNIFORM_NAME</a></li><li><a href="global.html#TEXTURE_BORDER_VALUE">TEXTURE_BORDER_VALUE</a></li><li><a href="global.html#TRIANGLE_INDEX_COMPONENT_COUNT">TRIANGLE_INDEX_COMPONENT_COUNT</a></li><li><a href="global.html#TRIANGLE_INDEX_COUNT_PER_FACE">TRIANGLE_INDEX_COUNT_PER_FACE</a></li><li><a href="global.html#UNIT_COMPONENT">UNIT_COMPONENT</a></li><li><a href="global.html#UNIT_POSITIONS">UNIT_POSITIONS</a></li><li><a href="global.html#UV_ATTRIBUTE_LOCATION">UV_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#UV_COMPONENT_COUNT">UV_COMPONENT_COUNT</a></li><li><a href="global.html#VECTOR3_ELEMENT_COUNT">VECTOR3_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_2_ELEMENT_COUNT">VECTOR_2_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_3_ELEMENT_COUNT">VECTOR_3_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_4_ELEMENT_COUNT">VECTOR_4_ELEMENT_COUNT</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VERTICES_PER_FACE">VERTICES_PER_FACE</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li><li><a href="global.html#WEBGL_FALSE_AS_INTEGER">WEBGL_FALSE_AS_INTEGER</a></li><li><a href="global.html#WEBGL_TRUE_AS_INTEGER">WEBGL_TRUE_AS_INTEGER</a></li><li><a href="global.html#WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME">WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME</a></li><li><a href="global.html#WORLD_MATRIX_UNIFORM_NAME">WORLD_MATRIX_UNIFORM_NAME</a></li><li><a href="global.html#ZERO_COMPONENT">ZERO_COMPONENT</a></li><li><a href="global.html#createEngine">createEngine</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Fri Dec 19 2025 20:33:11 GMT+0300 (Moscow Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

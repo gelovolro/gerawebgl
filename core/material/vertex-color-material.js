@@ -25,12 +25,9 @@ const MATRIX_UNIFORM_NAME = 'u_matrix';
 /** @type {string} */
 const VERTEX_SHADER_SOURCE = `#version 300 es
 precision mediump float;
-
 layout(location = ${POSITION_ATTRIBUTE_LOCATION}) in vec3 a_position;
 layout(location = ${COLOR_ATTRIBUTE_LOCATION}) in vec3 a_color;
-
 uniform mat4 ${MATRIX_UNIFORM_NAME};
-
 out vec3 v_color;
 
 void main() {
@@ -42,9 +39,7 @@ void main() {
 /** @type {string} */
 const FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision mediump float;
-
 in vec3 v_color;
-
 out vec4 outColor;
 
 void main() {

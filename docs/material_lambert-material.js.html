@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Class: Texture2D</title>
+    <title>JSDoc: Source: material/lambert-material.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,1008 +17,346 @@
 
 <div id="main">
 
-    <h1 class="page-title">Class: Texture2D</h1>
-
-    
-
-
-
-
-<section>
-
-<header>
-    
-        <h2><span class="attribs"><span class="type-signature"></span></span>Texture2D<span class="signature">(webglContext, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h2>
-        
-            <div class="class-description">`Texture2D` is a thin wrapper around a `WebGLTexture`.
-It supports a placeholder 1x1 pixel, and can asynchronously upload an image from URL.</div>
-        
-    
-</header>
-
-<article>
-    <div class="container-overview">
-    
-        
-
-    
-    <h2>Constructor</h2>
-    
-
-    
-    <h4 class="name" id="Texture2D"><span class="type-signature"></span>new Texture2D<span class="signature">(webglContext, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
-    
-
-    
-
-
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-        <th>Attributes</th>
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>webglContext</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">WebGL2RenderingContext</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">WebGL2 rendering context used to create and manage GPU resources.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>options</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Object</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">Optional texture creation options.
-                <h6>Properties</h6>
-                
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-        <th>Attributes</th>
-        
-
-        
-        <th>Default</th>
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>flipY</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">boolean</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
-
-            
-                <td class="default">
-                
-                    true
-                
-                </td>
-            
-
-            <td class="description last">Whether to flip the image data vertically on upload.</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-            </td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line89">line 89</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    </div>
-
-    
-
-    
-
-    
-        <h3 class="subsection-title">Classes</h3>
-
-        <dl>
-            <dt><a href="Texture2D.html">Texture2D</a></dt>
-            <dd></dd>
-        </dl>
-    
-
-    
-
-    
-
-    
-
-    
-        <h3 class="subsection-title">Members</h3>
-
-        
-            
-<h4 class="name" id="height"><span class="type-signature"></span>height<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    Returns the height of the uploaded image (or placeholder height until loaded).
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line221">line 221</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="isDisposed"><span class="type-signature"></span>isDisposed<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    Indicates whether this instance has been disposed.
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line241">line 241</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="isLoaded"><span class="type-signature"></span>isLoaded<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    Indicates whether the image has been uploaded.
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line231">line 231</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="texture"><span class="type-signature"></span>texture<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    Returns the underlying `WebGLTexture` object.
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line201">line 201</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="width"><span class="type-signature"></span>width<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    Returns the width of the uploaded image (or placeholder width until loaded).
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line211">line 211</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-    
-
-    
-        <h3 class="subsection-title">Methods</h3>
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="bind"><span class="type-signature"></span>bind<span class="signature">(textureUnitIndex)</span><span class="type-signature"></span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Binds this texture to a texture unit.
-</div>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>textureUnitIndex</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">number</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">Index of the texture unit (0 => N).</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line250">line 250</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="dispose"><span class="type-signature"></span>dispose<span class="signature">()</span><span class="type-signature"></span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Releases the WebGL texture.
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line283">line 283</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="loadFromUrl"><span class="type-signature">(async) </span>loadFromUrl<span class="signature">(url)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Loads an image from the given URL and uploads it into this WebGL texture.
-</div>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>url</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">string</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">Image URL (relative or absolute).</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line268">line 268</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<h5>Returns:</h5>
-
-        
-<div class="param-desc">
-    - Promise that resolves after successful GPU upload, or rejects on `load/decode/upload` error.
-</div>
-
-
-
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">Promise.&lt;void></span>
-
-
-    </dd>
-</dl>
-
-    
-
-
-
-
-
-        
-    
-
-    
-
-    
-</article>
-
-</section>
+    <h1 class="page-title">Source: material/lambert-material.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { Material }      from './material.js';
+import { ShaderProgram } from '../shader/shader-program.js';
+
+/**
+ * Attribute location used by `vec3` position.
+ * Must match geometry's `POSITION_ATTRIBUTE_LOCATION`.
+ *
+ * @type {number}
+ */
+const POSITION_ATTRIBUTE_LOCATION = 0;
+
+/**
+ * Attribute location used by `vec3` normal.
+ * Must match geometry's `NORMAL_ATTRIBUTE_LOCATION`.
+ *
+ * @type {number}
+ */
+const NORMAL_ATTRIBUTE_LOCATION = 3;
+
+/**
+ * Name of the final transformation matrix uniform (view projection * World).
+ *
+ * @type {string}
+ */
+const FINAL_MATRIX_UNIFORM_NAME = 'u_matrix';
+
+/**
+ * Name of the world inverse transpose matrix uniform ((world ^ -1) ^ T).
+ * Used to correctly transform normals into world space.
+ *
+ * @type {string}
+ */
+const WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME = 'u_worldInverseTranspose';
+
+/**
+ * Diffuse color uniform name.
+ *
+ * @type {string}
+ */
+const COLOR_UNIFORM_NAME = 'u_color';
+
+/**
+ * Directional light direction uniform name (world space).
+ * Vector points from surface to the light (towards the light).
+ *
+ * @type {string}
+ */
+const LIGHT_DIRECTION_UNIFORM_NAME = 'u_lightDirection';
+
+/**
+ * Ambient strength uniform name.
+ *
+ * @type {string}
+ */
+const AMBIENT_STRENGTH_UNIFORM_NAME = 'u_ambientStrength';
+
+/**
+ * Vector3 length (component count).
+ *
+ * @type {number}
+ */
+const VECTOR3_ELEMENT_COUNT = 3;
+
+/**
+ * Default diffuse color (RGB).
+ *
+ * @type {Float32Array}
+ */
+const DEFAULT_COLOR = new Float32Array([0.85, 0.85, 0.85]);
+
+/**
+ * Default directional light direction in world space (points from surface to light).
+ *
+ * @type {Float32Array}
+ */
+const DEFAULT_LIGHT_DIRECTION = new Float32Array([0.5, 0.7, 1.0]);
+
+/**
+ * Default ambient term strength [0..1].
+ *
+ * @type {number}
+ */
+const DEFAULT_AMBIENT_STRENGTH = 0.2;
+
+/**
+ * Minimum allowed squared length for a direction vector.
+ * Used to reject a zero-length direction.
+ *
+ * @type {number}
+ */
+const MIN_DIRECTION_LENGTH_SQUARED = 0.0;
+
+/**
+ * Numerator used, when computing inverse vector length: `1 / sqrt(lengthSquared)`.
+ *
+ * @type {number}
+ */
+const INVERSE_LENGTH_NUMERATOR = 1.0;
+
+/**
+ * GLSL vertex shader source code.
+ *
+ * Requires:
+ * - position attribute at location 0
+ * - normal attribute at location 3
+ *
+ * @type {string}
+ */
+const VERTEX_SHADER_SOURCE = `#version 300 es
+precision mediump float;
+layout(location = ${POSITION_ATTRIBUTE_LOCATION}) in vec3 a_position;
+layout(location = ${NORMAL_ATTRIBUTE_LOCATION}) in vec3 a_normal;
+uniform mat4 ${FINAL_MATRIX_UNIFORM_NAME};
+uniform mat4 ${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME};
+out vec3 v_normal;
+
+void main() {
+    gl_Position = ${FINAL_MATRIX_UNIFORM_NAME} * vec4(a_position, 1.0);
+    v_normal = (${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME} * vec4(a_normal, 0.0)).xyz;
+}
+`;
+
+/**
+ * GLSL fragment shader source code.
+ *
+ * Implements Lambert diffuse lighting: `ambient + diffuse`
+ *
+ * @type {string}
+ */
+const FRAGMENT_SHADER_SOURCE = `#version 300 es
+precision mediump float;
+in vec3 v_normal;
+uniform vec3  ${COLOR_UNIFORM_NAME};
+uniform vec3  ${LIGHT_DIRECTION_UNIFORM_NAME};
+uniform float ${AMBIENT_STRENGTH_UNIFORM_NAME};
+out vec4 outColor;
+
+void main() {
+    vec3 surface_normal = normalize(v_normal);
+    vec3 light_direction = normalize(${LIGHT_DIRECTION_UNIFORM_NAME});
+    float diffuse = max(dot(surface_normal, light_direction), 0.0);
+    float light = clamp(${AMBIENT_STRENGTH_UNIFORM_NAME} + diffuse, 0.0, 1.0);
+    outColor = vec4(${COLOR_UNIFORM_NAME} * light, 1.0);
+}
+`;
+
+/**
+ * Options used by `LambertMaterial`.
+ *
+ * @typedef {Object} LambertMaterialOptions
+ * @property {Float32Array | number[]} [color]          - Diffuse RGB color [red, green, blue] in [0..1] range.
+ * @property {Float32Array | number[]} [lightDirection] - Directional light direction (world space), will be normalized.
+ * @property {number} [ambientStrength]                 - Ambient term multiplier.
+ */
+
+/**
+ * Simple Lambert (diffuse) material with one directional light.
+ * This material expects geometry to provide normals (attribute location 3).
+ */
+export class LambertMaterial extends Material {
+
+    /**
+     * Diffuse color (RGB).
+     *
+     * @type {Float32Array}
+     * @private
+     */
+    #color = new Float32Array(VECTOR3_ELEMENT_COUNT);
+
+    /**
+     * Directional light direction (world space, normalized).
+     *
+     * @type {Float32Array}
+     * @private
+     */
+    #lightDirection = new Float32Array(VECTOR3_ELEMENT_COUNT);
+
+    /**
+     * Ambient term multiplier.
+     *
+     * @type {number}
+     * @private
+     */
+    #ambientStrength = DEFAULT_AMBIENT_STRENGTH;
+
+    /**
+     * Creates a new `LambertMaterial`.
+     *
+     * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to compile shaders.
+     * @param {LambertMaterialOptions} [options]    - Material options.
+     */
+    constructor(webglContext, options = {}) {
+        if (options === null || typeof options !== 'object' || Array.isArray(options)) {
+            throw new TypeError('`LambertMaterial` expects an options object (plain object).');
+        }
+
+        const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
+        super(webglContext, shaderProgram, { ownsShaderProgram: true });
+
+        this.#color.set(DEFAULT_COLOR);
+        this.setLightDirection(DEFAULT_LIGHT_DIRECTION);
+        this.#ambientStrength = DEFAULT_AMBIENT_STRENGTH;
+        const { color, lightDirection, ambientStrength } = options;
+
+        if (color !== undefined) {
+            this.setColor(color);
+        }
+
+        if (lightDirection !== undefined) {
+            this.setLightDirection(lightDirection);
+        }
+
+        if (ambientStrength !== undefined) {
+            this.setAmbientStrength(ambientStrength);
+        }
+    }
+
+    /**
+     * Uploads per-object uniforms for a draw call.
+     *
+     * @param {Float32Array} finalMatrix                 - view projection * world matrix.
+     * @param {Float32Array} worldInverseTransposeMatrix - (world ^ -1) ^ T, used to transform normals.
+     */
+    apply(finalMatrix, worldInverseTransposeMatrix) {
+        this.shaderProgram.setMatrix4(FINAL_MATRIX_UNIFORM_NAME, finalMatrix);
+        this.shaderProgram.setMatrix4(WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME, worldInverseTransposeMatrix);
+        this.shaderProgram.setVector3(COLOR_UNIFORM_NAME, this.#color);
+        this.shaderProgram.setVector3(LIGHT_DIRECTION_UNIFORM_NAME, this.#lightDirection);
+        this.shaderProgram.setFloat(AMBIENT_STRENGTH_UNIFORM_NAME, this.#ambientStrength);
+    }
+
+    /**
+     * Sets the diffuse RGB color.
+     *
+     * @param {Float32Array | number[]} color - [red, green, blue] in [0..1] range.
+     */
+    setColor(color) {
+        LambertMaterial.#assertVector3('`LambertMaterial.setColor`', color);
+        this.#color[0] = color[0];
+        this.#color[1] = color[1];
+        this.#color[2] = color[2];
+    }
+
+    /**
+     * Sets the light direction (world space). The direction is normalized internally.
+     *
+     * @param {Float32Array | number[]} direction - [x, y, z] direction vector (non-zero).
+     */
+    setLightDirection(direction) {
+        LambertMaterial.#assertVector3('`LambertMaterial.setLightDirection`', direction);
+        const directionX = direction[0];
+        const directionY = direction[1];
+        const directionZ = direction[2];
+
+        const directionLengthSquared =
+            directionX * directionX +
+            directionY * directionY +
+            directionZ * directionZ;
+
+        if (!Number.isFinite(directionLengthSquared) || directionLengthSquared &lt;= MIN_DIRECTION_LENGTH_SQUARED) {
+            throw new TypeError('`LambertMaterial.setLightDirection` expects a non-zero finite vector.');
+        }
+
+        const inverseDirectionLength = INVERSE_LENGTH_NUMERATOR / Math.sqrt(directionLengthSquared);
+        this.#lightDirection[0] = directionX * inverseDirectionLength;
+        this.#lightDirection[1] = directionY * inverseDirectionLength;
+        this.#lightDirection[2] = directionZ * inverseDirectionLength;
+    }
+
+    /**
+     * Sets ambient strength multiplier.
+     *
+     * @param {number} value - Ambient multiplier.
+     */
+    setAmbientStrength(value) {
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+            throw new TypeError('`LambertMaterial.setAmbientStrength` expects a finite number.');
+        }
+
+        this.#ambientStrength = value;
+    }
+
+    /**
+     * Returns the internal diffuse color buffer.
+     *
+     * @returns {Float32Array}
+     */
+    get color() {
+        return this.#color;
+    }
+
+    /**
+     * Returns the internal normalized light direction buffer.
+     *
+     * @returns {Float32Array}
+     */
+    get lightDirection() {
+        return this.#lightDirection;
+    }
+
+    /**
+     * @returns {number} Ambient strength multiplier.
+     */
+    get ambientStrength() {
+        return this.#ambientStrength;
+    }
+
+    /**
+     * Validates a vector3-like input.
+     *
+     * @param {string} methodName               - Method name for error messages.
+     * @param {Float32Array | number[]} vector3 - Vector to validate.
+     * @private
+     */
+    static #assertVector3(methodName, vector3) {
+        if (!Array.isArray(vector3) &amp;&amp; !(vector3 instanceof Float32Array)) {
+            throw new TypeError(`${methodName} expects a number[] or Float32Array.`);
+        }
+
+        if (vector3.length !== VECTOR3_ELEMENT_COUNT) {
+            throw new TypeError(`${methodName} expects exactly 3 components [x, y, z].`);
+        }
+
+        if (!Number.isFinite(vector3[0]) || !Number.isFinite(vector3[1]) || !Number.isFinite(vector3[2])) {
+            throw new TypeError(`${methodName} expects all components to be finite numbers.`);
+        }
+    }
+}
+</code></pre>
+        </article>
+    </section>
 
 
 

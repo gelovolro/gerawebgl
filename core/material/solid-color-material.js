@@ -43,9 +43,7 @@ const DEFAULT_COLOR = new Float32Array([1.0, 1.0, 1.0]);
  */
 const VERTEX_SHADER_SOURCE = `#version 300 es
 precision mediump float;
-
 layout(location = ${POSITION_ATTRIBUTE_LOCATION}) in vec3 a_position;
-
 uniform mat4 ${MATRIX_UNIFORM_NAME};
 
 void main() {
@@ -60,9 +58,7 @@ void main() {
  */
 const FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision mediump float;
-
 uniform vec3 ${COLOR_UNIFORM_NAME};
-
 out vec4 outColor;
 
 void main() {

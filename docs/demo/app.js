@@ -248,6 +248,70 @@ const EMPTY_STRING = '';
 const NON_EMPTY_TEXT_MIN_LENGTH = 1;
 
 /**
+ * Material mode identifier for the Phong lighting material.
+ *
+ * @type {string}
+ */
+const MATERIAL_MODE_PHONG = 'PHONG';
+
+/**
+ * Default directional light direction used by Phong material.
+ * Points from above and slightly from the right.
+ *
+ * @type {Float32Array}
+ */
+const DEFAULT_LIGHT_DIRECTION = new Float32Array([0.5, 0.7, 1.0]);
+
+/**
+ * Default base color used by Phong material.
+ *
+ * @type {Float32Array}
+ */
+const DEFAULT_PHONG_COLOR = new Float32Array([0.7, 0.7, 0.7]);
+
+/**
+ * Material mode identifier for the Lambert lighting material.
+ *
+ * @type {string}
+ */
+const MATERIAL_MODE_LAMBERT = 'LAMBERT';
+
+/**
+ * Default base color used by Lambert material.
+ *
+ * @type {Float32Array}
+ */
+const DEFAULT_LAMBERT_COLOR = new Float32Array([0.7, 0.7, 0.7]);
+
+/**
+ * Default ambient strength used by Phong material.
+ *
+ * @type {number}
+ */
+const DEFAULT_PHONG_AMBIENT_STRENGTH = 0.05;
+
+/**
+ * Default specular strength used by Phong material.
+ *
+ * @type {number}
+ */
+const DEFAULT_PHONG_SPECULAR_STRENGTH = 2.0;
+
+/**
+ * Default shininess exponent used by Phong material.
+ *
+ * @type {number}
+ */
+const DEFAULT_PHONG_SHININESS = 8.0;
+
+/**
+ * Default specular color used by Phong material.
+ *
+ * @type {Float32Array}
+ */
+const DEFAULT_PHONG_SPECULAR_COLOR = new Float32Array([1.0, 1.0, 1.0]);
+
+/**
  * @typedef {Object} Object3DTransformSnapshot
  * @property {{ x: number, y: number, z: number }} position - Position components.
  * @property {{ x: number, y: number, z: number }} rotation - Rotation (radians) components.
@@ -378,6 +442,22 @@ class DemoApp {
     #vertexModePerFaceColors;
 
     /**
+     * Shared Phong lighting material.
+     *
+     * @type {GeraWebGL.Materials.PhongMaterial}
+     * @private
+     */
+    #sharedPhongMaterial;
+
+    /**
+     * Shared Lambert lighting material.
+     *
+     * @type {GeraWebGL.Materials.LambertMaterial}
+     * @private
+     */
+    #sharedLambertMaterial;
+
+    /**
      * @param {HTMLCanvasElement} canvas             - Canvas used for rendering.
      * @param {HTMLButtonElement} wireframeButton    - Button, that toggles wireframe mode.
      * @param {HTMLSelectElement} materialModeSelect - Select, that switches material mode.
@@ -393,6 +473,20 @@ class DemoApp {
         this.#sharedVertexColorMaterial = new GeraWebGL.Materials.VertexColorMaterial(webglContext);
         this.#sharedSolidColorMaterial  = new GeraWebGL.Materials.SolidColorMaterial(webglContext, { color: DEFAULT_SOLID_COLOR });
         this.#sharedNormalMaterial      = new GeraWebGL.Materials.NormalMaterial(webglContext);
+
+        this.#sharedPhongMaterial = new GeraWebGL.Materials.PhongMaterial(webglContext, {
+            color          : DEFAULT_PHONG_COLOR,
+            lightDirection : DEFAULT_LIGHT_DIRECTION
+        });
+
+        this.#sharedLambertMaterial = new GeraWebGL.Materials.LambertMaterial(webglContext, {
+            color            : DEFAULT_LAMBERT_COLOR,
+            lightDirection   : DEFAULT_LIGHT_DIRECTION,
+            ambientStrength  : DEFAULT_PHONG_AMBIENT_STRENGTH,
+            specularStrength : DEFAULT_PHONG_SPECULAR_STRENGTH,
+            shininess        : DEFAULT_PHONG_SHININESS,
+            specularColor    : DEFAULT_PHONG_SPECULAR_COLOR
+        });
 
         this.#applyWireframeStateToSharedMaterials();
         this.#vertexModePerFaceColors = DemoApp.#createAlternatingPerFaceColors(
@@ -485,7 +579,7 @@ class DemoApp {
     /**
      * Switches the current material mode.
      *
-     * @param {string} mode     - One of: `VERTEX_COLOR | TEXTURED | SOLID_COLOR | NORMAL`.
+     * @param {string} mode     - One of: `VERTEX_COLOR | TEXTURED | SOLID_COLOR | NORMAL | PHONG | LAMBERT`.
      * @returns {Promise<void>} - Resolves, when the mode is applied and the cube mesh is replaced.
      * @private
      */
@@ -493,7 +587,9 @@ class DemoApp {
         if (mode !== MATERIAL_MODE_VERTEX_COLOR
             && mode !== MATERIAL_MODE_TEXTURED
             && mode !== MATERIAL_MODE_SOLID_COLOR
-            && mode !== MATERIAL_MODE_NORMAL) {
+            && mode !== MATERIAL_MODE_NORMAL
+            && mode !== MATERIAL_MODE_PHONG
+            && mode !== MATERIAL_MODE_LAMBERT) {
             throw new Error(`DemoApp: unknown material mode ${mode}.`);
         }
 
@@ -618,6 +714,14 @@ class DemoApp {
                 material = this.#sharedNormalMaterial;
                 break;
 
+            case MATERIAL_MODE_PHONG:
+                material = this.#sharedPhongMaterial;
+                break;
+
+            case MATERIAL_MODE_LAMBERT:
+                material = this.#sharedLambertMaterial;
+                break;
+
             default:
                 throw new Error(`DemoApp: unknown material mode ${this.#materialMode}.`);
         }
@@ -676,6 +780,8 @@ class DemoApp {
         this.#sharedVertexColorMaterial.setWireframeEnabled(this.#isWireframeEnabled);
         this.#sharedSolidColorMaterial.setWireframeEnabled(this.#isWireframeEnabled);
         this.#sharedNormalMaterial.setWireframeEnabled(this.#isWireframeEnabled);
+        this.#sharedPhongMaterial.setWireframeEnabled(this.#isWireframeEnabled);
+        this.#sharedLambertMaterial.setWireframeEnabled(this.#isWireframeEnabled);
 
         if (this.#sharedTexturedMaterial) {
             this.#sharedTexturedMaterial.setWireframeEnabled(this.#isWireframeEnabled);
