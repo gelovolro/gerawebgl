@@ -219,9 +219,12 @@ export class LambertMaterial extends Material {
      * Uploads per-object uniforms for a draw call.
      *
      * @param {Float32Array} finalMatrix                 - view projection * world matrix.
+     * @param {Float32Array} worldMatrix                 - world matrix (stub).
      * @param {Float32Array} worldInverseTransposeMatrix - (world ^ -1) ^ T, used to transform normals.
      */
-    apply(finalMatrix, worldInverseTransposeMatrix) {
+    apply(finalMatrix, worldMatrix, worldInverseTransposeMatrix) {
+        void worldMatrix; // stub
+
         this.shaderProgram.setMatrix4(FINAL_MATRIX_UNIFORM_NAME, finalMatrix);
         this.shaderProgram.setMatrix4(WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME, worldInverseTransposeMatrix);
         this.shaderProgram.setVector3(COLOR_UNIFORM_NAME, this.#color);
