@@ -10,6 +10,7 @@ import {
     LIGHT_DIRECTION_UNIFORM_NAME,
     CAMERA_POSITION_UNIFORM_NAME,
     AMBIENT_STRENGTH_UNIFORM_NAME,
+    OPACITY_UNIFORM_NAME,
     VECTOR3_ELEMENT_COUNT
 } from './directional-light-material.js';
 
@@ -99,6 +100,7 @@ uniform vec3  ${CAMERA_POSITION_UNIFORM_NAME};
 uniform float ${AMBIENT_STRENGTH_UNIFORM_NAME};
 uniform float ${SPECULAR_STRENGTH_UNIFORM_NAME};
 uniform float ${SHININESS_UNIFORM_NAME};
+uniform float ${OPACITY_UNIFORM_NAME};
 out vec4 outColor;
 
 void main() {
@@ -118,7 +120,7 @@ void main() {
     vec3 diffuse  = ${COLOR_UNIFORM_NAME} * diffuse_intensity;
     vec3 specular = ${SPECULAR_COLOR_UNIFORM_NAME} * (specular_intensity * ${SPECULAR_STRENGTH_UNIFORM_NAME});
     vec3 rgb = ambient + diffuse + specular;
-    outColor = vec4(rgb, 1.0);
+    outColor = vec4(rgb, ${OPACITY_UNIFORM_NAME});
 }
 `;
 

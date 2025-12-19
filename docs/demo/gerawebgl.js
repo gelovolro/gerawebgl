@@ -2270,6 +2270,9 @@ var ShaderProgram = class {
 };
 
 // core/material/material.js
+var MIN_OPACITY = 0;
+var MAX_OPACITY = 1;
+var DEFAULT_OPACITY = 1;
 var Material = class {
   /**
    * WebGL2 rendering context used to create and manage GPU resources.
@@ -2285,6 +2288,13 @@ var Material = class {
    * @private
    */
   #shaderProgram;
+  /**
+   * Opacity multiplier (alpha) in [0..1].
+   *
+   * @type {number}
+   * @private
+   */
+  #opacity = DEFAULT_OPACITY;
   /**
    * When enabled, the renderer should draw geometry using wireframe indices (lines) instead of solid triangles.
    *
@@ -2342,6 +2352,37 @@ var Material = class {
   get shaderProgram() {
     this.#assertNotDisposed();
     return this.#shaderProgram;
+  }
+  /**
+   * Returns the current opacity multiplier.
+   *
+   * @returns {number}
+   */
+  get opacity() {
+    this.#assertNotDisposed();
+    return this.#opacity;
+  }
+  /**
+   * Sets opacity multiplier (alpha).
+   *
+   * @param {number} value - Opacity multiplier in [0..1].
+   */
+  setOpacity(value) {
+    this.#assertNotDisposed();
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new TypeError("`Material.setOpacity` expects a finite number.");
+    }
+    if (value < MIN_OPACITY || value > MAX_OPACITY) {
+      throw new RangeError(`Material.setOpacity expects a value in [${MIN_OPACITY}..${MAX_OPACITY}].`);
+    }
+    this.#opacity = value;
+  }
+  /**
+   * @returns {boolean} True, when opacity is lower than `1.0`.
+   */
+  isTransparent() {
+    this.#assertNotDisposed();
+    return this.#opacity < MAX_OPACITY;
   }
   /**
    * Indicates whether this material has been disposed.
@@ -2408,6 +2449,7 @@ var Material = class {
 var POSITION_ATTRIBUTE_LOCATION2 = 0;
 var COLOR_ATTRIBUTE_LOCATION2 = 1;
 var MATRIX_UNIFORM_NAME = "u_matrix";
+var OPACITY_UNIFORM_NAME = "u_opacity";
 var VERTEX_SHADER_SOURCE = `#version 300 es
 precision mediump float;
 layout(location = ${POSITION_ATTRIBUTE_LOCATION2}) in vec3 a_position;
@@ -2423,10 +2465,11 @@ void main() {
 var FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision mediump float;
 in vec3 v_color;
+uniform float ${OPACITY_UNIFORM_NAME};
 out vec4 outColor;
 
 void main() {
-    outColor = vec4(v_color, 1.0);
+    outColor = vec4(v_color, ${OPACITY_UNIFORM_NAME});
 }
 `;
 var VertexColorMaterial = class extends Material {
@@ -2444,6 +2487,7 @@ var VertexColorMaterial = class extends Material {
    */
   apply(matrix4) {
     this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME, matrix4);
+    this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME, this.opacity);
   }
 };
 
@@ -2451,6 +2495,7 @@ var VertexColorMaterial = class extends Material {
 var POSITION_ATTRIBUTE_LOCATION3 = 0;
 var MATRIX_UNIFORM_NAME2 = "u_matrix";
 var COLOR_UNIFORM_NAME = "u_color";
+var OPACITY_UNIFORM_NAME2 = "u_opacity";
 var COLOR_COMPONENT_COUNT3 = 3;
 var DEFAULT_COLOR = new Float32Array([1, 1, 1]);
 var VERTEX_SHADER_SOURCE2 = `#version 300 es
@@ -2464,11 +2509,12 @@ void main() {
 `;
 var FRAGMENT_SHADER_SOURCE2 = `#version 300 es
 precision mediump float;
-uniform vec3 ${COLOR_UNIFORM_NAME};
+uniform vec3  ${COLOR_UNIFORM_NAME};
+uniform float ${OPACITY_UNIFORM_NAME2};
 out vec4 outColor;
 
 void main() {
-    outColor = vec4(${COLOR_UNIFORM_NAME}, 1.0);
+    outColor = vec4(${COLOR_UNIFORM_NAME}, ${OPACITY_UNIFORM_NAME2});
 }
 `;
 var SolidColorMaterial = class extends Material {
@@ -2502,6 +2548,7 @@ var SolidColorMaterial = class extends Material {
   apply(matrix4) {
     this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME2, matrix4);
     this.shaderProgram.setVector3(COLOR_UNIFORM_NAME, this.#color);
+    this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME2, this.opacity);
   }
   /**
    * Sets the RGB color.
@@ -2537,6 +2584,7 @@ var DEFAULT_TEXTURE_UNIT_INDEX2 = 0;
 var MIN_TEXTURE_UNIT_INDEX3 = 0;
 var MATRIX_UNIFORM_NAME3 = "u_matrix";
 var DIFFUSE_TEXTURE_UNIFORM_NAME = "u_diffuseTexture";
+var OPACITY_UNIFORM_NAME3 = "u_opacity";
 var VERTEX_SHADER_SOURCE3 = `#version 300 es
 precision mediump float;
 layout(location = ${POSITION_ATTRIBUTE_LOCATION4}) in vec3 a_position;
@@ -2553,10 +2601,12 @@ var FRAGMENT_SHADER_SOURCE3 = `#version 300 es
 precision mediump float;
 in vec2 v_uv;
 uniform sampler2D ${DIFFUSE_TEXTURE_UNIFORM_NAME};
+uniform float ${OPACITY_UNIFORM_NAME3};
 out vec4 outColor;
 
 void main() {
-    outColor = texture(${DIFFUSE_TEXTURE_UNIFORM_NAME}, v_uv);
+    vec4 sampledColor = texture(${DIFFUSE_TEXTURE_UNIFORM_NAME}, v_uv);
+    outColor = vec4(sampledColor.rgb, sampledColor.a * ${OPACITY_UNIFORM_NAME3});
 }
 `;
 var TexturedMaterial = class extends Material {
@@ -2623,6 +2673,7 @@ var TexturedMaterial = class extends Material {
     this.use();
     this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME3, matrix4);
     this.shaderProgram.setTexture2D(DIFFUSE_TEXTURE_UNIFORM_NAME, this.#diffuseTexture, this.#textureUnitIndex);
+    this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME3, this.opacity);
   }
   /**
    * Returns the current diffuse texture.
@@ -2675,9 +2726,9 @@ var TexturedMaterial = class extends Material {
 var POSITION_ATTRIBUTE_LOCATION5 = 0;
 var NORMAL_ATTRIBUTE_LOCATION2 = 3;
 var MATRIX_UNIFORM_NAME4 = "u_matrix";
+var OPACITY_UNIFORM_NAME4 = "u_opacity";
 var NORMAL_COLOR_SCALE = 0.5;
 var NORMAL_COLOR_BIAS = 0.5;
-var OUTPUT_ALPHA = 1;
 var VERTEX_SHADER_SOURCE4 = `#version 300 es
 precision mediump float;
 layout(location = ${POSITION_ATTRIBUTE_LOCATION5}) in vec3 a_position;
@@ -2693,12 +2744,13 @@ void main() {
 var FRAGMENT_SHADER_SOURCE4 = `#version 300 es
 precision mediump float;
 in vec3 v_normal;
+uniform float ${OPACITY_UNIFORM_NAME4};
 out vec4 outColor;
 
 void main() {
     vec3 normalizedNormal = normalize(v_normal);
     vec3 normalColor = (normalizedNormal * ${NORMAL_COLOR_SCALE}) + ${NORMAL_COLOR_BIAS};
-    outColor = vec4(normalColor, ${OUTPUT_ALPHA});
+    outColor = vec4(normalColor, ${OPACITY_UNIFORM_NAME4});
 }
 `;
 var NormalMaterial = class extends Material {
@@ -2716,6 +2768,7 @@ var NormalMaterial = class extends Material {
    */
   apply(matrix4) {
     this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME4, matrix4);
+    this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME4, this.opacity);
   }
 };
 
@@ -2729,6 +2782,7 @@ var COLOR_UNIFORM_NAME2 = "u_color";
 var LIGHT_DIRECTION_UNIFORM_NAME = "u_lightDirection";
 var CAMERA_POSITION_UNIFORM_NAME = "u_cameraPosition";
 var AMBIENT_STRENGTH_UNIFORM_NAME = "u_ambientStrength";
+var OPACITY_UNIFORM_NAME5 = "u_opacity";
 var VECTOR3_ELEMENT_COUNT = 3;
 var DEFAULT_COLOR2 = new Float32Array([0.85, 0.85, 0.85]);
 var DEFAULT_LIGHT_DIRECTION = new Float32Array([0.5, 0.7, 1]);
@@ -2813,6 +2867,7 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
     this.shaderProgram.setVector3(COLOR_UNIFORM_NAME2, this.#color);
     this.shaderProgram.setVector3(LIGHT_DIRECTION_UNIFORM_NAME, this.#lightDirection);
     this.shaderProgram.setFloat(AMBIENT_STRENGTH_UNIFORM_NAME, this.#ambientStrength);
+    this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME5, this.opacity);
     this.applyAdditionalUniforms(worldMatrix, cameraPosition);
   }
   /**
@@ -2941,6 +2996,7 @@ in vec3 v_normal;
 uniform vec3  ${COLOR_UNIFORM_NAME2};
 uniform vec3  ${LIGHT_DIRECTION_UNIFORM_NAME};
 uniform float ${AMBIENT_STRENGTH_UNIFORM_NAME};
+uniform float ${OPACITY_UNIFORM_NAME5};
 out vec4 outColor;
 
 void main() {
@@ -2948,7 +3004,7 @@ void main() {
     vec3 light_direction    = normalize(${LIGHT_DIRECTION_UNIFORM_NAME});
     float diffuse_intensity = max(dot(surface_normal, light_direction), 0.0);
     float light_intensity   = clamp(${AMBIENT_STRENGTH_UNIFORM_NAME} + diffuse_intensity, 0.0, 1.0);
-    outColor                = vec4(${COLOR_UNIFORM_NAME2} * light_intensity, 1.0);
+    outColor                = vec4(${COLOR_UNIFORM_NAME2} * light_intensity, ${OPACITY_UNIFORM_NAME5});
 }
 `;
 var LambertMaterial = class extends DirectionalLightMaterial {
@@ -3001,6 +3057,7 @@ uniform vec3  ${CAMERA_POSITION_UNIFORM_NAME};
 uniform float ${AMBIENT_STRENGTH_UNIFORM_NAME};
 uniform float ${SPECULAR_STRENGTH_UNIFORM_NAME};
 uniform float ${SHININESS_UNIFORM_NAME};
+uniform float ${OPACITY_UNIFORM_NAME5};
 out vec4 outColor;
 
 void main() {
@@ -3020,7 +3077,7 @@ void main() {
     vec3 diffuse  = ${COLOR_UNIFORM_NAME2} * diffuse_intensity;
     vec3 specular = ${SPECULAR_COLOR_UNIFORM_NAME} * (specular_intensity * ${SPECULAR_STRENGTH_UNIFORM_NAME});
     vec3 rgb = ambient + diffuse + specular;
-    outColor = vec4(rgb, 1.0);
+    outColor = vec4(rgb, ${OPACITY_UNIFORM_NAME5});
 }
 `;
 var PhongMaterial = class extends DirectionalLightMaterial {
@@ -3604,6 +3661,7 @@ var PerspectiveCamera = class extends Object3D {
 var INDEX_BUFFER_OFFSET_BYTES = 0;
 var MATRIX_4x4_ELEMENT_COUNT6 = 16;
 var VECTOR3_ELEMENT_COUNT2 = 3;
+var OPAQUE_OPACITY = 1;
 var MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT = 2;
 var MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT = 3;
 var MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT = 4;
@@ -3759,6 +3817,16 @@ var Renderer = class {
       worldMatrix
     );
     material.use();
+    const materialOpacity = material.opacity;
+    const isTransparent = materialOpacity < OPAQUE_OPACITY;
+    if (isTransparent) {
+      renderingContext.enable(renderingContext.BLEND);
+      renderingContext.blendFunc(renderingContext.SRC_ALPHA, renderingContext.ONE_MINUS_SRC_ALPHA);
+      renderingContext.depthMask(false);
+    } else {
+      renderingContext.disable(renderingContext.BLEND);
+      renderingContext.depthMask(true);
+    }
     const applyParameterCount = material.apply.length;
     const wantsWorldMatrix = applyParameterCount >= MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT;
     const wantsNormalMatrix = applyParameterCount >= MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT;

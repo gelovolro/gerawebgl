@@ -30,6 +30,13 @@ const MATRIX_4x4_ELEMENT_COUNT = 16;
 const VECTOR3_ELEMENT_COUNT = 3;
 
 /**
+ * Opacity value that is considered fully opaque.
+ *
+ * @type {number}
+ */
+const OPAQUE_OPACITY = 1.0;
+
+/**
  * `Material.apply()` parameter count, when it expects: finalMatrix, worldMatrix.
  *
  * @type {number}
@@ -240,6 +247,18 @@ export class Renderer {
         );
 
         material.use();
+        const materialOpacity = material.opacity;
+        const isTransparent   = materialOpacity < OPAQUE_OPACITY;
+
+        if (isTransparent) {
+            renderingContext.enable(renderingContext.BLEND);
+            renderingContext.blendFunc(renderingContext.SRC_ALPHA, renderingContext.ONE_MINUS_SRC_ALPHA);
+            renderingContext.depthMask(false);
+        } else {
+            renderingContext.disable(renderingContext.BLEND);
+            renderingContext.depthMask(true);
+        }
+
         const applyParameterCount = material.apply.length;
         const wantsWorldMatrix    = applyParameterCount >= MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT;
         const wantsNormalMatrix   = applyParameterCount >= MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT;

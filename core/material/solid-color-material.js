@@ -23,6 +23,13 @@ const MATRIX_UNIFORM_NAME = 'u_matrix';
 const COLOR_UNIFORM_NAME = 'u_color';
 
 /**
+ * Opacity uniform name.
+ *
+ * @type {string}
+ */
+const OPACITY_UNIFORM_NAME = 'u_opacity';
+
+/**
  * Number of components in a RGB color.
  *
  * @type {number}
@@ -58,11 +65,12 @@ void main() {
  */
 const FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision mediump float;
-uniform vec3 ${COLOR_UNIFORM_NAME};
+uniform vec3  ${COLOR_UNIFORM_NAME};
+uniform float ${OPACITY_UNIFORM_NAME};
 out vec4 outColor;
 
 void main() {
-    outColor = vec4(${COLOR_UNIFORM_NAME}, 1.0);
+    outColor = vec4(${COLOR_UNIFORM_NAME}, ${OPACITY_UNIFORM_NAME});
 }
 `;
 
@@ -111,6 +119,7 @@ export class SolidColorMaterial extends Material {
     apply(matrix4) {
         this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME, matrix4);
         this.shaderProgram.setVector3(COLOR_UNIFORM_NAME, this.#color);
+        this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME, this.opacity);
     }
 
     /**

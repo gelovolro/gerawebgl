@@ -22,6 +22,13 @@ const COLOR_ATTRIBUTE_LOCATION = 1;
  */
 const MATRIX_UNIFORM_NAME = 'u_matrix';
 
+/**
+ * Opacity uniform name.
+ *
+ * @type {string}
+ */
+const OPACITY_UNIFORM_NAME = 'u_opacity';
+
 /** @type {string} */
 const VERTEX_SHADER_SOURCE = `#version 300 es
 precision mediump float;
@@ -40,10 +47,11 @@ void main() {
 const FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision mediump float;
 in vec3 v_color;
+uniform float ${OPACITY_UNIFORM_NAME};
 out vec4 outColor;
 
 void main() {
-    outColor = vec4(v_color, 1.0);
+    outColor = vec4(v_color, ${OPACITY_UNIFORM_NAME});
 }
 `;
 
@@ -66,5 +74,6 @@ export class VertexColorMaterial extends Material {
      */
     apply(matrix4) {
         this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME, matrix4);
+        this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME, this.opacity);
     }
 }

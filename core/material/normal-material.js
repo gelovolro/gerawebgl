@@ -23,6 +23,13 @@ const NORMAL_ATTRIBUTE_LOCATION = 3;
 const MATRIX_UNIFORM_NAME = 'u_matrix';
 
 /**
+ * Opacity uniform name.
+ *
+ * @type {string}
+ */
+const OPACITY_UNIFORM_NAME = 'u_opacity';
+
+/**
  * Scale factor used to remap normal vector from [-1..1] into [0..1] range.
  *
  * @type {number}
@@ -35,13 +42,6 @@ const NORMAL_COLOR_SCALE = 0.5;
  * @type {number}
  */
 const NORMAL_COLOR_BIAS = 0.5;
-
-/**
- * Alpha component for output color.
- *
- * @type {number}
- */
-const OUTPUT_ALPHA = 1.0;
 
 /**
  * GLSL vertex shader source code.
@@ -69,12 +69,13 @@ void main() {
 const FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision mediump float;
 in vec3 v_normal;
+uniform float ${OPACITY_UNIFORM_NAME};
 out vec4 outColor;
 
 void main() {
     vec3 normalizedNormal = normalize(v_normal);
     vec3 normalColor = (normalizedNormal * ${NORMAL_COLOR_SCALE}) + ${NORMAL_COLOR_BIAS};
-    outColor = vec4(normalColor, ${OUTPUT_ALPHA});
+    outColor = vec4(normalColor, ${OPACITY_UNIFORM_NAME});
 }
 `;
 
@@ -98,5 +99,6 @@ export class NormalMaterial extends Material {
      */
     apply(matrix4) {
         this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME, matrix4);
+        this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME, this.opacity);
     }
 }

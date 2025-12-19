@@ -29,6 +29,41 @@ const MATERIAL_MODE_SELECT_ID = 'materialModeSelect';
 const RECREATE_MESH_BUTTON_ID = 'recreateMeshButton';
 
 /**
+ * Range slider element id, that controls material opacity.
+ *
+ * @type {string}
+ */
+const OPACITY_SLIDER_ID = 'opacitySlider';
+
+/**
+ * Element id used to display the current opacity slider value.
+ *
+ * @type {string}
+ */
+const OPACITY_VALUE_ELEMENT_ID = 'opacityValue';
+
+/**
+ * Default material opacity.
+ *
+ * @type {number}
+ */
+const DEFAULT_MATERIAL_OPACITY = 1.0;
+
+/**
+ * Minimum material opacity supported by the demo slider.
+ *
+ * @type {number}
+ */
+const MIN_MATERIAL_OPACITY = 0.1;
+
+/**
+ * Maximum material opacity.
+ *
+ * @type {number}
+ */
+const MAX_MATERIAL_OPACITY = 1.0;
+
+/**
  * Material mode identifier for the normal visualization material.
  *
  * @type {string}
@@ -312,6 +347,13 @@ const DEFAULT_PHONG_SHININESS = 8.0;
 const DEFAULT_PHONG_SPECULAR_COLOR = new Float32Array([1.0, 1.0, 1.0]);
 
 /**
+ * Number of fractional digits used when formatting opacity value in the UI.
+ *
+ * @type {number}
+ */
+const OPACITY_LABEL_FRACTION_DIGITS = 2;
+
+/**
  * @typedef {Object} Object3DTransformSnapshot
  * @property {{ x: number, y: number, z: number }} position - Position components.
  * @property {{ x: number, y: number, z: number }} rotation - Rotation (radians) components.
@@ -367,6 +409,30 @@ class DemoApp {
      * @private
      */
     #recreateMeshButton;
+
+    /**
+     * Range slider that controls material opacity.
+     *
+     * @type {HTMLInputElement}
+     * @private
+     */
+    #opacitySlider;
+
+    /**
+     * Element used to display current opacity value.
+     *
+     * @type {HTMLElement}
+     * @private
+     */
+    #opacityValueElement;
+
+    /**
+     * Current material opacity value [0..1].
+     *
+     * @type {number}
+     * @private
+     */
+    #materialOpacity = DEFAULT_MATERIAL_OPACITY;
 
     /**
      * How many times the mesh has been recreated via the explicit `recreate` button.
@@ -462,11 +528,15 @@ class DemoApp {
      * @param {HTMLButtonElement} wireframeButton    - Button, that toggles wireframe mode.
      * @param {HTMLSelectElement} materialModeSelect - Select, that switches material mode.
      * @param {HTMLButtonElement} recreateButton     - Button, that recreates the cube.
+     * @param {HTMLInputElement} opacitySlider       - Range slider, that controls material opacity.
+     * @param {HTMLElement} opacityValueElement      - Element, that displays the current opacity value.
      */
-    constructor(canvas, wireframeButton, materialModeSelect, recreateButton) {
+    constructor(canvas, wireframeButton, materialModeSelect, recreateButton, opacitySlider, opacityValueElement) {
         this.#wireframeToggleButton = wireframeButton;
         this.#materialModeSelect    = materialModeSelect;
         this.#recreateMeshButton    = recreateButton;
+        this.#opacitySlider         = opacitySlider;
+        this.#opacityValueElement   = opacityValueElement;
         this.#engine                = GeraWebGL.createEngine(canvas);
 
         const webglContext              = this.#engine.webglRenderingContext;
@@ -539,6 +609,10 @@ class DemoApp {
         this.#recreateMeshButton.addEventListener('click', async () => {
             await this.#recreateMesh();
         });
+
+        this.#opacitySlider.addEventListener('input', () => {
+            this.#onOpacitySliderChanged();
+        });
     }
 
     /**
@@ -546,6 +620,7 @@ class DemoApp {
      *
      * @private
      */
+
     #toggleWireframe() {
         this.#isWireframeEnabled = !this.#isWireframeEnabled;
         this.#applyWireframeStateToSharedMaterials();
@@ -769,6 +844,7 @@ class DemoApp {
         );
 
         this.#sharedTexturedMaterial.setWireframeEnabled(this.#isWireframeEnabled);
+        this.#sharedTexturedMaterial.setOpacity(this.#materialOpacity);
     }
 
     /**
@@ -797,6 +873,60 @@ class DemoApp {
         this.#wireframeToggleButton.textContent = this.#isWireframeEnabled
             ? WIREFRAME_ON_LABEL
             : WIREFRAME_OFF_LABEL;
+    }
+
+    /**
+     * Applies current opacity to all shared materials (and optionally the shared textured material).
+     *
+     * @private
+     */
+    #applyOpacityToSharedMaterials() {
+        this.#sharedVertexColorMaterial.setOpacity(this.#materialOpacity);
+        this.#sharedSolidColorMaterial.setOpacity(this.#materialOpacity);
+        this.#sharedNormalMaterial.setOpacity(this.#materialOpacity);
+        this.#sharedPhongMaterial.setOpacity(this.#materialOpacity);
+        this.#sharedLambertMaterial.setOpacity(this.#materialOpacity);
+
+        if (this.#sharedTexturedMaterial) {
+            this.#sharedTexturedMaterial.setOpacity(this.#materialOpacity);
+        }
+    }
+
+    /**
+     * Handles opacity slider changes.
+     *
+     * @private
+     */
+    #onOpacitySliderChanged() {
+        this.#materialOpacity = DemoApp.#parseOpacityValue(this.#opacitySlider.value);
+        this.#applyOpacityToSharedMaterials();
+        this.#updateOpacityLabel();
+    }
+
+    /**
+     * Updates opacity value label.
+     *
+     * @private
+     */
+    #updateOpacityLabel() {
+        this.#opacityValueElement.textContent = this.#materialOpacity.toFixed(OPACITY_LABEL_FRACTION_DIGITS);
+    }
+
+    /**
+     * Parses and clamps an opacity slider value.
+     *
+     * @param {string} value - Raw input value.
+     * @returns {number}     - Clamped opacity.
+     * @private
+     */
+    static #parseOpacityValue(value) {
+        const parsed = Number.parseFloat(value);
+
+        if (!Number.isFinite(parsed)) {
+            return DEFAULT_MATERIAL_OPACITY;
+        }
+
+        return Math.max(MIN_MATERIAL_OPACITY, Math.min(MAX_MATERIAL_OPACITY, parsed));
     }
 
     /**
@@ -888,6 +1018,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const wireframeButton = document.getElementById(WIREFRAME_TOGGLE_BUTTON_ID);
     const materialSelect  = document.getElementById(MATERIAL_MODE_SELECT_ID);
     const recreateButton  = document.getElementById(RECREATE_MESH_BUTTON_ID);
+    const opacitySlider   = document.getElementById(OPACITY_SLIDER_ID);
+    const opacityValue    = document.getElementById(OPACITY_VALUE_ELEMENT_ID);
 
     if (!(canvas instanceof HTMLCanvasElement)) {
         throw new Error(`Canvas element with id ${CANVAS_ELEMENT_ID} - not found.`);
@@ -905,6 +1037,14 @@ window.addEventListener('DOMContentLoaded', () => {
         throw new Error(`Button with id ${RECREATE_MESH_BUTTON_ID} - not found.`);
     }
 
-    const app = new DemoApp(canvas, wireframeButton, materialSelect, recreateButton);
+    if (!(opacitySlider instanceof HTMLInputElement)) {
+        throw new Error(`Range slider with id ${OPACITY_SLIDER_ID} - not found.`);
+    }
+
+    if (!(opacityValue instanceof HTMLElement)) {
+        throw new Error(`Opacity value element with id ${OPACITY_VALUE_ELEMENT_ID} - not found.`);
+    }
+
+    const app = new DemoApp(canvas, wireframeButton, materialSelect, recreateButton, opacitySlider, opacityValue);
     app.start();
 });

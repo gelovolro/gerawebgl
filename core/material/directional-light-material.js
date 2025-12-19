@@ -70,6 +70,13 @@ export const CAMERA_POSITION_UNIFORM_NAME = 'u_cameraPosition';
 export const AMBIENT_STRENGTH_UNIFORM_NAME = 'u_ambientStrength';
 
 /**
+ * Opacity uniform name.
+ *
+ * @type {string}
+ */
+export const OPACITY_UNIFORM_NAME = 'u_opacity';
+
+/**
  * Vector3 length (component count).
  *
  * @type {number}
@@ -232,6 +239,7 @@ export class DirectionalLightMaterial extends Material {
         this.shaderProgram.setVector3(COLOR_UNIFORM_NAME, this.#color);
         this.shaderProgram.setVector3(LIGHT_DIRECTION_UNIFORM_NAME, this.#lightDirection);
         this.shaderProgram.setFloat(AMBIENT_STRENGTH_UNIFORM_NAME, this.#ambientStrength);
+        this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME, this.opacity);
         this.applyAdditionalUniforms(worldMatrix, cameraPosition);
     }
 

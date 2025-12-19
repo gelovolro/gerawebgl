@@ -7,7 +7,8 @@ import {
     WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME,
     COLOR_UNIFORM_NAME,
     LIGHT_DIRECTION_UNIFORM_NAME,
-    AMBIENT_STRENGTH_UNIFORM_NAME
+    AMBIENT_STRENGTH_UNIFORM_NAME,
+    OPACITY_UNIFORM_NAME
 } from './directional-light-material.js';
 
 /**
@@ -46,6 +47,7 @@ in vec3 v_normal;
 uniform vec3  ${COLOR_UNIFORM_NAME};
 uniform vec3  ${LIGHT_DIRECTION_UNIFORM_NAME};
 uniform float ${AMBIENT_STRENGTH_UNIFORM_NAME};
+uniform float ${OPACITY_UNIFORM_NAME};
 out vec4 outColor;
 
 void main() {
@@ -53,7 +55,7 @@ void main() {
     vec3 light_direction    = normalize(${LIGHT_DIRECTION_UNIFORM_NAME});
     float diffuse_intensity = max(dot(surface_normal, light_direction), 0.0);
     float light_intensity   = clamp(${AMBIENT_STRENGTH_UNIFORM_NAME} + diffuse_intensity, 0.0, 1.0);
-    outColor                = vec4(${COLOR_UNIFORM_NAME} * light_intensity, 1.0);
+    outColor                = vec4(${COLOR_UNIFORM_NAME} * light_intensity, ${OPACITY_UNIFORM_NAME});
 }
 `;
 

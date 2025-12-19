@@ -46,6 +46,13 @@ const MATRIX_UNIFORM_NAME = 'u_matrix';
 const DIFFUSE_TEXTURE_UNIFORM_NAME = 'u_diffuseTexture';
 
 /**
+ * Opacity uniform name.
+ *
+ * @type {string}
+ */
+const OPACITY_UNIFORM_NAME = 'u_opacity';
+
+/**
  * GLSL vertex shader source code.
  *
  * @type {string}
@@ -72,10 +79,12 @@ const FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision mediump float;
 in vec2 v_uv;
 uniform sampler2D ${DIFFUSE_TEXTURE_UNIFORM_NAME};
+uniform float ${OPACITY_UNIFORM_NAME};
 out vec4 outColor;
 
 void main() {
-    outColor = texture(${DIFFUSE_TEXTURE_UNIFORM_NAME}, v_uv);
+    vec4 sampledColor = texture(${DIFFUSE_TEXTURE_UNIFORM_NAME}, v_uv);
+    outColor = vec4(sampledColor.rgb, sampledColor.a * ${OPACITY_UNIFORM_NAME});
 }
 `;
 
@@ -168,6 +177,7 @@ export class TexturedMaterial extends Material {
         this.use();
         this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME, matrix4);
         this.shaderProgram.setTexture2D(DIFFUSE_TEXTURE_UNIFORM_NAME, this.#diffuseTexture, this.#textureUnitIndex);
+        this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME, this.opacity);
     }
 
     /**

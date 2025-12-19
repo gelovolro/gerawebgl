@@ -1,6 +1,27 @@
 import { ShaderProgram } from '../shader/shader-program.js';
 
 /**
+ * Minimum allowed opacity value.
+ *
+ * @type {number}
+ */
+const MIN_OPACITY = 0.0;
+
+/**
+ * Maximum allowed opacity value.
+ *
+ * @type {number}
+ */
+const MAX_OPACITY = 1.0;
+
+/**
+ * Default opacity value.
+ *
+ * @type {number}
+ */
+const DEFAULT_OPACITY = 1.0;
+
+/**
  * Options used by Material.
  *
  * @typedef {Object} MaterialOptions
@@ -8,7 +29,7 @@ import { ShaderProgram } from '../shader/shader-program.js';
  */
 
 /**
- * Base material that owns a shader program and wireframe flag.
+ * Base material that owns a shader program, opacity and wireframe flag.
  */
 export class Material {
 
@@ -27,6 +48,14 @@ export class Material {
      * @private
      */
     #shaderProgram;
+
+    /**
+     * Opacity multiplier (alpha) in [0..1].
+     *
+     * @type {number}
+     * @private
+     */
+    #opacity = DEFAULT_OPACITY;
 
     /**
      * When enabled, the renderer should draw geometry using wireframe indices (lines) instead of solid triangles.
@@ -95,6 +124,43 @@ export class Material {
     get shaderProgram() {
         this.#assertNotDisposed();
         return this.#shaderProgram;
+    }
+
+    /**
+     * Returns the current opacity multiplier.
+     *
+     * @returns {number}
+     */
+    get opacity() {
+        this.#assertNotDisposed();
+        return this.#opacity;
+    }
+
+    /**
+     * Sets opacity multiplier (alpha).
+     *
+     * @param {number} value - Opacity multiplier in [0..1].
+     */
+    setOpacity(value) {
+        this.#assertNotDisposed();
+
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+            throw new TypeError('`Material.setOpacity` expects a finite number.');
+        }
+
+        if (value < MIN_OPACITY || value > MAX_OPACITY) {
+            throw new RangeError(`Material.setOpacity expects a value in [${MIN_OPACITY}..${MAX_OPACITY}].`);
+        }
+
+        this.#opacity = value;
+    }
+
+    /**
+     * @returns {boolean} True, when opacity is lower than `1.0`.
+     */
+    isTransparent() {
+        this.#assertNotDisposed();
+        return this.#opacity < MAX_OPACITY;
     }
 
     /**
