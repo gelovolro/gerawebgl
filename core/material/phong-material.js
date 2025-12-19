@@ -204,19 +204,19 @@ uniform float ${SHININESS_UNIFORM_NAME};
 out vec4 outColor;
 
 void main() {
-    vec3 n = normalize(v_normal);
-    vec3 l = normalize(${LIGHT_DIRECTION_UNIFORM_NAME});
-    vec3 v = normalize(${CAMERA_POSITION_UNIFORM_NAME} - v_worldPosition);
+    vec3 surface_normal  = normalize(v_normal);
+    vec3 light_direction = normalize(${LIGHT_DIRECTION_UNIFORM_NAME});
+    vec3 view_direction  = normalize(${CAMERA_POSITION_UNIFORM_NAME} - v_worldPosition);
 
     // Diffuse term:
-    float diff = max(dot(n, l), 0.0);
+    float diff = max(dot(surface_normal, light_direction), 0.0);
 
     // Specular term:
     float spec = 0.0;
 
     if (diff > 0.0) {
-        vec3 r = reflect(-l, n);
-        float specBase = max(dot(v, r), 0.0);
+        vec3 reflection_direction = reflect(-light_direction, surface_normal);
+        float specBase = max(dot(view_direction, reflection_direction), 0.0);
         spec = pow(specBase, ${SHININESS_UNIFORM_NAME});
     }
 
