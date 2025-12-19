@@ -30,7 +30,7 @@ High-level modules are for “get something on screen fast”:
 - `Engine` (scene + camera + renderer + render loop)
 - Scene graph        : `Scene`, `Object3D`, `Mesh`, `PerspectiveCamera`
 - Built-in geometry  : `BoxGeometry`
-- Built-in materials : `SolidColorMaterial`, `VertexColorMaterial`, `TexturedMaterial`, `NormalMaterial`, `LambertMaterial`, `PhongMaterial`
+- Built-in materials : `SolidColorMaterial`, `VertexColorMaterial`, `TexturedMaterial`, `NormalMaterial`, `DirectionalLightMaterial`, `LambertMaterial`, `PhongMaterial`
 
 Example:
 

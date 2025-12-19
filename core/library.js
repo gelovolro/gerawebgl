@@ -1,24 +1,25 @@
-import { WebGLContext }         from './webgl-context.js';
-import { Matrix4 }              from './math/matrix4.js';
-import { Vector3 }              from './math/vector3.js';
-import { CameraMath }           from './math/camera-math.js';
-import { Geometry }             from './geometry/geometry.js';
-import { BoxGeometry }          from './geometry/box-geometry.js';
-import { ShaderProgram }        from './shader/shader-program.js';
-import { Material }             from './material/material.js';
-import { VertexColorMaterial }  from './material/vertex-color-material.js';
-import { SolidColorMaterial }   from './material/solid-color-material.js';
-import { TexturedMaterial }     from './material/textured-material.js';
-import { NormalMaterial }       from './material/normal-material.js';
-import { LambertMaterial }      from './material/lambert-material.js';
-import { PhongMaterial }        from './material/phong-material.js';
-import { Texture2D }            from './texture/texture2d.js';
-import { Object3D }             from './scene/object3d.js';
-import { Mesh }                 from './scene/mesh.js';
-import { Scene }                from './scene/scene.js';
-import { PerspectiveCamera }    from './scene/perspective-camera.js';
-import { Renderer }             from './render/renderer.js';
-import { Engine, createEngine } from './engine/engine.js';
+import { WebGLContext }             from './webgl-context.js';
+import { Matrix4 }                  from './math/matrix4.js';
+import { Vector3 }                  from './math/vector3.js';
+import { CameraMath }               from './math/camera-math.js';
+import { Geometry }                 from './geometry/geometry.js';
+import { BoxGeometry }              from './geometry/box-geometry.js';
+import { ShaderProgram }            from './shader/shader-program.js';
+import { Material }                 from './material/material.js';
+import { VertexColorMaterial }      from './material/vertex-color-material.js';
+import { SolidColorMaterial }       from './material/solid-color-material.js';
+import { TexturedMaterial }         from './material/textured-material.js';
+import { NormalMaterial }           from './material/normal-material.js';
+import { DirectionalLightMaterial } from './material/directional-light-material.js';
+import { LambertMaterial }          from './material/lambert-material.js';
+import { PhongMaterial }            from './material/phong-material.js';
+import { Texture2D }                from './texture/texture2d.js';
+import { Object3D }                 from './scene/object3d.js';
+import { Mesh }                     from './scene/mesh.js';
+import { Scene }                    from './scene/scene.js';
+import { PerspectiveCamera }        from './scene/perspective-camera.js';
+import { Renderer }                 from './render/renderer.js';
+import { Engine, createEngine }     from './engine/engine.js';
 
 /**
  * Main public API namespace.
@@ -66,6 +67,7 @@ export const GeraWebGL = Object.freeze({
         SolidColorMaterial,
         TexturedMaterial,
         NormalMaterial,
+        DirectionalLightMaterial,
         LambertMaterial,
         PhongMaterial
     }),
