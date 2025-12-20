@@ -17,6 +17,7 @@ import { Texture2D }                from './texture/texture2d.js';
 import { Object3D }                 from './scene/object3d.js';
 import { Mesh }                     from './scene/mesh.js';
 import { Scene }                    from './scene/scene.js';
+import { Camera }                   from './scene/camera.js';
 import { PerspectiveCamera }        from './scene/perspective-camera.js';
 import { Renderer }                 from './render/renderer.js';
 import { Engine, createEngine }     from './engine/engine.js';
@@ -41,6 +42,7 @@ export const GeraWebGL = Object.freeze({
     WebGLContext,
     Renderer,
     Scene,
+    Camera,
     PerspectiveCamera,
     Object3D,
     Mesh,

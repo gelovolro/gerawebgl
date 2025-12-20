@@ -3527,75 +3527,289 @@ var Scene = class extends Object3D {
   }
 };
 
+// core/scene/camera.js
+var MATRIX_4x4_ELEMENT_COUNT5 = 16;
+var Camera = class extends Object3D {
+  /**
+   * Cached view matrix buffer. Reused between frames to avoid allocations.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #viewMatrix;
+  /**
+   * Cached local `position X` component used to detect transform changes.
+   *
+   * @type {number}
+   * @private
+   */
+  #cachedPositionX = Number.NaN;
+  /**
+   * Cached local `position Y` component used to detect transform changes.
+   *
+   * @type {number}
+   * @private
+   */
+  #cachedPositionY = Number.NaN;
+  /**
+   * Cached local `position Z` component used to detect transform changes.
+   *
+   * @type {number}
+   * @private
+   */
+  #cachedPositionZ = Number.NaN;
+  /**
+   * Cached local `rotation X` component (radians) used to detect transform changes.
+   *
+   * @type {number}
+   * @private
+   */
+  #cachedRotationX = Number.NaN;
+  /**
+   * Cached local `rotation Y` component (radians) used to detect transform changes.
+   *
+   * @type {number}
+   * @private
+   */
+  #cachedRotationY = Number.NaN;
+  /**
+   * Cached local `rotation Z` component (radians) used to detect transform changes.
+   *
+   * @type {number}
+   * @private
+   */
+  #cachedRotationZ = Number.NaN;
+  /**
+   * Cached local `scale X` component used to detect transform changes.
+   *
+   * @type {number}
+   * @private
+   */
+  #cachedScaleX = Number.NaN;
+  /**
+   * Cached local `scale Y` component used to detect transform changes.
+   *
+   * @type {number}
+   * @private
+   */
+  #cachedScaleY = Number.NaN;
+  /**
+   * Cached local `scale Z` component used to detect transform changes.
+   *
+   * @type {number}
+   * @private
+   */
+  #cachedScaleZ = Number.NaN;
+  constructor() {
+    super();
+    this.#viewMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT5);
+  }
+  /**
+   * Returns the view matrix (inverse of camera local TRS transform).
+   * The returned matrix is cached and reused between calls.
+   *
+   * @returns {Float32Array} - Cached view matrix.
+   */
+  getViewMatrix() {
+    this.#updateViewMatrixIfRequired();
+    return this.#viewMatrix;
+  }
+  /**
+   * Returns the projection matrix for this camera.
+   * Derived camera classes must implement this method.
+   *
+   * @throws {Error} Always throws in the base class.
+   * @returns {Float32Array} - Projection matrix.
+   */
+  getProjectionMatrix() {
+    throw new Error("`Camera.getProjectionMatrix` must be implemented in a derived camera class.");
+  }
+  /**
+   * Updates the camera aspect ratio (width/height).
+   * Base camera class does not define, how aspect ratio affects the projection.
+   *
+   * @param {number} aspectRatio - New viewport aspect ratio.
+   */
+  setAspectRatio(aspectRatio) {
+    if (typeof aspectRatio !== "number") {
+      throw new TypeError("`Camera.setAspectRatio` expects `aspectRatio` as a number.");
+    }
+    throw new Error("`Camera.setAspectRatio` must be implemented in a derived camera class.");
+  }
+  /**
+   * Recomputes the view matrix only, when local transform changes since the last call.
+   *
+   * @private
+   */
+  #updateViewMatrixIfRequired() {
+    const position = this.position;
+    const rotation = this.rotation;
+    const scale = this.scale;
+    const isViewDirty = this.#isTransformChanged(position, rotation, scale);
+    if (isViewDirty === true) {
+      CameraMath.writeViewMatrixTo(this.#viewMatrix, position, rotation, scale);
+      this.#cacheTransform(position, rotation, scale);
+    }
+  }
+  /**
+   * Checks whether the local transform has changed, since the last cached snapshot.
+   *
+   * @param {Object} position - Camera position vector.
+   * @param {Object} rotation - Camera rotation vector in radians.
+   * @param {Object} scale    - Camera scale vector.
+   * @returns {boolean}       - True, when local transform differs from cached snapshot.
+   * @private
+   */
+  #isTransformChanged(position, rotation, scale) {
+    if (this.#isPositionChanged(position) === true) {
+      return true;
+    }
+    if (this.#isRotationChanged(rotation) === true) {
+      return true;
+    }
+    if (this.#isScaleChanged(scale) === true) {
+      return true;
+    }
+    return false;
+  }
+  /* eslint-disable indent */
+  /**
+   * @param {Object} position - Position vector.
+   * @returns {boolean}       - True, when local position differs from the cached snapshot.
+   * @private
+   */
+  #isPositionChanged(position) {
+    return position.x !== this.#cachedPositionX || position.y !== this.#cachedPositionY || position.z !== this.#cachedPositionZ;
+  }
+  /**
+   * @param {Object} rotation - Rotation vector.
+   * @returns {boolean}       - True, when local rotation differs from the cached snapshot.
+   * @private
+   */
+  #isRotationChanged(rotation) {
+    return rotation.x !== this.#cachedRotationX || rotation.y !== this.#cachedRotationY || rotation.z !== this.#cachedRotationZ;
+  }
+  /**
+   * @param {Object} scale - Scale vector.
+   * @returns {boolean}    - True, when local scale differs from the cached snapshot.
+   * @private
+   */
+  #isScaleChanged(scale) {
+    return scale.x !== this.#cachedScaleX || scale.y !== this.#cachedScaleY || scale.z !== this.#cachedScaleZ;
+  }
+  /* eslint-enable indent */
+  /**
+   * Stores the current local transform components as a cached snapshot for future comparisons.
+   *
+   * @param {Object} position - Position vector.
+   * @param {Object} rotation - Rotation vector.
+   * @param {Object} scale    - Scale vector.
+   * @private
+   */
+  #cacheTransform(position, rotation, scale) {
+    this.#cachedPositionX = position.x;
+    this.#cachedPositionY = position.y;
+    this.#cachedPositionZ = position.z;
+    this.#cachedRotationX = rotation.x;
+    this.#cachedRotationY = rotation.y;
+    this.#cachedRotationZ = rotation.z;
+    this.#cachedScaleX = scale.x;
+    this.#cachedScaleY = scale.y;
+    this.#cachedScaleZ = scale.z;
+  }
+};
+
 // core/scene/perspective-camera.js
 var MINIMUM_NEAR_CLIP_DISTANCE2 = 0;
 var MINIMUM_ASPECT_RATIO2 = 0;
-var MATRIX_4x4_ELEMENT_COUNT5 = 16;
-var PerspectiveCamera = class extends Object3D {
-  /** @type {number} */
+var MATRIX_4x4_ELEMENT_COUNT6 = 16;
+var PerspectiveCamera = class extends Camera {
+  /**
+   * Vertical field of view in radians.
+   *
+   * @type {number}
+   * @private
+   */
   #fieldOfViewRadians;
-  /** @type {number} */
+  /**
+   * Viewport aspect ratio (width / height).
+   *
+   * @type {number}
+   * @private
+   */
   #aspectRatio;
-  /** @type {number} */
+  /**
+   * Distance to the near clipping plane.
+   *
+   * @type {number}
+   * @private
+   */
   #near;
-  /** @type {number} */
+  /**
+   * Distance to the far clipping plane.
+   *
+   * @type {number}
+   * @private
+   */
   #far;
-  /** @type {Float32Array} */
+  /**
+   * Cached projection matrix buffer.
+   * The buffer is reused between frames to avoid allocations.
+   *
+   * @type {Float32Array}
+   * @private
+   */
   #projectionMatrix;
-  /** @type {Float32Array} */
-  #viewMatrix;
-  /** @type {boolean} */
+  /**
+   * When true, projection matrix must be recomputed.
+   *
+   * @type {boolean}
+   * @private
+   */
   #isProjectionMatrixDirty = true;
-  /** @type {number} */
-  #cachedPositionX = Number.NaN;
-  /** @type {number} */
-  #cachedPositionY = Number.NaN;
-  /** @type {number} */
-  #cachedPositionZ = Number.NaN;
-  /** @type {number} */
-  #cachedRotationX = Number.NaN;
-  /** @type {number} */
-  #cachedRotationY = Number.NaN;
-  /** @type {number} */
-  #cachedRotationZ = Number.NaN;
-  /** @type {number} */
-  #cachedScaleX = Number.NaN;
-  /** @type {number} */
-  #cachedScaleY = Number.NaN;
-  /** @type {number} */
-  #cachedScaleZ = Number.NaN;
   /**
    * @param {number} fieldOfViewRadians - Vertical field of view in radians.
    * @param {number} aspectRatio        - Viewport aspect ratio (width / height).
-   * @param {number} near               - Distance to the near clipping plane (must be greater than 0).
-   * @param {number} far                - Distance to the far clipping plane (must be greater than near).
+   * @param {number} near               - Distance to the near clipping plane (must be greater, than 0).
+   * @param {number} far                - Distance to the far clipping plane (must be greater, than near).
    */
   constructor(fieldOfViewRadians, aspectRatio, near, far) {
     super();
-    if (typeof fieldOfViewRadians !== "number" || typeof aspectRatio !== "number" || typeof near !== "number" || typeof far !== "number") {
-      throw new TypeError("PerspectiveCamera expects numeric constructor arguments.");
+    if (typeof fieldOfViewRadians !== "number") {
+      throw new TypeError("`PerspectiveCamera` expects `fieldOfViewRadians` as a number.");
+    }
+    if (typeof aspectRatio !== "number") {
+      throw new TypeError("`PerspectiveCamera` expects `aspectRatio` as a number.");
+    }
+    if (typeof near !== "number") {
+      throw new TypeError("`PerspectiveCamera` expects `near` as a number.");
+    }
+    if (typeof far !== "number") {
+      throw new TypeError("`PerspectiveCamera` expects `far` as a number.");
     }
     if (aspectRatio <= MINIMUM_ASPECT_RATIO2) {
-      throw new RangeError("PerspectiveCamera expects a positive aspect ratio.");
+      throw new RangeError("`PerspectiveCamera` expects a positive `aspect ratio`.");
     }
     if (near <= MINIMUM_NEAR_CLIP_DISTANCE2 || far <= near) {
-      throw new RangeError("PerspectiveCamera expects 0 < near < far.");
+      throw new RangeError("`PerspectiveCamera` expects `0 < near < far`.");
     }
     this.#fieldOfViewRadians = fieldOfViewRadians;
     this.#aspectRatio = aspectRatio;
     this.#near = near;
     this.#far = far;
-    this.#projectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT5);
-    this.#viewMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT5);
+    this.#projectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
   }
   /**
-   * Updates the aspect ratio.
+   * Updates the aspect ratio and marks projection cache as dirty.
    *
    * @param {number} aspectRatio - New viewport aspect ratio (canvas width divided by canvas height).
    */
   setAspectRatio(aspectRatio) {
-    if (typeof aspectRatio !== "number" || aspectRatio <= MINIMUM_ASPECT_RATIO2) {
-      throw new RangeError("PerspectiveCamera.setAspectRatio expects a positive number.");
+    if (typeof aspectRatio !== "number") {
+      throw new TypeError("`PerspectiveCamera.setAspectRatio` expects `aspectRatio` as a number.");
+    }
+    if (aspectRatio <= MINIMUM_ASPECT_RATIO2) {
+      throw new RangeError("`PerspectiveCamera.setAspectRatio` expects a positive number.");
     }
     if (aspectRatio === this.#aspectRatio) {
       return;
@@ -3609,7 +3823,7 @@ var PerspectiveCamera = class extends Object3D {
    * @returns {Float32Array} - Cached projection matrix.
    */
   getProjectionMatrix() {
-    if (this.#isProjectionMatrixDirty) {
+    if (this.#isProjectionMatrixDirty === true) {
       CameraMath.writePerspectiveMatrixTo(
         this.#projectionMatrix,
         this.#fieldOfViewRadians,
@@ -3621,45 +3835,11 @@ var PerspectiveCamera = class extends Object3D {
     }
     return this.#projectionMatrix;
   }
-  /**
-   * Returns the view matrix for this camera (inverse of its local TRS transform).
-   * The returned matrix is cached and reused between calls.
-   *
-   * @returns {Float32Array} - Cached view matrix.
-   */
-  getViewMatrix() {
-    const position = this.position;
-    const rotation = this.rotation;
-    const scale = this.scale;
-    const positionX = position.x;
-    const positionY = position.y;
-    const positionZ = position.z;
-    const rotationX = rotation.x;
-    const rotationY = rotation.y;
-    const rotationZ = rotation.z;
-    const scaleX = scale.x;
-    const scaleY = scale.y;
-    const scaleZ = scale.z;
-    const hasTransformChanged = positionX !== this.#cachedPositionX || positionY !== this.#cachedPositionY || positionZ !== this.#cachedPositionZ || rotationX !== this.#cachedRotationX || rotationY !== this.#cachedRotationY || rotationZ !== this.#cachedRotationZ || scaleX !== this.#cachedScaleX || scaleY !== this.#cachedScaleY || scaleZ !== this.#cachedScaleZ;
-    if (hasTransformChanged) {
-      CameraMath.writeViewMatrixTo(this.#viewMatrix, position, rotation, scale);
-      this.#cachedPositionX = positionX;
-      this.#cachedPositionY = positionY;
-      this.#cachedPositionZ = positionZ;
-      this.#cachedRotationX = rotationX;
-      this.#cachedRotationY = rotationY;
-      this.#cachedRotationZ = rotationZ;
-      this.#cachedScaleX = scaleX;
-      this.#cachedScaleY = scaleY;
-      this.#cachedScaleZ = scaleZ;
-    }
-    return this.#viewMatrix;
-  }
 };
 
 // core/render/renderer.js
 var INDEX_BUFFER_OFFSET_BYTES = 0;
-var MATRIX_4x4_ELEMENT_COUNT6 = 16;
+var MATRIX_4x4_ELEMENT_COUNT7 = 16;
 var VECTOR3_ELEMENT_COUNT2 = 3;
 var OPAQUE_OPACITY = 1;
 var MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT = 2;
@@ -3746,10 +3926,10 @@ var Renderer = class {
     }
     this.#contextWrapper = webglContext;
     this.#webglRenderingContext = webglContext.context;
-    this.#viewProjectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
-    this.#finalMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
-    this.#worldMatrixInverse = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
-    this.#worldInverseTransposeMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
+    this.#viewProjectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT7);
+    this.#finalMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT7);
+    this.#worldMatrixInverse = new Float32Array(MATRIX_4x4_ELEMENT_COUNT7);
+    this.#worldInverseTransposeMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT7);
     this.#cameraPosition = new Float32Array(VECTOR3_ELEMENT_COUNT2);
     this.#frameViewProjectionMatrix = this.#viewProjectionMatrix;
     this.#frameCameraPosition = this.#cameraPosition;
@@ -4109,6 +4289,7 @@ var GeraWebGL = Object.freeze({
   WebGLContext,
   Renderer,
   Scene,
+  Camera,
   PerspectiveCamera,
   Object3D,
   Mesh,

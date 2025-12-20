@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Class: SolidColorMaterial</title>
+    <title>JSDoc: Source: scene/camera.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,584 +17,263 @@
 
 <div id="main">
 
-    <h1 class="page-title">Class: SolidColorMaterial</h1>
-
-    
-
-
-
-
-<section>
-
-<header>
-    
-        <h2><span class="attribs"><span class="type-signature"></span></span>SolidColorMaterial<span class="signature">(webglContext, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h2>
-        
-            <div class="class-description">SolidColorMaterial renders geometry using a single uniform color.</div>
-        
-    
-</header>
-
-<article>
-    <div class="container-overview">
-    
-        
-
-    
-    <h2>Constructor</h2>
-    
-
-    
-    <h4 class="name" id="SolidColorMaterial"><span class="type-signature"></span>new SolidColorMaterial<span class="signature">(webglContext, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
-    
-
-    
-
-
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-        <th>Attributes</th>
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>webglContext</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">WebGL2RenderingContext</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">WebGL2 rendering context used to compile shaders.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>options</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><a href="global.html#SolidColorMaterialOptions">SolidColorMaterialOptions</a></span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">Material options.</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="material_solid-color-material.js.html">material/solid-color-material.js</a>, <a href="material_solid-color-material.js.html#line87">line 87</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    </div>
-
-    
-
-    
-
-    
-        <h3 class="subsection-title">Classes</h3>
-
-        <dl>
-            <dt><a href="SolidColorMaterial.html">SolidColorMaterial</a></dt>
-            <dd></dd>
-        </dl>
-    
-
-    
-
-    
-
-    
-
-    
-        <h3 class="subsection-title">Members</h3>
-
-        
-            
-<h4 class="name" id="color"><span class="type-signature"></span>color<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    Returns the internal color buffer.
-Note: returned Float32Array is mutable.
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="material_solid-color-material.js.html">material/solid-color-material.js</a>, <a href="material_solid-color-material.js.html#line150">line 150</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-    
-
-    
-        <h3 class="subsection-title">Methods</h3>
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="apply"><span class="type-signature"></span>apply<span class="signature">(matrix4)</span><span class="type-signature"></span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Applies per-object uniforms.
-</div>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>matrix4</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Float32Array</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">Transformation matrix passed as u_matrix.</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="material_solid-color-material.js.html">material/solid-color-material.js</a>, <a href="material_solid-color-material.js.html#line119">line 119</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="setColor"><span class="type-signature"></span>setColor<span class="signature">(color)</span><span class="type-signature"></span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Sets the RGB color.
-</div>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>color</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Float32Array</span>
-|
-
-<span class="param-type">Array.&lt;number></span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">[r, g, b] in 0..1 range.</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="material_solid-color-material.js.html">material/solid-color-material.js</a>, <a href="material_solid-color-material.js.html#line130">line 130</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-    
-
-    
-
-    
-</article>
-
-</section>
+    <h1 class="page-title">Source: scene/camera.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { Object3D }   from './object3d.js';
+import { CameraMath } from '../math/camera-math.js';
+
+/**
+ * Element count for a 4x4 matrix stored in a flat array.
+ *
+ * @type {number}
+ */
+const MATRIX_4x4_ELEMENT_COUNT = 16;
+
+/**
+ * Base camera class. Responsibilities:
+ * - Caches view matrix (inverse of local TRS transform).
+ * - Defines a common camera contract for derived camera types.
+ */
+export class Camera extends Object3D {
+
+    /**
+     * Cached view matrix buffer. Reused between frames to avoid allocations.
+     *
+     * @type {Float32Array}
+     * @private
+     */
+    #viewMatrix;
+
+    /**
+     * Cached local `position X` component used to detect transform changes.
+     *
+     * @type {number}
+     * @private
+     */
+    #cachedPositionX = Number.NaN;
+
+    /**
+     * Cached local `position Y` component used to detect transform changes.
+     *
+     * @type {number}
+     * @private
+     */
+    #cachedPositionY = Number.NaN;
+
+    /**
+     * Cached local `position Z` component used to detect transform changes.
+     *
+     * @type {number}
+     * @private
+     */
+    #cachedPositionZ = Number.NaN;
+
+    /**
+     * Cached local `rotation X` component (radians) used to detect transform changes.
+     *
+     * @type {number}
+     * @private
+     */
+    #cachedRotationX = Number.NaN;
+
+    /**
+     * Cached local `rotation Y` component (radians) used to detect transform changes.
+     *
+     * @type {number}
+     * @private
+     */
+    #cachedRotationY = Number.NaN;
+
+    /**
+     * Cached local `rotation Z` component (radians) used to detect transform changes.
+     *
+     * @type {number}
+     * @private
+     */
+    #cachedRotationZ = Number.NaN;
+
+    /**
+     * Cached local `scale X` component used to detect transform changes.
+     *
+     * @type {number}
+     * @private
+     */
+    #cachedScaleX = Number.NaN;
+
+    /**
+     * Cached local `scale Y` component used to detect transform changes.
+     *
+     * @type {number}
+     * @private
+     */
+    #cachedScaleY = Number.NaN;
+
+    /**
+     * Cached local `scale Z` component used to detect transform changes.
+     *
+     * @type {number}
+     * @private
+     */
+    #cachedScaleZ = Number.NaN;
+
+    constructor() {
+        super();
+        this.#viewMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
+    }
+
+    /**
+     * Returns the view matrix (inverse of camera local TRS transform).
+     * The returned matrix is cached and reused between calls.
+     *
+     * @returns {Float32Array} - Cached view matrix.
+     */
+    getViewMatrix() {
+        this.#updateViewMatrixIfRequired();
+        return this.#viewMatrix;
+    }
+
+    /**
+     * Returns the projection matrix for this camera.
+     * Derived camera classes must implement this method.
+     *
+     * @throws {Error} Always throws in the base class.
+     * @returns {Float32Array} - Projection matrix.
+     */
+    getProjectionMatrix() {
+        throw new Error('`Camera.getProjectionMatrix` must be implemented in a derived camera class.');
+    }
+
+    /**
+     * Updates the camera aspect ratio (width/height).
+     * Base camera class does not define, how aspect ratio affects the projection.
+     *
+     * @param {number} aspectRatio - New viewport aspect ratio.
+     */
+    setAspectRatio(aspectRatio) {
+        if (typeof aspectRatio !== 'number') {
+            throw new TypeError('`Camera.setAspectRatio` expects `aspectRatio` as a number.');
+        }
+
+        throw new Error('`Camera.setAspectRatio` must be implemented in a derived camera class.');
+    }
+
+    /**
+     * Recomputes the view matrix only, when local transform changes since the last call.
+     *
+     * @private
+     */
+    #updateViewMatrixIfRequired() {
+        const position    = this.position;
+        const rotation    = this.rotation;
+        const scale       = this.scale;
+        const isViewDirty = this.#isTransformChanged(position, rotation, scale);
+
+        if (isViewDirty === true) {
+            CameraMath.writeViewMatrixTo(this.#viewMatrix, position, rotation, scale);
+            this.#cacheTransform(position, rotation, scale);
+        }
+    }
+
+    /**
+     * Checks whether the local transform has changed, since the last cached snapshot.
+     *
+     * @param {Object} position - Camera position vector.
+     * @param {Object} rotation - Camera rotation vector in radians.
+     * @param {Object} scale    - Camera scale vector.
+     * @returns {boolean}       - True, when local transform differs from cached snapshot.
+     * @private
+     */
+    #isTransformChanged(position, rotation, scale) {
+        if (this.#isPositionChanged(position) === true) {
+            return true;
+        }
+
+        if (this.#isRotationChanged(rotation) === true) {
+            return true;
+        }
+
+        if (this.#isScaleChanged(scale) === true) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /* eslint-disable indent */
+
+    /**
+     * @param {Object} position - Position vector.
+     * @returns {boolean}       - True, when local position differs from the cached snapshot.
+     * @private
+     */
+    #isPositionChanged(position) {
+        return (
+               position.x !== this.#cachedPositionX
+            || position.y !== this.#cachedPositionY
+            || position.z !== this.#cachedPositionZ
+        );
+    }
+
+    /**
+     * @param {Object} rotation - Rotation vector.
+     * @returns {boolean}       - True, when local rotation differs from the cached snapshot.
+     * @private
+     */
+    #isRotationChanged(rotation) {
+        return (
+               rotation.x !== this.#cachedRotationX
+            || rotation.y !== this.#cachedRotationY
+            || rotation.z !== this.#cachedRotationZ
+        );
+    }
+
+    /**
+     * @param {Object} scale - Scale vector.
+     * @returns {boolean}    - True, when local scale differs from the cached snapshot.
+     * @private
+     */
+    #isScaleChanged(scale) {
+        return (
+               scale.x !== this.#cachedScaleX
+            || scale.y !== this.#cachedScaleY
+            || scale.z !== this.#cachedScaleZ
+        );
+    }
+
+    /* eslint-enable indent */
+
+    /**
+     * Stores the current local transform components as a cached snapshot for future comparisons.
+     *
+     * @param {Object} position - Position vector.
+     * @param {Object} rotation - Rotation vector.
+     * @param {Object} scale    - Scale vector.
+     * @private
+     */
+    #cacheTransform(position, rotation, scale) {
+        this.#cachedPositionX = position.x;
+        this.#cachedPositionY = position.y;
+        this.#cachedPositionZ = position.z;
+
+        this.#cachedRotationX = rotation.x;
+        this.#cachedRotationY = rotation.y;
+        this.#cachedRotationZ = rotation.z;
+
+        this.#cachedScaleX = scale.x;
+        this.#cachedScaleY = scale.y;
+        this.#cachedScaleZ = scale.z;
+    }
+}
+</code></pre>
+        </article>
+    </section>
 
 
 
