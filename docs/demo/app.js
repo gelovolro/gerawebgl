@@ -354,6 +354,64 @@ const DEFAULT_PHONG_SPECULAR_COLOR = new Float32Array([1.0, 1.0, 1.0]);
 const OPACITY_LABEL_FRACTION_DIGITS = 2;
 
 /**
+ * Select element id that switches camera type.
+ *
+ * @type {string}
+ */
+const CAMERA_TYPE_SELECT_ID = 'cameraTypeSelect';
+
+/**
+ * Camera type select value for perspective camera.
+ *
+ * @type {string}
+ */
+const CAMERA_TYPE_PERSPECTIVE = 'PERSPECTIVE';
+
+/**
+ * Camera type select value for orthographic camera.
+ *
+ * @type {string}
+ */
+const CAMERA_TYPE_ORTHOGRAPHIC = 'ORTHOGRAPHIC';
+
+/**
+ * Default camera type used by the demo.
+ *
+ * @type {string}
+ */
+const DEFAULT_CAMERA_TYPE = CAMERA_TYPE_PERSPECTIVE;
+
+/**
+ * Default orthographic camera view size.
+ * Used, when the demo switches to orthographic mode.
+ *
+ * @type {number}
+ */
+const DEFAULT_ORTHOGRAPHIC_VIEW_SIZE = 4.0;
+
+/**
+ * Default near clipping plane distance used by the orthographic camera.
+ *
+ * @type {number}
+ */
+const DEFAULT_ORTHOGRAPHIC_NEAR = 0.1;
+
+/**
+ * Default far clipping plane distance used by the orthographic camera.
+ *
+ * @type {number}
+ */
+const DEFAULT_ORTHOGRAPHIC_FAR = 100.0;
+
+/**
+ * Initial camera aspect ratio used when creating cameras, that require an aspect ratio at construction time.
+ * The actual aspect ratio is updated by the renderer on the first render call.
+ *
+ * @type {number}
+ */
+const INITIAL_CAMERA_ASPECT_RATIO = 1.0;
+
+/**
  * @typedef {Object} Object3DTransformSnapshot
  * @property {{ x: number, y: number, z: number }} position - Position components.
  * @property {{ x: number, y: number, z: number }} rotation - Rotation (radians) components.
@@ -379,6 +437,24 @@ class DemoApp {
     #engine;
 
     /**
+     * Perspective camera instance used by the demo.
+     * This is the default camera created by the engine.
+     *
+     * @type {GeraWebGL.PerspectiveCamera}
+     * @private
+     */
+    #perspectiveCamera;
+
+    /**
+     * Orthographic camera instance used by the demo.
+     * Created once and reused when switching camera type.
+     *
+     * @type {GeraWebGL.OrthographicCamera}
+     * @private
+     */
+    #orthographicCamera;
+
+    /**
      * Currently rendered cube mesh.
      *
      * @type {GeraWebGL.Mesh}
@@ -401,6 +477,14 @@ class DemoApp {
      * @private
      */
     #materialModeSelect;
+
+    /**
+     * Select that switches camera type.
+     *
+     * @type {HTMLSelectElement}
+     * @private
+     */
+    #cameraTypeSelect;
 
     /**
      * Button that recreates the cube (dispose test).
@@ -457,6 +541,14 @@ class DemoApp {
      * @private
      */
     #materialMode = MATERIAL_MODE_VERTEX_COLOR;
+
+    /**
+     * Current camera type.
+     *
+     * @type {string}
+     * @private
+     */
+    #cameraType = DEFAULT_CAMERA_TYPE;
 
     /**
      * Shared VertexColor material.
@@ -526,18 +618,30 @@ class DemoApp {
     /**
      * @param {HTMLCanvasElement} canvas             - Canvas used for rendering.
      * @param {HTMLButtonElement} wireframeButton    - Button, that toggles wireframe mode.
+     * @param {HTMLSelectElement} cameraTypeSelect   - Select, that switches camera type.
      * @param {HTMLSelectElement} materialModeSelect - Select, that switches material mode.
      * @param {HTMLButtonElement} recreateButton     - Button, that recreates the cube.
      * @param {HTMLInputElement} opacitySlider       - Range slider, that controls material opacity.
      * @param {HTMLElement} opacityValueElement      - Element, that displays the current opacity value.
      */
-    constructor(canvas, wireframeButton, materialModeSelect, recreateButton, opacitySlider, opacityValueElement) {
+    constructor(canvas, wireframeButton, cameraTypeSelect, materialModeSelect, recreateButton, opacitySlider, opacityValueElement) {
         this.#wireframeToggleButton = wireframeButton;
+        this.#cameraTypeSelect      = cameraTypeSelect;
         this.#materialModeSelect    = materialModeSelect;
         this.#recreateMeshButton    = recreateButton;
         this.#opacitySlider         = opacitySlider;
         this.#opacityValueElement   = opacityValueElement;
         this.#engine                = GeraWebGL.createEngine(canvas);
+        this.#perspectiveCamera     = this.#engine.camera;
+        this.#orthographicCamera    = new GeraWebGL.OrthographicCamera({
+            viewSize    : DEFAULT_ORTHOGRAPHIC_VIEW_SIZE,
+            aspectRatio : INITIAL_CAMERA_ASPECT_RATIO,
+            near        : DEFAULT_ORTHOGRAPHIC_NEAR,
+            far         : DEFAULT_ORTHOGRAPHIC_FAR
+        });
+
+        DemoApp.#applyTransform(this.#orthographicCamera, DemoApp.#captureTransform(this.#perspectiveCamera));
+        this.#cameraType = this.#cameraTypeSelect.value;
 
         const webglContext              = this.#engine.webglRenderingContext;
         this.#sharedVertexColorMaterial = new GeraWebGL.Materials.VertexColorMaterial(webglContext);
@@ -613,6 +717,10 @@ class DemoApp {
         this.#opacitySlider.addEventListener('input', () => {
             this.#onOpacitySliderChanged();
         });
+
+        this.#cameraTypeSelect.addEventListener('change', () => {
+            this.#onCameraTypeSelectChanged();
+        });
     }
 
     /**
@@ -625,6 +733,33 @@ class DemoApp {
         this.#isWireframeEnabled = !this.#isWireframeEnabled;
         this.#applyWireframeStateToSharedMaterials();
         this.#updateWireframeButtonLabel();
+    }
+
+    /**
+     * Handles camera type changes via the select.
+     *
+     * @private
+     */
+    #onCameraTypeSelectChanged() {
+        const requestedType = this.#cameraTypeSelect.value;
+
+        if (requestedType !== CAMERA_TYPE_PERSPECTIVE && requestedType !== CAMERA_TYPE_ORTHOGRAPHIC) {
+            throw new RangeError('Demo internal error: unknown camera type requested.');
+        }
+
+        if (requestedType === this.#cameraType) {
+            return;
+        }
+
+        const currentCamera   = this.#engine.camera;
+        const cameraTransform = DemoApp.#captureTransform(currentCamera);
+        const nextCamera      = (requestedType === CAMERA_TYPE_ORTHOGRAPHIC)
+            ? this.#orthographicCamera
+            : this.#perspectiveCamera;
+
+        DemoApp.#applyTransform(nextCamera, cameraTransform);
+        this.#engine.setCamera(nextCamera);
+        this.#cameraType = requestedType;
     }
 
     /**
@@ -1015,11 +1150,12 @@ class DemoApp {
 
 window.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById(CANVAS_ELEMENT_ID);
-    const wireframeButton = document.getElementById(WIREFRAME_TOGGLE_BUTTON_ID);
-    const materialSelect  = document.getElementById(MATERIAL_MODE_SELECT_ID);
-    const recreateButton  = document.getElementById(RECREATE_MESH_BUTTON_ID);
-    const opacitySlider   = document.getElementById(OPACITY_SLIDER_ID);
-    const opacityValue    = document.getElementById(OPACITY_VALUE_ELEMENT_ID);
+    const wireframeButton  = document.getElementById(WIREFRAME_TOGGLE_BUTTON_ID);
+    const cameraTypeSelect = document.getElementById(CAMERA_TYPE_SELECT_ID);
+    const materialSelect   = document.getElementById(MATERIAL_MODE_SELECT_ID);
+    const recreateButton   = document.getElementById(RECREATE_MESH_BUTTON_ID);
+    const opacitySlider    = document.getElementById(OPACITY_SLIDER_ID);
+    const opacityValue     = document.getElementById(OPACITY_VALUE_ELEMENT_ID);
 
     if (!(canvas instanceof HTMLCanvasElement)) {
         throw new Error(`Canvas element with id ${CANVAS_ELEMENT_ID} - not found.`);
@@ -1027,6 +1163,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
     if (!(wireframeButton instanceof HTMLButtonElement)) {
         throw new Error(`Button with id ${WIREFRAME_TOGGLE_BUTTON_ID} - not found.`);
+    }
+
+    if (!(cameraTypeSelect instanceof HTMLSelectElement)) {
+        throw new Error(`Select element with id ${CAMERA_TYPE_SELECT_ID} - not found.`);
     }
 
     if (!(materialSelect instanceof HTMLSelectElement)) {
@@ -1045,6 +1185,15 @@ window.addEventListener('DOMContentLoaded', () => {
         throw new Error(`Opacity value element with id ${OPACITY_VALUE_ELEMENT_ID} - not found.`);
     }
 
-    const app = new DemoApp(canvas, wireframeButton, materialSelect, recreateButton, opacitySlider, opacityValue);
+    const app = new DemoApp(
+        canvas,
+        wireframeButton,
+        cameraTypeSelect,
+        materialSelect,
+        recreateButton,
+        opacitySlider,
+        opacityValue
+    );
+
     app.start();
 });

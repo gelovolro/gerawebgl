@@ -19,6 +19,7 @@ import { Mesh }                     from './scene/mesh.js';
 import { Scene }                    from './scene/scene.js';
 import { Camera }                   from './scene/camera.js';
 import { PerspectiveCamera }        from './scene/perspective-camera.js';
+import { OrthographicCamera }       from './scene/orthographic-camera.js';
 import { Renderer }                 from './render/renderer.js';
 import { Engine, createEngine }     from './engine/engine.js';
 
@@ -44,6 +45,7 @@ export const GeraWebGL = Object.freeze({
     Scene,
     Camera,
     PerspectiveCamera,
+    OrthographicCamera,
     Object3D,
     Mesh,
 

@@ -1,6 +1,7 @@
 import { WebGLContext }        from '../webgl-context.js';
 import { Renderer }            from '../render/renderer.js';
 import { Scene }               from '../scene/scene.js';
+import { Camera }              from '../scene/camera.js';
 import { PerspectiveCamera }   from '../scene/perspective-camera.js';
 import { Mesh }                from '../scene/mesh.js';
 import { BoxGeometry }         from '../geometry/box-geometry.js';
@@ -154,7 +155,7 @@ export class Engine {
     /**
      * Active camera used by the engine renderer.
      *
-     * @type {PerspectiveCamera}
+     * @type {Camera}
      * @private
      */
     #camera;
@@ -265,7 +266,7 @@ export class Engine {
         this.#contextWrapper    = new WebGLContext(canvas);
         this.#renderer          = new Renderer(this.#contextWrapper);
         this.#scene             = new Scene();
-        this.#camera            = new PerspectiveCamera(fieldOfViewRadians, INITIAL_CAMERA_ASPECT_RATIO, near, far);
+        this.#camera            = new PerspectiveCamera(fieldOfViewRadians, INITIAL_CAMERA_ASPECT_RATIO, near, far); // default camera type
         this.#camera.position.z = initialCameraZ;
     }
 
@@ -289,7 +290,7 @@ export class Engine {
         return this.#scene;
     }
 
-    /** @returns {PerspectiveCamera} */
+    /** @returns {Camera} */
     get camera() {
         return this.#camera;
     }
@@ -367,6 +368,19 @@ export class Engine {
         this.#requestAnimationFrameId = ENGINE_ANIMATION_FRAME_ID_RESET_VALUE;
         this.#isRunning               = false;
         this.#frameCallback           = null;
+    }
+
+    /**
+     * Sets the active camera used by the engine renderer.
+     *
+     * @param {Camera} camera - New active camera instance.
+     */
+    setCamera(camera) {
+        if (!(camera instanceof Camera)) {
+            throw new TypeError('`Engine.setCamera` expects a `Camera` instance (including the derived types).');
+        }
+
+        this.#camera = camera;
     }
 
     /**

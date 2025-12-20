@@ -1,9 +1,9 @@
-import { Matrix4 }           from '../math/matrix4.js';
-import { Object3D }          from '../scene/object3d.js';
-import { Mesh }              from '../scene/mesh.js';
-import { Scene }             from '../scene/scene.js';
-import { PerspectiveCamera } from '../scene/perspective-camera.js';
-import { WebGLContext }      from '../webgl-context.js';
+import { Matrix4 }      from '../math/matrix4.js';
+import { Object3D }     from '../scene/object3d.js';
+import { Mesh }         from '../scene/mesh.js';
+import { Scene }        from '../scene/scene.js';
+import { Camera }       from '../scene/camera.js';
+import { WebGLContext } from '../webgl-context.js';
 
 /**
  * Byte offset passed to `webglRenderingContext.drawElements()` call.
@@ -177,16 +177,16 @@ export class Renderer {
      * Renders the given scene from the point of view of the given camera.
      *
      * @param {Scene} scene                                - Scene graph containing all objects that should be rendered.
-     * @param {PerspectiveCamera} camera                   - Camera defining view and projection used for rendering.
+     * @param {Camera} camera                              - Camera defining view and projection used for rendering.
      * @param {ResizeToDisplaySizeOptions} [resizeOptions] - Optional canvas resize options.
      */
     render(scene, camera, resizeOptions) {
         if (!(scene instanceof Scene)) {
-            throw new TypeError('Renderer.render expects a Scene instance.');
+            throw new TypeError('`Renderer.render` expects a `Scene` instance.');
         }
 
-        if (!(camera instanceof PerspectiveCamera)) {
-            throw new TypeError('Renderer.render expects a PerspectiveCamera instance.');
+        if (!(camera instanceof Camera)) {
+            throw new TypeError('`Renderer.render` expects a `Camera` derived-instance.');
         }
 
         const renderingContext = this.#webglRenderingContext;

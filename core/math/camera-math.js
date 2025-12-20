@@ -1,30 +1,79 @@
 import { Vector3 } from './vector3.js';
 
-/** @type {number} */
+/**
+ * Divisor used to compute half of a vertical field of view angle.
+ * Required for `tan(fov / 2)`, when building a perspective projection matrix.
+ *
+ * @type {number}
+ */
 const HALF_FIELD_OF_VIEW_DIVISOR = 2.0;
 
-/** @type {number} */
+/**
+ * Numerator used, when computing the perspective projection scale factor.
+ * Kept as a named constant to make the math expression self-documenting.
+ *
+ * @type {number}
+ */
 const PROJECTION_SCALE_NUMERATOR = 1.0;
 
-/** @type {number} */
+/**
+ * Numerator used for inverse range computations, e.g. `1 / (near - far)`.
+ * Kept as a named constant to make the matrix formulas explicit.
+ *
+ * @type {number}
+ */
 const DEPTH_RANGE_NUMERATOR = 1.0;
 
-/** @type {number} */
+/**
+ * Multiplier used in the perspective projection Z translation term:
+ * `(2 * far * near) / (near - far)`.
+ *
+ * @type {number}
+ */
 const PERSPECTIVE_Z_RANGE_MULTIPLIER = 2.0;
 
-/** @type {number} */
+/**
+ * Constant used for the perspective projection matrix `out[11]` term.
+ *
+ * @type {number}
+ */
 const PERSPECTIVE_W_COMPONENT_SCALE = -1.0;
 
-/** @type {number} */
+/**
+ * Multiplier used for orthographic projection scaling terms:
+ * `2 / (right - left)` and `2 / (top - bottom)`.
+ *
+ * @type {number}
+ */
+const ORTHOGRAPHIC_SCALE_NUMERATOR = 2.0;
+
+/**
+ * Element count for a 4x4 matrix stored in a flat array.
+ * Used to validate and allocate `Float32Array(16)` buffers.
+ *
+ * @type {number}
+ */
 const MATRIX_4x4_ELEMENT_COUNT = 16;
 
-/** @type {number} */
+/**
+ * Minimum allowed aspect ratio for projection computations.
+ *
+ * @type {number}
+ */
 const MINIMUM_ASPECT_RATIO = 0.0;
 
-/** @type {number} */
+/**
+ * Minimum allowed near clipping plane distance.
+ *
+ * @type {number}
+ */
 const MINIMUM_NEAR_CLIP_DISTANCE = 0.0;
 
-/** @type {number} */
+/**
+ * Numerator used to compute inverse scale components `(1 / scale)`.
+ *
+ * @type {number}
+ */
 const SCALE_INVERSE_NUMERATOR = 1.0;
 
 /**
@@ -81,6 +130,71 @@ export class CameraMath {
         out[13] = 0;
         out[14] = (PERSPECTIVE_Z_RANGE_MULTIPLIER * far * near) * inverseDepthRange;
         out[15] = 0;
+
+        return out;
+    }
+
+    /**
+     * Writes an orthographic projection matrix into an existing output matrix.
+     *
+     * This uses the same clip-space depth convention as `writePerspectiveMatrixTo`.
+     *
+     * @param {Float32Array} out - Output 4x4 matrix (length 16), that will receive the projection matrix.
+     * @param {number} left      - Left plane.
+     * @param {number} right     - Right plane.
+     * @param {number} bottom    - Bottom plane.
+     * @param {number} top       - Top plane.
+     * @param {number} near      - Near clipping plane distance.
+     * @param {number} far       - Far clipping plane distance.
+     * @returns {Float32Array}   - The output matrix.
+     */
+    static writeOrthographicMatrixTo(out, left, right, bottom, top, near, far) {
+        CameraMath.#assertMatrix4(out);
+
+        if (typeof left      !== 'number'
+            || typeof right  !== 'number'
+            || typeof bottom !== 'number'
+            || typeof top    !== 'number'
+            || typeof near   !== 'number'
+            || typeof far    !== 'number') {
+            throw new TypeError('`CameraMath.writeOrthographicMatrixTo` expects numeric arguments.');
+        }
+
+        if (left === right) {
+            throw new RangeError('`CameraMath.writeOrthographicMatrixTo` expects `left !== right`.');
+        }
+
+        if (bottom === top) {
+            throw new RangeError('`CameraMath.writeOrthographicMatrixTo` expects `bottom !== top`.');
+        }
+
+        if (far <= near) {
+            throw new RangeError('`CameraMath.writeOrthographicMatrixTo` expects `near < far`.');
+        }
+
+        const inverseWidth  = DEPTH_RANGE_NUMERATOR / (right - left);
+        const inverseHeight = DEPTH_RANGE_NUMERATOR / (top - bottom);
+        const inverseDepth  = DEPTH_RANGE_NUMERATOR / (near - far);
+
+        out[0]  = ORTHOGRAPHIC_SCALE_NUMERATOR * inverseWidth;
+        out[1]  = 0;
+        out[2]  = 0;
+        out[3]  = 0;
+
+        out[4]  = 0;
+        out[5]  = ORTHOGRAPHIC_SCALE_NUMERATOR * inverseHeight;
+        out[6]  = 0;
+        out[7]  = 0;
+
+        out[8]  = 0;
+        out[9]  = 0;
+        out[10] = ORTHOGRAPHIC_SCALE_NUMERATOR * inverseDepth;
+        out[11] = 0;
+
+        out[12] = -(right + left) * inverseWidth;
+        out[13] = -(top + bottom) * inverseHeight;
+        out[14] = (far + near) * inverseDepth;
+        out[15] = 1;
 
         return out;
     }

@@ -749,6 +749,7 @@ var PROJECTION_SCALE_NUMERATOR2 = 1;
 var DEPTH_RANGE_NUMERATOR2 = 1;
 var PERSPECTIVE_Z_RANGE_MULTIPLIER2 = 2;
 var PERSPECTIVE_W_COMPONENT_SCALE2 = -1;
+var ORTHOGRAPHIC_SCALE_NUMERATOR = 2;
 var MATRIX_4x4_ELEMENT_COUNT2 = 16;
 var MINIMUM_ASPECT_RATIO = 0;
 var MINIMUM_NEAR_CLIP_DISTANCE = 0;
@@ -793,6 +794,55 @@ var CameraMath = class _CameraMath {
     out[13] = 0;
     out[14] = PERSPECTIVE_Z_RANGE_MULTIPLIER2 * far * near * inverseDepthRange;
     out[15] = 0;
+    return out;
+  }
+  /**
+   * Writes an orthographic projection matrix into an existing output matrix.
+   *
+   * This uses the same clip-space depth convention as `writePerspectiveMatrixTo`.
+   *
+   * @param {Float32Array} out - Output 4x4 matrix (length 16), that will receive the projection matrix.
+   * @param {number} left      - Left plane.
+   * @param {number} right     - Right plane.
+   * @param {number} bottom    - Bottom plane.
+   * @param {number} top       - Top plane.
+   * @param {number} near      - Near clipping plane distance.
+   * @param {number} far       - Far clipping plane distance.
+   * @returns {Float32Array}   - The output matrix.
+   */
+  static writeOrthographicMatrixTo(out, left, right, bottom, top, near, far) {
+    _CameraMath.#assertMatrix4(out);
+    if (typeof left !== "number" || typeof right !== "number" || typeof bottom !== "number" || typeof top !== "number" || typeof near !== "number" || typeof far !== "number") {
+      throw new TypeError("`CameraMath.writeOrthographicMatrixTo` expects numeric arguments.");
+    }
+    if (left === right) {
+      throw new RangeError("`CameraMath.writeOrthographicMatrixTo` expects `left !== right`.");
+    }
+    if (bottom === top) {
+      throw new RangeError("`CameraMath.writeOrthographicMatrixTo` expects `bottom !== top`.");
+    }
+    if (far <= near) {
+      throw new RangeError("`CameraMath.writeOrthographicMatrixTo` expects `near < far`.");
+    }
+    const inverseWidth = DEPTH_RANGE_NUMERATOR2 / (right - left);
+    const inverseHeight = DEPTH_RANGE_NUMERATOR2 / (top - bottom);
+    const inverseDepth = DEPTH_RANGE_NUMERATOR2 / (near - far);
+    out[0] = ORTHOGRAPHIC_SCALE_NUMERATOR * inverseWidth;
+    out[1] = 0;
+    out[2] = 0;
+    out[3] = 0;
+    out[4] = 0;
+    out[5] = ORTHOGRAPHIC_SCALE_NUMERATOR * inverseHeight;
+    out[6] = 0;
+    out[7] = 0;
+    out[8] = 0;
+    out[9] = 0;
+    out[10] = ORTHOGRAPHIC_SCALE_NUMERATOR * inverseDepth;
+    out[11] = 0;
+    out[12] = -(right + left) * inverseWidth;
+    out[13] = -(top + bottom) * inverseHeight;
+    out[14] = (far + near) * inverseDepth;
+    out[15] = 1;
     return out;
   }
   /**
@@ -3837,9 +3887,259 @@ var PerspectiveCamera = class extends Camera {
   }
 };
 
+// core/scene/orthographic-camera.js
+var MATRIX_4x4_ELEMENT_COUNT7 = 16;
+var MINIMUM_ASPECT_RATIO3 = 0;
+var MINIMUM_VIEW_SIZE = 0;
+var HALF_MULTIPLIER = 0.5;
+var OrthographicCamera = class extends Camera {
+  /**
+   * Projection bounds: left plane.
+   *
+   * @type {number}
+   * @private
+   */
+  #left;
+  /**
+   * Projection bounds: right plane.
+   *
+   * @type {number}
+   * @private
+   */
+  #right;
+  /**
+   * Projection bounds: bottom plane.
+   *
+   * @type {number}
+   * @private
+   */
+  #bottom;
+  /**
+   * Projection bounds: top plane.
+   *
+   * @type {number}
+   * @private
+   */
+  #top;
+  /**
+   * Near clipping plane distance.
+   *
+   * @type {number}
+   * @private
+   */
+  #near;
+  /**
+   * Far clipping plane distance.
+   *
+   * @type {number}
+   * @private
+   */
+  #far;
+  /**
+   * When not null, camera uses view-size mode.
+   * Represents the height of the orthographic volume in world units.
+   *
+   * @type {number | null}
+   * @private
+   */
+  #viewSize = null;
+  /**
+   * Aspect ratio used in view-size mode (width / height).
+   *
+   * @type {number}
+   * @private
+   */
+  #aspectRatio = 1;
+  /**
+   * Cached projection matrix buffer.
+   * Reused between frames to avoid allocations.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #projectionMatrix;
+  /**
+   * When true, projection matrix must be recomputed.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #isProjectionMatrixDirty = true;
+  /**
+   * Creates an orthographic camera.
+   *
+   * @param {number | Object} leftOrOptions - Either left bound (number) or an options object.
+   * @param {number} [right]                - Right bound (explicit bounds mode).
+   * @param {number} [bottom]               - Bottom bound (explicit bounds mode).
+   * @param {number} [top]                  - Top bound (explicit bounds mode).
+   * @param {number} [near]                 - Near clipping plane distance.
+   * @param {number} [far]                  - Far clipping plane distance.
+   */
+  constructor(leftOrOptions, right, bottom, top, near, far) {
+    super();
+    this.#projectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT7);
+    if (leftOrOptions !== null && typeof leftOrOptions === "object") {
+      if (Array.isArray(leftOrOptions) === true) {
+        throw new TypeError("`OrthographicCamera` expects options as a plain object, not an array.");
+      }
+      this.#initFromOptions(leftOrOptions);
+      return;
+    }
+    this.#initFromBounds(
+      leftOrOptions,
+      right,
+      bottom,
+      top,
+      near,
+      far
+    );
+  }
+  /**
+   * Updates the aspect ratio (width / height). Only affects the camera in view-size mode.
+   *
+   * @param {number} aspectRatio - New viewport aspect ratio (canvas width divided by canvas height).
+   */
+  setAspectRatio(aspectRatio) {
+    if (typeof aspectRatio !== "number") {
+      throw new TypeError("`OrthographicCamera.setAspectRatio` expects `aspectRatio` as a number.");
+    }
+    if (aspectRatio <= MINIMUM_ASPECT_RATIO3) {
+      throw new RangeError("`OrthographicCamera.setAspectRatio` expects `aspectRatio` to be a positive number.");
+    }
+    if (this.#viewSize === null) {
+      return;
+    }
+    if (aspectRatio === this.#aspectRatio) {
+      return;
+    }
+    this.#aspectRatio = aspectRatio;
+    this.#recomputeBoundsFromViewSize();
+    this.#isProjectionMatrixDirty = true;
+  }
+  /**
+   * Returns the projection matrix for this camera.
+   * The returned matrix is cached and reused between calls.
+   *
+   * @returns {Float32Array} - Cached projection matrix.
+   */
+  getProjectionMatrix() {
+    if (this.#isProjectionMatrixDirty === true) {
+      CameraMath.writeOrthographicMatrixTo(
+        this.#projectionMatrix,
+        this.#left,
+        this.#right,
+        this.#bottom,
+        this.#top,
+        this.#near,
+        this.#far
+      );
+      this.#isProjectionMatrixDirty = false;
+    }
+    return this.#projectionMatrix;
+  }
+  /**
+   * @param {Object} options - Initialization options.
+   * @private
+   */
+  #initFromOptions(options) {
+    const hasViewSize = Object.prototype.hasOwnProperty.call(options, "viewSize");
+    if (hasViewSize === true) {
+      this.#initFromViewSize(
+        options.viewSize,
+        options.aspectRatio,
+        options.near,
+        options.far
+      );
+      return;
+    }
+    this.#initFromBounds(
+      options.left,
+      options.right,
+      options.bottom,
+      options.top,
+      options.near,
+      options.far
+    );
+  }
+  /**
+   * @param {number} left   - Left plane.
+   * @param {number} right  - Right plane.
+   * @param {number} bottom - Bottom plane.
+   * @param {number} top    - Top plane.
+   * @param {number} near   - Near clipping plane distance.
+   * @param {number} far    - Far clipping plane distance.
+   * @private
+   */
+  #initFromBounds(left, right, bottom, top, near, far) {
+    if (typeof left !== "number" || typeof right !== "number" || typeof bottom !== "number" || typeof top !== "number" || typeof near !== "number" || typeof far !== "number") {
+      throw new TypeError("`OrthographicCamera` expects numeric arguments in bounds mode.");
+    }
+    if (left === right) {
+      throw new RangeError("`OrthographicCamera` expects `left !== right`.");
+    }
+    if (bottom === top) {
+      throw new RangeError("`OrthographicCamera` expects `bottom !== top`.");
+    }
+    if (far <= near) {
+      throw new RangeError("`OrthographicCamera` expects `near < far`.");
+    }
+    this.#viewSize = null;
+    this.#left = left;
+    this.#right = right;
+    this.#bottom = bottom;
+    this.#top = top;
+    this.#near = near;
+    this.#far = far;
+    this.#isProjectionMatrixDirty = true;
+  }
+  /**
+   * @param {number} viewSize    - Height of the view volume in world units.
+   * @param {number} aspectRatio - Viewport aspect ratio (width / height).
+   * @param {number} near        - Near clipping plane distance.
+   * @param {number} far         - Far clipping plane distance.
+   * @private
+   */
+  #initFromViewSize(viewSize, aspectRatio, near, far) {
+    if (typeof viewSize !== "number" || typeof aspectRatio !== "number" || typeof near !== "number" || typeof far !== "number") {
+      throw new TypeError("`OrthographicCamera` expects numeric arguments in view-size mode.");
+    }
+    if (viewSize <= MINIMUM_VIEW_SIZE) {
+      throw new RangeError("`OrthographicCamera` expects `viewSize` to be a positive number.");
+    }
+    if (aspectRatio <= MINIMUM_ASPECT_RATIO3) {
+      throw new RangeError("`OrthographicCamera` expects `aspectRatio` to be a positive number.");
+    }
+    if (far <= near) {
+      throw new RangeError("`OrthographicCamera` expects `near < far`.");
+    }
+    this.#viewSize = viewSize;
+    this.#aspectRatio = aspectRatio;
+    this.#near = near;
+    this.#far = far;
+    this.#recomputeBoundsFromViewSize();
+    this.#isProjectionMatrixDirty = true;
+  }
+  /**
+   * Recomputes `left/right/top/bottom` based on current `viewSize` and `aspectRatio`.
+   *
+   * @private
+   */
+  #recomputeBoundsFromViewSize() {
+    if (this.#viewSize === null) {
+      throw new Error("`OrthographicCamera` internal error: `viewSize` is null in view-size mode.");
+    }
+    const halfHeight = this.#viewSize * HALF_MULTIPLIER;
+    const halfWidth = halfHeight * this.#aspectRatio;
+    this.#left = -halfWidth;
+    this.#right = halfWidth;
+    this.#bottom = -halfHeight;
+    this.#top = halfHeight;
+  }
+};
+
 // core/render/renderer.js
 var INDEX_BUFFER_OFFSET_BYTES = 0;
-var MATRIX_4x4_ELEMENT_COUNT7 = 16;
+var MATRIX_4x4_ELEMENT_COUNT8 = 16;
 var VECTOR3_ELEMENT_COUNT2 = 3;
 var OPAQUE_OPACITY = 1;
 var MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT = 2;
@@ -3926,10 +4226,10 @@ var Renderer = class {
     }
     this.#contextWrapper = webglContext;
     this.#webglRenderingContext = webglContext.context;
-    this.#viewProjectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT7);
-    this.#finalMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT7);
-    this.#worldMatrixInverse = new Float32Array(MATRIX_4x4_ELEMENT_COUNT7);
-    this.#worldInverseTransposeMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT7);
+    this.#viewProjectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT8);
+    this.#finalMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT8);
+    this.#worldMatrixInverse = new Float32Array(MATRIX_4x4_ELEMENT_COUNT8);
+    this.#worldInverseTransposeMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT8);
     this.#cameraPosition = new Float32Array(VECTOR3_ELEMENT_COUNT2);
     this.#frameViewProjectionMatrix = this.#viewProjectionMatrix;
     this.#frameCameraPosition = this.#cameraPosition;
@@ -3939,15 +4239,15 @@ var Renderer = class {
    * Renders the given scene from the point of view of the given camera.
    *
    * @param {Scene} scene                                - Scene graph containing all objects that should be rendered.
-   * @param {PerspectiveCamera} camera                   - Camera defining view and projection used for rendering.
+   * @param {Camera} camera                              - Camera defining view and projection used for rendering.
    * @param {ResizeToDisplaySizeOptions} [resizeOptions] - Optional canvas resize options.
    */
   render(scene, camera, resizeOptions) {
     if (!(scene instanceof Scene)) {
-      throw new TypeError("Renderer.render expects a Scene instance.");
+      throw new TypeError("`Renderer.render` expects a `Scene` instance.");
     }
-    if (!(camera instanceof PerspectiveCamera)) {
-      throw new TypeError("Renderer.render expects a PerspectiveCamera instance.");
+    if (!(camera instanceof Camera)) {
+      throw new TypeError("`Renderer.render` expects a `Camera` derived-instance.");
     }
     const renderingContext = this.#webglRenderingContext;
     this.#contextWrapper.resizeToDisplaySize(resizeOptions);
@@ -4075,7 +4375,7 @@ var Engine = class {
   /**
    * Active camera used by the engine renderer.
    *
-   * @type {PerspectiveCamera}
+   * @type {Camera}
    * @private
    */
   #camera;
@@ -4186,7 +4486,7 @@ var Engine = class {
   get scene() {
     return this.#scene;
   }
-  /** @returns {PerspectiveCamera} */
+  /** @returns {Camera} */
   get camera() {
     return this.#camera;
   }
@@ -4255,6 +4555,17 @@ var Engine = class {
     this.#frameCallback = null;
   }
   /**
+   * Sets the active camera used by the engine renderer.
+   *
+   * @param {Camera} camera - New active camera instance.
+   */
+  setCamera(camera) {
+    if (!(camera instanceof Camera)) {
+      throw new TypeError("`Engine.setCamera` expects a `Camera` instance (including the derived types).");
+    }
+    this.#camera = camera;
+  }
+  /**
    * @param {number} timeMs - `requestAnimationFrame` timestamp in milliseconds.
    * @private
    */
@@ -4291,6 +4602,7 @@ var GeraWebGL = Object.freeze({
   Scene,
   Camera,
   PerspectiveCamera,
+  OrthographicCamera,
   Object3D,
   Mesh,
   // Grouped namespaces:
