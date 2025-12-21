@@ -25,12 +25,13 @@ engine.start((delta) => {
 
 ### High-level
 
-High-level modules are for “get something on screen fast”:
+High-level modules are for "get something on screen fast":
 
 - `Engine` (scene + camera + renderer + render loop)
-- Scene graph        : `Scene`, `Object3D`, `Mesh`, `Camera`, `PerspectiveCamera`, `OrthographicCamera`
+- Scene objects      : `Scene`, `Object3D`, `Mesh`, `Camera`, `PerspectiveCamera`, `OrthographicCamera`
 - Built-in geometry  : `BoxGeometry`
 - Built-in materials : `SolidColorMaterial`, `VertexColorMaterial`, `TexturedMaterial`, `NormalMaterial`, `DirectionalLightMaterial`, `LambertMaterial`, `PhongMaterial`
+- Controls           : `OrbitControls` 
 
 Example:
 

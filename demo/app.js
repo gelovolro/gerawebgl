@@ -412,6 +412,62 @@ const DEFAULT_ORTHOGRAPHIC_FAR = 100.0;
 const INITIAL_CAMERA_ASPECT_RATIO = 1.0;
 
 /**
+ * `OrbitControls` initial distance from target.
+ *
+ * @type {number}
+ */
+const ORBIT_CONTROLS_DISTANCE = 6.0;
+
+/**
+ * `OrbitControls` minimal allowed distance.
+ *
+ * @type {number}
+ */
+const ORBIT_CONTROLS_MIN_DISTANCE = 2.0;
+
+/**
+ * `OrbitControls` maximal allowed distance.
+ *
+ * @type {number}
+ */
+const ORBIT_CONTROLS_MAX_DISTANCE = 25.0;
+
+/**
+ * `OrbitControls` rotation speed multiplier.
+ *
+ * @type {number}
+ */
+const ORBIT_CONTROLS_ROTATION_SPEED = 2.0;
+
+/**
+ * `OrbitControls` zoom speed multiplier.
+ *
+ * @type {number}
+ */
+const ORBIT_CONTROLS_ZOOM_SPEED = 0.1;
+
+/**
+ * Range slider element id, that controls `OrbitControls` zoom (distance).
+ *
+ * @type {string}
+ */
+const ZOOM_SLIDER_ID = 'zoomSlider';
+
+/**
+ * Element id used to display the current zoom slider value (distance).
+ *
+ * @type {string}
+ */
+const ZOOM_VALUE_ELEMENT_ID = 'zoomValue';
+
+/**
+ * Number of fractional digits used, when formatting zoom value in the UI.
+ *
+ * @type {number}
+ */
+const ZOOM_LABEL_FRACTION_DIGITS = 1;
+
+/**
  * @typedef {Object} Object3DTransformSnapshot
  * @property {{ x: number, y: number, z: number }} position - Position components.
  * @property {{ x: number, y: number, z: number }} rotation - Rotation (radians) components.
@@ -453,6 +509,14 @@ class DemoApp {
      * @private
      */
     #orthographicCamera;
+
+    /**
+     * Orbit controls instance used to rotate/zoom around the target.
+     *
+     * @type {GeraWebGL.Controls.OrbitControls}
+     * @private
+     */
+    #orbitControls;
 
     /**
      * Currently rendered cube mesh.
@@ -616,6 +680,22 @@ class DemoApp {
     #sharedLambertMaterial;
 
     /**
+     * Range slider, that controls `OrbitControls` zoom (camera distance).
+     *
+     * @type {HTMLInputElement}
+     * @private
+     */
+    #zoomSlider;
+
+    /**
+     * Element used to display current zoom value (camera distance).
+     *
+     * @type {HTMLElement}
+     * @private
+     */
+    #zoomValueElement;
+
+    /**
      * @param {HTMLCanvasElement} canvas             - Canvas used for rendering.
      * @param {HTMLButtonElement} wireframeButton    - Button, that toggles wireframe mode.
      * @param {HTMLSelectElement} cameraTypeSelect   - Select, that switches camera type.
@@ -623,14 +703,28 @@ class DemoApp {
      * @param {HTMLButtonElement} recreateButton     - Button, that recreates the cube.
      * @param {HTMLInputElement} opacitySlider       - Range slider, that controls material opacity.
      * @param {HTMLElement} opacityValueElement      - Element, that displays the current opacity value.
+     * @param {HTMLInputElement} zoomSlider          - Range slider, that controls `OrbitControls` zoom (camera distance).
+     * @param {HTMLElement} zoomValueElement         - Element, that displays the current zoom value (camera distance).
      */
-    constructor(canvas, wireframeButton, cameraTypeSelect, materialModeSelect, recreateButton, opacitySlider, opacityValueElement) {
+    constructor(
+        canvas,
+        wireframeButton,
+        cameraTypeSelect,
+        materialModeSelect,
+        recreateButton,
+        opacitySlider,
+        opacityValueElement,
+        zoomSlider,
+        zoomValueElement
+    ) {
         this.#wireframeToggleButton = wireframeButton;
         this.#cameraTypeSelect      = cameraTypeSelect;
         this.#materialModeSelect    = materialModeSelect;
         this.#recreateMeshButton    = recreateButton;
         this.#opacitySlider         = opacitySlider;
         this.#opacityValueElement   = opacityValueElement;
+        this.#zoomSlider            = zoomSlider;
+        this.#zoomValueElement      = zoomValueElement;
         this.#engine                = GeraWebGL.createEngine(canvas);
         this.#perspectiveCamera     = this.#engine.camera;
         this.#orthographicCamera    = new GeraWebGL.OrthographicCamera({
@@ -640,8 +734,32 @@ class DemoApp {
             far         : DEFAULT_ORTHOGRAPHIC_FAR
         });
 
-        DemoApp.#applyTransform(this.#orthographicCamera, DemoApp.#captureTransform(this.#perspectiveCamera));
-        this.#cameraType = this.#cameraTypeSelect.value;
+        // Initial camera type from UI:
+        const initialCameraType = this.#cameraTypeSelect.value;
+        this.#cameraType = (initialCameraType === CAMERA_TYPE_ORTHOGRAPHIC || initialCameraType === CAMERA_TYPE_PERSPECTIVE)
+            ? initialCameraType
+            : DEFAULT_CAMERA_TYPE;
+
+        const activeCamera = (this.#cameraType === CAMERA_TYPE_ORTHOGRAPHIC)
+            ? this.#orthographicCamera
+            : this.#perspectiveCamera;
+
+        if (activeCamera !== this.#engine.camera) {
+            this.#engine.setCamera(activeCamera);
+        }
+
+        this.#orbitControls = new GeraWebGL.Controls.OrbitControls(activeCamera, canvas, {
+            distance      : ORBIT_CONTROLS_DISTANCE,
+            minDistance   : ORBIT_CONTROLS_MIN_DISTANCE,
+            maxDistance   : ORBIT_CONTROLS_MAX_DISTANCE,
+            rotationSpeed : ORBIT_CONTROLS_ROTATION_SPEED,
+            zoomSpeed     : ORBIT_CONTROLS_ZOOM_SPEED
+        });
+
+        this.#orbitControls.update();
+        const activeCameraTransform = DemoApp.#captureTransform(activeCamera);
+        DemoApp.#applyTransform(this.#perspectiveCamera, activeCameraTransform);
+        DemoApp.#applyTransform(this.#orthographicCamera, activeCameraTransform);
 
         const webglContext              = this.#engine.webglRenderingContext;
         this.#sharedVertexColorMaterial = new GeraWebGL.Materials.VertexColorMaterial(webglContext);
@@ -674,6 +792,7 @@ class DemoApp {
         this.#updateWireframeButtonLabel();
         this.#updateRecreateButtonLabel();
         this.#materialModeSelect.value = this.#materialMode;
+        this.#syncZoomUIFromControls();
     }
 
     /**
@@ -692,6 +811,7 @@ class DemoApp {
      * @private
      */
     #onFrame(deltaSeconds) {
+        this.#orbitControls.update();
         this.#cube.rotation.x += deltaSeconds * ROTATION_SPEED_X;
         this.#cube.rotation.y += deltaSeconds * ROTATION_SPEED_Y;
     }
@@ -721,6 +841,10 @@ class DemoApp {
         this.#cameraTypeSelect.addEventListener('change', () => {
             this.#onCameraTypeSelectChanged();
         });
+
+        this.#zoomSlider.addEventListener('input', () => {
+            this.#onZoomSliderChanged();
+        });
     }
 
     /**
@@ -728,7 +852,6 @@ class DemoApp {
      *
      * @private
      */
-
     #toggleWireframe() {
         this.#isWireframeEnabled = !this.#isWireframeEnabled;
         this.#applyWireframeStateToSharedMaterials();
@@ -759,6 +882,8 @@ class DemoApp {
 
         DemoApp.#applyTransform(nextCamera, cameraTransform);
         this.#engine.setCamera(nextCamera);
+        this.#orbitControls.setCamera(nextCamera);
+        this.#orbitControls.update();
         this.#cameraType = requestedType;
     }
 
@@ -809,7 +934,8 @@ class DemoApp {
             });
         }
 
-        this.#materialMode   = mode;
+        this.#materialMode = mode;
+
         const replaceOptions = {
             preserveTransform            : true,
             shouldIncrementRecreateCount : false
@@ -1146,16 +1272,48 @@ class DemoApp {
         object3d.scale.y = transform.scale.y;
         object3d.scale.z = transform.scale.z;
     }
+
+    /**
+     * Handles zoom slider input and applies it to `OrbitControls` distance.
+     *
+     * @private
+     */
+    #onZoomSliderChanged() {
+        const zoomUiValue = Number.parseFloat(this.#zoomSlider.value);
+
+        if (!Number.isFinite(zoomUiValue)) {
+            return;
+        }
+
+        const distance = ORBIT_CONTROLS_MIN_DISTANCE + ORBIT_CONTROLS_MAX_DISTANCE - zoomUiValue;
+        this.#orbitControls.setDistance(distance);
+        this.#orbitControls.update();
+        this.#syncZoomUIFromControls();
+    }
+
+    /**
+     * Synchronizes zoom UI controls (slider + value label) from the current `OrbitControls` state.
+     *
+     * @private
+     */
+    #syncZoomUIFromControls() {
+        const distance         = this.#orbitControls.distance;
+        const zoomUiValue      = ORBIT_CONTROLS_MIN_DISTANCE + ORBIT_CONTROLS_MAX_DISTANCE - distance;
+        this.#zoomSlider.value = String(zoomUiValue);
+        this.#zoomValueElement.textContent = zoomUiValue.toFixed(ZOOM_LABEL_FRACTION_DIGITS);
+    }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-    const canvas = document.getElementById(CANVAS_ELEMENT_ID);
+    const canvas           = document.getElementById(CANVAS_ELEMENT_ID);
     const wireframeButton  = document.getElementById(WIREFRAME_TOGGLE_BUTTON_ID);
     const cameraTypeSelect = document.getElementById(CAMERA_TYPE_SELECT_ID);
     const materialSelect   = document.getElementById(MATERIAL_MODE_SELECT_ID);
     const recreateButton   = document.getElementById(RECREATE_MESH_BUTTON_ID);
     const opacitySlider    = document.getElementById(OPACITY_SLIDER_ID);
     const opacityValue     = document.getElementById(OPACITY_VALUE_ELEMENT_ID);
+    const zoomSlider       = document.getElementById(ZOOM_SLIDER_ID);
+    const zoomValue        = document.getElementById(ZOOM_VALUE_ELEMENT_ID);
 
     if (!(canvas instanceof HTMLCanvasElement)) {
         throw new Error(`Canvas element with id ${CANVAS_ELEMENT_ID} - not found.`);
@@ -1185,6 +1343,17 @@ window.addEventListener('DOMContentLoaded', () => {
         throw new Error(`Opacity value element with id ${OPACITY_VALUE_ELEMENT_ID} - not found.`);
     }
 
+    if (!(zoomSlider instanceof HTMLInputElement)) {
+        throw new Error(`Zoom slider with id ${ZOOM_SLIDER_ID} - not found.`);
+    }
+
+    if (!(zoomValue instanceof HTMLElement)) {
+        throw new Error(`Zoom value element with id ${ZOOM_VALUE_ELEMENT_ID} - not found.`);
+    }
+
+    canvas.style.touchAction = 'none';
+    canvas.addEventListener('contextmenu', (x) => x.preventDefault());
+
     const app = new DemoApp(
         canvas,
         wireframeButton,
@@ -1192,7 +1361,9 @@ window.addEventListener('DOMContentLoaded', () => {
         materialSelect,
         recreateButton,
         opacitySlider,
-        opacityValue
+        opacityValue,
+        zoomSlider,
+        zoomValue
     );
 
     app.start();

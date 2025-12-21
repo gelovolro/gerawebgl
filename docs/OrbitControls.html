@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Class: Texture2D</title>
+    <title>JSDoc: Class: OrbitControls</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Class: Texture2D</h1>
+    <h1 class="page-title">Class: OrbitControls</h1>
 
     
 
@@ -28,10 +28,17 @@
 
 <header>
     
-        <h2><span class="attribs"><span class="type-signature"></span></span>Texture2D<span class="signature">(webglContext, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h2>
+        <h2><span class="attribs"><span class="type-signature"></span></span>OrbitControls<span class="signature">(camera, element, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h2>
         
-            <div class="class-description">`Texture2D` is a thin wrapper around a `WebGLTexture`.
-It supports a placeholder 1x1 pixel, and can asynchronously upload an image from URL.</div>
+            <div class="class-description">Orbit controller, that rotates a camera around a target point.
+
+Controls:
+- Mouse left drag: orbit (yaw/pitch).
+- Mouse wheel: zoom (distance).
+
+Notes:
+- This class modifies camera local `position` and `rotation`.
+- View matrix is still computed by the camera (inverse of its TRS transform).</div>
         
     
 </header>
@@ -46,7 +53,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
     
 
     
-    <h4 class="name" id="Texture2D"><span class="type-signature"></span>new Texture2D<span class="signature">(webglContext, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="OrbitControls"><span class="type-signature"></span>new OrbitControls<span class="signature">(camera, element, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
     
 
     
@@ -88,13 +95,13 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
         <tr>
             
-                <td class="name"><code>webglContext</code></td>
+                <td class="name"><code>camera</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type">WebGL2RenderingContext</span>
+<span class="param-type"><a href="Camera.html">Camera</a></span>
 
 
             
@@ -112,7 +119,38 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
             
 
-            <td class="description last">WebGL2 rendering context used to create and manage GPU resources.</td>
+            <td class="description last">Controlled camera instance.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>element</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">HTMLElement</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">DOM element that receives input (usually the canvas).</td>
         </tr>
 
     
@@ -145,7 +183,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
             
 
-            <td class="description last">Optional texture creation options.
+            <td class="description last">Orbit options (plain object).
                 <h6>Properties</h6>
                 
 
@@ -175,13 +213,13 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
         <tr>
             
-                <td class="name"><code>flipY</code></td>
+                <td class="name"><code>targetX</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type">boolean</span>
+<span class="param-type">number</span>
 
 
             
@@ -202,12 +240,441 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
             
                 <td class="default">
                 
-                    true
+                    0
                 
                 </td>
             
 
-            <td class="description last">Whether to flip the image data vertically on upload.</td>
+            <td class="description last">Orbit target X component.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>targetY</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    0
+                
+                </td>
+            
+
+            <td class="description last">Orbit target Y component.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>targetZ</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    0
+                
+                </td>
+            
+
+            <td class="description last">Orbit target Z component.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>distance</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    6
+                
+                </td>
+            
+
+            <td class="description last">Orbit distance from the target.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>minDistance</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    0.1
+                
+                </td>
+            
+
+            <td class="description last">Minimum orbit distance.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>maxDistance</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    1000
+                
+                </td>
+            
+
+            <td class="description last">Maximum orbit distance.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>azimuthRadians</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    0.7
+                
+                </td>
+            
+
+            <td class="description last">Initial yaw angle in radians.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>polarRadians</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    -0.6
+                
+                </td>
+            
+
+            <td class="description last">Initial pitch angle in radians.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>minPolarRadians</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    -1.5
+                
+                </td>
+            
+
+            <td class="description last">Minimum pitch angle in radians.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>maxPolarRadians</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    1.5
+                
+                </td>
+            
+
+            <td class="description last">Maximum pitch angle in radians.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>rotationSpeed</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    1.0
+                
+                </td>
+            
+
+            <td class="description last">Rotation speed multiplier.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>zoomSpeed</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    1.0
+                
+                </td>
+            
+
+            <td class="description last">Zoom speed multiplier.</td>
         </tr>
 
     
@@ -255,7 +722,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line89">line 89</a>
+        <a href="controls_orbit-controls.js.html">controls/orbit-controls.js</a>, <a href="controls_orbit-controls.js.html#line138">line 138</a>
     </li></ul></dd>
     
 
@@ -296,7 +763,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
         <h3 class="subsection-title">Classes</h3>
 
         <dl>
-            <dt><a href="Texture2D.html">Texture2D</a></dt>
+            <dt><a href="OrbitControls.html">OrbitControls</a></dt>
             <dd></dd>
         </dl>
     
@@ -312,13 +779,13 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
         
             
-<h4 class="name" id="height"><span class="type-signature"></span>height<span class="type-signature"></span></h4>
+<h4 class="name" id="distance"><span class="type-signature"></span>distance<span class="type-signature"></span></h4>
 
 
 
 
 <div class="description">
-    Returns the height of the uploaded image (or placeholder height until loaded).
+    Current orbit distance.
 </div>
 
 
@@ -356,7 +823,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line221">line 221</a>
+        <a href="controls_orbit-controls.js.html">controls/orbit-controls.js</a>, <a href="controls_orbit-controls.js.html#line437">line 437</a>
     </li></ul></dd>
     
 
@@ -374,13 +841,13 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
         
             
-<h4 class="name" id="isDisposed"><span class="type-signature"></span>isDisposed<span class="type-signature"></span></h4>
+<h4 class="name" id="target"><span class="type-signature"></span>target<span class="type-signature"></span></h4>
 
 
 
 
 <div class="description">
-    Indicates whether this instance has been disposed.
+    Orbit target (the point camera looks at).
 </div>
 
 
@@ -418,193 +885,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line241">line 241</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="isLoaded"><span class="type-signature"></span>isLoaded<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    Indicates whether the image has been uploaded.
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line231">line 231</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="texture"><span class="type-signature"></span>texture<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    Returns the underlying `WebGLTexture` object.
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line201">line 201</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="width"><span class="type-signature"></span>width<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    Returns the width of the uploaded image (or placeholder width until loaded).
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line211">line 211</a>
+        <a href="controls_orbit-controls.js.html">controls/orbit-controls.js</a>, <a href="controls_orbit-controls.js.html#line428">line 428</a>
     </li></ul></dd>
     
 
@@ -632,7 +913,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
     
 
     
-    <h4 class="name" id="bind"><span class="type-signature"></span>bind<span class="signature">(textureUnitIndex)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="dispose"><span class="type-signature"></span>dispose<span class="signature">()</span><span class="type-signature"></span></h4>
     
 
     
@@ -640,7 +921,96 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
 
 <div class="description">
-    Binds this texture to a texture unit.
+    Disposes the controller by removing all event listeners.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="controls_orbit-controls.js.html">controls/orbit-controls.js</a>, <a href="controls_orbit-controls.js.html#line516">line 516</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="setCamera"><span class="type-signature"></span>setCamera<span class="signature">(camera)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Replaces the controlled camera.
+Useful when an application switches camera type (perspective/orthographic), but wants to keep the same orbit behavior.
 </div>
 
 
@@ -676,7 +1046,144 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
         <tr>
             
-                <td class="name"><code>textureUnitIndex</code></td>
+                <td class="name"><code>camera</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="Camera.html">Camera</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">New controlled camera instance.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="controls_orbit-controls.js.html">controls/orbit-controls.js</a>, <a href="controls_orbit-controls.js.html#line463">line 463</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="setDistance"><span class="type-signature"></span>setDistance<span class="signature">(distance)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Sets orbit distance (useful for UI sliders).
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>distance</code></td>
             
 
             <td class="type">
@@ -692,7 +1199,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
             
 
-            <td class="description last">Index of the texture unit (0 => N).</td>
+            <td class="description last">New distance value.</td>
         </tr>
 
     
@@ -733,7 +1240,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line250">line 250</a>
+        <a href="controls_orbit-controls.js.html">controls/orbit-controls.js</a>, <a href="controls_orbit-controls.js.html#line504">line 504</a>
     </li></ul></dd>
     
 
@@ -769,7 +1276,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
     
 
     
-    <h4 class="name" id="dispose"><span class="type-signature"></span>dispose<span class="signature">()</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="setTarget"><span class="type-signature"></span>setTarget<span class="signature">(x, y, z)</span><span class="type-signature"></span></h4>
     
 
     
@@ -777,95 +1284,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
 
 <div class="description">
-    Releases the WebGL texture.
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line283">line 283</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="loadFromUrl"><span class="type-signature">(async) </span>loadFromUrl<span class="signature">(url)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Loads an image from the given URL and uploads it into this WebGL texture.
+    Sets orbit target components.
 </div>
 
 
@@ -901,13 +1320,13 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
         <tr>
             
-                <td class="name"><code>url</code></td>
+                <td class="name"><code>x</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type">string</span>
+<span class="param-type">number</span>
 
 
             
@@ -917,7 +1336,53 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
             
 
-            <td class="description last">Image URL (relative or absolute).</td>
+            <td class="description last">Target X component.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>y</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Target Y component.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>z</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Target Z component.</td>
         </tr>
 
     
@@ -958,7 +1423,7 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="texture_texture2d.js.html">texture/texture2d.js</a>, <a href="texture_texture2d.js.html#line268">line 268</a>
+        <a href="controls_orbit-controls.js.html">controls/orbit-controls.js</a>, <a href="controls_orbit-controls.js.html#line448">line 448</a>
     </li></ul></dd>
     
 
@@ -983,28 +1448,95 @@ It supports a placeholder 1x1 pixel, and can asynchronously upload an image from
 
 
 
-<h5>Returns:</h5>
+
+
+
+
 
         
-<div class="param-desc">
-    - Promise that resolves after successful GPU upload, or rejects on `load/decode/upload` error.
+            
+
+    
+
+    
+    <h4 class="name" id="update"><span class="type-signature"></span>update<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Applies the current orbit state to the camera (position + rotation).
+This method is intentionally cheap when nothing has changed.
 </div>
 
 
 
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">Promise.&lt;void></span>
 
 
-    </dd>
-</dl>
+
+
+
+
+
+
+
+
+<dl class="details">
 
     
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="controls_orbit-controls.js.html">controls/orbit-controls.js</a>, <a href="controls_orbit-controls.js.html#line476">line 476</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

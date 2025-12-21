@@ -20,6 +20,7 @@ import { Scene }                    from './scene/scene.js';
 import { Camera }                   from './scene/camera.js';
 import { PerspectiveCamera }        from './scene/perspective-camera.js';
 import { OrthographicCamera }       from './scene/orthographic-camera.js';
+import { OrbitControls }            from './controls/orbit-controls.js';
 import { Renderer }                 from './render/renderer.js';
 import { Engine, createEngine }     from './engine/engine.js';
 
@@ -74,6 +75,10 @@ export const GeraWebGL = Object.freeze({
         DirectionalLightMaterial,
         LambertMaterial,
         PhongMaterial
+    }),
+
+    Controls: Object.freeze({
+        OrbitControls
     }),
 
     // Low-level access (shaders, manual uniforms/attributes):
