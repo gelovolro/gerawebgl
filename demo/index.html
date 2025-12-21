@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Gera WebGL - demo</title>
     <style>
 
@@ -15,20 +16,39 @@
         }
 
         canvas {
-            display : block;
-            width   : 100%;
-            height  : 100%;
+            position : fixed;
+            top      : 0px;
+            left     : 0px;
+            display  : block;
+            width    : 100vw;
+            height   : 100vh;
+            height   : 100dvh;
         }
 
         #ui {
-            position       : fixed;
-            top            : 10px;
-            left           : 10px;
-            z-index        : 10;
-            display        : flex;
-            flex-direction : column;
-            gap            : 8px;
-            align-items    : flex-start;
+            position        : fixed;
+            top             : 10px;
+            left            : 10px;
+            z-index         : 10;
+            display         : flex;
+            flex-direction  : column;
+            gap             : 8px;
+            align-items     : flex-start;
+            background      : rgba(10, 30, 60, 0.28);
+            border          : 1px solid rgba(120, 180, 255, 0.22);
+            border-radius   : 10px;
+            padding         : 10px;
+            box-shadow      : 0px 8px 24px rgba(0, 0, 0, 0.35);
+            backdrop-filter : blur(10px);
+            pointer-events  : none;
+        }
+
+        #ui button,
+        #ui select,
+        #ui input,
+        #ui label,
+        #ui span {
+            pointer-events : auto;
         }
 
         .uiRow {
@@ -41,15 +61,54 @@
         #recreateMeshButton,
         #cameraTypeSelect,
         #materialModeSelect {
-            padding     : 6px 12px;
-            font-family : sans-serif;
-            font-size   : 14px;
-            cursor      : pointer;
+            padding       : 6px 12px;
+            font-family   : sans-serif;
+            font-size     : 14px;
+            cursor        : pointer;
+            background    : linear-gradient(180deg, rgba(110, 190, 255, 0.22), rgba(30, 90, 160, 0.18));
+            border        : 1px solid rgba(120, 190, 255, 0.35);
+            border-radius : 10px;
+            color         : rgba(235, 247, 255, 0.95);
+            outline       : none;
+            box-shadow    : 0px 6px 16px rgba(0, 0, 0, 0.28);
+            transition    : transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+        }
+
+        #wireframeToggleButton:hover,
+        #recreateMeshButton:hover,
+        #cameraTypeSelect:hover,
+        #materialModeSelect:hover {
+            border-color : rgba(160, 210, 255, 0.55);
+            box-shadow   : 0px 10px 22px rgba(0, 0, 0, 0.34);
+            transform    : translateY(-1px);
+        }
+
+        #wireframeToggleButton:active,
+        #recreateMeshButton:active {
+            transform  : translateY(0px);
+            box-shadow : 0px 6px 16px rgba(0, 0, 0, 0.28);
         }
 
         #cameraTypeSelect,
         #materialModeSelect {
-            cursor : pointer;
+            cursor              : pointer;
+            appearance          : none;
+            padding-right       : 28px;
+            background-repeat   : no-repeat;
+            background-position :
+                0px 0px,
+                right 12px top 55%,
+                right 7px  top 55%;
+
+            background-size:
+                auto,
+                6px 6px,
+                6px 6px;
+
+            background-image:
+                linear-gradient(180deg, rgba(110, 190, 255, 0.22), rgba(30, 90, 160, 0.18)),
+                linear-gradient(45deg, transparent 50%, rgba(235, 247, 255, 0.9) 50%),
+                linear-gradient(135deg, rgba(235, 247, 255, 0.9) 50%, transparent 50%);
         }
 
         #opacityLabel {
@@ -57,6 +116,7 @@
             font-family : sans-serif;
             font-size   : 14px;
             user-select : none;
+            text-shadow : 0px 1px 2px rgba(0, 0, 0, 0.35);
         }
 
         #opacityValue {
@@ -66,16 +126,66 @@
             min-width   : 3.5em;
             text-align  : right;
             user-select : none;
+            text-shadow : 0px 1px 2px rgba(0, 0, 0, 0.35);
         }
 
         #opacitySlider {
-            width : 150px;
+            width        : 150px;
+            accent-color : rgba(120, 200, 255, 0.95);
+        }
+
+        #wireframeToggleButton:focus-visible,
+        #recreateMeshButton:focus-visible,
+        #cameraTypeSelect:focus-visible,
+        #materialModeSelect:focus-visible,
+        #opacitySlider:focus-visible {
+            box-shadow : 0px 0px 0px 3px rgba(120, 200, 255, 0.25), 0px 10px 22px rgba(0, 0, 0, 0.34);
+        }
+
+        #cameraTypeSelect option,
+        #materialModeSelect option {
+            color      : rgba(235, 247, 255, 0.95);
+            background : rgba(10, 30, 60, 0.95);
         }
 
         @media (pointer: coarse), (max-width: 768px) {
-            #uiRowButtons,
-            #uiRowOpacity {
-                display : none;
+            canvas {
+                top    : 12vh;
+                height : calc(100vh - 12vh);
+                height : calc(100dvh - 12vh);
+            }
+
+            #ui {
+                top  : 8px;
+                left : 8px;
+            }
+
+            #uiRowSelects {
+                width     : 100%;
+                flex-wrap : wrap;
+            }
+
+            #cameraTypeSelect,
+            #materialModeSelect {
+                width     : 100%;
+                min-width : 0px;
+            }
+
+            #wireframeToggleButton,
+            #recreateMeshButton,
+            #cameraTypeSelect,
+            #materialModeSelect {
+                font-size : 12px;
+                padding   : 6px 10px;
+            }
+
+            #opacityLabel,
+            #opacityValue {
+                font-size : 12px;
+            }
+
+            #opacitySlider {
+                width : 140px;
             }
         }
 
