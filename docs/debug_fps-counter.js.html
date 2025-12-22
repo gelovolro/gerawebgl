@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: shader/shader-program.js</title>
+    <title>JSDoc: Source: debug/fps-counter.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: shader/shader-program.js</h1>
+    <h1 class="page-title">Source: debug/fps-counter.js</h1>
 
     
 
@@ -26,455 +26,598 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>import { Texture2D } from '../texture/texture2d.js';
+            <pre class="prettyprint source linenums"><code>/**
+ * Default label used by the counter header.
+ *
+ * @type {string}
+ */
+const DEFAULT_LABEL = 'performance';
 
 /**
- * Number of elements in a 4x4 matrix.
- * Used to validate and upload `mat4` uniform values.
+ * Default DOM update interval in milliseconds.
  *
  * @type {number}
  */
-const MATRIX_4x4_ELEMENT_COUNT = 16;
+const DEFAULT_UPDATE_INTERVAL_MS = 250;
 
 /**
- * Number of elements in a 2-component vector.
- * Used to validate `vec2` uniform values.
+ * Default exponential smoothing factor.
  *
  * @type {number}
  */
-const VECTOR_2_ELEMENT_COUNT = 2;
+const DEFAULT_SMOOTHING_FACTOR = 0.15;
 
 /**
- * Number of elements in a 3-component vector.
- * Used to validate `vec3` uniform values.
+ * Minimum allowed update interval.
  *
  * @type {number}
  */
-const VECTOR_3_ELEMENT_COUNT = 3;
+const MIN_UPDATE_INTERVAL_MS = 16;
 
 /**
- * Number of elements in a 4-component vector.
- * Used to validate `vec4` uniform values.
+ * Inclusive lower bound for a [0..1] range value.
  *
  * @type {number}
  */
-const VECTOR_4_ELEMENT_COUNT = 4;
+const MIN_NORMALIZED = 0;
 
 /**
- * WebGL sentinel value for `attribute not found`.
- * getAttribLocation returns `-1`, when the attribute is not found.
+ * Inclusive upper bound for a [0..1] range value.
  *
  * @type {number}
  */
-const ATTRIBUTE_LOCATION_NOT_FOUND_VALUE = -1;
+const MAX_NORMALIZED = 1;
 
 /**
- * Minimum allowed texture unit index.
+ * Default FPS threshold considered `good`.
  *
  * @type {number}
  */
-const MIN_TEXTURE_UNIT_INDEX = 0;
+const DEFAULT_GOOD_FPS_THRESHOLD = 55;
 
 /**
- * Default texture unit index used by `ShaderProgram.setTexture2D`.
- * Zero corresponds to `TEXTURE0`.
+ * Default FPS threshold considered `ok`.
  *
  * @type {number}
  */
-const DEFAULT_TEXTURE_UNIT_INDEX = 0;
+const DEFAULT_OK_FPS_THRESHOLD = 30;
 
 /**
- * Thin wrapper around a linked WebGL shader program.
+ * DOM element tag name used by the counter.
+ *
+ * @type {string}
  */
-export class ShaderProgram {
+const DIV_TAG_NAME = 'div';
+
+/**
+ * Placeholder text shown before the first measurement.
+ *
+ * @type {string}
+ */
+const PLACEHOLDER_TEXT = '--';
+
+/**
+ * FPS row label.
+ *
+ * @type {string}
+ */
+const FPS_ROW_LABEL = 'FPS';
+
+/**
+ * Frame time row label (milliseconds).
+ *
+ * @type {string}
+ */
+const FRAME_TIME_ROW_LABEL = 'MS';
+
+/**
+ * Amount of milliseconds in one second.
+ *
+ * @type {number}
+ */
+const MILLISECONDS_PER_SECOND = 1000;
+
+/**
+ * A guard value used by divisions to avoid a zero denominator.
+ *
+ * @type {number}
+ */
+const MIN_DENOMINATOR = 1;
+
+/**
+ * A numeric constant used for clamping values to a non-negative range.
+ *
+ * @type {number}
+ */
+const NON_NEGATIVE_MIN = 0;
+
+/**
+ * Initial frame counter value.
+ *
+ * @type {number}
+ */
+const INITIAL_FRAMES_SINCE_LAST_UPDATE = 0;
+
+/**
+ * Initial accumulated time value.
+ *
+ * @type {number}
+ */
+const INITIAL_ACCUMULATED_FRAME_TIME_MS = 0;
+
+/**
+ * Frame count increment used for each recorded frame.
+ *
+ * @type {number}
+ */
+const FRAMES_INCREMENT = 1;
+
+/**
+ * Fallback FPS returned by `FpsCounter#end`, when a value is not yet available.
+ *
+ * @type {number}
+ */
+const FPS_FALLBACK_VALUE = 0;
+
+/**
+ * Number of digits used by `Number#toFixed` to format frame time values.
+ *
+ * @type {number}
+ */
+const FRAME_TIME_DECIMAL_PLACES = 1;
+
+/**
+ * Role attribute value for the root element.
+ *
+ * @type {string}
+ */
+const ARIA_ROLE_STATUS = 'status';
+
+/**
+ * Attribute value used to announce updates politely.
+ *
+ * @type {string}
+ */
+const ARIA_LIVE_POLITE = 'polite';
+
+/**
+ * Root element CSS class.
+ *
+ * @type {string}
+ */
+const ROOT_CLASS = 'gwFpsCounter';
+
+/**
+ * Root element state class used, when FPS is in the `good` range.
+ *
+ * @type {string}
+ */
+const STATE_CLASS_GOOD = 'gwFpsCounter-good';
+
+/**
+ * Root element state class used, when FPS is in the `ok` range.
+ *
+ * @type {string}
+ */
+const STATE_CLASS_OK = 'gwFpsCounter-ok';
+
+/**
+ * Root element state class used, when FPS is in the `bad` range.
+ *
+ * @type {string}
+ */
+const STATE_CLASS_BAD = 'gwFpsCounter-bad';
+
+/**
+ * Header CSS class.
+ *
+ * @type {string}
+ */
+const HEADER_CLASS = 'gwFpsCounterHeader';
+
+/**
+ * Row CSS class.
+ *
+ * @type {string}
+ */
+const ROW_CLASS = 'gwFpsCounterRow';
+
+/**
+ * Label CSS class.
+ *
+ * @type {string}
+ */
+const ROW_LABEL_CLASS = 'gwFpsCounterRowLabel';
+
+/**
+ * Value CSS class.
+ *
+ * @type {string}
+ */
+const ROW_VALUE_CLASS = 'gwFpsCounterRowValue';
+
+/**
+ * Indicates that the counter has not yet computed a value.
+ *
+ * @type {number}
+ */
+const UNINITIALIZED_NUMBER = -1;
+
+/**
+ * Default flag that enables frame time (ms) display.
+ *
+ * @type {boolean}
+ */
+const DEFAULT_SHOW_FRAME_TIME = true;
+
+/**
+ * Options used by `FpsCounter`.
+ *
+ * @typedef {Object} FpsCounterOptions
+ * @property {string}  [label = 'Performance']  - Short title shown at the top of the panel.
+ * @property {number}  [updateIntervalMs = 250] - DOM refresh interval (ms). Values are computed every frame.
+ * @property {number}  [smoothingFactor = 0.15] - Exponential smoothing factor in [0..1].
+ * @property {boolean} [showFrameTime = true]   - When true, also shows the average frame time in milliseconds.
+ * @property {number}  [goodFpsThreshold = 55]  - FPS value that should be considered `good`.
+ * @property {number}  [okFpsThreshold   = 30]  - FPS value that should be considered `ok`.
+ */
+
+/**
+ * Small DOM-based FPS counter intended for demos and debugging.
+ */
+export class FpsCounter {
+
     /**
-     * Raw WebGL2 rendering context.
-     * Used for all shader program operations (e.g.: compile/link/use, uniforms, attributes).
+     * Root DOM element.
      *
-     * @type {WebGL2RenderingContext}
+     * @type {HTMLElement}
      * @private
      */
-    #webglRenderingContext;
+    #domElement;
 
     /**
-     * Linked WebGL program instance.
+     * DOM element, that shows the FPS value.
      *
-     * @type {WebGLProgram | null}
+     * @type {HTMLElement}
      * @private
      */
-    #program;
+    #fpsValueElement;
 
     /**
-     * Cache of uniform locations by uniform name.
-     * Avoids repeated calls to getUniformLocation for the same program.
+     * DOM element, that shows the frame time value (ms).
      *
-     * @type {Map&lt;string, WebGLUniformLocation>}
+     * @type {HTMLElement | null}
      * @private
      */
-    #uniformLocations;
+    #frameTimeValueElement;
 
     /**
-     * Indicates whether this shader program has been disposed.
+     * DOM refresh interval in milliseconds.
+     *
+     * @type {number}
+     * @private
+     */
+    #updateIntervalMs;
+
+    /**
+     * Exponential smoothing factor in [0..1].
+     *
+     * @type {number}
+     * @private
+     */
+    #smoothingFactor;
+
+    /**
+     * When true, frame time (ms) is displayed.
      *
      * @type {boolean}
      * @private
      */
-    #isDisposed = false;
+    #showFrameTime;
 
     /**
-     * @param {WebGL2RenderingContext} webglRenderingContext - WebGL2 rendering context used to create shaders and the program.
-     * @param {string} vertexSource                          - GLSL source code of the vertex shader.
-     * @param {string} fragmentSource                        - GLSL source code of the fragment shader.
-     */
-    constructor(webglRenderingContext, vertexSource, fragmentSource) {
-        if (!(webglRenderingContext instanceof WebGL2RenderingContext)) {
-            throw new TypeError('`ShaderProgram` expects a `WebGL2RenderingContext`.');
-        }
-
-        if (typeof vertexSource !== 'string' || typeof fragmentSource !== 'string') {
-            throw new TypeError('`ShaderProgram` expects vertex and fragment source as strings.');
-        }
-
-        this.#webglRenderingContext = webglRenderingContext;
-        this.#uniformLocations      = new Map();
-
-        const vertexShader   = this.#compileShader(this.#webglRenderingContext.VERTEX_SHADER, vertexSource);
-        const fragmentShader = this.#compileShader(this.#webglRenderingContext.FRAGMENT_SHADER, fragmentSource);
-        const program        = this.#webglRenderingContext.createProgram();
-
-        if (!program) {
-            this.#webglRenderingContext.deleteShader(vertexShader);
-            this.#webglRenderingContext.deleteShader(fragmentShader);
-            throw new Error('Failed to create WebGL program.');
-        }
-
-        this.#webglRenderingContext.attachShader(program, vertexShader);
-        this.#webglRenderingContext.attachShader(program, fragmentShader);
-        this.#webglRenderingContext.linkProgram(program);
-
-        const linkStatus = this.#webglRenderingContext.getProgramParameter(
-            program,
-            this.#webglRenderingContext.LINK_STATUS
-        );
-
-        this.#webglRenderingContext.deleteShader(vertexShader);
-        this.#webglRenderingContext.deleteShader(fragmentShader);
-
-        if (!linkStatus) {
-            const infoLog = this.#webglRenderingContext.getProgramInfoLog(program) || 'Unknown program link error';
-            this.#webglRenderingContext.deleteProgram(program);
-            throw new Error(`Failed to link program: ${infoLog}`);
-        }
-
-        this.#program = program;
-    }
-
-    /**
-     * Returns the underlying WebGL program object.
+     * FPS value considered `good`.
      *
-     * @returns {WebGLProgram}
+     * @type {number}
+     * @private
      */
-    get program() {
-        this.#assertNotDisposed();
-        return this.#program;
-    }
+    #goodFpsThreshold;
 
     /**
-     * Makes this program active for subsequent draw calls.
-     */
-    use() {
-        this.#assertNotDisposed();
-        this.#webglRenderingContext.useProgram(this.#program);
-    }
-
-    /**
-     * Returns the attribute location for the given attribute name.
-     * This is useful for manual `vertexAttribPointer` setups.
+     * FPS value considered `ok`.
      *
-     * @param {string} name - Attribute name in the linked shader program.
-     * @returns {number}    - Attribute location (0+).
+     * @type {number}
+     * @private
      */
-    getAttribLocation(name) {
-        this.#assertNotDisposed();
-
-        if (typeof name !== 'string') {
-            throw new TypeError('`ShaderProgram.getAttribLocation` expects attribute name as a string.');
-        }
-
-        const location = this.#webglRenderingContext.getAttribLocation(this.#program, name);
-
-        if (location === ATTRIBUTE_LOCATION_NOT_FOUND_VALUE) {
-            throw new Error(`Attribute "${name}" not found in shader program.`);
-        }
-
-        return location;
-    }
+    #okFpsThreshold;
 
     /**
-     * Returns a cached uniform location.
-     * This can be used for manual `gl.uniform*` calls.
+     * Frame start timestamp (ms).
      *
-     * @param {string} name - Uniform name in the linked shader program.
-     * @returns {WebGLUniformLocation}
+     * @type {number}
+     * @private
      */
-    getUniformLocation(name) {
-        return this.#getUniformLocation(name);
-    }
+    #frameStartTimeMs = UNINITIALIZED_NUMBER;
 
     /**
-     * Sets a float uniform.
+     * Timestamp (ms) of the last DOM refresh.
      *
-     * @param {string} name  - Name of the uniform variable.
-     * @param {number} value - Float value to upload.
+     * @type {number}
+     * @private
      */
-    setFloat(name, value) {
-        this.#assertNotDisposed();
-
-        if (typeof name !== 'string') {
-            throw new TypeError('`ShaderProgram.setFloat` expects uniform name as a string.');
-        }
-
-        if (typeof value !== 'number') {
-            throw new TypeError('`ShaderProgram.setFloat` expects value as a number.');
-        }
-
-        const location = this.#getUniformLocation(name);
-        this.#webglRenderingContext.uniform1f(location, value);
-    }
+    #lastUpdateTimeMs = UNINITIALIZED_NUMBER;
 
     /**
-     * Sets an integer uniform.
+     * Number of frames since the last DOM refresh.
      *
-     * @param {string} name  - Name of the uniform variable.
-     * @param {number} value - Integer value to upload.
+     * @type {number}
+     * @private
      */
-    setInt(name, value) {
-        this.#assertNotDisposed();
-
-        if (typeof name !== 'string') {
-            throw new TypeError('`ShaderProgram.setInt` expects uniform name as a string.');
-        }
-
-        if (typeof value !== 'number' || !Number.isInteger(value)) {
-            throw new TypeError('`ShaderProgram.setInt` expects an integer value.');
-        }
-
-        const location = this.#getUniformLocation(name);
-        this.#webglRenderingContext.uniform1i(location, value);
-    }
+    #framesSinceLastUpdate = INITIAL_FRAMES_SINCE_LAST_UPDATE;
 
     /**
-     * Sets a `sampler2D` uniform and binds a `Texture2D` to the specified texture unit.
+     * Accumulated frame time in milliseconds since the last DOM refresh.
      *
-     * @param {string} name                   - Name of the uniform variable.
-     * @param {Texture2D} texture             - `Texture2D` instance to bind.
-     * @param {number} [textureUnitIndex = 0] - Texture unit index (0 => N).
+     * @type {number}
+     * @private
      */
-    setTexture2D(name, texture, textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX) {
-        this.#assertNotDisposed();
-
-        if (typeof name !== 'string') {
-            throw new TypeError('`ShaderProgram.setTexture2D` expects uniform name as a string.');
-        }
-
-        if (!(texture instanceof Texture2D)) {
-            throw new TypeError('`ShaderProgram.setTexture2D` expects texture as Texture2D.');
-        }
-
-        if (!Number.isInteger(textureUnitIndex) || textureUnitIndex &lt; MIN_TEXTURE_UNIT_INDEX) {
-            throw new TypeError('`ShaderProgram.setTexture2D` expects textureUnitIndex as a non-negative integer.');
-        }
-
-        texture.bind(textureUnitIndex);
-        const location = this.#getUniformLocation(name);
-        this.#webglRenderingContext.uniform1i(location, textureUnitIndex);
-    }
+    #accumulatedFrameTimeMs = INITIAL_ACCUMULATED_FRAME_TIME_MS;
 
     /**
-     * Sets a vec2 uniform.
+     * Smoothed FPS value.
      *
-     * @param {string} name                   - Name of the uniform variable.
-     * @param {Float32Array | number[]} value - Two numeric components.
+     * @type {number}
+     * @private
      */
-    setVector2(name, value) {
-        this.#assertNotDisposed();
-
-        if (typeof name !== 'string') {
-            throw new TypeError('`ShaderProgram.setVector2` expects uniform name as a string.');
-        }
-
-        if (!Array.isArray(value) &amp;&amp; !(value instanceof Float32Array)) {
-            throw new TypeError('`ShaderProgram.setVector2` expects a number[] or Float32Array.');
-        }
-
-        if (value.length !== VECTOR_2_ELEMENT_COUNT) {
-            throw new TypeError('`ShaderProgram.setVector2` expects exactly 2 components.');
-        }
-
-        const location = this.#getUniformLocation(name);
-        this.#webglRenderingContext.uniform2fv(location, value);
-    }
+    #smoothedFps = UNINITIALIZED_NUMBER;
 
     /**
-     * Sets a vec3 uniform.
+     * Smoothed frame time (ms).
      *
-     * @param {string} name                   - Name of the uniform variable.
-     * @param {Float32Array | number[]} value - Three numeric components.
+     * @type {number}
+     * @private
      */
-    setVector3(name, value) {
-        this.#assertNotDisposed();
+    #smoothedFrameTimeMs = UNINITIALIZED_NUMBER;
 
-        if (typeof name !== 'string') {
-            throw new TypeError('`ShaderProgram.setVector3` expects uniform name as a string.');
+    /**
+     * @param {FpsCounterOptions} [options] - Counter options.
+     */
+    constructor(options = {}) {
+        if (options === null || typeof options !== 'object' || Array.isArray(options)) {
+            throw new TypeError('`FpsCounter` expects an options object (plain object).');
         }
 
-        if (!Array.isArray(value) &amp;&amp; !(value instanceof Float32Array)) {
-            throw new TypeError('`ShaderProgram.setVector3` expects a number[] or Float32Array.');
+        const {
+            label            = DEFAULT_LABEL,
+            updateIntervalMs = DEFAULT_UPDATE_INTERVAL_MS,
+            smoothingFactor  = DEFAULT_SMOOTHING_FACTOR,
+            showFrameTime    = DEFAULT_SHOW_FRAME_TIME,
+            goodFpsThreshold = DEFAULT_GOOD_FPS_THRESHOLD,
+            okFpsThreshold   = DEFAULT_OK_FPS_THRESHOLD
+        } = options;
+
+        if (typeof label !== 'string') {
+            throw new TypeError('`FpsCounter` option `label` must be a string.');
         }
 
-        if (value.length !== VECTOR_3_ELEMENT_COUNT) {
-            throw new TypeError('`ShaderProgram.setVector3` expects exactly 3 components.');
+        if (typeof updateIntervalMs !== 'number' || updateIntervalMs &lt; MIN_UPDATE_INTERVAL_MS) {
+            throw new RangeError(`\`FpsCounter\` option \`updateIntervalMs\` must be a number >= ${MIN_UPDATE_INTERVAL_MS}.`);
         }
 
-        const location = this.#getUniformLocation(name);
-        this.#webglRenderingContext.uniform3fv(location, value);
+        if (typeof smoothingFactor !== 'number' || smoothingFactor &lt; MIN_NORMALIZED || smoothingFactor > MAX_NORMALIZED) {
+            throw new RangeError('`FpsCounter` option `smoothingFactor` must be a number in [0..1].');
+        }
+
+        if (typeof showFrameTime !== 'boolean') {
+            throw new TypeError('`FpsCounter` option `showFrameTime` must be a boolean.');
+        }
+
+        if (typeof goodFpsThreshold !== 'number' || goodFpsThreshold &lt;= NON_NEGATIVE_MIN) {
+            throw new RangeError('`FpsCounter` option `goodFpsThreshold` must be a positive number.');
+        }
+
+        if (typeof okFpsThreshold !== 'number' || okFpsThreshold &lt;= NON_NEGATIVE_MIN) {
+            throw new RangeError('`FpsCounter` option `okFpsThreshold` must be a positive number.');
+        }
+
+        if (okFpsThreshold > goodFpsThreshold) {
+            throw new RangeError('`FpsCounter` options must satisfy: `okFpsThreshold &lt;= goodFpsThreshold`.');
+        }
+
+        if (typeof document === 'undefined') {
+            throw new Error('`FpsCounter` requires a browser environment with `document` available.');
+        }
+
+        this.#updateIntervalMs = updateIntervalMs;
+        this.#smoothingFactor  = smoothingFactor;
+        this.#showFrameTime    = showFrameTime;
+        this.#goodFpsThreshold = goodFpsThreshold;
+        this.#okFpsThreshold   = okFpsThreshold;
+
+        this.#domElement           = document.createElement(DIV_TAG_NAME);
+        this.#domElement.className = `${ROOT_CLASS} ${STATE_CLASS_GOOD}`;
+        this.#domElement.setAttribute('role'      , ARIA_ROLE_STATUS);
+        this.#domElement.setAttribute('aria-live' , ARIA_LIVE_POLITE);
+
+        const headerElement       = document.createElement(DIV_TAG_NAME);
+        headerElement.className   = HEADER_CLASS;
+        headerElement.textContent = label;
+        this.#domElement.appendChild(headerElement);
+
+        const fpsRow          = FpsCounter.#createRow(FPS_ROW_LABEL, PLACEHOLDER_TEXT);
+        this.#fpsValueElement = fpsRow.valueElement;
+        this.#domElement.appendChild(fpsRow.rowElement);
+
+        if (this.#showFrameTime) {
+            const frameTimeRow = FpsCounter.#createRow(FRAME_TIME_ROW_LABEL, PLACEHOLDER_TEXT);
+            this.#frameTimeValueElement = frameTimeRow.valueElement;
+            this.#domElement.appendChild(frameTimeRow.rowElement);
+        } else {
+            this.#frameTimeValueElement = null;
+        }
+    }
+
+    /** @returns {HTMLElement} */
+    get domElement() {
+        return this.#domElement;
     }
 
     /**
-     * Sets a `vec4` uniform.
+     * Marks the beginning of a frame.
+     */
+    begin() {
+        this.#frameStartTimeMs = performance.now();
+    }
+
+    /**
+     * Marks the end of a frame.
      *
-     * @param {string} name                   - Name of the uniform variable.
-     * @param {Float32Array | number[]} value - Four numeric components.
+     * @returns {number} - Latest smoothed FPS value.
      */
-    setVector4(name, value) {
-        this.#assertNotDisposed();
+    end() {
+        const nowMs            = performance.now();
+        const frameStartTimeMs = (this.#frameStartTimeMs === UNINITIALIZED_NUMBER) ? nowMs : this.#frameStartTimeMs;
+        const frameTimeMs      = Math.max(NON_NEGATIVE_MIN, nowMs - frameStartTimeMs);
 
-        if (typeof name !== 'string') {
-            throw new TypeError('`ShaderProgram.setVector4` expects uniform name as a string.');
-        }
+        this.#recordFrame(frameTimeMs, nowMs);
+        this.#frameStartTimeMs = nowMs;
 
-        if (!Array.isArray(value) &amp;&amp; !(value instanceof Float32Array)) {
-            throw new TypeError('`ShaderProgram.setVector4` expects a number[] or `Float32Array`.');
-        }
-
-        if (value.length !== VECTOR_4_ELEMENT_COUNT) {
-            throw new TypeError('`ShaderProgram.setVector4` expects exactly 4 components.');
-        }
-
-        const location = this.#getUniformLocation(name);
-        this.#webglRenderingContext.uniform4fv(location, value);
+        return (this.#smoothedFps === UNINITIALIZED_NUMBER) ? FPS_FALLBACK_VALUE : this.#smoothedFps;
     }
 
     /**
-     * Sets a 4x4 matrix uniform.
+     * Updates the counter using a known delta time.
      *
-     * @param {string} name         - Name of the uniform variable in the GLSL program.
-     * @param {Float32Array} matrix - 4x4 matrix in column-major order to upload to the uniform.
+     * @param {number} deltaTimeSeconds - Time since previous frame in seconds.
      */
-    setMatrix4(name, matrix) {
-        this.#assertNotDisposed();
-
-        if (typeof name !== 'string') {
-            throw new TypeError('`ShaderProgram.setMatrix4` expects uniform name as a string.');
+    update(deltaTimeSeconds) {
+        if (typeof deltaTimeSeconds !== 'number' || !Number.isFinite(deltaTimeSeconds) || deltaTimeSeconds &lt; NON_NEGATIVE_MIN) {
+            throw new TypeError('`FpsCounter.update` expects a non-negative finite number (seconds).');
         }
 
-        if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
-            throw new TypeError('`ShaderProgram.setMatrix4` expects a 4x4 Float32Array.');
-        }
-
-        const location = this.#getUniformLocation(name);
-        this.#webglRenderingContext.uniformMatrix4fv(location, false, matrix);
+        const deltaTimeMs = deltaTimeSeconds * MILLISECONDS_PER_SECOND;
+        this.#recordFrame(deltaTimeMs, performance.now());
     }
 
     /**
-     * Releases the underlying WebGL program. After calling dispose, this instance must not be used.
+     * Resets internal counters and UI.
      */
-    dispose() {
-        if (this.#isDisposed) {
+    reset() {
+        this.#frameStartTimeMs            = UNINITIALIZED_NUMBER;
+        this.#lastUpdateTimeMs            = UNINITIALIZED_NUMBER;
+        this.#framesSinceLastUpdate       = INITIAL_FRAMES_SINCE_LAST_UPDATE;
+        this.#accumulatedFrameTimeMs      = INITIAL_ACCUMULATED_FRAME_TIME_MS;
+        this.#smoothedFps                 = UNINITIALIZED_NUMBER;
+        this.#smoothedFrameTimeMs         = UNINITIALIZED_NUMBER;
+        this.#fpsValueElement.textContent = PLACEHOLDER_TEXT;
+
+        if (this.#frameTimeValueElement) {
+            this.#frameTimeValueElement.textContent = PLACEHOLDER_TEXT;
+        }
+
+        this.#applyStateClass(STATE_CLASS_GOOD);
+    }
+
+    /**
+     * Records a single frame measurement.
+     *
+     * @param {number} frameTimeMs - Frame time in milliseconds.
+     * @param {number} nowMs       - Current timestamp in milliseconds.
+     * @private
+     */
+    #recordFrame(frameTimeMs, nowMs) {
+        if (this.#lastUpdateTimeMs === UNINITIALIZED_NUMBER) {
+            this.#lastUpdateTimeMs = nowMs;
+        }
+
+        this.#framesSinceLastUpdate  += FRAMES_INCREMENT;
+        this.#accumulatedFrameTimeMs += frameTimeMs;
+
+        const elapsedMs = nowMs - this.#lastUpdateTimeMs;
+
+        if (elapsedMs &lt; this.#updateIntervalMs) {
             return;
         }
 
-        if (this.#program) {
-            this.#webglRenderingContext.deleteProgram(this.#program);
-        }
+        const fps            = (this.#framesSinceLastUpdate * MILLISECONDS_PER_SECOND) / Math.max(MIN_DENOMINATOR, elapsedMs);
+        const avgFrameTimeMs = this.#accumulatedFrameTimeMs / Math.max(MIN_DENOMINATOR, this.#framesSinceLastUpdate);
 
-        this.#uniformLocations.clear();
-        this.#program    = null;
-        this.#isDisposed = true;
+        this.#smoothedFps            = this.#smoothValue(this.#smoothedFps, fps);
+        this.#smoothedFrameTimeMs    = this.#smoothValue(this.#smoothedFrameTimeMs, avgFrameTimeMs);
+        this.#updateDom();
+        this.#lastUpdateTimeMs       = nowMs;
+        this.#framesSinceLastUpdate  = INITIAL_FRAMES_SINCE_LAST_UPDATE;
+        this.#accumulatedFrameTimeMs = INITIAL_ACCUMULATED_FRAME_TIME_MS;
     }
 
     /**
+     * @param {number} currentValue - Current smoothed value or `UNINITIALIZED_NUMBER`.
+     * @param {number} nextValue    - New measurement.
+     * @returns {number}            - Smoothed value computed using exponential moving average.
      * @private
      */
-    #assertNotDisposed() {
-        if (this.#isDisposed || this.#program === null) {
-            throw new Error('`ShaderProgram` has been disposed and can no longer be used.');
+    #smoothValue(currentValue, nextValue) {
+        if (currentValue === UNINITIALIZED_NUMBER) {
+            return nextValue;
         }
+
+        return currentValue + (nextValue - currentValue) * this.#smoothingFactor;
     }
 
     /**
-     * Looks up a uniform location with caching.
+     * Updates the UI using current smoothed values.
      *
-     * @param {string} name - Name of the uniform variable in the linked shader program.
-     * @returns {WebGLUniformLocation}
      * @private
      */
-    #getUniformLocation(name) {
-        this.#assertNotDisposed();
+    #updateDom() {
+        const fps = this.#smoothedFps;
+        const frameTimeMs = this.#smoothedFrameTimeMs;
+        this.#fpsValueElement.textContent = String(Math.round(fps));
 
-        if (typeof name !== 'string') {
-            throw new TypeError('`ShaderProgram.#getUniformLocation` expects a string name.');
+        if (this.#frameTimeValueElement) {
+            this.#frameTimeValueElement.textContent = frameTimeMs.toFixed(FRAME_TIME_DECIMAL_PLACES);
         }
 
-        if (this.#uniformLocations.has(name)) {
-            const cachedLocation = this.#uniformLocations.get(name);
-            return cachedLocation;
+        if (fps >= this.#goodFpsThreshold) {
+            this.#applyStateClass(STATE_CLASS_GOOD);
+        } else if (fps >= this.#okFpsThreshold) {
+            this.#applyStateClass(STATE_CLASS_OK);
+        } else {
+            this.#applyStateClass(STATE_CLASS_BAD);
         }
-
-        const location = this.#webglRenderingContext.getUniformLocation(this.#program, name);
-
-        if (location === null) {
-            throw new Error(`Uniform "${name}" not found in shader program.`);
-        }
-
-        this.#uniformLocations.set(name, location);
-        return location;
     }
 
     /**
-     * Compiles a shader of the given type.
+     * Applies one of the state classes to the root element.
      *
-     * @param {number} type   - Shader type constant (e.g. gl.VERTEX_SHADER or gl.FRAGMENT_SHADER).
-     * @param {string} source - GLSL source code for the shader.
-     * @returns {WebGLShader}
+     * @param {string} nextStateClass - One of: `STATE_CLASS_GOOD/OK/BAD`.
      * @private
      */
-    #compileShader(type, source) {
-        if (typeof type !== 'number') {
-            throw new TypeError('`ShaderProgram.#compileShader` expects a numeric shader type.');
-        }
+    #applyStateClass(nextStateClass) {
+        this.#domElement.classList.remove(STATE_CLASS_GOOD, STATE_CLASS_OK, STATE_CLASS_BAD);
+        this.#domElement.classList.add(ROOT_CLASS, nextStateClass);
+    }
 
-        if (typeof source !== 'string') {
-            throw new TypeError('`ShaderProgram.#compileShader` expects shader source as a string.');
-        }
+    /**
+     * @param {string} labelText        - Left label string.
+     * @param {string} initialValueText - Initial value text.
+     * @returns {{ rowElement: HTMLElement, valueElement: HTMLElement }}
+     * @private
+     */
+    static #createRow(labelText, initialValueText) {
+        const rowElement     = document.createElement(DIV_TAG_NAME);
+        rowElement.className = ROW_CLASS;
 
-        const shader = this.#webglRenderingContext.createShader(type);
+        const labelElement       = document.createElement(DIV_TAG_NAME);
+        labelElement.className   = ROW_LABEL_CLASS;
+        labelElement.textContent = labelText;
 
-        if (!shader) {
-            throw new Error('Failed to create the WebGL shader.');
-        }
-
-        this.#webglRenderingContext.shaderSource(shader, source);
-        this.#webglRenderingContext.compileShader(shader);
-        const compileStatus = this.#webglRenderingContext.getShaderParameter(shader, this.#webglRenderingContext.COMPILE_STATUS);
-
-        if (!compileStatus) {
-            const infoLog = this.#webglRenderingContext.getShaderInfoLog(shader) || 'Unknown shader compilation error';
-            this.#webglRenderingContext.deleteShader(shader);
-            throw new Error(`Failed to compile shader: ${infoLog}`);
-        }
-
-        return shader;
+        const valueElement       = document.createElement(DIV_TAG_NAME);
+        valueElement.className   = ROW_VALUE_CLASS;
+        valueElement.textContent = initialValueText;
+        rowElement.appendChild(labelElement);
+        rowElement.appendChild(valueElement);
+        return { rowElement, valueElement };
     }
 }
 </code></pre>

@@ -23,6 +23,7 @@ import { OrthographicCamera }       from './scene/orthographic-camera.js';
 import { OrbitControls }            from './controls/orbit-controls.js';
 import { Renderer }                 from './render/renderer.js';
 import { Engine, createEngine }     from './engine/engine.js';
+import { FpsCounter }               from './debug/fps-counter.js';
 
 /**
  * Main public API namespace.
@@ -79,6 +80,10 @@ export const GeraWebGL = Object.freeze({
 
     Controls: Object.freeze({
         OrbitControls
+    }),
+
+    Debug: Object.freeze({
+        FpsCounter
     }),
 
     // Low-level access (shaders, manual uniforms/attributes):

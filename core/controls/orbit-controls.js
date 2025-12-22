@@ -51,6 +51,13 @@ const DEFAULT_MAX_DISTANCE = 1000.0;
 const DEFAULT_AZIMUTH_RADIANS = 0.7;
 
 /**
+ * Default roll (Z rotation).
+ *
+ * @type {number}
+ */
+const DEFAULT_CAMERA_ROLL_RADIANS = 0.0;
+
+/**
  * Default polar (pitch) angle in radians.
  *
  * @type {number}
@@ -413,11 +420,11 @@ export class OrbitControls {
         this.#onWheel        = (event) => this.#handleWheel(event);
         this.#onContextMenu  = (event) => event.preventDefault();
 
-        this.#element.addEventListener('pointerdown', this.#onPointerDown);
-        window.addEventListener('pointermove', this.#onPointerMove);
-        window.addEventListener('pointerup', this.#onPointerUp);
-        this.#element.addEventListener('wheel', this.#onWheel, WHEEL_LISTENER_OPTIONS);
-        this.#element.addEventListener('contextmenu', this.#onContextMenu);
+        this.#element.addEventListener('pointerdown' , this.#onPointerDown);
+        window.addEventListener('pointermove'        , this.#onPointerMove);
+        window.addEventListener('pointerup'          , this.#onPointerUp);
+        this.#element.addEventListener('wheel'       , this.#onWheel, WHEEL_LISTENER_OPTIONS);
+        this.#element.addEventListener('contextmenu' , this.#onContextMenu);
     }
 
     /**
@@ -456,7 +463,6 @@ export class OrbitControls {
 
     /**
      * Replaces the controlled camera.
-     * Useful when an application switches camera type (perspective/orthographic), but wants to keep the same orbit behavior.
      *
      * @param {Camera} camera - New controlled camera instance.
      */
@@ -471,7 +477,6 @@ export class OrbitControls {
 
     /**
      * Applies the current orbit state to the camera (position + rotation).
-     * This method is intentionally cheap when nothing has changed.
      */
     update() {
         if (this.#isDirty !== true) {
@@ -492,7 +497,7 @@ export class OrbitControls {
         const camera     = this.#camera;
 
         camera.position.set(cameraX, cameraY, cameraZ);
-        camera.rotation.set(polar, azimuth, 0.0);
+        camera.rotation.set(polar, azimuth, DEFAULT_CAMERA_ROLL_RADIANS);
         this.#isDirty = false;
     }
 
@@ -514,11 +519,11 @@ export class OrbitControls {
      * Disposes the controller by removing all event listeners.
      */
     dispose() {
-        this.#element.removeEventListener('pointerdown', this.#onPointerDown);
-        window.removeEventListener('pointermove', this.#onPointerMove);
-        window.removeEventListener('pointerup', this.#onPointerUp);
-        this.#element.removeEventListener('wheel', this.#onWheel, WHEEL_LISTENER_OPTIONS);
-        this.#element.removeEventListener('contextmenu', this.#onContextMenu);
+        this.#element.removeEventListener('pointerdown' , this.#onPointerDown);
+        window.removeEventListener('pointermove'        , this.#onPointerMove);
+        window.removeEventListener('pointerup'          , this.#onPointerUp);
+        this.#element.removeEventListener('wheel'       , this.#onWheel, WHEEL_LISTENER_OPTIONS);
+        this.#element.removeEventListener('contextmenu' , this.#onContextMenu);
         this.#capturedPointerId = POINTER_ID_RESET_VALUE;
     }
 

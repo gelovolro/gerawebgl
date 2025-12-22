@@ -468,6 +468,35 @@ const ZOOM_VALUE_ELEMENT_ID = 'zoomValue';
 const ZOOM_LABEL_FRACTION_DIGITS = 1;
 
 /**
+ * How often FPS counter UI is refreshed (ms).
+ *
+ * @type {number}
+ */
+const FPS_COUNTER_UPDATE_INTERVAL_MS = 250;
+
+/**
+ * Exponential smoothing factor used by the FPS counter.
+ * Higher values react faster but fluctuate more.
+ *
+ * @type {number}
+ */
+const FPS_COUNTER_SMOOTHING_FACTOR = 0.15;
+
+/**
+ * FPS value considered `good` (styling threshold).
+ *
+ * @type {number}
+ */
+const FPS_COUNTER_GOOD_FPS_THRESHOLD = 55;
+
+/**
+ * FPS value considered `ok` (styling threshold).
+ *
+ * @type {number}
+ */
+const FPS_COUNTER_OK_FPS_THRESHOLD = 30;
+
+/**
  * @typedef {Object} Object3DTransformSnapshot
  * @property {{ x: number, y: number, z: number }} position - Position components.
  * @property {{ x: number, y: number, z: number }} rotation - Rotation (radians) components.
@@ -696,6 +725,14 @@ class DemoApp {
     #zoomValueElement;
 
     /**
+     * FPS counter overlay displayed by the demo.
+     *
+     * @type {GeraWebGL.Debug.FpsCounter}
+     * @private
+     */
+    #fpsCounter;
+
+    /**
      * @param {HTMLCanvasElement} canvas             - Canvas used for rendering.
      * @param {HTMLButtonElement} wireframeButton    - Button, that toggles wireframe mode.
      * @param {HTMLSelectElement} cameraTypeSelect   - Select, that switches camera type.
@@ -793,6 +830,15 @@ class DemoApp {
         this.#updateRecreateButtonLabel();
         this.#materialModeSelect.value = this.#materialMode;
         this.#syncZoomUIFromControls();
+
+        this.#fpsCounter = new GeraWebGL.Debug.FpsCounter({
+            updateIntervalMs : FPS_COUNTER_UPDATE_INTERVAL_MS,
+            smoothingFactor  : FPS_COUNTER_SMOOTHING_FACTOR,
+            goodFpsThreshold : FPS_COUNTER_GOOD_FPS_THRESHOLD,
+            okFpsThreshold   : FPS_COUNTER_OK_FPS_THRESHOLD
+        });
+
+        document.body.appendChild(this.#fpsCounter.domElement);
     }
 
     /**
@@ -811,6 +857,7 @@ class DemoApp {
      * @private
      */
     #onFrame(deltaSeconds) {
+        this.#fpsCounter.update(deltaSeconds);
         this.#orbitControls.update();
         this.#cube.rotation.x += deltaSeconds * ROTATION_SPEED_X;
         this.#cube.rotation.y += deltaSeconds * ROTATION_SPEED_Y;

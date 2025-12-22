@@ -31,7 +31,8 @@ High-level modules are for "get something on screen fast":
 - Scene objects      : `Scene`, `Object3D`, `Mesh`, `Camera`, `PerspectiveCamera`, `OrthographicCamera`
 - Built-in geometry  : `BoxGeometry`
 - Built-in materials : `SolidColorMaterial`, `VertexColorMaterial`, `TexturedMaterial`, `NormalMaterial`, `DirectionalLightMaterial`, `LambertMaterial`, `PhongMaterial`
-- Controls           : `OrbitControls` 
+- Controls           : `OrbitControls`
+- Debugging          : `FpsCounter`
 
 Example:
 
