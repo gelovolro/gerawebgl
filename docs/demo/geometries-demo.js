@@ -29,6 +29,27 @@ const SEGMENTS_SLIDER_ID = 'segmentsSlider';
 const SEGMENTS_VALUE_ELEMENT_ID = 'segmentsValue';
 
 /**
+ * Zoom slider element id.
+ *
+ * @type {string}
+ */
+const ZOOM_SLIDER_ID = 'zoomSlider';
+
+/**
+ * Element id used to display current zoom slider value.
+ *
+ * @type {string}
+ */
+const ZOOM_VALUE_ELEMENT_ID = 'zoomValue';
+
+/**
+ * Fraction digits for the zoom label.
+ *
+ * @type {number}
+ */
+const ZOOM_LABEL_FRACTION_DIGITS = 1;
+
+/**
  * Button element id, that toggles wireframe mode.
  *
  * @type {string}
@@ -75,7 +96,7 @@ const DEFAULT_SEGMENTS = 8;
  *
  * @type {number}
  */
-const ORBIT_DISTANCE = 4.0;
+const ORBIT_DISTANCE = 7.0;
 
 /**
  * Orbit controls minimum allowed distance.
@@ -90,6 +111,48 @@ const ORBIT_MIN_DISTANCE = 1.5;
  * @type {number}
  */
 const ORBIT_MAX_DISTANCE = 12.0;
+
+/**
+ * FPS counter update interval.
+ *
+ * @type {number}
+ */
+const FPS_COUNTER_UPDATE_INTERVAL_MS = 250;
+
+/**
+ * FPS counter smoothing factor.
+ *
+ * @type {number}
+ */
+const FPS_COUNTER_SMOOTHING_FACTOR = 0.15;
+
+/**
+ * FPS threshold for `good` state.
+ *
+ * @type {number}
+ */
+const FPS_COUNTER_GOOD_FPS_THRESHOLD = 55;
+
+/**
+ * FPS threshold for `ok` state.
+ *
+ * @type {number}
+ */
+const FPS_COUNTER_OK_FPS_THRESHOLD = 30;
+
+/**
+ * First character index in a string.
+ *
+ * @type {number}
+ */
+const FIRST_CHAR_INDEX = 0;
+
+/**
+ * Start index for the "rest of string" slice (everything after first char).
+ *
+ * @type {number}
+ */
+const REST_SLICE_START_INDEX = 1;
 
 /**
  * Requested clear color (RGB).
@@ -164,7 +227,7 @@ function createPlaneGeometry(webglContext, segments) {
 function createSphereGeometry(webglContext, segments) {
     const widthSegments  = clamp(segments * 2, 3, 256);
     const heightSegments = clamp(segments, 2, 256);
-    const diameter = 1.6;
+    const diameter       = 1.6;
 
     return new GeraWebGL.Geometries.SphereGeometry(webglContext, {
         width          : diameter,
@@ -338,12 +401,36 @@ class GeometriesDemoApp {
     #segmentsValueElement;
 
     /**
+     * Zoom slider element.
+     *
+     * @type {HTMLInputElement}
+     * @private
+     */
+    #zoomSlider;
+
+    /**
+     * Zoom value element.
+     *
+     * @type {HTMLElement}
+     * @private
+     */
+    #zoomValueElement;
+
+    /**
      * Wireframe toggle button.
      *
      * @type {HTMLButtonElement}
      * @private
      */
     #wireframeToggleButton;
+
+    /**
+     * FPS counter instance.
+     *
+     * @type {GeraWebGL.Debug.FpsCounter}
+     * @private
+     */
+    #fpsCounter;
 
     /**
      * Populates geometry select with available demo geometries.
@@ -360,7 +447,7 @@ class GeometriesDemoApp {
         for (const [type] of Object.entries(DEMO_GEOMETRIES)) {
             const option = document.createElement('option');
             option.value = type;
-            option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+            option.textContent = `Geometry: ${type.charAt(FIRST_CHAR_INDEX).toUpperCase() + type.slice(REST_SLICE_START_INDEX)}`;
             this.#geometrySelect.appendChild(option);
         }
     }
@@ -391,6 +478,15 @@ class GeometriesDemoApp {
         this.#setupCamera(canvas);
         this.#bindUI();
         this.#setupScene();
+
+        this.#fpsCounter = new GeraWebGL.Debug.FpsCounter({
+            updateIntervalMs : FPS_COUNTER_UPDATE_INTERVAL_MS,
+            smoothingFactor  : FPS_COUNTER_SMOOTHING_FACTOR,
+            goodFpsThreshold : FPS_COUNTER_GOOD_FPS_THRESHOLD,
+            okFpsThreshold   : FPS_COUNTER_OK_FPS_THRESHOLD
+        });
+
+        document.body.appendChild(this.#fpsCounter.domElement);
     }
 
     /**
@@ -409,6 +505,8 @@ class GeometriesDemoApp {
      * @private
      */
     #onFrame(deltaTimeSeconds) {
+        this.#fpsCounter.update(deltaTimeSeconds);
+
         if (this.#orbitControls) {
             this.#orbitControls.update(deltaTimeSeconds);
         }
@@ -436,6 +534,42 @@ class GeometriesDemoApp {
             rotationSpeed : 1.0,
             zoomSpeed     : 1.0
         });
+
+        this.#orbitControls.update();
+    }
+
+    /**
+     * Handles zoom slider input and applies it to `OrbitControls` distance.
+     *
+     * @private
+     */
+    #onZoomSliderChanged() {
+        const zoomUiValue = Number.parseFloat(this.#zoomSlider.value);
+
+        if (!Number.isFinite(zoomUiValue)) {
+            return;
+        }
+
+        const distance = ORBIT_MIN_DISTANCE + ORBIT_MAX_DISTANCE - zoomUiValue;
+        this.#orbitControls.setDistance(distance);
+        this.#orbitControls.update();
+        this.#syncZoomUIFromControls();
+    }
+
+    /**
+     * Synchronizes zoom UI (slider + value) from the current `OrbitControls` state.
+     *
+     * @private
+     */
+    #syncZoomUIFromControls() {
+        if (!this.#orbitControls || !this.#zoomSlider || !this.#zoomValueElement) {
+            return;
+        }
+
+        const distance         = this.#orbitControls.distance;
+        const zoomUiValue      = ORBIT_MIN_DISTANCE + ORBIT_MAX_DISTANCE - distance;
+        this.#zoomSlider.value = String(zoomUiValue);
+        this.#zoomValueElement.textContent = zoomUiValue.toFixed(ZOOM_LABEL_FRACTION_DIGITS);
     }
 
     /**
@@ -444,8 +578,8 @@ class GeometriesDemoApp {
      * @private
      */
     #setupScene() {
-        const webglContext          = this.#engine.webglRenderingContext;
-        this.#sharedNormalMaterial  = new GeraWebGL.Materials.NormalMaterial(webglContext);
+        const webglContext         = this.#engine.webglRenderingContext;
+        this.#sharedNormalMaterial = new GeraWebGL.Materials.NormalMaterial(webglContext);
         this.#applyWireframeStateToSharedMaterial();
         this.#mesh = this.#createMesh();
         this.#engine.scene.add(this.#mesh);
@@ -592,6 +726,33 @@ class GeometriesDemoApp {
         this.#segmentsSlider        = document.getElementById(SEGMENTS_SLIDER_ID);
         this.#segmentsValueElement  = document.getElementById(SEGMENTS_VALUE_ELEMENT_ID);
         this.#wireframeToggleButton = document.getElementById(WIREFRAME_TOGGLE_BUTTON_ID);
+        this.#zoomSlider            = document.getElementById(ZOOM_SLIDER_ID);
+        this.#zoomValueElement      = document.getElementById(ZOOM_VALUE_ELEMENT_ID);
+
+        if (!(this.#geometrySelect instanceof HTMLSelectElement)) {
+            throw new Error(`Select element with id ${GEOMETRY_SELECT_ID} - not found.`);
+        }
+
+        if (!(this.#segmentsSlider instanceof HTMLInputElement)) {
+            throw new Error(`Range slider with id ${SEGMENTS_SLIDER_ID} - not found.`);
+        }
+
+        if (!(this.#wireframeToggleButton instanceof HTMLButtonElement)) {
+            throw new Error(`Button with id ${WIREFRAME_TOGGLE_BUTTON_ID} - not found.`);
+        }
+
+        if (!(this.#zoomSlider instanceof HTMLInputElement)) {
+            throw new Error(`Range slider with id ${ZOOM_SLIDER_ID} - not found.`);
+        }
+
+        if (!(this.#segmentsValueElement instanceof HTMLElement)) {
+            throw new Error(`Element with id ${SEGMENTS_VALUE_ELEMENT_ID} - not found.`);
+        }
+
+        if (!(this.#zoomValueElement instanceof HTMLElement)) {
+            throw new Error(`Element with id ${ZOOM_VALUE_ELEMENT_ID} - not found.`);
+        }
+
         this.#populateGeometrySelectOptions();
         this.#geometrySelect.value  = DEFAULT_GEOMETRY_TYPE;
 
@@ -603,6 +764,7 @@ class GeometriesDemoApp {
         this.#syncSegmentsSliderLimits(this.#geometrySelect.value);
         this.#updateSegmentsValueLabel();
         this.#updateWireframeButtonLabel();
+        this.#syncZoomUIFromControls();
 
         this.#geometrySelect.addEventListener('change', () => {
             this.#syncSegmentsSliderLimits(this.#geometrySelect.value);
@@ -618,6 +780,10 @@ class GeometriesDemoApp {
             this.#isWireframeEnabled = !this.#isWireframeEnabled;
             this.#applyWireframeStateToSharedMaterial();
             this.#updateWireframeButtonLabel();
+        });
+
+        this.#zoomSlider.addEventListener('input', () => {
+            this.#onZoomSliderChanged();
         });
     }
 
