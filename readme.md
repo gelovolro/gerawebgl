@@ -3,7 +3,7 @@
 I first developed my own WebGL library (based on v1.0) back in 2014. Now I’ve decided to revisit those ideas, explore what WebGL 2.0 offers, and rebuild everything from scratch. The project is named in memory of my cat, who died in 2017.
 
 - **API reference (JSDoc):** https://gelovolro.github.io/gerawebgl/
-- **Material demo:** https://gelovolro.github.io/gerawebgl/demo/
+- **Materials demo:** https://gelovolro.github.io/gerawebgl/demo/materials.html
 - **Geometries demo:** https://gelovolro.github.io/gerawebgl/demo/geometries.html
 
 ## Quick start

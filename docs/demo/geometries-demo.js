@@ -148,7 +148,7 @@ const FPS_COUNTER_OK_FPS_THRESHOLD = 30;
 const FIRST_CHAR_INDEX = 0;
 
 /**
- * Start index for the "rest of string" slice (everything after first char).
+ * Start index for the rest of string slice.
  *
  * @type {number}
  */
@@ -445,8 +445,8 @@ class GeometriesDemoApp {
         this.#geometrySelect.textContent = '';
 
         for (const [type] of Object.entries(DEMO_GEOMETRIES)) {
-            const option = document.createElement('option');
-            option.value = type;
+            const option       = document.createElement('option');
+            option.value       = type;
             option.textContent = `Geometry: ${type.charAt(FIRST_CHAR_INDEX).toUpperCase() + type.slice(REST_SLICE_START_INDEX)}`;
             this.#geometrySelect.appendChild(option);
         }
