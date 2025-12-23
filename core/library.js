@@ -4,6 +4,11 @@ import { Vector3 }                  from './math/vector3.js';
 import { CameraMath }               from './math/camera-math.js';
 import { Geometry }                 from './geometry/geometry.js';
 import { BoxGeometry }              from './geometry/box-geometry.js';
+import { PlaneGeometry }            from './geometry/plane-geometry.js';
+import { SphereGeometry }           from './geometry/sphere-geometry.js';
+import { TorusGeometry }            from './geometry/torus-geometry.js';
+import { ConeGeometry }             from './geometry/cone-geometry.js';
+import { PyramidGeometry }          from './geometry/pyramid-geometry.js';
 import { ShaderProgram }            from './shader/shader-program.js';
 import { Material }                 from './material/material.js';
 import { VertexColorMaterial }      from './material/vertex-color-material.js';
@@ -60,7 +65,12 @@ export const GeraWebGL = Object.freeze({
 
     Geometries: Object.freeze({
         Geometry,
-        BoxGeometry
+        BoxGeometry,
+        PlaneGeometry,
+        SphereGeometry,
+        TorusGeometry,
+        ConeGeometry,
+        PyramidGeometry
     }),
 
     Textures: Object.freeze({

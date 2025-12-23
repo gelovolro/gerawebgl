@@ -190,6 +190,22 @@ export class Geometry {
     #wireframeIndexCount;
 
     /**
+     * Index component type used for solid rendering.
+     *
+     * @type {number}
+     * @private
+     */
+    #solidIndexComponentType;
+
+    /**
+     * Index component type used for wireframe rendering.
+     *
+     * @type {number}
+     * @private
+     */
+    #wireframeIndexComponentType;
+
+    /**
      * Indicates whether this geometry instance has been disposed.
      * Disposed geometries must not be used for rendering.
      *
@@ -199,13 +215,13 @@ export class Geometry {
     #isDisposed = false;
 
     /**
-     * @param {WebGL2RenderingContext} webglContext  - WebGL2 rendering context used to create and manage GPU resources.
-     * @param {Float32Array} positions               - [x, y, z] triples.
-     * @param {Float32Array | null} colors           - [red, green, blue] triples or null.
-     * @param {Uint16Array} indicesSolid             - Indices for solid triangles.
-     * @param {Uint16Array} indicesWireframe         - Indices for wireframe lines.
-     * @param {Float32Array | null} [uvs = null]     - [u, v] pairs or null.
-     * @param {Float32Array | null} [normals = null] - [x, y, z] triples or null.
+     * @param {WebGL2RenderingContext} webglContext        - WebGL2 rendering context used to create and manage GPU resources.
+     * @param {Float32Array} positions                     - [x, y, z] triples.
+     * @param {Float32Array | null} colors                 - [red, green, blue] triples or null.
+     * @param {Uint16Array | Uint32Array} indicesSolid     - Indices for solid triangles.
+     * @param {Uint16Array | Uint32Array} indicesWireframe - Indices for wireframe lines.
+     * @param {Float32Array | null} [uvs = null]           - [u, v] pairs or null.
+     * @param {Float32Array | null} [normals = null]       - [x, y, z] triples or null.
      */
     constructor(webglContext, positions, colors, indicesSolid, indicesWireframe, uvs = null, normals = null) {
         if (!(webglContext instanceof WebGL2RenderingContext)) {
@@ -228,23 +244,25 @@ export class Geometry {
             throw new TypeError('`Geometry` expects normals as `Float32Array` or null.');
         }
 
-        if (!(indicesSolid instanceof Uint16Array) || !(indicesWireframe instanceof Uint16Array)) {
-            throw new TypeError('`Geometry` expects indices as `Uint16Array`.');
+        if (!Geometry.#isSupportedIndexArray(indicesSolid) || !Geometry.#isSupportedIndexArray(indicesWireframe)) {
+            throw new TypeError('`Geometry` expects indices as `Uint16Array` or `Uint32Array`.');
         }
 
         this.#validateAttributeSizes(positions, colors, uvs, normals);
         this.#validateIndexSizes(indicesSolid, indicesWireframe);
 
-        this.#webglContext         = webglContext;
-        this.#solidIndexCount      = indicesSolid.length;
-        this.#wireframeIndexCount  = indicesWireframe.length;
-        this.#vertexArrayObject    = this.#createVertexArrayObject();
-        this.#positionBuffer       = this.#createStaticArrayBuffer(positions);
-        this.#colorBuffer          = colors ? this.#createStaticArrayBuffer(colors) : null;
-        this.#uvBuffer             = uvs ? this.#createStaticArrayBuffer(uvs) : null;
-        this.#normalBuffer         = normals ? this.#createStaticArrayBuffer(normals) : null;
-        this.#indexBufferSolid     = this.#createIndexBuffer(indicesSolid);
-        this.#indexBufferWireframe = this.#createIndexBuffer(indicesWireframe);
+        this.#webglContext                = webglContext;
+        this.#solidIndexCount             = indicesSolid.length;
+        this.#wireframeIndexCount         = indicesWireframe.length;
+        this.#solidIndexComponentType     = Geometry.#resolveIndexComponentType(webglContext, indicesSolid);
+        this.#wireframeIndexComponentType = Geometry.#resolveIndexComponentType(webglContext, indicesWireframe);
+        this.#vertexArrayObject           = this.#createVertexArrayObject();
+        this.#positionBuffer              = this.#createStaticArrayBuffer(positions);
+        this.#colorBuffer                 = colors ? this.#createStaticArrayBuffer(colors) : null;
+        this.#uvBuffer                    = uvs ? this.#createStaticArrayBuffer(uvs) : null;
+        this.#normalBuffer                = normals ? this.#createStaticArrayBuffer(normals) : null;
+        this.#indexBufferSolid            = this.#createIndexBuffer(indicesSolid);
+        this.#indexBufferWireframe        = this.#createIndexBuffer(indicesWireframe);
         this.#configureVertexArray();
     }
 
@@ -276,6 +294,18 @@ export class Geometry {
     getIndexCount(wireframe) {
         this.#assertNotDisposed();
         return wireframe ? this.#wireframeIndexCount : this.#solidIndexCount;
+    }
+
+    /**
+     * Returns index component type constant used by `drawElements()`.
+     * This depends on whether the index buffer is `Uint16Array` or `Uint32Array`.
+     *
+     * @param {boolean} wireframe - When true, returns wireframe index component type.
+     * @returns {number}          - WebGL component type constant.
+     */
+    getIndexComponentType(wireframe) {
+        this.#assertNotDisposed();
+        return wireframe ? this.#wireframeIndexComponentType : this.#solidIndexComponentType;
     }
 
     /**
@@ -349,7 +379,7 @@ export class Geometry {
     /**
      * Creates an `ELEMENT_ARRAY_BUFFER` and uploads the given index data.
      *
-     * @param {Uint16Array} indices - Index data referencing vertices in the associated vertex buffers.
+     * @param {Uint16Array | Uint32Array} indices - Index data referencing vertices in the associated vertex buffers.
      * @returns {WebGLBuffer}
      * @private
      */
@@ -360,18 +390,45 @@ export class Geometry {
             throw new Error('Failed to create `ELEMENT_ARRAY_BUFFER`.');
         }
 
+        if (!Geometry.#isSupportedIndexArray(indices)) {
+            throw new TypeError('`Geometry` expects indices as `Uint16Array` or `Uint32Array`.');
+        }
+
         this.#webglContext.bindBuffer(this.#webglContext.ELEMENT_ARRAY_BUFFER, buffer);
         this.#webglContext.bufferData(this.#webglContext.ELEMENT_ARRAY_BUFFER, indices, this.#webglContext.STATIC_DRAW);
         return buffer;
     }
 
     /**
+     * Checks whether an index array type is supported by `Geometry`.
+     *
+     * @param {unknown} indices - Value to test.
+     * @returns {boolean}       - True if indices is `Uint16Array` or `Uint32Array`.
+     * @private
+     */
+    static #isSupportedIndexArray(indices) {
+        return (indices instanceof Uint16Array) || (indices instanceof Uint32Array);
+    }
+
+    /**
+     * Resolves WebGL index component type constant for the given index array.
+     *
+     * @param {WebGL2RenderingContext} webglContext - WebGL2 context, that provides constants.
+     * @param {Uint16Array | Uint32Array} indices   - Index buffer array.
+     * @returns {number}                            - `UNSIGNED_SHORT` or `UNSIGNED_INT`.
+     * @private
+     */
+    static #resolveIndexComponentType(webglContext, indices) {
+        return (indices instanceof Uint32Array) ? webglContext.UNSIGNED_INT : webglContext.UNSIGNED_SHORT;
+    }
+
+    /**
      * Validates vertex attribute array sizes (positions, colors, uvs, normals).
      *
-     * @param {Float32Array} positions      - Flat array of vec3 positions: [x, y, z] * vertexCount.
-     * @param {Float32Array | null} colors  - Optional flat array of vec3 colors: [red, green, blue] * vertexCount.
-     * @param {Float32Array | null} uvs     - Optional flat array of vec2 UVs: [u, v] * vertexCount.
-     * @param {Float32Array | null} normals - Optional flat array of vec3 normals: [x, y, z] * vertexCount.
+     * @param {Float32Array} positions      - Flat array of positions: `[x, y, z] * vertexCount`.
+     * @param {Float32Array | null} colors  - Optional flat array of colors: `[red, green, blue] * vertexCount`.
+     * @param {Float32Array | null} uvs     - Optional flat array of UVs: `[u, v] * vertexCount`.
+     * @param {Float32Array | null} normals - Optional flat array of normals: `[x, y, z] * vertexCount`.
      * @private
      */
     #validateAttributeSizes(positions, colors, uvs, normals) {
@@ -421,8 +478,8 @@ export class Geometry {
     /**
      * Validates basic index array structure (triangles + lines).
      *
-     * @param {Uint16Array} indicesSolid     - Triangle index buffer data (3 indices per triangle).
-     * @param {Uint16Array} indicesWireframe - Line index buffer data (2 indices per line segment).
+     * @param {Uint16Array | Uint32Array} indicesSolid     - Triangle index buffer data (3 indices per triangle).
+     * @param {Uint16Array | Uint32Array} indicesWireframe - Line index buffer data (2 indices per line segment).
      * @private
      */
     #validateIndexSizes(indicesSolid, indicesWireframe) {

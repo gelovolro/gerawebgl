@@ -288,7 +288,7 @@ export class Renderer {
         renderingContext.drawElements(
             mode,
             indexCount,
-            renderingContext.UNSIGNED_SHORT,
+            geometry.getIndexComponentType(isWireframeEnabled),
             INDEX_BUFFER_OFFSET_BYTES
         );
     }

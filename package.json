@@ -5,7 +5,7 @@
   "scripts": {
     "clear:all": "rimraf docs",
     "copy:demo-assets": "copyfiles -u 1 \"assets/**/*\" docs/demo/assets",
-    "copy:demo-scripts": "copyfiles -f demo/index.html demo/app.js docs/demo",
+    "copy:demo-scripts": "copyfiles -f \"demo/**/*\" docs/demo",
     "demo:serve": "python -m http.server 9090 -d docs/demo",
     "docs:build": "jsdoc -c jsdoc.json",
     "docs:serve": "python -m http.server 9091 -d docs",

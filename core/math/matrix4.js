@@ -33,9 +33,6 @@ const INVERSE_DETERMINANT_NUMERATOR = 1.0;
 
 /**
  * Utility class for working with 4x4 matrices in column-major order.
- *
- * Most methods return new 'Float32Array' instances.
- * Methods ending with "To" write results into an existing output matrix.
  */
 export class Matrix4 {
     /**
@@ -386,8 +383,6 @@ export class Matrix4 {
 
     /**
      * Inverts a 4x4 matrix into an existing output matrix.
-     *
-     * Notes: out must not be the same object as matrix.
      *
      * @param {Float32Array} out    - Output 4x4 matrix.
      * @param {Float32Array} matrix - Input 4x4 matrix.

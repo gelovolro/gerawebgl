@@ -437,8 +437,6 @@ var Matrix4 = class _Matrix4 {
   /**
    * Inverts a 4x4 matrix into an existing output matrix.
    *
-   * Notes: out must not be the same object as matrix.
-   *
    * @param {Float32Array} out    - Output 4x4 matrix.
    * @param {Float32Array} matrix - Input 4x4 matrix.
    * @returns {Float32Array}      - The output matrix (out).
@@ -699,7 +697,7 @@ var Vector3 = class _Vector3 {
     return this;
   }
   /**
-   * Copies components from another Vector3.
+   * Copies components from another `Vector3`.
    *
    * @param {Vector3} other - Source vector to copy components from.
    * @returns {Vector3}     - This vector instance after copying components from the source vector (for chaining).
@@ -946,7 +944,7 @@ var ATTRIBUTE_NO_OFFSET = 0;
 var MODULO_ALIGNED_VALUE = 0;
 var TRIANGLE_INDEX_COMPONENT_COUNT = 3;
 var LINE_INDEX_COMPONENT_COUNT = 2;
-var Geometry = class {
+var Geometry = class _Geometry {
   /**
    * WebGL2 rendering context used to create and manage GPU resources.
    *
@@ -1021,6 +1019,20 @@ var Geometry = class {
    */
   #wireframeIndexCount;
   /**
+   * Index component type used for solid rendering.
+   *
+   * @type {number}
+   * @private
+   */
+  #solidIndexComponentType;
+  /**
+   * Index component type used for wireframe rendering.
+   *
+   * @type {number}
+   * @private
+   */
+  #wireframeIndexComponentType;
+  /**
    * Indicates whether this geometry instance has been disposed.
    * Disposed geometries must not be used for rendering.
    *
@@ -1029,13 +1041,13 @@ var Geometry = class {
    */
   #isDisposed = false;
   /**
-   * @param {WebGL2RenderingContext} webglContext  - WebGL2 rendering context used to create and manage GPU resources.
-   * @param {Float32Array} positions               - [x, y, z] triples.
-   * @param {Float32Array | null} colors           - [red, green, blue] triples or null.
-   * @param {Uint16Array} indicesSolid             - Indices for solid triangles.
-   * @param {Uint16Array} indicesWireframe         - Indices for wireframe lines.
-   * @param {Float32Array | null} [uvs = null]     - [u, v] pairs or null.
-   * @param {Float32Array | null} [normals = null] - [x, y, z] triples or null.
+   * @param {WebGL2RenderingContext} webglContext        - WebGL2 rendering context used to create and manage GPU resources.
+   * @param {Float32Array} positions                     - [x, y, z] triples.
+   * @param {Float32Array | null} colors                 - [red, green, blue] triples or null.
+   * @param {Uint16Array | Uint32Array} indicesSolid     - Indices for solid triangles.
+   * @param {Uint16Array | Uint32Array} indicesWireframe - Indices for wireframe lines.
+   * @param {Float32Array | null} [uvs = null]           - [u, v] pairs or null.
+   * @param {Float32Array | null} [normals = null]       - [x, y, z] triples or null.
    */
   constructor(webglContext, positions, colors, indicesSolid, indicesWireframe, uvs = null, normals = null) {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
@@ -1053,14 +1065,16 @@ var Geometry = class {
     if (normals !== null && !(normals instanceof Float32Array)) {
       throw new TypeError("`Geometry` expects normals as `Float32Array` or null.");
     }
-    if (!(indicesSolid instanceof Uint16Array) || !(indicesWireframe instanceof Uint16Array)) {
-      throw new TypeError("`Geometry` expects indices as `Uint16Array`.");
+    if (!_Geometry.#isSupportedIndexArray(indicesSolid) || !_Geometry.#isSupportedIndexArray(indicesWireframe)) {
+      throw new TypeError("`Geometry` expects indices as `Uint16Array` or `Uint32Array`.");
     }
     this.#validateAttributeSizes(positions, colors, uvs, normals);
     this.#validateIndexSizes(indicesSolid, indicesWireframe);
     this.#webglContext = webglContext;
     this.#solidIndexCount = indicesSolid.length;
     this.#wireframeIndexCount = indicesWireframe.length;
+    this.#solidIndexComponentType = _Geometry.#resolveIndexComponentType(webglContext, indicesSolid);
+    this.#wireframeIndexComponentType = _Geometry.#resolveIndexComponentType(webglContext, indicesWireframe);
     this.#vertexArrayObject = this.#createVertexArrayObject();
     this.#positionBuffer = this.#createStaticArrayBuffer(positions);
     this.#colorBuffer = colors ? this.#createStaticArrayBuffer(colors) : null;
@@ -1096,6 +1110,17 @@ var Geometry = class {
   getIndexCount(wireframe) {
     this.#assertNotDisposed();
     return wireframe ? this.#wireframeIndexCount : this.#solidIndexCount;
+  }
+  /**
+   * Returns index component type constant used by `drawElements()`.
+   * This depends on whether the index buffer is `Uint16Array` or `Uint32Array`.
+   *
+   * @param {boolean} wireframe - When true, returns wireframe index component type.
+   * @returns {number}          - WebGL component type constant.
+   */
+  getIndexComponentType(wireframe) {
+    this.#assertNotDisposed();
+    return wireframe ? this.#wireframeIndexComponentType : this.#solidIndexComponentType;
   }
   /**
    * Releases all GPU resources owned by this geometry (VAO and buffers).
@@ -1156,7 +1181,7 @@ var Geometry = class {
   /**
    * Creates an `ELEMENT_ARRAY_BUFFER` and uploads the given index data.
    *
-   * @param {Uint16Array} indices - Index data referencing vertices in the associated vertex buffers.
+   * @param {Uint16Array | Uint32Array} indices - Index data referencing vertices in the associated vertex buffers.
    * @returns {WebGLBuffer}
    * @private
    */
@@ -1165,17 +1190,41 @@ var Geometry = class {
     if (!buffer) {
       throw new Error("Failed to create `ELEMENT_ARRAY_BUFFER`.");
     }
+    if (!_Geometry.#isSupportedIndexArray(indices)) {
+      throw new TypeError("`Geometry` expects indices as `Uint16Array` or `Uint32Array`.");
+    }
     this.#webglContext.bindBuffer(this.#webglContext.ELEMENT_ARRAY_BUFFER, buffer);
     this.#webglContext.bufferData(this.#webglContext.ELEMENT_ARRAY_BUFFER, indices, this.#webglContext.STATIC_DRAW);
     return buffer;
   }
   /**
+   * Checks whether an index array type is supported by `Geometry`.
+   *
+   * @param {unknown} indices - Value to test.
+   * @returns {boolean}       - True if indices is `Uint16Array` or `Uint32Array`.
+   * @private
+   */
+  static #isSupportedIndexArray(indices) {
+    return indices instanceof Uint16Array || indices instanceof Uint32Array;
+  }
+  /**
+   * Resolves WebGL index component type constant for the given index array.
+   *
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 context, that provides constants.
+   * @param {Uint16Array | Uint32Array} indices   - Index buffer array.
+   * @returns {number}                            - `UNSIGNED_SHORT` or `UNSIGNED_INT`.
+   * @private
+   */
+  static #resolveIndexComponentType(webglContext, indices) {
+    return indices instanceof Uint32Array ? webglContext.UNSIGNED_INT : webglContext.UNSIGNED_SHORT;
+  }
+  /**
    * Validates vertex attribute array sizes (positions, colors, uvs, normals).
    *
-   * @param {Float32Array} positions      - Flat array of vec3 positions: [x, y, z] * vertexCount.
-   * @param {Float32Array | null} colors  - Optional flat array of vec3 colors: [red, green, blue] * vertexCount.
-   * @param {Float32Array | null} uvs     - Optional flat array of vec2 UVs: [u, v] * vertexCount.
-   * @param {Float32Array | null} normals - Optional flat array of vec3 normals: [x, y, z] * vertexCount.
+   * @param {Float32Array} positions      - Flat array of positions: `[x, y, z] * vertexCount`.
+   * @param {Float32Array | null} colors  - Optional flat array of colors: `[red, green, blue] * vertexCount`.
+   * @param {Float32Array | null} uvs     - Optional flat array of UVs: `[u, v] * vertexCount`.
+   * @param {Float32Array | null} normals - Optional flat array of normals: `[x, y, z] * vertexCount`.
    * @private
    */
   #validateAttributeSizes(positions, colors, uvs, normals) {
@@ -1214,8 +1263,8 @@ var Geometry = class {
   /**
    * Validates basic index array structure (triangles + lines).
    *
-   * @param {Uint16Array} indicesSolid     - Triangle index buffer data (3 indices per triangle).
-   * @param {Uint16Array} indicesWireframe - Line index buffer data (2 indices per line segment).
+   * @param {Uint16Array | Uint32Array} indicesSolid     - Triangle index buffer data (3 indices per triangle).
+   * @param {Uint16Array | Uint32Array} indicesWireframe - Line index buffer data (2 indices per line segment).
    * @private
    */
   #validateIndexSizes(indicesSolid, indicesWireframe) {
@@ -1293,313 +1342,88 @@ var Geometry = class {
   }
 };
 
+// core/geometry/geometry-utils.js
+var DEFAULT_VERTEX_COLOR = new Float32Array([1, 1, 1]);
+var COLOR_COMPONENT_COUNT2 = 3;
+var DEFAULT_EXPECTED_PER_VERTEX_COLOR_LENGTH = 0;
+var AUTO_EXPECTED_PER_VERTEX_COLOR_LENGTH = 0;
+var MAX_UINT16_INDEX_VALUE = 65535;
+var VERTEX_COUNT_TO_MAX_INDEX_OFFSET = 1;
+var TRIANGLE_INDEX_STRIDE = 3;
+var EDGE_KEY_SEPARATOR = ",";
+function createColorsFromSpec(vertexCount, colors, expectedPerVertexLength = DEFAULT_EXPECTED_PER_VERTEX_COLOR_LENGTH) {
+  if (!(colors instanceof Float32Array)) {
+    throw new TypeError("`createColorsFromSpec` expects colors as a `Float32Array`.");
+  }
+  const perVertexLength = expectedPerVertexLength > AUTO_EXPECTED_PER_VERTEX_COLOR_LENGTH ? expectedPerVertexLength : vertexCount * COLOR_COMPONENT_COUNT2;
+  if (colors.length === COLOR_COMPONENT_COUNT2) {
+    const colorBuffer = new Float32Array(perVertexLength);
+    for (let i = 0; i < vertexCount; i += 1) {
+      const baseIndex = i * COLOR_COMPONENT_COUNT2;
+      colorBuffer[baseIndex + 0] = colors[0];
+      colorBuffer[baseIndex + 1] = colors[1];
+      colorBuffer[baseIndex + 2] = colors[2];
+    }
+    return colorBuffer;
+  }
+  if (colors.length === perVertexLength) {
+    return colors;
+  }
+  throw new TypeError(
+    "`createColorsFromSpec` expects `colors` length to be `{uniform}` (uniform) or `{vertex}` (per-vertex).".replace("{uniform}", String(COLOR_COMPONENT_COUNT2)).replace("{vertex}", String(perVertexLength))
+  );
+}
+function createIndexArray(vertexCount, indices) {
+  if (!Array.isArray(indices)) {
+    throw new TypeError("`createIndexArray` expects indices as an array of numbers.");
+  }
+  const requiresUint32 = vertexCount - VERTEX_COUNT_TO_MAX_INDEX_OFFSET > MAX_UINT16_INDEX_VALUE;
+  if (requiresUint32) {
+    return new Uint32Array(indices);
+  }
+  return new Uint16Array(indices);
+}
+function createWireframeIndicesFromSolidIndices(vertexCount, triangleIndices) {
+  if (!(triangleIndices instanceof Uint16Array) && !(triangleIndices instanceof Uint32Array)) {
+    throw new TypeError("`createWireframeIndicesFromSolidIndices` expects indices as `Uint16Array` or `Uint32Array`.");
+  }
+  const edgeSet = /* @__PURE__ */ new Set();
+  const lines = [];
+  for (let i = 0; i < triangleIndices.length; i += TRIANGLE_INDEX_STRIDE) {
+    const firstVertexIndex = triangleIndices[i + 0];
+    const secondVertexIndex = triangleIndices[i + 1];
+    const thirdVertexIndex = triangleIndices[i + 2];
+    addEdge(edgeSet, lines, firstVertexIndex, secondVertexIndex);
+    addEdge(edgeSet, lines, secondVertexIndex, thirdVertexIndex);
+    addEdge(edgeSet, lines, thirdVertexIndex, firstVertexIndex);
+  }
+  return createIndexArray(vertexCount, lines);
+}
+function addEdge(edgeSet, lines, indexA, indexB) {
+  const minVertexIndex = Math.min(indexA, indexB);
+  const maxVertexIndex = Math.max(indexA, indexB);
+  const edgeKey = String(minVertexIndex) + EDGE_KEY_SEPARATOR + String(maxVertexIndex);
+  if (edgeSet.has(edgeKey)) {
+    return;
+  }
+  edgeSet.add(edgeKey);
+  lines.push(minVertexIndex, maxVertexIndex);
+}
+
 // core/geometry/box-geometry.js
 var DEFAULT_BOX_SIZE = 1;
-var BOX_HALF_SIZE_DIVISOR = 2;
-var DEFAULT_VERTEX_COLOR = new Float32Array([1, 1, 1]);
+var DEFAULT_SEGMENT_COUNT = 1;
+var HALF_SIZE_DIVISOR = 2;
+var VEC3_COMPONENT_COUNT = 3;
 var BOX_FACE_COUNT = 6;
-var VERTICES_PER_FACE = 4;
-var BOX_VERTEX_COUNT = BOX_FACE_COUNT * VERTICES_PER_FACE;
-var COLOR_COMPONENT_COUNT2 = DEFAULT_VERTEX_COLOR.length;
-var COLORS_UNIFORM_LENGTH = COLOR_COMPONENT_COUNT2;
-var COLORS_PER_FACE_LENGTH = BOX_FACE_COUNT * COLOR_COMPONENT_COUNT2;
-var COLORS_PER_VERTEX_LENGTH = BOX_VERTEX_COUNT * COLOR_COMPONENT_COUNT2;
-var COLOR_COMPONENT_INDEX_RED = 0;
-var COLOR_COMPONENT_INDEX_GREEN = 1;
-var COLOR_COMPONENT_INDEX_BLUE = 2;
-var TRIANGLE_INDEX_COUNT_PER_FACE = 6;
-var BOX_TRIANGLE_INDEX_COUNT = BOX_FACE_COUNT * TRIANGLE_INDEX_COUNT_PER_FACE;
-var UNIT_POSITIONS = new Float32Array([
-  /* eslint-disable indent */
-  // Front (+Z):
-  -1,
-  -1,
-  1,
-  1,
-  -1,
-  1,
-  1,
-  1,
-  1,
-  -1,
-  1,
-  1,
-  // Back (-Z):
-  1,
-  -1,
-  -1,
-  -1,
-  -1,
-  -1,
-  -1,
-  1,
-  -1,
-  1,
-  1,
-  -1,
-  // Top (+Y):
-  -1,
-  1,
-  1,
-  1,
-  1,
-  1,
-  1,
-  1,
-  -1,
-  -1,
-  1,
-  -1,
-  // Bottom (-Y):
-  -1,
-  -1,
-  -1,
-  1,
-  -1,
-  -1,
-  1,
-  -1,
-  1,
-  -1,
-  -1,
-  1,
-  // Right (+X):
-  1,
-  -1,
-  1,
-  1,
-  -1,
-  -1,
-  1,
-  1,
-  -1,
-  1,
-  1,
-  1,
-  // Left (-X):
-  -1,
-  -1,
-  -1,
-  -1,
-  -1,
-  1,
-  -1,
-  1,
-  1,
-  -1,
-  1,
-  -1
-  /* eslint-enable indent */
-]);
-var BOX_FACE_UVS = new Float32Array([
-  // Front:
-  0,
-  0,
-  1,
-  0,
-  1,
-  1,
-  0,
-  1,
-  // Back (flip `U` to avoid the mirrored appearance):
-  1,
-  0,
-  0,
-  0,
-  0,
-  1,
-  1,
-  1,
-  // Top:
-  0,
-  0,
-  1,
-  0,
-  1,
-  1,
-  0,
-  1,
-  // Bottom:
-  0,
-  0,
-  1,
-  0,
-  1,
-  1,
-  0,
-  1,
-  // Right:
-  0,
-  0,
-  1,
-  0,
-  1,
-  1,
-  0,
-  1,
-  // Left:
-  0,
-  0,
-  1,
-  0,
-  1,
-  1,
-  0,
-  1
-]);
-var BOX_FACE_NORMALS = new Float32Array([
-  // Front (+Z):
-  0,
-  0,
-  1,
-  0,
-  0,
-  1,
-  0,
-  0,
-  1,
-  0,
-  0,
-  1,
-  // Back (-Z):
-  0,
-  0,
-  -1,
-  0,
-  0,
-  -1,
-  0,
-  0,
-  -1,
-  0,
-  0,
-  -1,
-  // Top (+Y):
-  0,
-  1,
-  0,
-  0,
-  1,
-  0,
-  0,
-  1,
-  0,
-  0,
-  1,
-  0,
-  // Bottom (-Y):
-  0,
-  -1,
-  0,
-  0,
-  -1,
-  0,
-  0,
-  -1,
-  0,
-  0,
-  -1,
-  0,
-  // Right (+X):
-  1,
-  0,
-  0,
-  1,
-  0,
-  0,
-  1,
-  0,
-  0,
-  1,
-  0,
-  0,
-  // Left (-X):
-  -1,
-  0,
-  0,
-  -1,
-  0,
-  0,
-  -1,
-  0,
-  0,
-  -1,
-  0,
-  0
-]);
-var INDICES_SOLID = new Uint16Array([
-  // Front (0-3):
-  0,
-  1,
-  2,
-  2,
-  3,
-  0,
-  // Back (4-7):
-  4,
-  5,
-  6,
-  6,
-  7,
-  4,
-  // Top (8-11):
-  8,
-  9,
-  10,
-  10,
-  11,
-  8,
-  // Bottom (12-15):
-  12,
-  13,
-  14,
-  14,
-  15,
-  12,
-  // Right (16-19):
-  16,
-  17,
-  18,
-  18,
-  19,
-  16,
-  // Left (20-23):
-  20,
-  21,
-  22,
-  22,
-  23,
-  20
-]);
-var INDICES_WIREFRAME = new Uint16Array([
-  // Front edges:
-  0,
-  1,
-  1,
-  2,
-  2,
-  3,
-  3,
-  0,
-  // Back edges:
-  4,
-  5,
-  5,
-  6,
-  6,
-  7,
-  7,
-  4,
-  // Side edges:
-  0,
-  5,
-  1,
-  4,
-  2,
-  7,
-  3,
-  6
-]);
+var COLORS_PER_FACE_LENGTH = BOX_FACE_COUNT * VEC3_COMPONENT_COUNT;
+var MIN_SEGMENT_COUNT = 1;
+var VERTICES_PER_SEGMENT_INCREMENT = 1;
+var CENTER_T_OFFSET = 0.5;
+var UV_V_FLIP_BASE = 1;
+var DEFAULT_T_VALUE = 0;
+var ZERO_SEGMENT_COUNT = 0;
+var NEXT_VERTEX_OFFSET = 1;
 var BoxGeometry = class _BoxGeometry extends Geometry {
   /**
    * @param {WebGL2RenderingContext} webglContext         - WebGL2 rendering context.
@@ -1607,117 +1431,1416 @@ var BoxGeometry = class _BoxGeometry extends Geometry {
    */
   constructor(webglContext, optionsOrSize = {}) {
     const options = _BoxGeometry.#normalizeOptions(optionsOrSize);
-    const { size, colors: colorsSpec } = options;
-    const halfSize = size / BOX_HALF_SIZE_DIVISOR;
-    const positions = _BoxGeometry.#createPositions(halfSize);
-    const colors = _BoxGeometry.#createColors(colorsSpec);
-    const uvs = BOX_FACE_UVS;
-    const normals = BOX_FACE_NORMALS;
-    if (INDICES_SOLID.length !== BOX_TRIANGLE_INDEX_COUNT) {
-      throw new Error("`BoxGeometry` internal error: unexpected triangle index count.");
-    }
-    super(webglContext, positions, colors, INDICES_SOLID, INDICES_WIREFRAME, uvs, normals);
+    const data = _BoxGeometry.#createGeometryData(options);
+    super(
+      webglContext,
+      data.positions,
+      data.colors,
+      data.indicesSolid,
+      data.indicesWireframe,
+      data.uvs,
+      data.normals
+    );
   }
   /**
    * Normalizes constructor input to a `BoxGeometryOptions` object.
    *
    * @param {BoxGeometryOptions | number} optionsOrSize - Options object or numeric size.
-   * @returns {{ size: number, colors: Float32Array }}  - Normalized options.
+   * @returns {Required<BoxGeometryOptions>}            - Normalized options.
    * @private
    */
   static #normalizeOptions(optionsOrSize) {
     if (typeof optionsOrSize === "number") {
-      return { size: optionsOrSize, colors: DEFAULT_VERTEX_COLOR };
+      return {
+        size: optionsOrSize,
+        width: optionsOrSize,
+        height: optionsOrSize,
+        depth: optionsOrSize,
+        widthSegments: DEFAULT_SEGMENT_COUNT,
+        heightSegments: DEFAULT_SEGMENT_COUNT,
+        depthSegments: DEFAULT_SEGMENT_COUNT,
+        colors: DEFAULT_VERTEX_COLOR
+      };
     }
     if (optionsOrSize === null || typeof optionsOrSize !== "object") {
       throw new TypeError("`BoxGeometry` expects options as an object or a number.");
     }
-    const { size = DEFAULT_BOX_SIZE, colors = DEFAULT_VERTEX_COLOR } = optionsOrSize;
-    if (typeof size !== "number") {
-      throw new TypeError("`BoxGeometry` expects size as a number.");
+    const {
+      size = DEFAULT_BOX_SIZE,
+      width = size,
+      height = size,
+      depth = size,
+      widthSegments = DEFAULT_SEGMENT_COUNT,
+      heightSegments = DEFAULT_SEGMENT_COUNT,
+      depthSegments = DEFAULT_SEGMENT_COUNT,
+      colors = DEFAULT_VERTEX_COLOR
+    } = optionsOrSize;
+    if (typeof width !== "number" || typeof height !== "number" || typeof depth !== "number") {
+      throw new TypeError("`BoxGeometry` expects `width/height/depth` as numbers.");
+    }
+    if (!Number.isFinite(width) || !Number.isFinite(height) || !Number.isFinite(depth)) {
+      throw new RangeError("`BoxGeometry` expects finite `width/height/depth`.");
     }
     if (!(colors instanceof Float32Array)) {
       throw new TypeError("`BoxGeometry` expects colors as a `Float32Array`.");
     }
-    if (colors.length !== COLORS_UNIFORM_LENGTH && colors.length !== COLORS_PER_FACE_LENGTH && colors.length !== COLORS_PER_VERTEX_LENGTH) {
-      throw new TypeError(
-        "`BoxGeometry` expects `colors` length to be `{uniform}` (uniform), `{face}` (per-face), or `{vertex}` (per-vertex).".replace("{uniform}", String(COLORS_UNIFORM_LENGTH)).replace("{face}", String(COLORS_PER_FACE_LENGTH)).replace("{vertex}", String(COLORS_PER_VERTEX_LENGTH))
+    return {
+      size,
+      width,
+      height,
+      depth,
+      widthSegments: _BoxGeometry.#normalizeSegmentCount(widthSegments, "widthSegments"),
+      heightSegments: _BoxGeometry.#normalizeSegmentCount(heightSegments, "heightSegments"),
+      depthSegments: _BoxGeometry.#normalizeSegmentCount(depthSegments, "depthSegments"),
+      colors
+    };
+  }
+  /**
+   * Normalizes and validates a segment count parameter.
+   *
+   * @param {number} value      - Segment count value.
+   * @param {string} optionName - Name of the option for error messages.
+   * @returns {number}          - Normalized integer `>= 1`.
+   * @private
+   */
+  static #normalizeSegmentCount(value, optionName) {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new TypeError("`BoxGeometry` expects `{name}` as a finite number.".replace("{name}", optionName));
+    }
+    const intValue = Math.floor(value);
+    if (intValue < MIN_SEGMENT_COUNT) {
+      throw new RangeError(
+        "`BoxGeometry` expects `{name}` to be `>= {min}`.".replace("{name}", optionName).replace("{min}", String(MIN_SEGMENT_COUNT))
       );
     }
-    return { size, colors };
+    return intValue;
   }
   /**
-   * Creates scaled positions for the box.
-   * `UNIT_POSITIONS` contains `-1/+1` cube coordinates, scaling them by `halfSize`.
+   * Creates full geometry data for a segmented box.
    *
-   * @param {number} halfSize - Half of the cube edge size.
-   * @returns {Float32Array}  - Scaled positions buffer.
+   * @param {Required<BoxGeometryOptions>} options - Normalized options.
+   * @returns {BoxGeometryData}                    - Geometry buffers.
+   *
    * @private
    */
-  static #createPositions(halfSize) {
-    const positions = new Float32Array(UNIT_POSITIONS.length);
-    for (let i = 0; i < UNIT_POSITIONS.length; i += 1) {
-      positions[i] = UNIT_POSITIONS[i] * halfSize;
+  static #createGeometryData(options) {
+    const halfWidth = options.width / HALF_SIZE_DIVISOR;
+    const halfHeight = options.height / HALF_SIZE_DIVISOR;
+    const halfDepth = options.depth / HALF_SIZE_DIVISOR;
+    const positions = [];
+    const normals = [];
+    const uvs = [];
+    const faceVertexCounts = [];
+    const indicesSolid = [];
+    let vertexOffset = 0;
+    const faces = [
+      // Front (+Z)
+      {
+        axisU: [1, 0, 0],
+        axisV: [0, 1, 0],
+        normal: [0, 0, 1],
+        fixed: halfDepth,
+        sizeU: options.width,
+        sizeV: options.height,
+        segmentsU: options.widthSegments,
+        segmentsV: options.heightSegments
+      },
+      // Back (-Z)
+      {
+        axisU: [-1, 0, 0],
+        axisV: [0, 1, 0],
+        normal: [0, 0, -1],
+        fixed: halfDepth,
+        sizeU: options.width,
+        sizeV: options.height,
+        segmentsU: options.widthSegments,
+        segmentsV: options.heightSegments
+      },
+      // Top (+Y)
+      {
+        axisU: [1, 0, 0],
+        axisV: [0, 0, -1],
+        normal: [0, 1, 0],
+        fixed: halfHeight,
+        sizeU: options.width,
+        sizeV: options.depth,
+        segmentsU: options.widthSegments,
+        segmentsV: options.depthSegments
+      },
+      // Bottom (-Y)
+      {
+        axisU: [1, 0, 0],
+        axisV: [0, 0, 1],
+        normal: [0, -1, 0],
+        fixed: halfHeight,
+        sizeU: options.width,
+        sizeV: options.depth,
+        segmentsU: options.widthSegments,
+        segmentsV: options.depthSegments
+      },
+      // Right (+X)
+      {
+        axisU: [0, 0, -1],
+        axisV: [0, 1, 0],
+        normal: [1, 0, 0],
+        fixed: halfWidth,
+        sizeU: options.depth,
+        sizeV: options.height,
+        segmentsU: options.depthSegments,
+        segmentsV: options.heightSegments
+      },
+      // Left (-X)
+      {
+        axisU: [0, 0, 1],
+        axisV: [0, 1, 0],
+        normal: [-1, 0, 0],
+        fixed: halfWidth,
+        sizeU: options.depth,
+        sizeV: options.height,
+        segmentsU: options.depthSegments,
+        segmentsV: options.heightSegments
+      }
+    ];
+    for (let faceIndex = 0; faceIndex < faces.length; faceIndex += 1) {
+      const face = faces[faceIndex];
+      const localVertexCount = _BoxGeometry.#appendFaceGrid(
+        positions,
+        normals,
+        uvs,
+        indicesSolid,
+        vertexOffset,
+        face
+      );
+      faceVertexCounts.push(localVertexCount);
+      vertexOffset += localVertexCount;
     }
-    return positions;
+    const vertexCount = vertexOffset;
+    const colors = _BoxGeometry.#createColors(options.colors, vertexCount, faceVertexCounts);
+    const indicesSolidTyped = createIndexArray(vertexCount, indicesSolid);
+    const indicesWireframe = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolidTyped);
+    return {
+      positions: new Float32Array(positions),
+      normals: new Float32Array(normals),
+      uvs: new Float32Array(uvs),
+      colors,
+      indicesSolid: indicesSolidTyped,
+      indicesWireframe
+    };
   }
   /**
-   * Converts `colors` input (uniform/per-face/per-vertex) into a per-vertex RGB buffer.
+   * Appends a single face grid to the output buffers.
    *
-   * @param {Float32Array} colorsSpec - Color buffer that follows 3/18/72 proportion length.
-   * @returns {Float32Array}          - Per-vertex RGB colors buffer (length = 72).
+   * @param {number[]} positions     - Output positions.
+   * @param {number[]} normals       - Output normals.
+   * @param {number[]} uvs           - Output UVs.
+   * @param {number[]} indicesSolid  - Output solid indices (triangles).
+   * @param {number} vertexOffset    - Starting vertex index for this face.
+   * @param {BoxFaceDefinition} face - Face definition.
+   * @returns {number}               - Number of vertices appended for this face.
    * @private
    */
-  static #createColors(colorsSpec) {
-    if (colorsSpec.length === COLORS_PER_VERTEX_LENGTH) {
-      return new Float32Array(colorsSpec);
+  static #appendFaceGrid(positions, normals, uvs, indicesSolid, vertexOffset, face) {
+    const segmentsU = face.segmentsU;
+    const segmentsV = face.segmentsV;
+    const uVertexCount = segmentsU + VERTICES_PER_SEGMENT_INCREMENT;
+    const vVertexCount = segmentsV + VERTICES_PER_SEGMENT_INCREMENT;
+    for (let vIndex = 0; vIndex < vVertexCount; vIndex += 1) {
+      const vNormalized = segmentsV === ZERO_SEGMENT_COUNT ? DEFAULT_T_VALUE : vIndex / segmentsV;
+      const vLocalOffset = (vNormalized - CENTER_T_OFFSET) * face.sizeV;
+      for (let uIndex = 0; uIndex < uVertexCount; uIndex += 1) {
+        const uNormalized = segmentsU === ZERO_SEGMENT_COUNT ? DEFAULT_T_VALUE : uIndex / segmentsU;
+        const uLocalOffset = (uNormalized - CENTER_T_OFFSET) * face.sizeU;
+        const positionX = face.axisU[0] * uLocalOffset + face.axisV[0] * vLocalOffset + face.normal[0] * face.fixed;
+        const positionY = face.axisU[1] * uLocalOffset + face.axisV[1] * vLocalOffset + face.normal[1] * face.fixed;
+        const positionZ = face.axisU[2] * uLocalOffset + face.axisV[2] * vLocalOffset + face.normal[2] * face.fixed;
+        positions.push(positionX, positionY, positionZ);
+        normals.push(face.normal[0], face.normal[1], face.normal[2]);
+        uvs.push(uNormalized, UV_V_FLIP_BASE - vNormalized);
+      }
     }
-    if (colorsSpec.length === COLORS_UNIFORM_LENGTH) {
-      return _BoxGeometry.#createUniformColors(colorsSpec);
+    for (let vIndex = 0; vIndex < segmentsV; vIndex += 1) {
+      for (let uIndex = 0; uIndex < segmentsU; uIndex += 1) {
+        const topLeftVertexIndex = vertexOffset + vIndex * uVertexCount + uIndex;
+        const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET;
+        const bottomLeftVertexIndex = topLeftVertexIndex + uVertexCount;
+        const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET;
+        indicesSolid.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
+        indicesSolid.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
+      }
     }
-    return _BoxGeometry.#createPerFaceColors(colorsSpec);
+    return uVertexCount * vVertexCount;
   }
   /**
-   * Creates a uniform per-vertex color buffer from a single RGB triplet.
+   * Creates a per-vertex color buffer for the final vertex count.
    *
-   * @param {Float32Array} uniformColor - Float32Array([red, green, blue]).
+   * @param {Float32Array} colorsSpec   - Color specification.
+   * @param {number} vertexCount        - Total vertex count.
+   * @param {number[]} faceVertexCounts - Vertex count for each face, in face order.
    * @returns {Float32Array}            - Per-vertex RGB buffer.
    * @private
    */
-  static #createUniformColors(uniformColor) {
-    const colors = new Float32Array(COLORS_PER_VERTEX_LENGTH);
-    for (let vertexIndex = 0; vertexIndex < BOX_VERTEX_COUNT; vertexIndex += 1) {
-      const baseIndex = vertexIndex * COLOR_COMPONENT_COUNT2;
-      colors[baseIndex + COLOR_COMPONENT_INDEX_RED] = uniformColor[COLOR_COMPONENT_INDEX_RED];
-      colors[baseIndex + COLOR_COMPONENT_INDEX_GREEN] = uniformColor[COLOR_COMPONENT_INDEX_GREEN];
-      colors[baseIndex + COLOR_COMPONENT_INDEX_BLUE] = uniformColor[COLOR_COMPONENT_INDEX_BLUE];
+  static #createColors(colorsSpec, vertexCount, faceVertexCounts) {
+    if (colorsSpec.length === COLORS_PER_FACE_LENGTH) {
+      const colorBuffer = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT);
+      let vertexBase = 0;
+      for (let faceIndex = 0; faceIndex < BOX_FACE_COUNT; faceIndex += 1) {
+        const faceVertexCount = faceVertexCounts[faceIndex];
+        const faceColorBase = faceIndex * VEC3_COMPONENT_COUNT;
+        const red = colorsSpec[faceColorBase + 0];
+        const green = colorsSpec[faceColorBase + 1];
+        const blue = colorsSpec[faceColorBase + 2];
+        for (let i = 0; i < faceVertexCount; i += 1) {
+          const destinationComponentOffset = (vertexBase + i) * VEC3_COMPONENT_COUNT;
+          colorBuffer[destinationComponentOffset + 0] = red;
+          colorBuffer[destinationComponentOffset + 1] = green;
+          colorBuffer[destinationComponentOffset + 2] = blue;
+        }
+        vertexBase += faceVertexCount;
+      }
+      return colorBuffer;
     }
-    return colors;
+    return createColorsFromSpec(vertexCount, colorsSpec);
+  }
+};
+
+// core/geometry/plane-geometry.js
+var DEFAULT_PLANE_WIDTH = 1;
+var DEFAULT_PLANE_HEIGHT = 1;
+var DEFAULT_SEGMENT_COUNT2 = 1;
+var MIN_SEGMENT_COUNT2 = 1;
+var VERTICES_PER_SEGMENT_INCREMENT2 = 1;
+var NEXT_VERTEX_OFFSET2 = 1;
+var CENTER_T_OFFSET2 = 0.5;
+var UV_V_FLIP_BASE2 = 1;
+var PLANE_Z_POSITION = 0;
+var VEC3_COMPONENT_COUNT2 = 3;
+var VEC2_COMPONENT_COUNT = 2;
+var PLANE_NORMAL_X = 0;
+var PLANE_NORMAL_Y = 0;
+var PLANE_NORMAL_Z = 1;
+var PlaneGeometry = class _PlaneGeometry extends Geometry {
+  /**
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @param {PlaneGeometryOptions} [options = {}] - Geometry options.
+   */
+  constructor(webglContext, options = {}) {
+    const normalized = _PlaneGeometry.#normalizeOptions(options);
+    const data = _PlaneGeometry.#createGeometryData(normalized);
+    super(
+      webglContext,
+      data.positions,
+      data.colors,
+      data.indicesSolid,
+      data.indicesWireframe,
+      data.uvs,
+      data.normals
+    );
   }
   /**
-   * Creates a per-vertex color buffer from per-face RGB colors.
-   * Each face color is applied to all 4 vertices of that face.
+   * Normalizes constructor input to a `PlaneGeometryOptions` object.
    *
-   * @param {Float32Array} perFaceColors - Float32Array length = 18 (6 faces * 3 RGB).
-   * @returns {Float32Array}             - Per-vertex RGB buffer (length = 72).
+   * @param {PlaneGeometryOptions} options     - Options object.
+   * @returns {Required<PlaneGeometryOptions>} - Normalized options.
    * @private
    */
-  static #createPerFaceColors(perFaceColors) {
-    const colors = new Float32Array(COLORS_PER_VERTEX_LENGTH);
-    for (let faceIndex = 0; faceIndex < BOX_FACE_COUNT; faceIndex += 1) {
-      const faceColorBaseIndex = faceIndex * COLOR_COMPONENT_COUNT2;
-      const faceRed = perFaceColors[faceColorBaseIndex + COLOR_COMPONENT_INDEX_RED];
-      const faceGreen = perFaceColors[faceColorBaseIndex + COLOR_COMPONENT_INDEX_GREEN];
-      const faceBlue = perFaceColors[faceColorBaseIndex + COLOR_COMPONENT_INDEX_BLUE];
-      for (let vertexOnFace = 0; vertexOnFace < VERTICES_PER_FACE; vertexOnFace += 1) {
-        const vertexIndex = faceIndex * VERTICES_PER_FACE + vertexOnFace;
-        const vertexBaseIndex = vertexIndex * COLOR_COMPONENT_COUNT2;
-        colors[vertexBaseIndex + COLOR_COMPONENT_INDEX_RED] = faceRed;
-        colors[vertexBaseIndex + COLOR_COMPONENT_INDEX_GREEN] = faceGreen;
-        colors[vertexBaseIndex + COLOR_COMPONENT_INDEX_BLUE] = faceBlue;
+  static #normalizeOptions(options) {
+    if (options === null || typeof options !== "object") {
+      throw new TypeError("`PlaneGeometry` expects options as an object.");
+    }
+    const {
+      width = DEFAULT_PLANE_WIDTH,
+      height = DEFAULT_PLANE_HEIGHT,
+      widthSegments = DEFAULT_SEGMENT_COUNT2,
+      heightSegments = DEFAULT_SEGMENT_COUNT2,
+      colors = DEFAULT_VERTEX_COLOR
+    } = options;
+    if (typeof width !== "number" || typeof height !== "number") {
+      throw new TypeError("`PlaneGeometry` expects `width/height` as numbers.");
+    }
+    if (!Number.isFinite(width) || !Number.isFinite(height)) {
+      throw new RangeError("`PlaneGeometry` expects finite `width/height`.");
+    }
+    if (!(colors instanceof Float32Array)) {
+      throw new TypeError("`PlaneGeometry` expects colors as a `Float32Array`.");
+    }
+    return {
+      width,
+      height,
+      widthSegments: _PlaneGeometry.#normalizeSegmentCount(widthSegments, "widthSegments"),
+      heightSegments: _PlaneGeometry.#normalizeSegmentCount(heightSegments, "heightSegments"),
+      colors
+    };
+  }
+  /**
+   * Normalizes and validates a segment count parameter.
+   *
+   * @param {number} value      - Segment count value.
+   * @param {string} optionName - Name of the option for error messages.
+   * @returns {number}          - Normalized integer `>= 1`.
+   * @private
+   */
+  static #normalizeSegmentCount(value, optionName) {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new TypeError("`PlaneGeometry` expects `{name}` as a finite number.".replace("{name}", optionName));
+    }
+    const intValue = Math.floor(value);
+    if (intValue < MIN_SEGMENT_COUNT2) {
+      throw new RangeError(
+        "`PlaneGeometry` expects `{name}` to be `>= {min}`.".replace("{name}", optionName).replace("{min}", String(MIN_SEGMENT_COUNT2))
+      );
+    }
+    return intValue;
+  }
+  /**
+   * Creates full geometry data for a segmented plane.
+   *
+   * @param {Required<PlaneGeometryOptions>} options - Normalized options.
+   * @returns {PlaneGeometryData}                    - Geometry buffers.
+   * @private
+   */
+  static #createGeometryData(options) {
+    const widthSegments = options.widthSegments;
+    const heightSegments = options.heightSegments;
+    const widthVertexCount = widthSegments + VERTICES_PER_SEGMENT_INCREMENT2;
+    const heightVertexCount = heightSegments + VERTICES_PER_SEGMENT_INCREMENT2;
+    const vertexCount = widthVertexCount * heightVertexCount;
+    const positions = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT2);
+    const normals = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT2);
+    const uvs = new Float32Array(vertexCount * VEC2_COMPONENT_COUNT);
+    let vertexIndex = 0;
+    for (let rowIndex = 0; rowIndex < heightVertexCount; rowIndex += 1) {
+      const vNormalized = rowIndex / heightSegments;
+      const positionY = (vNormalized - CENTER_T_OFFSET2) * options.height;
+      for (let columnIndex = 0; columnIndex < widthVertexCount; columnIndex += 1) {
+        const uNormalized = columnIndex / widthSegments;
+        const positionX = (uNormalized - CENTER_T_OFFSET2) * options.width;
+        const positionBaseOffset = vertexIndex * VEC3_COMPONENT_COUNT2;
+        positions[positionBaseOffset + 0] = positionX;
+        positions[positionBaseOffset + 1] = positionY;
+        positions[positionBaseOffset + 2] = PLANE_Z_POSITION;
+        normals[positionBaseOffset + 0] = PLANE_NORMAL_X;
+        normals[positionBaseOffset + 1] = PLANE_NORMAL_Y;
+        normals[positionBaseOffset + 2] = PLANE_NORMAL_Z;
+        const uvBaseOffset = vertexIndex * VEC2_COMPONENT_COUNT;
+        uvs[uvBaseOffset + 0] = uNormalized;
+        uvs[uvBaseOffset + 1] = UV_V_FLIP_BASE2 - vNormalized;
+        vertexIndex += 1;
       }
     }
-    return colors;
+    const solidTriangleIndices = [];
+    for (let rowIndex = 0; rowIndex < heightSegments; rowIndex += 1) {
+      for (let columnIndex = 0; columnIndex < widthSegments; columnIndex += 1) {
+        const topLeftVertexIndex = rowIndex * widthVertexCount + columnIndex;
+        const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET2;
+        const bottomLeftVertexIndex = topLeftVertexIndex + widthVertexCount;
+        const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET2;
+        solidTriangleIndices.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
+        solidTriangleIndices.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
+      }
+    }
+    const indicesSolid = createIndexArray(vertexCount, solidTriangleIndices);
+    const indicesWireframe = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
+    const colors = createColorsFromSpec(vertexCount, options.colors);
+    return {
+      positions,
+      normals,
+      uvs,
+      colors,
+      indicesSolid,
+      indicesWireframe
+    };
+  }
+};
+
+// core/geometry/sphere-geometry.js
+var DEFAULT_SPHERE_WIDTH = 1;
+var DEFAULT_SPHERE_HEIGHT = 1;
+var DEFAULT_SPHERE_DEPTH = 1;
+var DEFAULT_WIDTH_SEGMENTS = 24;
+var DEFAULT_HEIGHT_SEGMENTS = 16;
+var MIN_WIDTH_SEGMENT_COUNT = 3;
+var MIN_HEIGHT_SEGMENT_COUNT = 2;
+var HALF_SIZE_DIVISOR2 = 2;
+var VERTICES_PER_SEGMENT_INCREMENT3 = 1;
+var NEXT_VERTEX_OFFSET3 = 1;
+var UV_V_FLIP_BASE3 = 1;
+var ZERO_VALUE = 0;
+var ONE_VALUE = 1;
+var VEC3_COMPONENT_COUNT3 = 3;
+var VEC2_COMPONENT_COUNT2 = 2;
+var TWO_PI = Math.PI * 2;
+var SphereGeometry = class _SphereGeometry extends Geometry {
+  /**
+   * @param {WebGL2RenderingContext} webglContext  - WebGL2 rendering context.
+   * @param {SphereGeometryOptions} [options = {}] - Geometry options.
+   */
+  constructor(webglContext, options = {}) {
+    const normalized = _SphereGeometry.#normalizeOptions(options);
+    const data = _SphereGeometry.#createGeometryData(normalized);
+    super(
+      webglContext,
+      data.positions,
+      data.colors,
+      data.indicesSolid,
+      data.indicesWireframe,
+      data.uvs,
+      data.normals
+    );
+  }
+  /**
+   * Normalizes constructor input to a `SphereGeometryOptions` object.
+   *
+   * @param {SphereGeometryOptions} options     - Options object.
+   * @returns {Required<SphereGeometryOptions>} - Normalized options.
+   * @private
+   */
+  static #normalizeOptions(options) {
+    if (options === null || typeof options !== "object") {
+      throw new TypeError("`SphereGeometry` expects options as an object.");
+    }
+    const {
+      width = DEFAULT_SPHERE_WIDTH,
+      height = DEFAULT_SPHERE_HEIGHT,
+      depth = DEFAULT_SPHERE_DEPTH,
+      widthSegments = DEFAULT_WIDTH_SEGMENTS,
+      heightSegments = DEFAULT_HEIGHT_SEGMENTS,
+      colors = DEFAULT_VERTEX_COLOR
+    } = options;
+    if (typeof width !== "number" || typeof height !== "number" || typeof depth !== "number") {
+      throw new TypeError("`SphereGeometry` expects `width/height/depth` as numbers.");
+    }
+    if (!Number.isFinite(width) || !Number.isFinite(height) || !Number.isFinite(depth)) {
+      throw new RangeError("`SphereGeometry` expects finite `width/height/depth`.");
+    }
+    if (!(colors instanceof Float32Array)) {
+      throw new TypeError("`SphereGeometry` expects colors as a `Float32Array`.");
+    }
+    return {
+      width,
+      height,
+      depth,
+      widthSegments: _SphereGeometry.#normalizeSegmentCount(widthSegments, "widthSegments", MIN_WIDTH_SEGMENT_COUNT),
+      heightSegments: _SphereGeometry.#normalizeSegmentCount(heightSegments, "heightSegments", MIN_HEIGHT_SEGMENT_COUNT),
+      colors
+    };
+  }
+  /**
+   * Normalizes and validates a segment count parameter.
+   *
+   * @param {number} value      - Segment count value.
+   * @param {string} optionName - Name of the option for error messages.
+   * @param {number} minValue   - Minimal allowed value.
+   * @returns {number}          - Normalized integer segment count.
+   * @private
+   */
+  static #normalizeSegmentCount(value, optionName, minValue) {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new TypeError("`SphereGeometry` expects `{name}` as a finite number.".replace("{name}", optionName));
+    }
+    const intValue = Math.floor(value);
+    if (intValue < minValue) {
+      throw new RangeError(
+        "`SphereGeometry` expects `{name}` to be `>= {min}`.".replace("{name}", optionName).replace("{min}", String(minValue))
+      );
+    }
+    return intValue;
+  }
+  /**
+   * Creates full geometry data for a segmented UV sphere.
+   *
+   * @param {Required<SphereGeometryOptions>} options - Normalized options.
+   * @returns {SphereGeometryData}                    - Geometry buffers.
+   * @private
+   */
+  static #createGeometryData(options) {
+    const radiusX = options.width / HALF_SIZE_DIVISOR2;
+    const radiusY = options.height / HALF_SIZE_DIVISOR2;
+    const radiusZ = options.depth / HALF_SIZE_DIVISOR2;
+    const widthSegments = options.widthSegments;
+    const heightSegments = options.heightSegments;
+    const widthVertexCount = widthSegments + VERTICES_PER_SEGMENT_INCREMENT3;
+    const heightVertexCount = heightSegments + VERTICES_PER_SEGMENT_INCREMENT3;
+    const vertexCount = widthVertexCount * heightVertexCount;
+    const positions = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT3);
+    const normals = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT3);
+    const uvs = new Float32Array(vertexCount * VEC2_COMPONENT_COUNT2);
+    let vertexIndex = 0;
+    for (let latitudeIndex = 0; latitudeIndex < heightVertexCount; latitudeIndex += 1) {
+      const vNormalized = latitudeIndex / heightSegments;
+      const phiRadians = vNormalized * Math.PI;
+      const sinPhi = Math.sin(phiRadians);
+      const cosPhi = Math.cos(phiRadians);
+      for (let longitudeIndex = 0; longitudeIndex < widthVertexCount; longitudeIndex += 1) {
+        const uNormalized = longitudeIndex / widthSegments;
+        const thetaRadians = uNormalized * TWO_PI;
+        const sinTheta = Math.sin(thetaRadians);
+        const cosTheta = Math.cos(thetaRadians);
+        const positionX = cosTheta * sinPhi * radiusX;
+        const positionY = cosPhi * radiusY;
+        const positionZ = sinTheta * sinPhi * radiusZ;
+        const positionBaseOffset = vertexIndex * VEC3_COMPONENT_COUNT3;
+        positions[positionBaseOffset + 0] = positionX;
+        positions[positionBaseOffset + 1] = positionY;
+        positions[positionBaseOffset + 2] = positionZ;
+        const normalX0 = radiusX !== ZERO_VALUE ? positionX / (radiusX * radiusX) : ZERO_VALUE;
+        const normalY0 = radiusY !== ZERO_VALUE ? positionY / (radiusY * radiusY) : ZERO_VALUE;
+        const normalZ0 = radiusZ !== ZERO_VALUE ? positionZ / (radiusZ * radiusZ) : ZERO_VALUE;
+        const inverseNormalLength = _SphereGeometry.#inverseLength(normalX0, normalY0, normalZ0);
+        normals[positionBaseOffset + 0] = normalX0 * inverseNormalLength;
+        normals[positionBaseOffset + 1] = normalY0 * inverseNormalLength;
+        normals[positionBaseOffset + 2] = normalZ0 * inverseNormalLength;
+        const uvBaseOffset = vertexIndex * VEC2_COMPONENT_COUNT2;
+        uvs[uvBaseOffset + 0] = uNormalized;
+        uvs[uvBaseOffset + 1] = UV_V_FLIP_BASE3 - vNormalized;
+        vertexIndex += 1;
+      }
+    }
+    const solidTriangleIndices = [];
+    for (let latitudeIndex = 0; latitudeIndex < heightSegments; latitudeIndex += 1) {
+      for (let longitudeIndex = 0; longitudeIndex < widthSegments; longitudeIndex += 1) {
+        const topLeftVertexIndex = latitudeIndex * widthVertexCount + longitudeIndex;
+        const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET3;
+        const bottomLeftVertexIndex = topLeftVertexIndex + widthVertexCount;
+        const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET3;
+        solidTriangleIndices.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
+        solidTriangleIndices.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
+      }
+    }
+    const indicesSolid = createIndexArray(vertexCount, solidTriangleIndices);
+    const indicesWireframe = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
+    const colors = createColorsFromSpec(vertexCount, options.colors);
+    return {
+      positions,
+      normals,
+      uvs,
+      colors,
+      indicesSolid,
+      indicesWireframe
+    };
+  }
+  /**
+   * Computes inverse vector length `(1 / sqrt(x ^ 2 + y ^ 2 + z ^ 2))`.
+   * Returns 0 when the input vector is zero-length.
+   *
+   * @param {number} x - X component.
+   * @param {number} y - Y component.
+   * @param {number} z - Z component.
+   * @returns {number} - Inverse length.
+   * @private
+   */
+  static #inverseLength(x, y, z) {
+    const length = Math.sqrt(x * x + y * y + z * z);
+    if (length === ZERO_VALUE) {
+      return ZERO_VALUE;
+    }
+    return ONE_VALUE / length;
+  }
+};
+
+// core/geometry/torus-geometry.js
+var DEFAULT_MAJOR_DIAMETER = 1.5;
+var DEFAULT_TUBE_DIAMETER = 0.5;
+var DEFAULT_RADIAL_SEGMENTS = 16;
+var DEFAULT_TUBULAR_SEGMENTS = 32;
+var MIN_SEGMENT_COUNT3 = 3;
+var HALF_SIZE_DIVISOR3 = 2;
+var VERTICES_PER_SEGMENT_INCREMENT4 = 1;
+var UV_V_FLIP_BASE4 = 1;
+var VEC3_COMPONENT_COUNT4 = 3;
+var VEC2_COMPONENT_COUNT3 = 2;
+var TWO_PI2 = Math.PI * 2;
+var NEXT_VERTEX_OFFSET4 = 1;
+var TorusGeometry = class _TorusGeometry extends Geometry {
+  /**
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @param {TorusGeometryOptions} [options = {}] - Geometry options.
+   */
+  constructor(webglContext, options = {}) {
+    const normalized = _TorusGeometry.#normalizeOptions(options);
+    const data = _TorusGeometry.#createGeometryData(normalized);
+    super(
+      webglContext,
+      data.positions,
+      data.colors,
+      data.indicesSolid,
+      data.indicesWireframe,
+      data.uvs,
+      data.normals
+    );
+  }
+  /**
+   * Normalizes constructor input to a `TorusGeometryOptions` object.
+   *
+   * @param {TorusGeometryOptions} options     - Options object.
+   * @returns {Required<TorusGeometryOptions>} - Normalized options.
+   * @private
+   */
+  static #normalizeOptions(options) {
+    if (options === null || typeof options !== "object") {
+      throw new TypeError("`TorusGeometry` expects options as an object.");
+    }
+    const {
+      width = DEFAULT_MAJOR_DIAMETER,
+      height = DEFAULT_TUBE_DIAMETER,
+      tubularSegments = DEFAULT_TUBULAR_SEGMENTS,
+      radialSegments = DEFAULT_RADIAL_SEGMENTS,
+      colors = DEFAULT_VERTEX_COLOR
+    } = options;
+    if (typeof width !== "number" || typeof height !== "number") {
+      throw new TypeError("`TorusGeometry` expects `width/height` as numbers.");
+    }
+    if (!Number.isFinite(width) || !Number.isFinite(height)) {
+      throw new RangeError("`TorusGeometry` expects finite `width/height`.");
+    }
+    if (!(colors instanceof Float32Array)) {
+      throw new TypeError("`TorusGeometry` expects colors as a `Float32Array`.");
+    }
+    return {
+      width,
+      height,
+      tubularSegments: _TorusGeometry.#normalizeSegmentCount(tubularSegments, "tubularSegments"),
+      radialSegments: _TorusGeometry.#normalizeSegmentCount(radialSegments, "radialSegments"),
+      colors
+    };
+  }
+  /**
+   * Normalizes and validates a segment count parameter.
+   *
+   * @param {number} value      - Segment count value.
+   * @param {string} optionName - Name of the option for error messages.
+   * @returns {number}          - Normalized integer `>= 3`.
+   * @private
+   */
+  static #normalizeSegmentCount(value, optionName) {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new TypeError("`TorusGeometry` expects `{name}` as a finite number.".replace("{name}", optionName));
+    }
+    const intValue = Math.floor(value);
+    if (intValue < MIN_SEGMENT_COUNT3) {
+      throw new RangeError(
+        "`TorusGeometry` expects `{name}` to be `>= {min}`.".replace("{name}", optionName).replace("{min}", String(MIN_SEGMENT_COUNT3))
+      );
+    }
+    return intValue;
+  }
+  /**
+   * Creates full geometry data for a torus.
+   *
+   * @param {Required<TorusGeometryOptions>} options - Normalized options.
+   * @returns {TorusGeometryData}                    - Geometry buffers.
+   * @private
+   */
+  static #createGeometryData(options) {
+    const majorRadius = options.width / HALF_SIZE_DIVISOR3;
+    const tubeRadius = options.height / HALF_SIZE_DIVISOR3;
+    const tubularSegments = options.tubularSegments;
+    const radialSegments = options.radialSegments;
+    const tubularVertexCount = tubularSegments + VERTICES_PER_SEGMENT_INCREMENT4;
+    const radialVertexCount = radialSegments + VERTICES_PER_SEGMENT_INCREMENT4;
+    const vertexCount = tubularVertexCount * radialVertexCount;
+    const positions = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT4);
+    const normals = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT4);
+    const uvs = new Float32Array(vertexCount * VEC2_COMPONENT_COUNT3);
+    let vertexIndex = 0;
+    for (let radialIndex = 0; radialIndex < radialVertexCount; radialIndex += 1) {
+      const vNormalized = radialIndex / radialSegments;
+      const phi = vNormalized * TWO_PI2;
+      const cosPhi = Math.cos(phi);
+      const sinPhi = Math.sin(phi);
+      for (let tubularIndex = 0; tubularIndex < tubularVertexCount; tubularIndex += 1) {
+        const uNormalized = tubularIndex / tubularSegments;
+        const theta = uNormalized * TWO_PI2;
+        const cosTheta = Math.cos(theta);
+        const sinTheta = Math.sin(theta);
+        const ringRadius = majorRadius + tubeRadius * cosPhi;
+        const positionX = ringRadius * cosTheta;
+        const positionY = tubeRadius * sinPhi;
+        const positionZ = ringRadius * sinTheta;
+        const positionBase = vertexIndex * VEC3_COMPONENT_COUNT4;
+        positions[positionBase + 0] = positionX;
+        positions[positionBase + 1] = positionY;
+        positions[positionBase + 2] = positionZ;
+        normals[positionBase + 0] = cosTheta * cosPhi;
+        normals[positionBase + 1] = sinPhi;
+        normals[positionBase + 2] = sinTheta * cosPhi;
+        const uvBase = vertexIndex * VEC2_COMPONENT_COUNT3;
+        uvs[uvBase + 0] = uNormalized;
+        uvs[uvBase + 1] = UV_V_FLIP_BASE4 - vNormalized;
+        vertexIndex += 1;
+      }
+    }
+    const indicesSolidList = [];
+    for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
+      for (let tubularIndex = 0; tubularIndex < tubularSegments; tubularIndex += 1) {
+        const topLeftVertexIndex = radialIndex * tubularVertexCount + tubularIndex;
+        const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET4;
+        const bottomLeftVertexIndex = topLeftVertexIndex + tubularVertexCount;
+        const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET4;
+        indicesSolidList.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
+        indicesSolidList.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
+      }
+    }
+    const indicesSolid = createIndexArray(vertexCount, indicesSolidList);
+    const indicesWireframe = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
+    const colors = createColorsFromSpec(vertexCount, options.colors);
+    return {
+      positions,
+      normals,
+      uvs,
+      colors,
+      indicesSolid,
+      indicesWireframe
+    };
+  }
+};
+
+// core/geometry/cone-geometry.js
+var DEFAULT_CONE_WIDTH = 1;
+var DEFAULT_CONE_HEIGHT = 1.5;
+var DEFAULT_RADIAL_SEGMENTS2 = 24;
+var DEFAULT_HEIGHT_SEGMENTS2 = 1;
+var MIN_RADIAL_SEGMENT_COUNT = 3;
+var MIN_HEIGHT_SEGMENT_COUNT2 = 1;
+var HALF_SIZE_DIVISOR4 = 2;
+var VERTICES_PER_SEGMENT_INCREMENT5 = 1;
+var NEXT_INDEX_OFFSET = 1;
+var UV_V_FLIP_BASE5 = 1;
+var UV_CENTER = 0.5;
+var TWO_PI3 = Math.PI * 2;
+var NORMAL_X_ZERO = 0;
+var NORMAL_Z_ZERO = 0;
+var NORMAL_Y_UP = 1;
+var NORMAL_Y_DOWN = -1;
+var ORIGIN = 0;
+var DOUBLE_SIZE_MULTIPLIER = 2;
+var ZERO_VALUE2 = 0;
+var VEC3_COMPONENT_COUNT5 = 3;
+var VEC2_COMPONENT_COUNT4 = 2;
+var ZERO_VERTEX_COUNT = 0;
+var ConeGeometry = class _ConeGeometry extends Geometry {
+  /**
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @param {ConeGeometryOptions} [options = {}]  - Geometry options.
+   */
+  constructor(webglContext, options = {}) {
+    const normalized = _ConeGeometry.#normalizeOptions(options);
+    const data = _ConeGeometry.#createGeometryData(normalized);
+    super(
+      webglContext,
+      data.positions,
+      data.colors,
+      data.indicesSolid,
+      data.indicesWireframe,
+      data.uvs,
+      data.normals
+    );
+  }
+  /**
+   * Normalizes constructor input to a `ConeGeometryOptions` object.
+   *
+   * @param {ConeGeometryOptions} options     - Options object.
+   * @returns {Required<ConeGeometryOptions>} - Normalized options.
+   * @private
+   */
+  static #normalizeOptions(options) {
+    if (options === null || typeof options !== "object") {
+      throw new TypeError("`ConeGeometry` expects options as an object.");
+    }
+    const {
+      width = DEFAULT_CONE_WIDTH,
+      height = DEFAULT_CONE_HEIGHT,
+      depth = width,
+      radialSegments = DEFAULT_RADIAL_SEGMENTS2,
+      heightSegments = DEFAULT_HEIGHT_SEGMENTS2,
+      capped = true,
+      colors = DEFAULT_VERTEX_COLOR
+    } = options;
+    if (typeof width !== "number" || typeof height !== "number" || typeof depth !== "number") {
+      throw new TypeError("`ConeGeometry` expects `width/height/depth` as numbers.");
+    }
+    if (!Number.isFinite(width) || !Number.isFinite(height) || !Number.isFinite(depth)) {
+      throw new RangeError("`ConeGeometry` expects finite `width/height/depth`.");
+    }
+    if (!(colors instanceof Float32Array)) {
+      throw new TypeError("`ConeGeometry` expects colors as a `Float32Array`.");
+    }
+    return {
+      width,
+      height,
+      depth,
+      radialSegments: _ConeGeometry.#normalizeSegmentCount(radialSegments, "radialSegments", MIN_RADIAL_SEGMENT_COUNT),
+      heightSegments: _ConeGeometry.#normalizeSegmentCount(heightSegments, "heightSegments", MIN_HEIGHT_SEGMENT_COUNT2),
+      capped: Boolean(capped),
+      colors
+    };
+  }
+  /**
+   * Normalizes and validates a segment count parameter.
+   *
+   * @param {number} value      - Segment count.
+   * @param {string} optionName - Option name.
+   * @param {number} minValue   - Minimal allowed value.
+   * @returns {number}          - Normalized integer segment count.
+   * @private
+   */
+  static #normalizeSegmentCount(value, optionName, minValue) {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new TypeError("`ConeGeometry` expects `{name}` as a finite number.".replace("{name}", optionName));
+    }
+    const intValue = Math.floor(value);
+    if (intValue < minValue) {
+      throw new RangeError(
+        "`ConeGeometry` expects `{name}` to be `>= {min}`.".replace("{name}", optionName).replace("{min}", String(minValue))
+      );
+    }
+    return intValue;
+  }
+  /**
+   * Creates full geometry data for a segmented cone.
+   *
+   * @param {Required<ConeGeometryOptions>} options - Normalized options.
+   * @returns {ConeGeometryData}                    - Geometry buffers.
+   * @private
+   */
+  static #createGeometryData(options) {
+    const radiusX = options.width / HALF_SIZE_DIVISOR4;
+    const radiusZ = options.depth / HALF_SIZE_DIVISOR4;
+    const height = options.height;
+    const radialSegments = options.radialSegments;
+    const heightSegments = options.heightSegments;
+    const ringVertexCount = radialSegments + VERTICES_PER_SEGMENT_INCREMENT5;
+    const sideRingCount = heightSegments;
+    const sideVertexCount = sideRingCount * ringVertexCount;
+    const hasCap = options.capped;
+    const capVertexCount = hasCap ? ringVertexCount + VERTICES_PER_SEGMENT_INCREMENT5 : ZERO_VERTEX_COUNT;
+    const vertexCount = sideVertexCount + VERTICES_PER_SEGMENT_INCREMENT5 + capVertexCount;
+    const positions = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT5);
+    const normals = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT5);
+    const uvs = new Float32Array(vertexCount * VEC2_COMPONENT_COUNT4);
+    let vertexIndex = 0;
+    for (let heightRingIndex = 0; heightRingIndex < sideRingCount; heightRingIndex += 1) {
+      const heightNormalized = heightRingIndex / heightSegments;
+      const radiusFactor = UV_V_FLIP_BASE5 - heightNormalized;
+      const positionY = -height / HALF_SIZE_DIVISOR4 + heightNormalized * height;
+      const currentRadiusX = radiusX * radiusFactor;
+      const currentRadiusZ = radiusZ * radiusFactor;
+      for (let radialVertexIndex = 0; radialVertexIndex < ringVertexCount; radialVertexIndex += 1) {
+        const uNormalized = radialVertexIndex / radialSegments;
+        const angleRadians = uNormalized * TWO_PI3;
+        const cosTheta = Math.cos(angleRadians);
+        const sinTheta = Math.sin(angleRadians);
+        const positionX = cosTheta * currentRadiusX;
+        const positionZ = sinTheta * currentRadiusZ;
+        const positionBaseOffset = vertexIndex * VEC3_COMPONENT_COUNT5;
+        positions[positionBaseOffset + 0] = positionX;
+        positions[positionBaseOffset + 1] = positionY;
+        positions[positionBaseOffset + 2] = positionZ;
+        const normalX0 = radiusZ * height * cosTheta;
+        const normalY0 = radiusX * radiusZ;
+        const normalZ0 = radiusX * height * sinTheta;
+        const inverseNormalLength = _ConeGeometry.#inverseLength(normalX0, normalY0, normalZ0);
+        normals[positionBaseOffset + 0] = normalX0 * inverseNormalLength;
+        normals[positionBaseOffset + 1] = normalY0 * inverseNormalLength;
+        normals[positionBaseOffset + 2] = normalZ0 * inverseNormalLength;
+        const uvBaseOffset = vertexIndex * VEC2_COMPONENT_COUNT4;
+        uvs[uvBaseOffset + 0] = uNormalized;
+        uvs[uvBaseOffset + 1] = UV_V_FLIP_BASE5 - heightNormalized;
+        vertexIndex += 1;
+      }
+    }
+    const apexIndex = vertexIndex;
+    {
+      const apexBaseOffset = apexIndex * VEC3_COMPONENT_COUNT5;
+      positions[apexBaseOffset + 0] = ORIGIN;
+      positions[apexBaseOffset + 1] = height / HALF_SIZE_DIVISOR4;
+      positions[apexBaseOffset + 2] = ORIGIN;
+      normals[apexBaseOffset + 0] = NORMAL_X_ZERO;
+      normals[apexBaseOffset + 1] = NORMAL_Y_UP;
+      normals[apexBaseOffset + 2] = NORMAL_Z_ZERO;
+      const apexUvOffset = apexIndex * VEC2_COMPONENT_COUNT4;
+      uvs[apexUvOffset + 0] = UV_CENTER;
+      uvs[apexUvOffset + 1] = ORIGIN;
+    }
+    vertexIndex += 1;
+    const capCenterIndex = vertexIndex;
+    if (hasCap) {
+      {
+        const capCenterBaseOffset = capCenterIndex * VEC3_COMPONENT_COUNT5;
+        positions[capCenterBaseOffset + 0] = ORIGIN;
+        positions[capCenterBaseOffset + 1] = -height / HALF_SIZE_DIVISOR4;
+        positions[capCenterBaseOffset + 2] = ORIGIN;
+        normals[capCenterBaseOffset + 0] = NORMAL_X_ZERO;
+        normals[capCenterBaseOffset + 1] = NORMAL_Y_DOWN;
+        normals[capCenterBaseOffset + 2] = NORMAL_Z_ZERO;
+        const capCenterUvOffset = capCenterIndex * VEC2_COMPONENT_COUNT4;
+        uvs[capCenterUvOffset + 0] = UV_CENTER;
+        uvs[capCenterUvOffset + 1] = UV_CENTER;
+      }
+      vertexIndex += 1;
+      for (let radialVertexIndex = 0; radialVertexIndex < ringVertexCount; radialVertexIndex += 1) {
+        const uNormalized = radialVertexIndex / radialSegments;
+        const angleRadians = uNormalized * TWO_PI3;
+        const cosTheta = Math.cos(angleRadians);
+        const sinTheta = Math.sin(angleRadians);
+        const positionX = cosTheta * radiusX;
+        const positionZ = sinTheta * radiusZ;
+        const positionBaseOffset = vertexIndex * VEC3_COMPONENT_COUNT5;
+        positions[positionBaseOffset + 0] = positionX;
+        positions[positionBaseOffset + 1] = -height / HALF_SIZE_DIVISOR4;
+        positions[positionBaseOffset + 2] = positionZ;
+        normals[positionBaseOffset + 0] = NORMAL_X_ZERO;
+        normals[positionBaseOffset + 1] = NORMAL_Y_DOWN;
+        normals[positionBaseOffset + 2] = NORMAL_Z_ZERO;
+        const uvBaseOffset = vertexIndex * VEC2_COMPONENT_COUNT4;
+        uvs[uvBaseOffset + 0] = radiusX === ZERO_VALUE2 ? UV_CENTER : positionX / (radiusX * DOUBLE_SIZE_MULTIPLIER) + UV_CENTER;
+        uvs[uvBaseOffset + 1] = radiusZ === ZERO_VALUE2 ? UV_CENTER : positionZ / (radiusZ * DOUBLE_SIZE_MULTIPLIER) + UV_CENTER;
+        vertexIndex += 1;
+      }
+    }
+    const solidTriangleIndices = [];
+    for (let heightRingIndex = 0; heightRingIndex < sideRingCount - VERTICES_PER_SEGMENT_INCREMENT5; heightRingIndex += 1) {
+      const currentRingStartIndex = heightRingIndex * ringVertexCount;
+      const nextRingStartIndex = (heightRingIndex + VERTICES_PER_SEGMENT_INCREMENT5) * ringVertexCount;
+      for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
+        const topLeftVertexIndex = currentRingStartIndex + radialIndex;
+        const topRightVertexIndex = topLeftVertexIndex + NEXT_INDEX_OFFSET;
+        const bottomLeftVertexIndex = nextRingStartIndex + radialIndex;
+        const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_INDEX_OFFSET;
+        solidTriangleIndices.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
+        solidTriangleIndices.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
+      }
+    }
+    const topRingStartIndex = (sideRingCount - VERTICES_PER_SEGMENT_INCREMENT5) * ringVertexCount;
+    for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
+      const topLeftVertexIndex = topRingStartIndex + radialIndex;
+      const topRightVertexIndex = topLeftVertexIndex + NEXT_INDEX_OFFSET;
+      solidTriangleIndices.push(topLeftVertexIndex, apexIndex, topRightVertexIndex);
+    }
+    if (hasCap) {
+      const capRingStartIndex = capCenterIndex + VERTICES_PER_SEGMENT_INCREMENT5;
+      for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
+        const capLeftVertexIndex = capRingStartIndex + radialIndex;
+        const capRightVertexIndex = capRingStartIndex + radialIndex + VERTICES_PER_SEGMENT_INCREMENT5;
+        solidTriangleIndices.push(capCenterIndex, capRightVertexIndex, capLeftVertexIndex);
+      }
+    }
+    const indicesSolid = createIndexArray(vertexCount, solidTriangleIndices);
+    const indicesWireframe = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
+    const colors = createColorsFromSpec(vertexCount, options.colors);
+    return {
+      positions,
+      normals,
+      uvs,
+      colors,
+      indicesSolid,
+      indicesWireframe
+    };
+  }
+  /**
+   * Computes inverse vector length `(1 / sqrt(x ^ 2 + y ^ 2 + z ^ 2))`.
+   * Returns `0`, when the input vector is zero-length.
+   *
+   * @param {number} x - X component.
+   * @param {number} y - Y component.
+   * @param {number} z - Z component.
+   * @returns {number} - Inverse length.
+   * @private
+   */
+  static #inverseLength(x, y, z) {
+    const length = Math.sqrt(x * x + y * y + z * z);
+    if (length === ZERO_VALUE2) {
+      return ZERO_VALUE2;
+    }
+    return UV_V_FLIP_BASE5 / length;
+  }
+};
+
+// core/geometry/pyramid-geometry.js
+var DEFAULT_PYRAMID_WIDTH = 1;
+var DEFAULT_PYRAMID_HEIGHT = 1.5;
+var DEFAULT_BASE_SEGMENT_COUNT = 1;
+var DEFAULT_HEIGHT_SEGMENT_COUNT = 1;
+var MIN_SEGMENT_COUNT4 = 1;
+var HALF_SIZE_DIVISOR5 = 2;
+var CENTER_T_OFFSET3 = 0.5;
+var UV_V_FLIP_BASE6 = 1;
+var VERTICES_PER_SEGMENT_INCREMENT6 = 1;
+var NEXT_VERTEX_OFFSET5 = 1;
+var ZERO_VALUE3 = 0;
+var ONE_VALUE2 = 1;
+var NEGATIVE_ONE_VALUE = -1;
+var APEX_UV_U = 0.5;
+var APEX_UV_V = 0;
+var OUTWARD_HINT_FRONT = [0, 0, 1];
+var OUTWARD_HINT_RIGHT = [1, 0, 0];
+var OUTWARD_HINT_BACK = [0, 0, -1];
+var OUTWARD_HINT_LEFT = [-1, 0, 0];
+var PyramidGeometry = class _PyramidGeometry extends Geometry {
+  /**
+   * @param {WebGL2RenderingContext} webglContext   - WebGL2 rendering context.
+   * @param {PyramidGeometryOptions} [options = {}] - Geometry options.
+   */
+  constructor(webglContext, options = {}) {
+    const normalized = _PyramidGeometry.#normalizeOptions(options);
+    const data = _PyramidGeometry.#createGeometryData(normalized);
+    super(
+      webglContext,
+      data.positions,
+      data.colors,
+      data.indicesSolid,
+      data.indicesWireframe,
+      data.uvs,
+      data.normals
+    );
+  }
+  /**
+   * Normalizes constructor input to a `PyramidGeometryOptions` object.
+   *
+   * @param {PyramidGeometryOptions} options     - Options object.
+   * @returns {Required<PyramidGeometryOptions>} - Normalized options.
+   * @private
+   */
+  static #normalizeOptions(options) {
+    if (options === null || typeof options !== "object") {
+      throw new TypeError("`PyramidGeometry` expects options as an object.");
+    }
+    const {
+      width = DEFAULT_PYRAMID_WIDTH,
+      height = DEFAULT_PYRAMID_HEIGHT,
+      depth = width,
+      widthSegments = DEFAULT_BASE_SEGMENT_COUNT,
+      depthSegments = widthSegments,
+      heightSegments = DEFAULT_HEIGHT_SEGMENT_COUNT,
+      capped = true,
+      colors = DEFAULT_VERTEX_COLOR
+    } = options;
+    if (typeof width !== "number" || typeof height !== "number" || typeof depth !== "number") {
+      throw new TypeError("`PyramidGeometry` expects `width/height/depth` as numbers.");
+    }
+    if (!Number.isFinite(width) || !Number.isFinite(height) || !Number.isFinite(depth)) {
+      throw new RangeError("`PyramidGeometry` expects finite `width/height/depth`.");
+    }
+    if (!(colors instanceof Float32Array)) {
+      throw new TypeError("`PyramidGeometry` expects colors as a `Float32Array`.");
+    }
+    return {
+      width,
+      height,
+      depth,
+      widthSegments: _PyramidGeometry.#normalizeSegmentCount(widthSegments, "widthSegments", MIN_SEGMENT_COUNT4),
+      depthSegments: _PyramidGeometry.#normalizeSegmentCount(depthSegments, "depthSegments", MIN_SEGMENT_COUNT4),
+      heightSegments: _PyramidGeometry.#normalizeSegmentCount(heightSegments, "heightSegments", MIN_SEGMENT_COUNT4),
+      capped: Boolean(capped),
+      colors
+    };
+  }
+  /**
+   * Normalizes and validates a segment count parameter.
+   *
+   * @param {number} value      - Segment count.
+   * @param {string} optionName - Option name.
+   * @param {number} minValue   - Minimal allowed value.
+   * @returns {number}          - Integer segment count.
+   * @private
+   */
+  static #normalizeSegmentCount(value, optionName, minValue) {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new TypeError("`PyramidGeometry` expects `{name}` as a finite number.".replace("{name}", optionName));
+    }
+    const intValue = Math.floor(value);
+    if (intValue < minValue) {
+      throw new RangeError(
+        "`PyramidGeometry` expects `{name}` to be `>= {min}`.".replace("{name}", optionName).replace("{min}", String(minValue))
+      );
+    }
+    return intValue;
+  }
+  /**
+   * Creates full geometry data for a segmented pyramid.
+   *
+   * @param {Required<PyramidGeometryOptions>} options - Normalized options.
+   * @returns {PyramidGeometryData}                    - Geometry buffers.
+   * @private
+   */
+  static #createGeometryData(options) {
+    const halfWidth = options.width / HALF_SIZE_DIVISOR5;
+    const halfDepth = options.depth / HALF_SIZE_DIVISOR5;
+    const halfHeight = options.height / HALF_SIZE_DIVISOR5;
+    const apexPoint = [ZERO_VALUE3, halfHeight, ZERO_VALUE3];
+    const positions = [];
+    const normals = [];
+    const uvs = [];
+    const indicesSolidList = [];
+    let vertexOffset = 0;
+    if (options.capped) {
+      const baseAppendResult = _PyramidGeometry.#appendBase(
+        positions,
+        normals,
+        uvs,
+        indicesSolidList,
+        vertexOffset,
+        halfWidth,
+        halfDepth,
+        halfHeight,
+        options.widthSegments,
+        options.depthSegments
+      );
+      vertexOffset += baseAppendResult.vertexCount;
+    }
+    const baseY = -halfHeight;
+    const corners = {
+      frontLeft: [-halfWidth, baseY, halfDepth],
+      frontRight: [halfWidth, baseY, halfDepth],
+      backRight: [halfWidth, baseY, -halfDepth],
+      backLeft: [-halfWidth, baseY, -halfDepth]
+    };
+    vertexOffset += _PyramidGeometry.#appendSideFace(
+      positions,
+      normals,
+      uvs,
+      indicesSolidList,
+      vertexOffset,
+      corners.frontLeft,
+      corners.frontRight,
+      apexPoint,
+      options.widthSegments,
+      options.heightSegments,
+      OUTWARD_HINT_FRONT
+    );
+    vertexOffset += _PyramidGeometry.#appendSideFace(
+      positions,
+      normals,
+      uvs,
+      indicesSolidList,
+      vertexOffset,
+      corners.frontRight,
+      corners.backRight,
+      apexPoint,
+      options.depthSegments,
+      options.heightSegments,
+      OUTWARD_HINT_RIGHT
+    );
+    vertexOffset += _PyramidGeometry.#appendSideFace(
+      positions,
+      normals,
+      uvs,
+      indicesSolidList,
+      vertexOffset,
+      corners.backRight,
+      corners.backLeft,
+      apexPoint,
+      options.widthSegments,
+      options.heightSegments,
+      OUTWARD_HINT_BACK
+    );
+    vertexOffset += _PyramidGeometry.#appendSideFace(
+      positions,
+      normals,
+      uvs,
+      indicesSolidList,
+      vertexOffset,
+      corners.backLeft,
+      corners.frontLeft,
+      apexPoint,
+      options.depthSegments,
+      options.heightSegments,
+      OUTWARD_HINT_LEFT
+    );
+    const vertexCount = vertexOffset;
+    const indicesSolid = createIndexArray(vertexCount, indicesSolidList);
+    const indicesWireframe = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
+    const colors = createColorsFromSpec(vertexCount, options.colors);
+    return {
+      positions: new Float32Array(positions),
+      normals: new Float32Array(normals),
+      uvs: new Float32Array(uvs),
+      colors,
+      indicesSolid,
+      indicesWireframe
+    };
+  }
+  /**
+   * Appends a bottom base grid `XZ plane` with a `-Y` normal.
+   *
+   * @param {number[]} positions        - Output positions (flat vec3).
+   * @param {number[]} normals          - Output normals (flat vec3).
+   * @param {number[]} uvs              - Output UVs (flat vec2).
+   * @param {number[]} indicesSolid     - Output solid indices.
+   * @param {number} vertexOffset       - Starting vertex index.
+   * @param {number} halfWidth          - Half base width.
+   * @param {number} halfDepth          - Half base depth.
+   * @param {number} halfHeight         - Half pyramid height.
+   * @param {number} widthSegments      - Base subdivisions along X.
+   * @param {number} depthSegments      - Base subdivisions along Z.
+   * @returns {PyramidBaseAppendResult} - Base append result.
+   * @private
+   */
+  static #appendBase(positions, normals, uvs, indicesSolid, vertexOffset, halfWidth, halfDepth, halfHeight, widthSegments, depthSegments) {
+    const xSegments = widthSegments;
+    const zSegments = depthSegments;
+    const xVertexCount = xSegments + VERTICES_PER_SEGMENT_INCREMENT6;
+    const zVertexCount = zSegments + VERTICES_PER_SEGMENT_INCREMENT6;
+    const baseY = -halfHeight;
+    const fullWidth = halfWidth * HALF_SIZE_DIVISOR5;
+    const fullDepth = halfDepth * HALF_SIZE_DIVISOR5;
+    for (let zIndex = 0; zIndex < zVertexCount; zIndex += 1) {
+      const vNormalized = zIndex / zSegments;
+      const positionZ = (vNormalized - CENTER_T_OFFSET3) * fullDepth;
+      for (let xIndex = 0; xIndex < xVertexCount; xIndex += 1) {
+        const uNormalized = xIndex / xSegments;
+        const positionX = (uNormalized - CENTER_T_OFFSET3) * fullWidth;
+        positions.push(positionX, baseY, positionZ);
+        normals.push(ZERO_VALUE3, NEGATIVE_ONE_VALUE, ZERO_VALUE3);
+        uvs.push(uNormalized, UV_V_FLIP_BASE6 - vNormalized);
+      }
+    }
+    for (let zIndex = 0; zIndex < zSegments; zIndex += 1) {
+      for (let xIndex = 0; xIndex < xSegments; xIndex += 1) {
+        const topLeftVertexIndex = vertexOffset + zIndex * xVertexCount + xIndex;
+        const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET5;
+        const bottomLeftVertexIndex = topLeftVertexIndex + xVertexCount;
+        const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET5;
+        indicesSolid.push(topLeftVertexIndex, topRightVertexIndex, bottomLeftVertexIndex);
+        indicesSolid.push(topRightVertexIndex, bottomRightVertexIndex, bottomLeftVertexIndex);
+      }
+    }
+    return { vertexCount: xVertexCount * zVertexCount };
+  }
+  /**
+   * Appends a single planar side face subdivided into a grid.
+   * The face uses a flat normal (sharp edges).
+   *
+   * @param {number[]} positions    - Output positions.
+   * @param {number[]} normals      - Output normals.
+   * @param {number[]} uvs          - Output UVs.
+   * @param {number[]} indicesSolid - Output solid indices.
+   * @param {number} vertexOffset   - Starting vertex index.
+   * @param {number[]} baseStart    - Base edge start point [x, y, z].
+   * @param {number[]} baseEnd      - Base edge end point [x, y, z].
+   * @param {number[]} apex         - Apex point [x, y, z].
+   * @param {number} edgeSegments   - Subdivisions along the base edge.
+   * @param {number} heightSegments - Subdivisions along the face height.
+   * @param {number[]} outwardHint  - Expected outward direction hint.
+   * @returns {number}              - Number of vertices appended.
+   * @private
+   */
+  static #appendSideFace(positions, normals, uvs, indicesSolid, vertexOffset, baseStart, baseEnd, apex, edgeSegments, heightSegments, outwardHint) {
+    let edgeStart = baseStart;
+    let edgeEnd = baseEnd;
+    let faceNormal = _PyramidGeometry.#computeFaceNormal(edgeStart, edgeEnd, apex);
+    if (_PyramidGeometry.#dot(faceNormal, outwardHint) < ZERO_VALUE3) {
+      edgeStart = baseEnd;
+      edgeEnd = baseStart;
+      faceNormal = _PyramidGeometry.#computeFaceNormal(edgeStart, edgeEnd, apex);
+    }
+    const edgeVertexCount = edgeSegments + VERTICES_PER_SEGMENT_INCREMENT6;
+    const ringCount = heightSegments;
+    const faceVertexCount = ringCount * edgeVertexCount + VERTICES_PER_SEGMENT_INCREMENT6;
+    for (let ringIndex = 0; ringIndex < ringCount; ringIndex += 1) {
+      const heightNormalized = ringIndex / heightSegments;
+      const rowStart = _PyramidGeometry.#lerp3(edgeStart, apex, heightNormalized);
+      const rowEnd = _PyramidGeometry.#lerp3(edgeEnd, apex, heightNormalized);
+      for (let edgeIndex = 0; edgeIndex < edgeVertexCount; edgeIndex += 1) {
+        const edgeNormalized = edgeIndex / edgeSegments;
+        const point = _PyramidGeometry.#lerp3(rowStart, rowEnd, edgeNormalized);
+        positions.push(point[0], point[1], point[2]);
+        normals.push(faceNormal[0], faceNormal[1], faceNormal[2]);
+        uvs.push(edgeNormalized, UV_V_FLIP_BASE6 - heightNormalized);
+      }
+    }
+    positions.push(apex[0], apex[1], apex[2]);
+    normals.push(faceNormal[0], faceNormal[1], faceNormal[2]);
+    uvs.push(APEX_UV_U, APEX_UV_V);
+    const apexVertexIndex = vertexOffset + faceVertexCount - VERTICES_PER_SEGMENT_INCREMENT6;
+    for (let ringIndex = 0; ringIndex < ringCount - VERTICES_PER_SEGMENT_INCREMENT6; ringIndex += 1) {
+      const ringStartVertexIndex = vertexOffset + ringIndex * edgeVertexCount;
+      const nextRingVertexIndex = vertexOffset + (ringIndex + VERTICES_PER_SEGMENT_INCREMENT6) * edgeVertexCount;
+      for (let edgeIndex = 0; edgeIndex < edgeSegments; edgeIndex += 1) {
+        const topLeftVertexIndex = ringStartVertexIndex + edgeIndex;
+        const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET5;
+        const bottomLeftVertexIndex = nextRingVertexIndex + edgeIndex;
+        const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET5;
+        indicesSolid.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
+        indicesSolid.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
+      }
+    }
+    const topRingStartVertexIndex = vertexOffset + (ringCount - VERTICES_PER_SEGMENT_INCREMENT6) * edgeVertexCount;
+    for (let edgeIndex = 0; edgeIndex < edgeSegments; edgeIndex += 1) {
+      const topLeftVertexIndex = topRingStartVertexIndex + edgeIndex;
+      const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET5;
+      indicesSolid.push(topLeftVertexIndex, apexVertexIndex, topRightVertexIndex);
+    }
+    return faceVertexCount;
+  }
+  /**
+   * Computes a normalized face normal from 3 points.
+   *
+   * @param {number[]} pointA - Point A [x, y, z].
+   * @param {number[]} pointB - Point B [x, y, z].
+   * @param {number[]} pointC - Point C [x, y, z].
+   * @returns {number[]}      - Normalized normal vector [x, y, z].
+   * @private
+   */
+  static #computeFaceNormal(pointA, pointB, pointC) {
+    const vectorAB = [
+      pointB[0] - pointA[0],
+      pointB[1] - pointA[1],
+      pointB[2] - pointA[2]
+    ];
+    const vectorAC = [
+      pointC[0] - pointA[0],
+      pointC[1] - pointA[1],
+      pointC[2] - pointA[2]
+    ];
+    const normalX0 = vectorAB[1] * vectorAC[2] - vectorAB[2] * vectorAC[1];
+    const normalY0 = vectorAB[2] * vectorAC[0] - vectorAB[0] * vectorAC[2];
+    const normalZ0 = vectorAB[0] * vectorAC[1] - vectorAB[1] * vectorAC[0];
+    const inverseNormalLength = _PyramidGeometry.#inverseLength(normalX0, normalY0, normalZ0);
+    return [normalX0 * inverseNormalLength, normalY0 * inverseNormalLength, normalZ0 * inverseNormalLength];
+  }
+  /**
+   * Linear interpolation between points A and B.
+   *
+   * @param {number[]} pointA            - Point A [x, y, z].
+   * @param {number[]} pointB            - Point B [x, y, z].
+   * @param {number} interpolationFactor - Interpolation factor.
+   * @returns {number[]}                 - Interpolated point [x, y, z].
+   * @private
+   */
+  static #lerp3(pointA, pointB, interpolationFactor) {
+    return [
+      pointA[0] + (pointB[0] - pointA[0]) * interpolationFactor,
+      pointA[1] + (pointB[1] - pointA[1]) * interpolationFactor,
+      pointA[2] + (pointB[2] - pointA[2]) * interpolationFactor
+    ];
+  }
+  /**
+   * Dot product of two `vec3` arrays.
+   *
+   * @param {number[]} vectorA - Vector A.
+   * @param {number[]} vectorB - Vector B.
+   * @returns {number}         - Dot product.
+   * @private
+   */
+  static #dot(vectorA, vectorB) {
+    return vectorA[0] * vectorB[0] + vectorA[1] * vectorB[1] + vectorA[2] * vectorB[2];
+  }
+  /**
+   * Computes inverse vector length `(1 / sqrt(x ^ 2 + y ^ 2 + z ^ 2))`.
+   * Returns 0 when the input vector is zero-length.
+   *
+   * @param {number} x - X component.
+   * @param {number} y - Y component.
+   * @param {number} z - Z component.
+   * @returns {number} - Inverse length.
+   * @private
+   */
+  static #inverseLength(x, y, z) {
+    const length = Math.sqrt(x * x + y * y + z * z);
+    if (length === ZERO_VALUE3) {
+      return ZERO_VALUE3;
+    }
+    return ONE_VALUE2 / length;
   }
 };
 
@@ -4768,7 +5891,7 @@ var Renderer = class {
     renderingContext.drawElements(
       mode,
       indexCount,
-      renderingContext.UNSIGNED_SHORT,
+      geometry.getIndexComponentType(isWireframeEnabled),
       INDEX_BUFFER_OFFSET_BYTES
     );
   }
@@ -5384,7 +6507,12 @@ var GeraWebGL = Object.freeze({
   }),
   Geometries: Object.freeze({
     Geometry,
-    BoxGeometry
+    BoxGeometry,
+    PlaneGeometry,
+    SphereGeometry,
+    TorusGeometry,
+    ConeGeometry,
+    PyramidGeometry
   }),
   Textures: Object.freeze({
     Texture2D

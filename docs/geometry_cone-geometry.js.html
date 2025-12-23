@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: geometry/cone-geometry.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: geometry/cone-geometry.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { Geometry } from './geometry.js';
+import {
+    DEFAULT_VERTEX_COLOR,
+    createColorsFromSpec,
+    createIndexArray,
+    createWireframeIndicesFromSolidIndices
+} from './geometry-utils.js';
+
+/**
+ * Default cone base diameter along X.
+ *
+ * @type {number}
+ */
+const DEFAULT_CONE_WIDTH = 1.0;
+
+/**
+ * Default cone height along Y.
+ *
+ * @type {number}
+ */
+const DEFAULT_CONE_HEIGHT = 1.5;
+
+/**
+ * Default radial segment count.
+ *
+ * @type {number}
+ */
+const DEFAULT_RADIAL_SEGMENTS = 24;
+
+/**
+ * Default height segment count.
+ *
+ * @type {number}
+ */
+const DEFAULT_HEIGHT_SEGMENTS = 1;
+
+/**
+ * Minimum allowed radial segment count.
+ *
+ * @type {number}
+ */
+const MIN_RADIAL_SEGMENT_COUNT = 3;
+
+/**
+ * Minimum allowed height segment count.
+ *
+ * @type {number}
+ */
+const MIN_HEIGHT_SEGMENT_COUNT = 1;
+
+/**
+ * Divisor used to compute half sizes from full sizes.
+ *
+ * @type {number}
+ */
+const HALF_SIZE_DIVISOR = 2.0;
+
+/**
+ * Adds one vertex per grid intersection, so vertex count along an axis is `segments + 1`.
+ *
+ * @type {number}
+ */
+const VERTICES_PER_SEGMENT_INCREMENT = 1;
+
+/**
+ * Offset to move from an index to the next index in the same ring/row.
+ *
+ * @type {number}
+ */
+const NEXT_INDEX_OFFSET = 1;
+
+/**
+ * UV/V coordinate is flipped to keep (0, 0) at top-left.
+ *
+ * @type {number}
+ */
+const UV_V_FLIP_BASE = 1.0;
+
+/**
+ * UV center coordinate.
+ *
+ * @type {number}
+ */
+const UV_CENTER = 0.5;
+
+/**
+ * Constant for `2 * pi`.
+ *
+ * @type {number}
+ */
+const TWO_PI = Math.PI * 2.0;
+
+/**
+ * Plane-like normal components.
+ *
+ * @type {number}
+ */
+const NORMAL_X_ZERO = 0.0;
+
+/**
+ * Plane-like normal components.
+ *
+ * @type {number}
+ */
+const NORMAL_Z_ZERO = 0.0;
+
+/**
+ * Up normal Y.
+ *
+ * @type {number}
+ */
+const NORMAL_Y_UP = 1.0;
+
+/**
+ * Down normal Y.
+ *
+ * @type {number}
+ */
+const NORMAL_Y_DOWN = -1.0;
+
+/**
+ * Origin coordinate.
+ *
+ * @type {number}
+ */
+const ORIGIN = 0.0;
+
+/**
+ * Used in some UV computations.
+ *
+ * @type {number}
+ */
+const DOUBLE_SIZE_MULTIPLIER = 2.0;
+
+/**
+ * Used in comparisons (e.g. radius checks).
+ *
+ * @type {number}
+ */
+const ZERO_VALUE = 0.0;
+
+/**
+ * Number of float components per `vec3` (position/normal).
+ *
+ * @type {number}
+ */
+const VEC3_COMPONENT_COUNT = 3;
+
+/**
+ * Number of float components per `vec2` (uv).
+ *
+ * @type {number}
+ */
+const VEC2_COMPONENT_COUNT = 2;
+
+/**
+ * Vertex count used, when an optional part is disabled.
+ *
+ * @type {number}
+ */
+const ZERO_VERTEX_COUNT = 0;
+
+/**
+ * Cone geometry options.
+ *
+ * `width` is the base diameter along X. `depth` (optional) is the base diameter along Z.
+ * If `depth` is not provided, it defaults to `width` (circular base).
+ *
+ * Segment parameters must be integers:
+ * - `radialSegments >= 3`
+ * - `heightSegments >= 1`
+ *
+ * @typedef {Object} ConeGeometryOptions
+ * @property {number} [width = 1.0]         - Base diameter along X.
+ * @property {number} [height = 1.5]        - Cone height along Y.
+ * @property {number} [depth = width]       - Base diameter along Z.
+ * @property {number} [radialSegments = 24] - Segments around the base.
+ * @property {number} [heightSegments = 1]  - Segments along height.
+ * @property {boolean} [capped = true]      - Whether to generate a bottom cap.
+ * @property {Float32Array} [colors]        - Color specification buffer.
+ */
+
+/**
+ * Internal geometry buffers produced by `ConeGeometry`.
+ *
+ * @typedef {Object} ConeGeometryData
+ * @property {Float32Array} positions                     - Vertex positions (xyz).
+ * @property {Float32Array} normals                       - Vertex normals (xyz).
+ * @property {Float32Array} uvs                           - Vertex UVs (uv).
+ * @property {Float32Array} colors                        - Vertex colors (rgb).
+ * @property {Uint16Array | Uint32Array} indicesSolid     - Triangle index buffer.
+ * @property {Uint16Array | Uint32Array} indicesWireframe - Line index buffer for wireframe.
+ */
+
+/**
+ * Segmented cone geometry (with optional elliptical base and bottom cap).
+ */
+export class ConeGeometry extends Geometry {
+
+    /**
+     * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+     * @param {ConeGeometryOptions} [options = {}]  - Geometry options.
+     */
+    constructor(webglContext, options = {}) {
+        const normalized = ConeGeometry.#normalizeOptions(options);
+        const data       = ConeGeometry.#createGeometryData(normalized);
+
+        super(
+            webglContext,
+            data.positions,
+            data.colors,
+            data.indicesSolid,
+            data.indicesWireframe,
+            data.uvs,
+            data.normals
+        );
+    }
+
+    /**
+     * Normalizes constructor input to a `ConeGeometryOptions` object.
+     *
+     * @param {ConeGeometryOptions} options     - Options object.
+     * @returns {Required&lt;ConeGeometryOptions>} - Normalized options.
+     * @private
+     */
+    static #normalizeOptions(options) {
+        if (options === null || typeof options !== 'object') {
+            throw new TypeError('`ConeGeometry` expects options as an object.');
+        }
+
+        const {
+            width          = DEFAULT_CONE_WIDTH,
+            height         = DEFAULT_CONE_HEIGHT,
+            depth          = width,
+            radialSegments = DEFAULT_RADIAL_SEGMENTS,
+            heightSegments = DEFAULT_HEIGHT_SEGMENTS,
+            capped         = true,
+            colors         = DEFAULT_VERTEX_COLOR
+        } = options;
+
+        if (typeof width !== 'number' || typeof height !== 'number' || typeof depth !== 'number') {
+            throw new TypeError('`ConeGeometry` expects `width/height/depth` as numbers.');
+        }
+
+        if (!Number.isFinite(width) || !Number.isFinite(height) || !Number.isFinite(depth)) {
+            throw new RangeError('`ConeGeometry` expects finite `width/height/depth`.');
+        }
+
+        if (!(colors instanceof Float32Array)) {
+            throw new TypeError('`ConeGeometry` expects colors as a `Float32Array`.');
+        }
+
+        return {
+            width,
+            height,
+            depth,
+            radialSegments : ConeGeometry.#normalizeSegmentCount(radialSegments, 'radialSegments', MIN_RADIAL_SEGMENT_COUNT),
+            heightSegments : ConeGeometry.#normalizeSegmentCount(heightSegments, 'heightSegments', MIN_HEIGHT_SEGMENT_COUNT),
+            capped         : Boolean(capped),
+            colors
+        };
+    }
+
+    /**
+     * Normalizes and validates a segment count parameter.
+     *
+     * @param {number} value      - Segment count.
+     * @param {string} optionName - Option name.
+     * @param {number} minValue   - Minimal allowed value.
+     * @returns {number}          - Normalized integer segment count.
+     * @private
+     */
+    static #normalizeSegmentCount(value, optionName, minValue) {
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+            throw new TypeError('`ConeGeometry` expects `{name}` as a finite number.'.replace('{name}', optionName));
+        }
+
+        const intValue = Math.floor(value);
+
+        if (intValue &lt; minValue) {
+            /* eslint-disable indent */
+            throw new RangeError(
+                '`ConeGeometry` expects `{name}` to be `>= {min}`.'
+                .replace('{name}', optionName)
+                .replace('{min}', String(minValue))
+            );
+            /* eslint-enable indent */
+        }
+
+        return intValue;
+    }
+
+    /**
+     * Creates full geometry data for a segmented cone.
+     *
+     * @param {Required&lt;ConeGeometryOptions>} options - Normalized options.
+     * @returns {ConeGeometryData}                    - Geometry buffers.
+     * @private
+     */
+    static #createGeometryData(options) {
+        const radiusX         = options.width / HALF_SIZE_DIVISOR;
+        const radiusZ         = options.depth / HALF_SIZE_DIVISOR;
+        const height          = options.height;
+        const radialSegments  = options.radialSegments;
+        const heightSegments  = options.heightSegments;
+        const ringVertexCount = radialSegments + VERTICES_PER_SEGMENT_INCREMENT;
+        const sideRingCount   = heightSegments;
+        const sideVertexCount = sideRingCount * ringVertexCount;
+        const hasCap          = options.capped;
+        const capVertexCount  = hasCap ? (ringVertexCount + VERTICES_PER_SEGMENT_INCREMENT) : ZERO_VERTEX_COUNT;
+        const vertexCount     = sideVertexCount + VERTICES_PER_SEGMENT_INCREMENT + capVertexCount;
+        const positions       = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT);
+        const normals         = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT);
+        const uvs             = new Float32Array(vertexCount * VEC2_COMPONENT_COUNT);
+        let vertexIndex = 0;
+
+        for (let heightRingIndex = 0; heightRingIndex &lt; sideRingCount; heightRingIndex += 1) {
+            const heightNormalized = heightRingIndex / heightSegments;
+            const radiusFactor     = UV_V_FLIP_BASE - heightNormalized;
+            const positionY        = ((-height / HALF_SIZE_DIVISOR) + (heightNormalized * height));
+            const currentRadiusX   = radiusX * radiusFactor;
+            const currentRadiusZ   = radiusZ * radiusFactor;
+
+            for (let radialVertexIndex = 0; radialVertexIndex &lt; ringVertexCount; radialVertexIndex += 1) {
+                const uNormalized  = radialVertexIndex / radialSegments;
+                const angleRadians = uNormalized * TWO_PI;
+                const cosTheta     = Math.cos(angleRadians);
+                const sinTheta     = Math.sin(angleRadians);
+                const positionX    = cosTheta * currentRadiusX;
+                const positionZ    = sinTheta * currentRadiusZ;
+
+                const positionBaseOffset = vertexIndex * VEC3_COMPONENT_COUNT;
+                positions[positionBaseOffset + 0] = positionX;
+                positions[positionBaseOffset + 1] = positionY;
+                positions[positionBaseOffset + 2] = positionZ;
+
+                const normalX0 = radiusZ * height * cosTheta;
+                const normalY0 = radiusX * radiusZ;
+                const normalZ0 = radiusX * height * sinTheta;
+                const inverseNormalLength = ConeGeometry.#inverseLength(normalX0, normalY0, normalZ0);
+
+                normals[positionBaseOffset + 0] = normalX0 * inverseNormalLength;
+                normals[positionBaseOffset + 1] = normalY0 * inverseNormalLength;
+                normals[positionBaseOffset + 2] = normalZ0 * inverseNormalLength;
+
+                const uvBaseOffset = vertexIndex * VEC2_COMPONENT_COUNT;
+                uvs[uvBaseOffset + 0] = uNormalized;
+                uvs[uvBaseOffset + 1] = UV_V_FLIP_BASE - heightNormalized;
+                vertexIndex += 1;
+            }
+        }
+
+        const apexIndex = vertexIndex;
+        {
+            const apexBaseOffset = apexIndex * VEC3_COMPONENT_COUNT;
+            positions[apexBaseOffset + 0] = ORIGIN;
+            positions[apexBaseOffset + 1] = height / HALF_SIZE_DIVISOR;
+            positions[apexBaseOffset + 2] = ORIGIN;
+
+            normals[apexBaseOffset + 0] = NORMAL_X_ZERO;
+            normals[apexBaseOffset + 1] = NORMAL_Y_UP;
+            normals[apexBaseOffset + 2] = NORMAL_Z_ZERO;
+
+            const apexUvOffset = apexIndex * VEC2_COMPONENT_COUNT;
+            uvs[apexUvOffset + 0] = UV_CENTER;
+            uvs[apexUvOffset + 1] = ORIGIN;
+        }
+
+        vertexIndex += 1;
+        const capCenterIndex = vertexIndex;
+
+        if (hasCap) {
+            {
+                const capCenterBaseOffset = capCenterIndex * VEC3_COMPONENT_COUNT;
+                positions[capCenterBaseOffset + 0] = ORIGIN;
+                positions[capCenterBaseOffset + 1] = -height / HALF_SIZE_DIVISOR;
+                positions[capCenterBaseOffset + 2] = ORIGIN;
+
+                normals[capCenterBaseOffset + 0] = NORMAL_X_ZERO;
+                normals[capCenterBaseOffset + 1] = NORMAL_Y_DOWN;
+                normals[capCenterBaseOffset + 2] = NORMAL_Z_ZERO;
+
+                const capCenterUvOffset = capCenterIndex * VEC2_COMPONENT_COUNT;
+                uvs[capCenterUvOffset + 0] = UV_CENTER;
+                uvs[capCenterUvOffset + 1] = UV_CENTER;
+            }
+
+            vertexIndex += 1;
+
+            for (let radialVertexIndex = 0; radialVertexIndex &lt; ringVertexCount; radialVertexIndex += 1) {
+                const uNormalized  = radialVertexIndex / radialSegments;
+                const angleRadians = uNormalized * TWO_PI;
+                const cosTheta     = Math.cos(angleRadians);
+                const sinTheta     = Math.sin(angleRadians);
+                const positionX    = cosTheta * radiusX;
+                const positionZ    = sinTheta * radiusZ;
+
+                const positionBaseOffset = vertexIndex * VEC3_COMPONENT_COUNT;
+                positions[positionBaseOffset + 0] = positionX;
+                positions[positionBaseOffset + 1] = -height / HALF_SIZE_DIVISOR;
+                positions[positionBaseOffset + 2] = positionZ;
+
+                normals[positionBaseOffset + 0] = NORMAL_X_ZERO;
+                normals[positionBaseOffset + 1] = NORMAL_Y_DOWN;
+                normals[positionBaseOffset + 2] = NORMAL_Z_ZERO;
+
+                const uvBaseOffset = vertexIndex * VEC2_COMPONENT_COUNT;
+
+                uvs[uvBaseOffset + 0] = (radiusX === ZERO_VALUE)
+                    ? UV_CENTER
+                    : ((positionX / (radiusX * DOUBLE_SIZE_MULTIPLIER)) + UV_CENTER);
+
+                uvs[uvBaseOffset + 1] = (radiusZ === ZERO_VALUE)
+                    ? UV_CENTER
+                    : ((positionZ / (radiusZ * DOUBLE_SIZE_MULTIPLIER)) + UV_CENTER);
+
+                vertexIndex += 1;
+            }
+        }
+
+        const solidTriangleIndices = [];
+
+        for (let heightRingIndex = 0; heightRingIndex &lt; (sideRingCount - VERTICES_PER_SEGMENT_INCREMENT); heightRingIndex += 1) {
+            const currentRingStartIndex = heightRingIndex * ringVertexCount;
+            const nextRingStartIndex    = (heightRingIndex + VERTICES_PER_SEGMENT_INCREMENT) * ringVertexCount;
+
+            for (let radialIndex = 0; radialIndex &lt; radialSegments; radialIndex += 1) {
+                const topLeftVertexIndex     = currentRingStartIndex + radialIndex;
+                const topRightVertexIndex    = topLeftVertexIndex + NEXT_INDEX_OFFSET;
+                const bottomLeftVertexIndex  = nextRingStartIndex + radialIndex;
+                const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_INDEX_OFFSET;
+                solidTriangleIndices.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
+                solidTriangleIndices.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
+            }
+        }
+
+        const topRingStartIndex = (sideRingCount - VERTICES_PER_SEGMENT_INCREMENT) * ringVertexCount;
+
+        for (let radialIndex = 0; radialIndex &lt; radialSegments; radialIndex += 1) {
+            const topLeftVertexIndex  = topRingStartIndex + radialIndex;
+            const topRightVertexIndex = topLeftVertexIndex + NEXT_INDEX_OFFSET;
+            solidTriangleIndices.push(topLeftVertexIndex, apexIndex, topRightVertexIndex);
+        }
+
+        if (hasCap) {
+            const capRingStartIndex = capCenterIndex + VERTICES_PER_SEGMENT_INCREMENT;
+
+            for (let radialIndex = 0; radialIndex &lt; radialSegments; radialIndex += 1) {
+                const capLeftVertexIndex  = capRingStartIndex + radialIndex;
+                const capRightVertexIndex = capRingStartIndex + radialIndex + VERTICES_PER_SEGMENT_INCREMENT;
+                solidTriangleIndices.push(capCenterIndex, capRightVertexIndex, capLeftVertexIndex);
+            }
+        }
+
+        const indicesSolid     = createIndexArray(vertexCount, solidTriangleIndices);
+        const indicesWireframe = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
+        const colors           = createColorsFromSpec(vertexCount, options.colors);
+
+        return {
+            positions,
+            normals,
+            uvs,
+            colors,
+            indicesSolid,
+            indicesWireframe
+        };
+    }
+
+    /**
+     * Computes inverse vector length `(1 / sqrt(x ^ 2 + y ^ 2 + z ^ 2))`.
+     * Returns `0`, when the input vector is zero-length.
+     *
+     * @param {number} x - X component.
+     * @param {number} y - Y component.
+     * @param {number} z - Z component.
+     * @returns {number} - Inverse length.
+     * @private
+     */
+    static #inverseLength(x, y, z) {
+        const length = Math.sqrt((x * x) + (y * y) + (z * z));
+
+        if (length === ZERO_VALUE) {
+            return ZERO_VALUE;
+        }
+
+        return UV_V_FLIP_BASE / length;
+    }
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Namespaces</h3><ul><li><a href="GeraWebGL.html">GeraWebGL</a></li></ul><h3>Classes</h3><ul><li><a href="BoxGeometry.html">BoxGeometry</a></li><li><a href="Camera.html">Camera</a></li><li><a href="CameraMath.html">CameraMath</a></li><li><a href="ConeGeometry.html">ConeGeometry</a></li><li><a href="DirectionalLightMaterial.html">DirectionalLightMaterial</a></li><li><a href="Engine.html">Engine</a></li><li><a href="FpsCounter.html">FpsCounter</a></li><li><a href="Geometry.html">Geometry</a></li><li><a href="LambertMaterial.html">LambertMaterial</a></li><li><a href="Material.html">Material</a></li><li><a href="Matrix4.html">Matrix4</a></li><li><a href="Mesh.html">Mesh</a></li><li><a href="NormalMaterial.html">NormalMaterial</a></li><li><a href="Object3D.html">Object3D</a></li><li><a href="OrbitControls.html">OrbitControls</a></li><li><a href="OrthographicCamera.html">OrthographicCamera</a></li><li><a href="PerspectiveCamera.html">PerspectiveCamera</a></li><li><a href="PhongMaterial.html">PhongMaterial</a></li><li><a href="PlaneGeometry.html">PlaneGeometry</a></li><li><a href="PyramidGeometry.html">PyramidGeometry</a></li><li><a href="Renderer.html">Renderer</a></li><li><a href="Scene.html">Scene</a></li><li><a href="ShaderProgram.html">ShaderProgram</a></li><li><a href="SolidColorMaterial.html">SolidColorMaterial</a></li><li><a href="SphereGeometry.html">SphereGeometry</a></li><li><a href="Texture2D.html">Texture2D</a></li><li><a href="TexturedMaterial.html">TexturedMaterial</a></li><li><a href="TorusGeometry.html">TorusGeometry</a></li><li><a href="Vector3.html">Vector3</a></li><li><a href="VertexColorMaterial.html">VertexColorMaterial</a></li><li><a href="WebGLContext.html">WebGLContext</a></li></ul><h3>Global</h3><ul><li><a href="global.html#AMBIENT_STRENGTH_UNIFORM_NAME">AMBIENT_STRENGTH_UNIFORM_NAME</a></li><li><a href="global.html#APEX_UV_U">APEX_UV_U</a></li><li><a href="global.html#APEX_UV_V">APEX_UV_V</a></li><li><a href="global.html#ARIA_LIVE_POLITE">ARIA_LIVE_POLITE</a></li><li><a href="global.html#ARIA_ROLE_STATUS">ARIA_ROLE_STATUS</a></li><li><a href="global.html#ATTRIBUTE_LOCATION_NOT_FOUND_VALUE">ATTRIBUTE_LOCATION_NOT_FOUND_VALUE</a></li><li><a href="global.html#ATTRIBUTE_NORMALIZED">ATTRIBUTE_NORMALIZED</a></li><li><a href="global.html#ATTRIBUTE_NO_OFFSET">ATTRIBUTE_NO_OFFSET</a></li><li><a href="global.html#ATTRIBUTE_NO_STRIDE">ATTRIBUTE_NO_STRIDE</a></li><li><a href="global.html#AUTO_EXPECTED_PER_VERTEX_COLOR_LENGTH">AUTO_EXPECTED_PER_VERTEX_COLOR_LENGTH</a></li><li><a href="global.html#BASE_MIPMAP_LEVEL">BASE_MIPMAP_LEVEL</a></li><li><a href="global.html#BITWISE_ZERO">BITWISE_ZERO</a></li><li><a href="global.html#BIT_MASK_ONE">BIT_MASK_ONE</a></li><li><a href="global.html#BOX_FACE_COUNT">BOX_FACE_COUNT</a></li><li><a href="global.html#CAMERA_POSITION_UNIFORM_NAME">CAMERA_POSITION_UNIFORM_NAME</a></li><li><a href="global.html#CENTER_T_OFFSET">CENTER_T_OFFSET</a></li><li><a href="global.html#CHILD_NOT_FOUND_INDEX">CHILD_NOT_FOUND_INDEX</a></li><li><a href="global.html#COLORS_PER_FACE_LENGTH">COLORS_PER_FACE_LENGTH</a></li><li><a href="global.html#COLOR_ATTRIBUTE_LOCATION">COLOR_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#COLOR_COMPONENT_COUNT">COLOR_COMPONENT_COUNT</a></li><li><a href="global.html#COLOR_UNIFORM_NAME">COLOR_UNIFORM_NAME</a></li><li><a href="global.html#DEFAULT_AMBIENT_STRENGTH">DEFAULT_AMBIENT_STRENGTH</a></li><li><a href="global.html#DEFAULT_AZIMUTH_RADIANS">DEFAULT_AZIMUTH_RADIANS</a></li><li><a href="global.html#DEFAULT_BASE_SEGMENT_COUNT">DEFAULT_BASE_SEGMENT_COUNT</a></li><li><a href="global.html#DEFAULT_BOX_SIZE">DEFAULT_BOX_SIZE</a></li><li><a href="global.html#DEFAULT_CAMERA_ROLL_RADIANS">DEFAULT_CAMERA_ROLL_RADIANS</a></li><li><a href="global.html#DEFAULT_COLOR">DEFAULT_COLOR</a></li><li><a href="global.html#DEFAULT_CONE_HEIGHT">DEFAULT_CONE_HEIGHT</a></li><li><a href="global.html#DEFAULT_CONE_WIDTH">DEFAULT_CONE_WIDTH</a></li><li><a href="global.html#DEFAULT_DEVICE_PIXEL_RATIO">DEFAULT_DEVICE_PIXEL_RATIO</a></li><li><a href="global.html#DEFAULT_DISTANCE">DEFAULT_DISTANCE</a></li><li><a href="global.html#DEFAULT_EXPECTED_PER_VERTEX_COLOR_LENGTH">DEFAULT_EXPECTED_PER_VERTEX_COLOR_LENGTH</a></li><li><a href="global.html#DEFAULT_FAR">DEFAULT_FAR</a></li><li><a href="global.html#DEFAULT_FIELD_OF_VIEW_RADIANS">DEFAULT_FIELD_OF_VIEW_RADIANS</a></li><li><a href="global.html#DEFAULT_GOOD_FPS_THRESHOLD">DEFAULT_GOOD_FPS_THRESHOLD</a></li><li><a href="global.html#DEFAULT_HEIGHT_SEGMENTS">DEFAULT_HEIGHT_SEGMENTS</a></li><li><a href="global.html#DEFAULT_HEIGHT_SEGMENT_COUNT">DEFAULT_HEIGHT_SEGMENT_COUNT</a></li><li><a href="global.html#DEFAULT_INITIAL_CAMERA_Z">DEFAULT_INITIAL_CAMERA_Z</a></li><li><a href="global.html#DEFAULT_LABEL">DEFAULT_LABEL</a></li><li><a href="global.html#DEFAULT_LIGHT_DIRECTION">DEFAULT_LIGHT_DIRECTION</a></li><li><a href="global.html#DEFAULT_MAJOR_DIAMETER">DEFAULT_MAJOR_DIAMETER</a></li><li><a href="global.html#DEFAULT_MAX_DISTANCE">DEFAULT_MAX_DISTANCE</a></li><li><a href="global.html#DEFAULT_MAX_POLAR_RADIANS">DEFAULT_MAX_POLAR_RADIANS</a></li><li><a href="global.html#DEFAULT_MIN_DISTANCE">DEFAULT_MIN_DISTANCE</a></li><li><a href="global.html#DEFAULT_MIN_POLAR_RADIANS">DEFAULT_MIN_POLAR_RADIANS</a></li><li><a href="global.html#DEFAULT_NEAR">DEFAULT_NEAR</a></li><li><a href="global.html#DEFAULT_OK_FPS_THRESHOLD">DEFAULT_OK_FPS_THRESHOLD</a></li><li><a href="global.html#DEFAULT_OPACITY">DEFAULT_OPACITY</a></li><li><a href="global.html#DEFAULT_OWNS_GEOMETRY">DEFAULT_OWNS_GEOMETRY</a></li><li><a href="global.html#DEFAULT_OWNS_MATERIAL">DEFAULT_OWNS_MATERIAL</a></li><li><a href="global.html#DEFAULT_PLANE_HEIGHT">DEFAULT_PLANE_HEIGHT</a></li><li><a href="global.html#DEFAULT_PLANE_WIDTH">DEFAULT_PLANE_WIDTH</a></li><li><a href="global.html#DEFAULT_POLAR_RADIANS">DEFAULT_POLAR_RADIANS</a></li><li><a href="global.html#DEFAULT_PYRAMID_HEIGHT">DEFAULT_PYRAMID_HEIGHT</a></li><li><a href="global.html#DEFAULT_PYRAMID_WIDTH">DEFAULT_PYRAMID_WIDTH</a></li><li><a href="global.html#DEFAULT_RADIAL_SEGMENTS">DEFAULT_RADIAL_SEGMENTS</a></li><li><a href="global.html#DEFAULT_ROTATION_SPEED">DEFAULT_ROTATION_SPEED</a></li><li><a href="global.html#DEFAULT_SEGMENT_COUNT">DEFAULT_SEGMENT_COUNT</a></li><li><a href="global.html#DEFAULT_SHININESS">DEFAULT_SHININESS</a></li><li><a href="global.html#DEFAULT_SHOW_FRAME_TIME">DEFAULT_SHOW_FRAME_TIME</a></li><li><a href="global.html#DEFAULT_SMOOTHING_FACTOR">DEFAULT_SMOOTHING_FACTOR</a></li><li><a href="global.html#DEFAULT_SPECULAR_COLOR">DEFAULT_SPECULAR_COLOR</a></li><li><a href="global.html#DEFAULT_SPECULAR_STRENGTH">DEFAULT_SPECULAR_STRENGTH</a></li><li><a href="global.html#DEFAULT_SPHERE_DEPTH">DEFAULT_SPHERE_DEPTH</a></li><li><a href="global.html#DEFAULT_SPHERE_HEIGHT">DEFAULT_SPHERE_HEIGHT</a></li><li><a href="global.html#DEFAULT_SPHERE_WIDTH">DEFAULT_SPHERE_WIDTH</a></li><li><a href="global.html#DEFAULT_TARGET_X">DEFAULT_TARGET_X</a></li><li><a href="global.html#DEFAULT_TARGET_Y">DEFAULT_TARGET_Y</a></li><li><a href="global.html#DEFAULT_TARGET_Z">DEFAULT_TARGET_Z</a></li><li><a href="global.html#DEFAULT_TEXTURE_UNIT_INDEX">DEFAULT_TEXTURE_UNIT_INDEX</a></li><li><a href="global.html#DEFAULT_TUBE_DIAMETER">DEFAULT_TUBE_DIAMETER</a></li><li><a href="global.html#DEFAULT_TUBULAR_SEGMENTS">DEFAULT_TUBULAR_SEGMENTS</a></li><li><a href="global.html#DEFAULT_T_VALUE">DEFAULT_T_VALUE</a></li><li><a href="global.html#DEFAULT_UPDATE_INTERVAL_MS">DEFAULT_UPDATE_INTERVAL_MS</a></li><li><a href="global.html#DEFAULT_VERTEX_COLOR">DEFAULT_VERTEX_COLOR</a></li><li><a href="global.html#DEFAULT_WIDTH_SEGMENTS">DEFAULT_WIDTH_SEGMENTS</a></li><li><a href="global.html#DEFAULT_ZOOM_SPEED">DEFAULT_ZOOM_SPEED</a></li><li><a href="global.html#DEPTH_RANGE_NUMERATOR">DEPTH_RANGE_NUMERATOR</a></li><li><a href="global.html#DIFFUSE_TEXTURE_UNIFORM_NAME">DIFFUSE_TEXTURE_UNIFORM_NAME</a></li><li><a href="global.html#DIV_TAG_NAME">DIV_TAG_NAME</a></li><li><a href="global.html#DOUBLE_SIZE_MULTIPLIER">DOUBLE_SIZE_MULTIPLIER</a></li><li><a href="global.html#EDGE_KEY_SEPARATOR">EDGE_KEY_SEPARATOR</a></li><li><a href="global.html#ENGINE_ANIMATION_FRAME_ID_RESET_VALUE">ENGINE_ANIMATION_FRAME_ID_RESET_VALUE</a></li><li><a href="global.html#ENGINE_TIME_SECONDS_RESET_VALUE">ENGINE_TIME_SECONDS_RESET_VALUE</a></li><li><a href="global.html#FINAL_MATRIX_UNIFORM_NAME">FINAL_MATRIX_UNIFORM_NAME</a></li><li><a href="global.html#FPS_FALLBACK_VALUE">FPS_FALLBACK_VALUE</a></li><li><a href="global.html#FPS_ROW_LABEL">FPS_ROW_LABEL</a></li><li><a href="global.html#FRAGMENT_SHADER_SOURCE">FRAGMENT_SHADER_SOURCE</a></li><li><a href="global.html#FRAMES_INCREMENT">FRAMES_INCREMENT</a></li><li><a href="global.html#FRAME_TIME_DECIMAL_PLACES">FRAME_TIME_DECIMAL_PLACES</a></li><li><a href="global.html#FRAME_TIME_ROW_LABEL">FRAME_TIME_ROW_LABEL</a></li><li><a href="global.html#HALF_FIELD_OF_VIEW_DIVISOR">HALF_FIELD_OF_VIEW_DIVISOR</a></li><li><a href="global.html#HALF_MULTIPLIER">HALF_MULTIPLIER</a></li><li><a href="global.html#HALF_SIZE_DIVISOR">HALF_SIZE_DIVISOR</a></li><li><a href="global.html#HEADER_CLASS">HEADER_CLASS</a></li><li><a href="global.html#INDEX_BUFFER_OFFSET_BYTES">INDEX_BUFFER_OFFSET_BYTES</a></li><li><a href="global.html#INITIAL_ACCUMULATED_FRAME_TIME_MS">INITIAL_ACCUMULATED_FRAME_TIME_MS</a></li><li><a href="global.html#INITIAL_CAMERA_ASPECT_RATIO">INITIAL_CAMERA_ASPECT_RATIO</a></li><li><a href="global.html#INITIAL_FRAMES_SINCE_LAST_UPDATE">INITIAL_FRAMES_SINCE_LAST_UPDATE</a></li><li><a href="global.html#INVERSE_DETERMINANT_NUMERATOR">INVERSE_DETERMINANT_NUMERATOR</a></li><li><a href="global.html#INVERSE_LENGTH_NUMERATOR">INVERSE_LENGTH_NUMERATOR</a></li><li><a href="global.html#LIGHT_DIRECTION_UNIFORM_NAME">LIGHT_DIRECTION_UNIFORM_NAME</a></li><li><a href="global.html#LINE_INDEX_COMPONENT_COUNT">LINE_INDEX_COMPONENT_COUNT</a></li><li><a href="global.html#MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT">MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT</a></li><li><a href="global.html#MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT">MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT</a></li><li><a href="global.html#MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT">MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT</a></li><li><a href="global.html#MATRIX_4x4_ELEMENT_COUNT">MATRIX_4x4_ELEMENT_COUNT</a></li><li><a href="global.html#MATRIX_COLUMN_COUNT">MATRIX_COLUMN_COUNT</a></li><li><a href="global.html#MATRIX_ROW_COUNT">MATRIX_ROW_COUNT</a></li><li><a href="global.html#MATRIX_STRIDE">MATRIX_STRIDE</a></li><li><a href="global.html#MATRIX_UNIFORM_NAME">MATRIX_UNIFORM_NAME</a></li><li><a href="global.html#MAX_COLOR_COMPONENT">MAX_COLOR_COMPONENT</a></li><li><a href="global.html#MAX_NORMALIZED">MAX_NORMALIZED</a></li><li><a href="global.html#MAX_OPACITY">MAX_OPACITY</a></li><li><a href="global.html#MAX_UINT16_INDEX_VALUE">MAX_UINT16_INDEX_VALUE</a></li><li><a href="global.html#MILLISECONDS_PER_SECOND">MILLISECONDS_PER_SECOND</a></li><li><a href="global.html#MILLISECONDS_TO_SECONDS">MILLISECONDS_TO_SECONDS</a></li><li><a href="global.html#MINIMUM_ASPECT_RATIO">MINIMUM_ASPECT_RATIO</a></li><li><a href="global.html#MINIMUM_NEAR_CLIP_DISTANCE">MINIMUM_NEAR_CLIP_DISTANCE</a></li><li><a href="global.html#MINIMUM_VIEW_SIZE">MINIMUM_VIEW_SIZE</a></li><li><a href="global.html#MIN_BOX_SIZE">MIN_BOX_SIZE</a></li><li><a href="global.html#MIN_COLOR_COMPONENT">MIN_COLOR_COMPONENT</a></li><li><a href="global.html#MIN_DENOMINATOR">MIN_DENOMINATOR</a></li><li><a href="global.html#MIN_DIRECTION_LENGTH_SQUARED">MIN_DIRECTION_LENGTH_SQUARED</a></li><li><a href="global.html#MIN_DRAWING_BUFFER_DIMENSION">MIN_DRAWING_BUFFER_DIMENSION</a></li><li><a href="global.html#MIN_EXCLUSIVE_NUMBER">MIN_EXCLUSIVE_NUMBER</a></li><li><a href="global.html#MIN_HEIGHT_SEGMENT_COUNT">MIN_HEIGHT_SEGMENT_COUNT</a></li><li><a href="global.html#MIN_INVERTIBLE_DETERMINANT_ABS">MIN_INVERTIBLE_DETERMINANT_ABS</a></li><li><a href="global.html#MIN_NORMALIZED">MIN_NORMALIZED</a></li><li><a href="global.html#MIN_OPACITY">MIN_OPACITY</a></li><li><a href="global.html#MIN_POWER_OF_TWO_VALUE">MIN_POWER_OF_TWO_VALUE</a></li><li><a href="global.html#MIN_RADIAL_SEGMENT_COUNT">MIN_RADIAL_SEGMENT_COUNT</a></li><li><a href="global.html#MIN_REQUIRED_STRING_LENGTH">MIN_REQUIRED_STRING_LENGTH</a></li><li><a href="global.html#MIN_SEGMENT_COUNT">MIN_SEGMENT_COUNT</a></li><li><a href="global.html#MIN_TEXTURE_UNIT_INDEX">MIN_TEXTURE_UNIT_INDEX</a></li><li><a href="global.html#MIN_UPDATE_INTERVAL_MS">MIN_UPDATE_INTERVAL_MS</a></li><li><a href="global.html#MIN_WIDTH_SEGMENT_COUNT">MIN_WIDTH_SEGMENT_COUNT</a></li><li><a href="global.html#MODULO_ALIGNED_VALUE">MODULO_ALIGNED_VALUE</a></li><li><a href="global.html#NEGATIVE_ONE_VALUE">NEGATIVE_ONE_VALUE</a></li><li><a href="global.html#NEXT_INDEX_OFFSET">NEXT_INDEX_OFFSET</a></li><li><a href="global.html#NEXT_VERTEX_OFFSET">NEXT_VERTEX_OFFSET</a></li><li><a href="global.html#NON_NEGATIVE_MIN">NON_NEGATIVE_MIN</a></li><li><a href="global.html#NORMAL_ATTRIBUTE_LOCATION">NORMAL_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#NORMAL_COLOR_BIAS">NORMAL_COLOR_BIAS</a></li><li><a href="global.html#NORMAL_COLOR_SCALE">NORMAL_COLOR_SCALE</a></li><li><a href="global.html#NORMAL_COMPONENT_COUNT">NORMAL_COMPONENT_COUNT</a></li><li><a href="global.html#NORMAL_X_ZERO">NORMAL_X_ZERO</a></li><li><a href="global.html#NORMAL_Y_DOWN">NORMAL_Y_DOWN</a></li><li><a href="global.html#NORMAL_Y_UP">NORMAL_Y_UP</a></li><li><a href="global.html#NORMAL_Z_ZERO">NORMAL_Z_ZERO</a></li><li><a href="global.html#ONE_VALUE">ONE_VALUE</a></li><li><a href="global.html#OPACITY_UNIFORM_NAME">OPACITY_UNIFORM_NAME</a></li><li><a href="global.html#OPAQUE_OPACITY">OPAQUE_OPACITY</a></li><li><a href="global.html#ORIGIN">ORIGIN</a></li><li><a href="global.html#ORTHOGRAPHIC_SCALE_NUMERATOR">ORTHOGRAPHIC_SCALE_NUMERATOR</a></li><li><a href="global.html#OUTWARD_HINT_BACK">OUTWARD_HINT_BACK</a></li><li><a href="global.html#OUTWARD_HINT_FRONT">OUTWARD_HINT_FRONT</a></li><li><a href="global.html#OUTWARD_HINT_LEFT">OUTWARD_HINT_LEFT</a></li><li><a href="global.html#OUTWARD_HINT_RIGHT">OUTWARD_HINT_RIGHT</a></li><li><a href="global.html#PERSPECTIVE_W_COMPONENT_SCALE">PERSPECTIVE_W_COMPONENT_SCALE</a></li><li><a href="global.html#PERSPECTIVE_Z_RANGE_MULTIPLIER">PERSPECTIVE_Z_RANGE_MULTIPLIER</a></li><li><a href="global.html#PLACEHOLDER_PIXEL_RGBA">PLACEHOLDER_PIXEL_RGBA</a></li><li><a href="global.html#PLACEHOLDER_TEXT">PLACEHOLDER_TEXT</a></li><li><a href="global.html#PLACEHOLDER_TEXTURE_HEIGHT">PLACEHOLDER_TEXTURE_HEIGHT</a></li><li><a href="global.html#PLACEHOLDER_TEXTURE_WIDTH">PLACEHOLDER_TEXTURE_WIDTH</a></li><li><a href="global.html#PLANE_NORMAL_X">PLANE_NORMAL_X</a></li><li><a href="global.html#PLANE_NORMAL_Y">PLANE_NORMAL_Y</a></li><li><a href="global.html#PLANE_NORMAL_Z">PLANE_NORMAL_Z</a></li><li><a href="global.html#PLANE_Z_POSITION">PLANE_Z_POSITION</a></li><li><a href="global.html#POINTER_ID_RESET_VALUE">POINTER_ID_RESET_VALUE</a></li><li><a href="global.html#POSITION_ATTRIBUTE_LOCATION">POSITION_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#POSITION_COMPONENT_COUNT">POSITION_COMPONENT_COUNT</a></li><li><a href="global.html#PROJECTION_SCALE_NUMERATOR">PROJECTION_SCALE_NUMERATOR</a></li><li><a href="global.html#ROOT_CLASS">ROOT_CLASS</a></li><li><a href="global.html#ROTATE_BUTTON">ROTATE_BUTTON</a></li><li><a href="global.html#ROTATION_RADIANS_PER_PIXEL">ROTATION_RADIANS_PER_PIXEL</a></li><li><a href="global.html#ROW_CLASS">ROW_CLASS</a></li><li><a href="global.html#ROW_LABEL_CLASS">ROW_LABEL_CLASS</a></li><li><a href="global.html#ROW_VALUE_CLASS">ROW_VALUE_CLASS</a></li><li><a href="global.html#SCALE_INVERSE_NUMERATOR">SCALE_INVERSE_NUMERATOR</a></li><li><a href="global.html#SHININESS_UNIFORM_NAME">SHININESS_UNIFORM_NAME</a></li><li><a href="global.html#SINGLE_CHILD_REMOVE_COUNT">SINGLE_CHILD_REMOVE_COUNT</a></li><li><a href="global.html#SPECULAR_COLOR_UNIFORM_NAME">SPECULAR_COLOR_UNIFORM_NAME</a></li><li><a href="global.html#SPECULAR_STRENGTH_UNIFORM_NAME">SPECULAR_STRENGTH_UNIFORM_NAME</a></li><li><a href="global.html#STATE_CLASS_BAD">STATE_CLASS_BAD</a></li><li><a href="global.html#STATE_CLASS_GOOD">STATE_CLASS_GOOD</a></li><li><a href="global.html#STATE_CLASS_OK">STATE_CLASS_OK</a></li><li><a href="global.html#TEXTURE_BORDER_VALUE">TEXTURE_BORDER_VALUE</a></li><li><a href="global.html#TRIANGLE_INDEX_COMPONENT_COUNT">TRIANGLE_INDEX_COMPONENT_COUNT</a></li><li><a href="global.html#TRIANGLE_INDEX_STRIDE">TRIANGLE_INDEX_STRIDE</a></li><li><a href="global.html#TWO_PI">TWO_PI</a></li><li><a href="global.html#UNINITIALIZED_NUMBER">UNINITIALIZED_NUMBER</a></li><li><a href="global.html#UNIT_COMPONENT">UNIT_COMPONENT</a></li><li><a href="global.html#UV_ATTRIBUTE_LOCATION">UV_ATTRIBUTE_LOCATION</a></li><li><a href="global.html#UV_CENTER">UV_CENTER</a></li><li><a href="global.html#UV_COMPONENT_COUNT">UV_COMPONENT_COUNT</a></li><li><a href="global.html#UV_V_FLIP_BASE">UV_V_FLIP_BASE</a></li><li><a href="global.html#VEC2_COMPONENT_COUNT">VEC2_COMPONENT_COUNT</a></li><li><a href="global.html#VEC3_COMPONENT_COUNT">VEC3_COMPONENT_COUNT</a></li><li><a href="global.html#VECTOR3_ELEMENT_COUNT">VECTOR3_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_2_ELEMENT_COUNT">VECTOR_2_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_3_ELEMENT_COUNT">VECTOR_3_ELEMENT_COUNT</a></li><li><a href="global.html#VECTOR_4_ELEMENT_COUNT">VECTOR_4_ELEMENT_COUNT</a></li><li><a href="global.html#VERTEX_COUNT_TO_MAX_INDEX_OFFSET">VERTEX_COUNT_TO_MAX_INDEX_OFFSET</a></li><li><a href="global.html#VERTEX_SHADER_SOURCE">VERTEX_SHADER_SOURCE</a></li><li><a href="global.html#VERTICES_PER_SEGMENT_INCREMENT">VERTICES_PER_SEGMENT_INCREMENT</a></li><li><a href="global.html#VIEWPORT_ORIGIN_X">VIEWPORT_ORIGIN_X</a></li><li><a href="global.html#VIEWPORT_ORIGIN_Y">VIEWPORT_ORIGIN_Y</a></li><li><a href="global.html#WEBGL2_CONTEXT_TYPE">WEBGL2_CONTEXT_TYPE</a></li><li><a href="global.html#WEBGL_FALSE_AS_INTEGER">WEBGL_FALSE_AS_INTEGER</a></li><li><a href="global.html#WEBGL_TRUE_AS_INTEGER">WEBGL_TRUE_AS_INTEGER</a></li><li><a href="global.html#WHEEL_DISTANCE_MULTIPLIER">WHEEL_DISTANCE_MULTIPLIER</a></li><li><a href="global.html#WHEEL_LISTENER_OPTIONS">WHEEL_LISTENER_OPTIONS</a></li><li><a href="global.html#WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME">WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME</a></li><li><a href="global.html#WORLD_MATRIX_UNIFORM_NAME">WORLD_MATRIX_UNIFORM_NAME</a></li><li><a href="global.html#ZERO_COMPONENT">ZERO_COMPONENT</a></li><li><a href="global.html#ZERO_SEGMENT_COUNT">ZERO_SEGMENT_COUNT</a></li><li><a href="global.html#ZERO_VALUE">ZERO_VALUE</a></li><li><a href="global.html#ZERO_VERTEX_COUNT">ZERO_VERTEX_COUNT</a></li><li><a href="global.html#createColorsFromSpec">createColorsFromSpec</a></li><li><a href="global.html#createEngine">createEngine</a></li><li><a href="global.html#createIndexArray">createIndexArray</a></li><li><a href="global.html#createWireframeIndicesFromSolidIndices">createWireframeIndicesFromSolidIndices</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Tue Dec 23 2025 04:46:45 GMT+0300 (Moscow Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

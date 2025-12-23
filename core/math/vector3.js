@@ -5,7 +5,7 @@ const ZERO_COMPONENT = 0;
 const UNIT_COMPONENT = 1;
 
 /**
- * 3D vector with observable components. Can invoke an onChange callback when x, y, z changes.
+ * 3D vector with observable components. Can invoke an onChange callback, when `x, y, z` changes.
  */
 export class Vector3 {
     /** @type {number} */
@@ -158,7 +158,7 @@ export class Vector3 {
     }
 
     /**
-     * Copies components from another Vector3.
+     * Copies components from another `Vector3`.
      *
      * @param {Vector3} other - Source vector to copy components from.
      * @returns {Vector3}     - This vector instance after copying components from the source vector (for chaining).

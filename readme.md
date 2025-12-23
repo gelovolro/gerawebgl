@@ -3,7 +3,8 @@
 I first developed my own WebGL library (based on v1.0) back in 2014. Now I’ve decided to revisit those ideas, explore what WebGL 2.0 offers, and rebuild everything from scratch. The project is named in memory of my cat, who died in 2017.
 
 - **API reference (JSDoc):** https://gelovolro.github.io/gerawebgl/
-- **Demo:** https://gelovolro.github.io/gerawebgl/demo/
+- **Material demo:** https://gelovolro.github.io/gerawebgl/demo/
+- **Geometries demo:** https://gelovolro.github.io/gerawebgl/demo/geometries.html
 
 ## Quick start
 
@@ -29,7 +30,7 @@ High-level modules are for "get something on screen fast":
 
 - `Engine` (scene + camera + renderer + render loop)
 - Scene objects      : `Scene`, `Object3D`, `Mesh`, `Camera`, `PerspectiveCamera`, `OrthographicCamera`
-- Built-in geometry  : `BoxGeometry`
+- Built-in geometry  : `BoxGeometry`, `PlaneGeometry`, `SphereGeometry`, `ConeGeometry`, `TorusGeometry`, `PyramidGeometry` (all of them support segmentation)
 - Built-in materials : `SolidColorMaterial`, `VertexColorMaterial`, `TexturedMaterial`, `NormalMaterial`, `DirectionalLightMaterial`, `LambertMaterial`, `PhongMaterial`
 - Controls           : `OrbitControls`
 - Debugging          : `FpsCounter`
