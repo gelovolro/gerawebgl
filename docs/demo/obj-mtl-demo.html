@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gera WebGL - OBJ/MTL loader</title>
+    <style>
+
+        html, body {
+            margin     : 0px;
+            padding    : 0px;
+            height     : 100%;
+            background : #000000;
+            overflow   : hidden;
+        }
+
+        body {
+            overscroll-behavior : none;
+        }
+
+        canvas {
+            position     : fixed;
+            top          : 0px;
+            left         : 0px;
+            display      : block;
+            width        : 100vw;
+            height       : 100vh;
+            height       : 100dvh;
+            touch-action : none;
+        }
+
+        #ui {
+            position        : fixed;
+            top             : calc(10px + env(safe-area-inset-top));
+            left            : calc(10px + env(safe-area-inset-left));
+            z-index         : 10;
+            display         : flex;
+            flex-direction  : column;
+            gap             : 8px;
+            align-items     : flex-start;
+            max-width       : calc(100vw - 20px - env(safe-area-inset-left) - env(safe-area-inset-right));
+            background      : rgba(10, 30, 60, 0.28);
+            border          : 1px solid rgba(120, 180, 255, 0.22);
+            border-radius   : 10px;
+            padding         : 10px;
+            box-shadow      : 0px 8px 24px rgba(0, 0, 0, 0.35);
+            backdrop-filter : blur(10px);
+            pointer-events  : none;
+        }
+
+        #ui button,
+        #ui span {
+            pointer-events : auto;
+        }
+
+        .uiRow {
+            display     : flex;
+            gap         : 8px;
+            align-items : center;
+            flex-wrap   : nowrap;
+            width       : 100%;
+        }
+
+        #wireframeToggleButton,
+        #resetViewButton {
+            padding       : 6px 12px;
+            font-family   : sans-serif;
+            font-size     : 14px;
+            cursor        : pointer;
+            background    : linear-gradient(180deg, rgba(110, 190, 255, 0.22), rgba(30, 90, 160, 0.18));
+            border        : 1px solid rgba(120, 190, 255, 0.35);
+            border-radius : 10px;
+            color         : rgba(235, 247, 255, 0.95);
+            outline       : none;
+            box-shadow    : 0px 6px 16px rgba(0, 0, 0, 0.28);
+            transition    : transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+        }
+
+        #wireframeToggleButton:hover,
+        #resetViewButton:hover {
+            border-color : rgba(160, 210, 255, 0.55);
+            box-shadow   : 0px 10px 22px rgba(0, 0, 0, 0.34);
+            transform    : translateY(-1px);
+        }
+
+        #wireframeToggleButton:active,
+        #resetViewButton:active {
+            transform  : translateY(0px);
+            box-shadow : 0px 6px 16px rgba(0, 0, 0, 0.28);
+        }
+
+        #titleLabel,
+        #statusLabel {
+            color       : #ffffff;
+            font-family : sans-serif;
+            font-size   : 14px;
+            user-select : none;
+            text-shadow : 0px 1px 2px rgba(0, 0, 0, 0.35);
+            white-space : nowrap;
+        }
+
+        #statusLabel {
+            opacity : 0.8;
+        }
+
+        #wireframeToggleButton:focus-visible,
+        #resetViewButton:focus-visible {
+            box-shadow : 0px 0px 0px 3px rgba(120, 200, 255, 0.25), 0px 10px 22px rgba(0, 0, 0, 0.34);
+        }
+
+        @media (pointer: coarse), (max-width: 768px) {
+            #ui {
+                top       : calc(8px + env(safe-area-inset-top));
+                left      : calc(8px + env(safe-area-inset-left));
+                padding   : 10px;
+                gap       : 8px;
+                max-width : calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right));
+            }
+
+            #wireframeToggleButton,
+            #resetViewButton {
+                font-size : 12px;
+                padding   : 6px 10px;
+            }
+
+            #titleLabel,
+            #statusLabel {
+                font-size : 12px;
+            }
+        }
+
+    </style>
+</head>
+
+<body>
+    <div id="ui">
+        <div class="uiRow">
+            <span id="titleLabel">OBJ/MTL loader demo</span>
+        </div>
+        <div class="uiRow">
+            <button id="wireframeToggleButton">Wireframe: OFF</button>
+            <button id="resetViewButton">Reset view</button>
+        </div>
+        <div class="uiRow">
+            <span id="statusLabel">Loading model...</span>
+        </div>
+    </div>
+    <canvas id="glcanvas"></canvas>
+    <script type="module" src="./obj-mtl-demo.js"></script>
+</body>
+</html>

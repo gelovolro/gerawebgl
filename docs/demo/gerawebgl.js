@@ -1410,6 +1410,127 @@ function addEdge(edgeSet, lines, indexA, indexB) {
   lines.push(minVertexIndex, maxVertexIndex);
 }
 
+// core/geometry/custom-geometry.js
+var DEFAULT_WIREFRAME_INDICES = null;
+var DEFAULT_COLORS = null;
+var DEFAULT_UVS = null;
+var DEFAULT_NORMALS = null;
+var POSITION_COMPONENT_COUNT2 = 3;
+var ZERO_VALUE = 0;
+var CustomGeometry = class _CustomGeometry extends Geometry {
+  /**
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @param {CustomGeometryOptions} options       - Geometry buffers.
+   */
+  constructor(webglContext, options = {}) {
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("`CustomGeometry` expects options as a plain object.");
+    }
+    const {
+      positions,
+      indices,
+      wireframeIndices = DEFAULT_WIREFRAME_INDICES,
+      colors = DEFAULT_COLORS,
+      uvs = DEFAULT_UVS,
+      normals = DEFAULT_NORMALS
+    } = options;
+    if (!(positions instanceof Float32Array)) {
+      throw new TypeError("`CustomGeometry` expects `positions` as `Float32Array`.");
+    }
+    if (positions.length % POSITION_COMPONENT_COUNT2 !== ZERO_VALUE) {
+      throw new RangeError("`CustomGeometry` expects `positions` length to be a multiple of 3.");
+    }
+    const vertexCount = positions.length / POSITION_COMPONENT_COUNT2;
+    const solidIndexBuffer = _CustomGeometry.#normalizeIndices(vertexCount, indices, "indices");
+    const wireIndexBuffer = _CustomGeometry.#normalizeWireframeIndices(vertexCount, solidIndexBuffer, wireframeIndices);
+    const colorBuffer = _CustomGeometry.#normalizeColors(vertexCount, colors);
+    const uvBuffer = _CustomGeometry.#normalizeOptionalFloat32Array(uvs, "uvs");
+    const normalBuffer = _CustomGeometry.#normalizeOptionalFloat32Array(normals, "normals");
+    super(
+      webglContext,
+      positions,
+      colorBuffer,
+      solidIndexBuffer,
+      wireIndexBuffer,
+      uvBuffer,
+      normalBuffer
+    );
+  }
+  /**
+   * Normalizes solid indices input to a typed array.
+   *
+   * @param {number} vertexCount                           - Total vertex count.
+   * @param {number[] | Uint16Array | Uint32Array} indices - Input indices.
+   * @param {string} optionName                            - Option name for error reporting.
+   * @returns {Uint16Array | Uint32Array}
+   * @private
+   */
+  static #normalizeIndices(vertexCount, indices, optionName) {
+    if (Array.isArray(indices)) {
+      return createIndexArray(vertexCount, indices);
+    }
+    if (indices instanceof Uint16Array || indices instanceof Uint32Array) {
+      return indices;
+    }
+    throw new TypeError(`\`CustomGeometry\` expects \`${optionName}\` as an array, Uint16Array or Uint32Array.`);
+  }
+  /**
+   * Normalizes wireframe indices input.
+   *
+   * @param {number} vertexCount                                           - Total vertex count.
+   * @param {Uint16Array | Uint32Array} solidIndices                       - Solid triangle indices.
+   * @param {number[] | Uint16Array | Uint32Array | null} wireframeIndices - Wireframe indices.
+   * @returns {Uint16Array | Uint32Array}
+   * @private
+   */
+  static #normalizeWireframeIndices(vertexCount, solidIndices, wireframeIndices) {
+    if (wireframeIndices === null || wireframeIndices === void 0) {
+      return createWireframeIndicesFromSolidIndices(vertexCount, solidIndices);
+    }
+    if (Array.isArray(wireframeIndices)) {
+      return createIndexArray(vertexCount, wireframeIndices);
+    }
+    if (wireframeIndices instanceof Uint16Array || wireframeIndices instanceof Uint32Array) {
+      return wireframeIndices;
+    }
+    throw new TypeError("`CustomGeometry` expects `wireframeIndices` as an array, `Uint16Array`, `Uint32Array` or null.");
+  }
+  /**
+   * Normalizes optional colors input.
+   *
+   * @param {number} vertexCount         - Total vertex count.
+   * @param {Float32Array | null} colors - Colors input.
+   * @returns {Float32Array | null}
+   * @private
+   */
+  static #normalizeColors(vertexCount, colors) {
+    if (colors === null || colors === void 0) {
+      return null;
+    }
+    if (!(colors instanceof Float32Array)) {
+      throw new TypeError("`CustomGeometry` expects `colors` as `Float32Array` or null.");
+    }
+    return createColorsFromSpec(vertexCount, colors);
+  }
+  /**
+   * Normalizes optional float arrays.
+   *
+   * @param {Float32Array | null} value - Buffer value.
+   * @param {string} optionName         - Option name for error reporting.
+   * @returns {Float32Array | null}
+   * @private
+   */
+  static #normalizeOptionalFloat32Array(value, optionName) {
+    if (value === null || value === void 0) {
+      return null;
+    }
+    if (!(value instanceof Float32Array)) {
+      throw new TypeError(`\`CustomGeometry\` expects \`${optionName}\` as \`Float32Array\` or null.`);
+    }
+    return value;
+  }
+};
+
 // core/geometry/box-geometry.js
 var DEFAULT_BOX_SIZE = 1;
 var DEFAULT_SEGMENT_COUNT = 1;
@@ -1864,7 +1985,7 @@ var HALF_SIZE_DIVISOR2 = 2;
 var VERTICES_PER_SEGMENT_INCREMENT3 = 1;
 var NEXT_VERTEX_OFFSET3 = 1;
 var UV_V_FLIP_BASE3 = 1;
-var ZERO_VALUE = 0;
+var ZERO_VALUE2 = 0;
 var ONE_VALUE = 1;
 var VEC3_COMPONENT_COUNT3 = 3;
 var VEC2_COMPONENT_COUNT2 = 2;
@@ -1982,9 +2103,9 @@ var SphereGeometry = class _SphereGeometry extends Geometry {
         positions[positionBaseOffset + 0] = positionX;
         positions[positionBaseOffset + 1] = positionY;
         positions[positionBaseOffset + 2] = positionZ;
-        const normalX0 = radiusX !== ZERO_VALUE ? positionX / (radiusX * radiusX) : ZERO_VALUE;
-        const normalY0 = radiusY !== ZERO_VALUE ? positionY / (radiusY * radiusY) : ZERO_VALUE;
-        const normalZ0 = radiusZ !== ZERO_VALUE ? positionZ / (radiusZ * radiusZ) : ZERO_VALUE;
+        const normalX0 = radiusX !== ZERO_VALUE2 ? positionX / (radiusX * radiusX) : ZERO_VALUE2;
+        const normalY0 = radiusY !== ZERO_VALUE2 ? positionY / (radiusY * radiusY) : ZERO_VALUE2;
+        const normalZ0 = radiusZ !== ZERO_VALUE2 ? positionZ / (radiusZ * radiusZ) : ZERO_VALUE2;
         const inverseNormalLength = _SphereGeometry.#inverseLength(normalX0, normalY0, normalZ0);
         normals[positionBaseOffset + 0] = normalX0 * inverseNormalLength;
         normals[positionBaseOffset + 1] = normalY0 * inverseNormalLength;
@@ -2030,8 +2151,8 @@ var SphereGeometry = class _SphereGeometry extends Geometry {
    */
   static #inverseLength(x, y, z) {
     const length = Math.sqrt(x * x + y * y + z * z);
-    if (length === ZERO_VALUE) {
-      return ZERO_VALUE;
+    if (length === ZERO_VALUE2) {
+      return ZERO_VALUE2;
     }
     return ONE_VALUE / length;
   }
@@ -2213,7 +2334,7 @@ var NORMAL_Y_UP = 1;
 var NORMAL_Y_DOWN = -1;
 var ORIGIN = 0;
 var DOUBLE_SIZE_MULTIPLIER = 2;
-var ZERO_VALUE2 = 0;
+var ZERO_VALUE3 = 0;
 var VEC3_COMPONENT_COUNT5 = 3;
 var VEC2_COMPONENT_COUNT4 = 2;
 var ZERO_VERTEX_COUNT = 0;
@@ -2392,8 +2513,8 @@ var ConeGeometry = class _ConeGeometry extends Geometry {
         normals[positionBaseOffset + 1] = NORMAL_Y_DOWN;
         normals[positionBaseOffset + 2] = NORMAL_Z_ZERO;
         const uvBaseOffset = vertexIndex * VEC2_COMPONENT_COUNT4;
-        uvs[uvBaseOffset + 0] = radiusX === ZERO_VALUE2 ? UV_CENTER : positionX / (radiusX * DOUBLE_SIZE_MULTIPLIER) + UV_CENTER;
-        uvs[uvBaseOffset + 1] = radiusZ === ZERO_VALUE2 ? UV_CENTER : positionZ / (radiusZ * DOUBLE_SIZE_MULTIPLIER) + UV_CENTER;
+        uvs[uvBaseOffset + 0] = radiusX === ZERO_VALUE3 ? UV_CENTER : positionX / (radiusX * DOUBLE_SIZE_MULTIPLIER) + UV_CENTER;
+        uvs[uvBaseOffset + 1] = radiusZ === ZERO_VALUE3 ? UV_CENTER : positionZ / (radiusZ * DOUBLE_SIZE_MULTIPLIER) + UV_CENTER;
         vertexIndex += 1;
       }
     }
@@ -2448,8 +2569,8 @@ var ConeGeometry = class _ConeGeometry extends Geometry {
    */
   static #inverseLength(x, y, z) {
     const length = Math.sqrt(x * x + y * y + z * z);
-    if (length === ZERO_VALUE2) {
-      return ZERO_VALUE2;
+    if (length === ZERO_VALUE3) {
+      return ZERO_VALUE3;
     }
     return UV_V_FLIP_BASE5 / length;
   }
@@ -2466,7 +2587,7 @@ var CENTER_T_OFFSET3 = 0.5;
 var UV_V_FLIP_BASE6 = 1;
 var VERTICES_PER_SEGMENT_INCREMENT6 = 1;
 var NEXT_VERTEX_OFFSET5 = 1;
-var ZERO_VALUE3 = 0;
+var ZERO_VALUE4 = 0;
 var ONE_VALUE2 = 1;
 var NEGATIVE_ONE_VALUE = -1;
 var APEX_UV_U = 0.5;
@@ -2566,7 +2687,7 @@ var PyramidGeometry = class _PyramidGeometry extends Geometry {
     const halfWidth = options.width / HALF_SIZE_DIVISOR5;
     const halfDepth = options.depth / HALF_SIZE_DIVISOR5;
     const halfHeight = options.height / HALF_SIZE_DIVISOR5;
-    const apexPoint = [ZERO_VALUE3, halfHeight, ZERO_VALUE3];
+    const apexPoint = [ZERO_VALUE4, halfHeight, ZERO_VALUE4];
     const positions = [];
     const normals = [];
     const uvs = [];
@@ -2690,7 +2811,7 @@ var PyramidGeometry = class _PyramidGeometry extends Geometry {
         const uNormalized = xIndex / xSegments;
         const positionX = (uNormalized - CENTER_T_OFFSET3) * fullWidth;
         positions.push(positionX, baseY, positionZ);
-        normals.push(ZERO_VALUE3, NEGATIVE_ONE_VALUE, ZERO_VALUE3);
+        normals.push(ZERO_VALUE4, NEGATIVE_ONE_VALUE, ZERO_VALUE4);
         uvs.push(uNormalized, UV_V_FLIP_BASE6 - vNormalized);
       }
     }
@@ -2728,7 +2849,7 @@ var PyramidGeometry = class _PyramidGeometry extends Geometry {
     let edgeStart = baseStart;
     let edgeEnd = baseEnd;
     let faceNormal = _PyramidGeometry.#computeFaceNormal(edgeStart, edgeEnd, apex);
-    if (_PyramidGeometry.#dot(faceNormal, outwardHint) < ZERO_VALUE3) {
+    if (_PyramidGeometry.#dot(faceNormal, outwardHint) < ZERO_VALUE4) {
       edgeStart = baseEnd;
       edgeEnd = baseStart;
       faceNormal = _PyramidGeometry.#computeFaceNormal(edgeStart, edgeEnd, apex);
@@ -2837,8 +2958,8 @@ var PyramidGeometry = class _PyramidGeometry extends Geometry {
    */
   static #inverseLength(x, y, z) {
     const length = Math.sqrt(x * x + y * y + z * z);
-    if (length === ZERO_VALUE3) {
-      return ZERO_VALUE3;
+    if (length === ZERO_VALUE4) {
+      return ZERO_VALUE4;
     }
     return ONE_VALUE2 / length;
   }
@@ -6486,6 +6607,705 @@ var FpsCounter = class _FpsCounter {
   }
 };
 
+// core/loader/obj-mtl-loader.js
+var COMMENT_TOKEN = "#";
+var OBJ_VERTEX_TOKEN = "v";
+var OBJ_TEXCOORD_TOKEN = "vt";
+var OBJ_NORMAL_TOKEN = "vn";
+var OBJ_FACE_TOKEN = "f";
+var OBJ_MATERIAL_LIB_TOKEN = "mtllib";
+var OBJ_USE_MATERIAL_TOKEN = "usemtl";
+var MTL_NEW_MATERIAL_TOKEN = "newmtl";
+var MTL_DIFFUSE_COLOR_TOKEN = "Kd";
+var MTL_DIFFUSE_MAP_TOKEN = "map_Kd";
+var MTL_OPACITY_TOKEN = "d";
+var MTL_TRANSPARENCY_TOKEN = "Tr";
+var OBJ_FACE_ATTRIBUTE_SEPARATOR = "/";
+var DEFAULT_MATERIAL_NAME = "default";
+var DEFAULT_TEXTURE_UNIT_INDEX3 = 0;
+var DEFAULT_OPACITY2 = 1;
+var DEFAULT_DIFFUSE_COLOR = new Float32Array([1, 1, 1]);
+var DEFAULT_UV = [0, 0];
+var DEFAULT_NORMAL = [0, 0, 1];
+var DEFAULT_BASE_URL = "";
+var SPACE_SEPARATOR = " ";
+var PATH_SEPARATOR = "/";
+var LINE_SPLIT_REGEX = /\s+/u;
+var ABSOLUTE_URL_REGEX = /^[a-zA-Z][a-zA-Z\d+.-]*:/u;
+var FACE_MIN_VERTEX_COUNT = 3;
+var OBJ_INDEX_OFFSET = 1;
+var OBJ_INDEX_NOT_PROVIDED = -1;
+var OBJ_INDEX_ZERO = 0;
+var POSITION_COMPONENT_COUNT3 = 3;
+var UV_COMPONENT_COUNT2 = 2;
+var NORMAL_COMPONENT_COUNT2 = 3;
+var FAN_FIRST_VERTEX_INDEX = 0;
+var NEXT_FACE_VERTEX_OFFSET = 1;
+var BASE_PATH_SLICE_OFFSET = 1;
+var COLOR_COMPONENT_COUNT4 = 3;
+var COMPONENT_INDEX_X = 0;
+var COMPONENT_INDEX_Y = 1;
+var COMPONENT_INDEX_Z = 2;
+var ZERO_VALUE5 = 0;
+var FIRST_INDEX = 0;
+var SECOND_INDEX = 1;
+var THIRD_INDEX = 2;
+var FOURTH_INDEX = 3;
+var NOT_FOUND_INDEX = -1;
+var VERTEX_KEY_SEPARATOR = "|";
+var ERROR_MISSING_POSITION_INDEX = "OBJ face vertex is missing position index.";
+var DECIMAL_RADIX = 10;
+var ObjMtlLoader = class _ObjMtlLoader {
+  /**
+   * WebGL2 rendering context used to create GPU resources.
+   *
+   * @type {WebGL2RenderingContext}
+   * @private
+   */
+  #webglContext;
+  /**
+   * Texture unit index for textured materials.
+   *
+   * @type {number}
+   * @private
+   */
+  #textureUnitIndex;
+  /**
+   * Default diffuse color used, when no material info is available.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #defaultColor = new Float32Array(DEFAULT_DIFFUSE_COLOR);
+  /**
+   * Cache of loaded textures by URL.
+   *
+   * @type {Map<string, Texture2D>}
+   * @private
+   */
+  #textureCache = /* @__PURE__ */ new Map();
+  /**
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @param {ObjMtlLoaderOptions} [options]       - Loader options.
+   */
+  constructor(webglContext, options = {}) {
+    if (!(webglContext instanceof WebGL2RenderingContext)) {
+      throw new TypeError("`ObjMtlLoader` expects a `WebGL2RenderingContext`.");
+    }
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("`ObjMtlLoader` expects options as a plain object.");
+    }
+    const {
+      textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX3,
+      defaultColor
+    } = options;
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE5) {
+      throw new TypeError("`ObjMtlLoader` expects `textureUnitIndex` as a non-negative integer.");
+    }
+    if (defaultColor !== void 0) {
+      if (!Array.isArray(defaultColor) && !(defaultColor instanceof Float32Array)) {
+        throw new TypeError("`ObjMtlLoader` expects `defaultColor` as `number[]` or `Float32Array`.");
+      }
+      if (defaultColor.length !== COLOR_COMPONENT_COUNT4) {
+        throw new TypeError("`ObjMtlLoader` expects `defaultColor` to have 3 components.");
+      }
+      this.#defaultColor.set(defaultColor);
+    }
+    this.#webglContext = webglContext;
+    this.#textureUnitIndex = textureUnitIndex;
+  }
+  /**
+   * Loads OBJ/MTL assets from URLs and creates meshes.
+   *
+   * @param {ObjMtlLoadFromUrlsOptions} options - Load options.
+   * @returns {Promise<ObjMtlLoadResult>}
+   */
+  async loadFromUrls(options = {}) {
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("`ObjMtlLoader.loadFromUrls` expects options as a plain object.");
+    }
+    const {
+      objUrl,
+      mtlUrl,
+      baseUrl = DEFAULT_BASE_URL,
+      textureBaseUrl
+    } = options;
+    if (typeof objUrl !== "string") {
+      throw new TypeError("`ObjMtlLoader.loadFromUrls` expects `objUrl` as a string.");
+    }
+    if (mtlUrl !== void 0 && typeof mtlUrl !== "string") {
+      throw new TypeError("`ObjMtlLoader.loadFromUrls` expects `mtlUrl` as a string, when provided.");
+    }
+    if (typeof baseUrl !== "string") {
+      throw new TypeError("`ObjMtlLoader.loadFromUrls` expects `baseUrl` as a string.");
+    }
+    if (textureBaseUrl !== void 0 && typeof textureBaseUrl !== "string") {
+      throw new TypeError("`ObjMtlLoader.loadFromUrls` expects `textureBaseUrl` as a string, when provided.");
+    }
+    const objText = await _ObjMtlLoader.#fetchText(objUrl);
+    const objData = _ObjMtlLoader.#parseObj(objText);
+    const resolvedBaseUrl = baseUrl || _ObjMtlLoader.#getBasePath(objUrl);
+    const mtlLibrary = mtlUrl || objData.materialLibraries[FIRST_INDEX];
+    let mtlData = /* @__PURE__ */ new Map();
+    if (mtlLibrary) {
+      const mtlBaseUrl = baseUrl || resolvedBaseUrl;
+      const resolvedMtlUrl = mtlUrl ? ABSOLUTE_URL_REGEX.test(mtlLibrary) || mtlLibrary.startsWith(PATH_SEPARATOR) || mtlLibrary.startsWith(mtlBaseUrl) ? mtlLibrary : _ObjMtlLoader.#resolvePath(mtlBaseUrl, mtlLibrary) : _ObjMtlLoader.#resolvePath(resolvedBaseUrl, mtlLibrary);
+      const mtlText = await _ObjMtlLoader.#fetchText(resolvedMtlUrl);
+      mtlData = _ObjMtlLoader.#parseMtl(mtlText);
+    }
+    const resolvedTextureBase = textureBaseUrl || resolvedBaseUrl;
+    return this.#buildMeshes(objData, mtlData, resolvedTextureBase);
+  }
+  /**
+   * Fetches text content by URL.
+   *
+   * @param {string} url - URL to fetch.
+   * @returns {Promise<string>}
+   * @private
+   */
+  static async #fetchText(url) {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch resource: ${url}`);
+    }
+    return response.text();
+  }
+  /**
+   * Parses OBJ text into structured data.
+   *
+   * @param {string} objText - OBJ file contents.
+   * @returns {{ materialLibraries: string[], groups: Map<string, ObjGroupData> }}
+   * @private
+   */
+  static #parseObj(objText) {
+    const positions = [];
+    const uvs = [];
+    const normals = [];
+    const materialLibraries = [];
+    const groups = /* @__PURE__ */ new Map();
+    let currentMaterial = DEFAULT_MATERIAL_NAME;
+    _ObjMtlLoader.#getOrCreateGroup(groups, currentMaterial);
+    const lines = objText.split(/\r?\n/u);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith(COMMENT_TOKEN)) {
+        continue;
+      }
+      const parts = trimmed.split(LINE_SPLIT_REGEX);
+      const keyword = parts[FIRST_INDEX];
+      switch (keyword) {
+        case OBJ_VERTEX_TOKEN: {
+          const vertex = _ObjMtlLoader.#parseFloatTriplet(parts, POSITION_COMPONENT_COUNT3);
+          positions.push(...vertex);
+          break;
+        }
+        case OBJ_TEXCOORD_TOKEN: {
+          const uv = _ObjMtlLoader.#parseFloatPair(parts);
+          uvs.push(...uv);
+          break;
+        }
+        case OBJ_NORMAL_TOKEN: {
+          const normal = _ObjMtlLoader.#parseFloatTriplet(parts, NORMAL_COMPONENT_COUNT2);
+          normals.push(...normal);
+          break;
+        }
+        case OBJ_MATERIAL_LIB_TOKEN: {
+          const libName = parts.slice(SECOND_INDEX).join(SPACE_SEPARATOR);
+          if (libName) {
+            materialLibraries.push(libName);
+          }
+          break;
+        }
+        case OBJ_USE_MATERIAL_TOKEN: {
+          const materialName = parts.slice(SECOND_INDEX).join(SPACE_SEPARATOR) || DEFAULT_MATERIAL_NAME;
+          currentMaterial = materialName;
+          _ObjMtlLoader.#getOrCreateGroup(groups, currentMaterial);
+          break;
+        }
+        case OBJ_FACE_TOKEN: {
+          _ObjMtlLoader.#parseFace(parts, positions, uvs, normals, groups.get(currentMaterial));
+          break;
+        }
+        default:
+          break;
+      }
+    }
+    return { materialLibraries, groups };
+  }
+  /**
+   * Parses MTL text into material definitions.
+   *
+   * @param {string} mtlText - MTL file contents.
+   * @returns {Map<string, ParsedMtlMaterial>}
+   * @private
+   */
+  static #parseMtl(mtlText) {
+    const materials = /* @__PURE__ */ new Map();
+    const lines = mtlText.split(/\r?\n/u);
+    let currentMaterial = null;
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith(COMMENT_TOKEN)) {
+        continue;
+      }
+      const parts = trimmed.split(LINE_SPLIT_REGEX);
+      const keyword = parts[FIRST_INDEX];
+      switch (keyword) {
+        case MTL_NEW_MATERIAL_TOKEN: {
+          const name = parts.slice(SECOND_INDEX).join(SPACE_SEPARATOR);
+          if (!name) {
+            currentMaterial = null;
+            break;
+          }
+          currentMaterial = {
+            name,
+            diffuseColor: new Float32Array(DEFAULT_DIFFUSE_COLOR),
+            diffuseMap: null,
+            opacity: DEFAULT_OPACITY2
+          };
+          materials.set(name, currentMaterial);
+          break;
+        }
+        case MTL_DIFFUSE_COLOR_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          const color = _ObjMtlLoader.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT4);
+          currentMaterial.diffuseColor.set(color);
+          break;
+        }
+        case MTL_DIFFUSE_MAP_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          const mapPath = parts.slice(SECOND_INDEX).join(SPACE_SEPARATOR);
+          currentMaterial.diffuseMap = mapPath || null;
+          break;
+        }
+        case MTL_OPACITY_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          const value = _ObjMtlLoader.#parseFloatValue(parts[SECOND_INDEX]);
+          if (value !== null) {
+            currentMaterial.opacity = value;
+          }
+          break;
+        }
+        case MTL_TRANSPARENCY_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          const value = _ObjMtlLoader.#parseFloatValue(parts[SECOND_INDEX]);
+          if (value !== null) {
+            currentMaterial.opacity = DEFAULT_OPACITY2 - value;
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+    return materials;
+  }
+  /**
+   * Creates meshes for parsed OBJ/MTL data.
+   *
+   * @param {{ groups: Map<string, ObjGroupData> }} objData - Parsed OBJ data.
+   * @param {Map<string, ParsedMtlMaterial>} mtlData        - Parsed MTL data.
+   * @param {string} textureBaseUrl                         - Base URL for textures.
+   * @returns {Promise<ObjMtlLoadResult>}
+   * @private
+   */
+  async #buildMeshes(objData, mtlData, textureBaseUrl) {
+    const root = new Object3D();
+    const meshes = [];
+    const geometries = [];
+    const materials = [];
+    const textures = [];
+    for (const group of objData.groups.values()) {
+      if (group.indices.length === ZERO_VALUE5) {
+        continue;
+      }
+      const positions = new Float32Array(group.positions);
+      const uvs = group.hasUvs ? new Float32Array(group.uvs) : null;
+      const normals = group.needsNormals ? _ObjMtlLoader.#generateNormals(positions, group.indices) : new Float32Array(group.normals);
+      const geometry = new CustomGeometry(this.#webglContext, {
+        positions,
+        indices: group.indices,
+        uvs,
+        normals
+      });
+      const materialDefinition = mtlData.get(group.materialName) || null;
+      const material = await this.#createMaterial(materialDefinition, textureBaseUrl, textures);
+      const mesh = new Mesh(geometry, material);
+      root.add(mesh);
+      meshes.push(mesh);
+      geometries.push(geometry);
+      materials.push(material);
+    }
+    return {
+      root,
+      meshes,
+      geometries,
+      materials,
+      textures
+    };
+  }
+  /**
+   * Creates a material instance based on MTL data.
+   *
+   * @param {ParsedMtlMaterial | null} definition - Parsed material definition.
+   * @param {string} textureBaseUrl               - Base URL used for resolving textures.
+   * @param {Texture2D[]} textures                - Output list of created textures.
+   * @returns {Promise<SolidColorMaterial | TexturedMaterial>}
+   * @private
+   */
+  async #createMaterial(definition, textureBaseUrl, textures) {
+    const opacity = definition ? definition.opacity : DEFAULT_OPACITY2;
+    if (definition && definition.diffuseMap) {
+      const textureUrl = _ObjMtlLoader.#resolvePath(textureBaseUrl, definition.diffuseMap);
+      const texture = await this.#getTexture(textureUrl, textures);
+      const material2 = new TexturedMaterial(this.#webglContext, {
+        texture,
+        ownsTexture: false,
+        textureUnitIndex: this.#textureUnitIndex
+      });
+      material2.setOpacity(opacity);
+      return material2;
+    }
+    const color = definition ? definition.diffuseColor : this.#defaultColor;
+    const material = new SolidColorMaterial(this.#webglContext, { color });
+    material.setOpacity(opacity);
+    return material;
+  }
+  /**
+   * Returns cached or newly loaded texture.
+   *
+   * @param {string} url         - Texture URL.
+   * @param {Texture2D[]} output - Output list of created textures.
+   * @returns {Promise<Texture2D>}
+   * @private
+   */
+  async #getTexture(url, output) {
+    if (this.#textureCache.has(url)) {
+      return this.#textureCache.get(url);
+    }
+    const texture = new Texture2D(this.#webglContext);
+    await texture.loadFromUrl(url);
+    this.#textureCache.set(url, texture);
+    output.push(texture);
+    return texture;
+  }
+  /**
+   * Parses a face and appends data to the current group.
+   *
+   * @param {string[]} parts     - Face line parts.
+   * @param {number[]} positions - Source positions.
+   * @param {number[]} uvs       - Source uvs.
+   * @param {number[]} normals   - Source normals.
+   * @param {ObjGroupData} group - Target group data.
+   * @private
+   */
+  static #parseFace(parts, positions, uvs, normals, group) {
+    const faceVertices = parts.slice(SECOND_INDEX);
+    if (faceVertices.length < FACE_MIN_VERTEX_COUNT) {
+      return;
+    }
+    const vertexIndices = faceVertices.map(
+      (vertex) => _ObjMtlLoader.#resolveFaceVertex(vertex, positions, uvs, normals, group)
+    );
+    for (let index = SECOND_INDEX; index < vertexIndices.length - NEXT_FACE_VERTEX_OFFSET; index += NEXT_FACE_VERTEX_OFFSET) {
+      const firstIndex = vertexIndices[FAN_FIRST_VERTEX_INDEX];
+      const secondIndex = vertexIndices[index];
+      const thirdIndex = vertexIndices[index + NEXT_FACE_VERTEX_OFFSET];
+      group.indices.push(firstIndex, secondIndex, thirdIndex);
+    }
+  }
+  /**
+   * Resolves a face vertex and appends data to group buffers.
+   *
+   * @param {string} vertexData  - Face vertex string.
+   * @param {number[]} positions - Source positions.
+   * @param {number[]} uvs       - Source uvs.
+   * @param {number[]} normals   - Source normals.
+   * @param {ObjGroupData} group - Target group data.
+   * @returns {number}           - Index of the resolved vertex.
+   * @private
+   */
+  static #resolveFaceVertex(vertexData, positions, uvs, normals, group) {
+    const indices = vertexData.split(OBJ_FACE_ATTRIBUTE_SEPARATOR);
+    const positionIndex = _ObjMtlLoader.#parseIndex(indices[FIRST_INDEX], positions.length / POSITION_COMPONENT_COUNT3);
+    const uvIndex = _ObjMtlLoader.#parseIndex(indices[SECOND_INDEX], uvs.length / UV_COMPONENT_COUNT2);
+    const normalIndex = _ObjMtlLoader.#parseIndex(indices[THIRD_INDEX], normals.length / NORMAL_COMPONENT_COUNT2);
+    if (positionIndex === OBJ_INDEX_NOT_PROVIDED) {
+      throw new Error(ERROR_MISSING_POSITION_INDEX);
+    }
+    const vertexKey = _ObjMtlLoader.#buildVertexKey(positionIndex, uvIndex, normalIndex);
+    if (group.vertexMap.has(vertexKey)) {
+      return group.vertexMap.get(vertexKey);
+    }
+    const vertexIndex = group.positions.length / POSITION_COMPONENT_COUNT3;
+    group.vertexMap.set(vertexKey, vertexIndex);
+    _ObjMtlLoader.#appendPosition(positions, positionIndex, group.positions);
+    _ObjMtlLoader.#appendUv(uvs, uvIndex, group);
+    _ObjMtlLoader.#appendNormal(normals, normalIndex, group);
+    return vertexIndex;
+  }
+  /**
+   * Parses an OBJ index string into a zero-based index.
+   *
+   * @param {string} value     - OBJ index string.
+   * @param {number} maxLength - Maximum element count.
+   * @returns {number}
+   * @private
+   */
+  static #parseIndex(value, maxLength) {
+    if (!value) {
+      return OBJ_INDEX_NOT_PROVIDED;
+    }
+    const indexValue = Number.parseInt(value, DECIMAL_RADIX);
+    if (maxLength === ZERO_VALUE5) {
+      return OBJ_INDEX_NOT_PROVIDED;
+    }
+    if (Number.isNaN(indexValue) || indexValue === OBJ_INDEX_ZERO) {
+      return OBJ_INDEX_NOT_PROVIDED;
+    }
+    if (indexValue > ZERO_VALUE5) {
+      return indexValue - OBJ_INDEX_OFFSET;
+    }
+    return maxLength + indexValue;
+  }
+  /**
+   * Appends a position to the target buffer.
+   *
+   * @param {number[]} sourcePositions - Source positions.
+   * @param {number} index             - Position index.
+   * @param {number[]} target          - Target positions buffer.
+   * @private
+   */
+  static #appendPosition(sourcePositions, index, target) {
+    const baseIndex = index * POSITION_COMPONENT_COUNT3;
+    target.push(
+      sourcePositions[baseIndex + COMPONENT_INDEX_X],
+      sourcePositions[baseIndex + COMPONENT_INDEX_Y],
+      sourcePositions[baseIndex + COMPONENT_INDEX_Z]
+    );
+  }
+  /**
+   * Appends a UV to the target buffer.
+   *
+   * @param {number[]} sourceUvs - Source UVs.
+   * @param {number} index       - UV index.
+   * @param {ObjGroupData} group - Group data.
+   * @private
+   */
+  static #appendUv(sourceUvs, index, group) {
+    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE5 && index * UV_COMPONENT_COUNT2 < sourceUvs.length) {
+      const baseIndex = index * UV_COMPONENT_COUNT2;
+      group.uvs.push(sourceUvs[baseIndex + COMPONENT_INDEX_X], sourceUvs[baseIndex + COMPONENT_INDEX_Y]);
+      group.hasUvs = true;
+      return;
+    }
+    group.uvs.push(DEFAULT_UV[COMPONENT_INDEX_X], DEFAULT_UV[COMPONENT_INDEX_Y]);
+  }
+  /**
+   * Appends a normal to the target buffer.
+   *
+   * @param {number[]} sourceNormals - Source normals.
+   * @param {number} index           - Normal index.
+   * @param {ObjGroupData} group     - Group data.
+   * @private
+   */
+  static #appendNormal(sourceNormals, index, group) {
+    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE5 && index * NORMAL_COMPONENT_COUNT2 < sourceNormals.length) {
+      const baseIndex = index * NORMAL_COMPONENT_COUNT2;
+      group.normals.push(
+        sourceNormals[baseIndex + COMPONENT_INDEX_X],
+        sourceNormals[baseIndex + COMPONENT_INDEX_Y],
+        sourceNormals[baseIndex + COMPONENT_INDEX_Z]
+      );
+      return;
+    }
+    group.needsNormals = true;
+    group.normals.push(DEFAULT_NORMAL[COMPONENT_INDEX_X], DEFAULT_NORMAL[COMPONENT_INDEX_Y], DEFAULT_NORMAL[COMPONENT_INDEX_Z]);
+  }
+  /**
+   * Generates vertex normals, when missing.
+   *
+   * @param {Float32Array} positions - Vertex positions.
+   * @param {number[]} indices       - Triangle indices.
+   * @returns {Float32Array}
+   * @private
+   */
+  static #generateNormals(positions, indices) {
+    const normalBuffer = new Float32Array(positions.length);
+    for (let index = ZERO_VALUE5; index < indices.length; index += NORMAL_COMPONENT_COUNT2) {
+      const indexA = indices[index + COMPONENT_INDEX_X] * POSITION_COMPONENT_COUNT3;
+      const indexB = indices[index + COMPONENT_INDEX_Y] * POSITION_COMPONENT_COUNT3;
+      const indexC = indices[index + COMPONENT_INDEX_Z] * POSITION_COMPONENT_COUNT3;
+      const ax = positions[indexA + COMPONENT_INDEX_X];
+      const ay = positions[indexA + COMPONENT_INDEX_Y];
+      const az = positions[indexA + COMPONENT_INDEX_Z];
+      const bx = positions[indexB + COMPONENT_INDEX_X];
+      const by = positions[indexB + COMPONENT_INDEX_Y];
+      const bz = positions[indexB + COMPONENT_INDEX_Z];
+      const cx = positions[indexC + COMPONENT_INDEX_X];
+      const cy = positions[indexC + COMPONENT_INDEX_Y];
+      const cz = positions[indexC + COMPONENT_INDEX_Z];
+      const abx = bx - ax;
+      const aby = by - ay;
+      const abz = bz - az;
+      const acx = cx - ax;
+      const acy = cy - ay;
+      const acz = cz - az;
+      const nx = aby * acz - abz * acy;
+      const ny = abz * acx - abx * acz;
+      const nz = abx * acy - aby * acx;
+      normalBuffer[indexA + COMPONENT_INDEX_X] += nx;
+      normalBuffer[indexA + COMPONENT_INDEX_Y] += ny;
+      normalBuffer[indexA + COMPONENT_INDEX_Z] += nz;
+      normalBuffer[indexB + COMPONENT_INDEX_X] += nx;
+      normalBuffer[indexB + COMPONENT_INDEX_Y] += ny;
+      normalBuffer[indexB + COMPONENT_INDEX_Z] += nz;
+      normalBuffer[indexC + COMPONENT_INDEX_X] += nx;
+      normalBuffer[indexC + COMPONENT_INDEX_Y] += ny;
+      normalBuffer[indexC + COMPONENT_INDEX_Z] += nz;
+    }
+    for (let index = ZERO_VALUE5; index < normalBuffer.length; index += NORMAL_COMPONENT_COUNT2) {
+      const nx = normalBuffer[index + COMPONENT_INDEX_X];
+      const ny = normalBuffer[index + COMPONENT_INDEX_Y];
+      const nz = normalBuffer[index + COMPONENT_INDEX_Z];
+      const length = Math.hypot(nx, ny, nz);
+      if (length > ZERO_VALUE5) {
+        normalBuffer[index + COMPONENT_INDEX_X] = nx / length;
+        normalBuffer[index + COMPONENT_INDEX_Y] = ny / length;
+        normalBuffer[index + COMPONENT_INDEX_Z] = nz / length;
+      }
+    }
+    return normalBuffer;
+  }
+  /**
+   * Builds a unique vertex key from indices.
+   *
+   * @param {number} positionIndex - Position index.
+   * @param {number} uvIndex       - UV index.
+   * @param {number} normalIndex   - Normal index.
+   * @returns {string}
+   * @private
+   */
+  static #buildVertexKey(positionIndex, uvIndex, normalIndex) {
+    return String(positionIndex) + VERTEX_KEY_SEPARATOR + String(uvIndex) + VERTEX_KEY_SEPARATOR + String(normalIndex);
+  }
+  /**
+   * Creates or returns a group entry for a material.
+   *
+   * @param {Map<string, ObjGroupData>} groups - Group map.
+   * @param {string} materialName              - Material name.
+   * @returns {ObjGroupData}
+   * @private
+   */
+  static #getOrCreateGroup(groups, materialName) {
+    if (groups.has(materialName)) {
+      return groups.get(materialName);
+    }
+    const group = {
+      materialName,
+      positions: [],
+      uvs: [],
+      normals: [],
+      indices: [],
+      vertexMap: /* @__PURE__ */ new Map(),
+      hasUvs: false,
+      needsNormals: false
+    };
+    groups.set(materialName, group);
+    return group;
+  }
+  /**
+   * Parses a float triplet from line parts.
+   *
+   * @param {string[]} parts  - Line parts.
+   * @param {number} expected - Expected component count.
+   * @returns {number[]}
+   * @private
+   */
+  static #parseFloatTriplet(parts, expected) {
+    if (parts.length <= expected) {
+      return [ZERO_VALUE5, ZERO_VALUE5, ZERO_VALUE5];
+    }
+    return [
+      Number.parseFloat(parts[SECOND_INDEX]),
+      Number.parseFloat(parts[THIRD_INDEX]),
+      Number.parseFloat(parts[FOURTH_INDEX])
+    ];
+  }
+  /**
+   * Parses a float pair from line parts.
+   *
+   * @param {string[]} parts - Line parts.
+   * @returns {number[]}
+   * @private
+   */
+  static #parseFloatPair(parts) {
+    if (parts.length <= THIRD_INDEX) {
+      return [ZERO_VALUE5, ZERO_VALUE5];
+    }
+    return [
+      Number.parseFloat(parts[SECOND_INDEX]),
+      Number.parseFloat(parts[THIRD_INDEX])
+    ];
+  }
+  /**
+   * Parses a float value from string.
+   *
+   * @param {string} value - String value.
+   * @returns {number | null}
+   * @private
+   */
+  static #parseFloatValue(value) {
+    if (!value) {
+      return null;
+    }
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  /**
+   * Resolves a base path from a URL string.
+   *
+   * @param {string} url - Input URL.
+   * @returns {string}
+   * @private
+   */
+  static #getBasePath(url) {
+    const lastSlashIndex = url.lastIndexOf(PATH_SEPARATOR);
+    if (lastSlashIndex === NOT_FOUND_INDEX) {
+      return DEFAULT_BASE_URL;
+    }
+    return url.slice(FIRST_INDEX, lastSlashIndex + BASE_PATH_SLICE_OFFSET);
+  }
+  /**
+   * Resolves a relative path against a base URL.
+   *
+   * @param {string} baseUrl - Base URL.
+   * @param {string} path    - Path to resolve.
+   * @returns {string}
+   * @private
+   */
+  static #resolvePath(baseUrl, path) {
+    if (!path) {
+      return baseUrl;
+    }
+    if (ABSOLUTE_URL_REGEX.test(path) || path.startsWith(PATH_SEPARATOR)) {
+      return path;
+    }
+    if (!baseUrl) {
+      return path;
+    }
+    return baseUrl + path;
+  }
+};
+
 // core/library.js
 var GeraWebGL = Object.freeze({
   Engine,
@@ -6512,7 +7332,8 @@ var GeraWebGL = Object.freeze({
     SphereGeometry,
     TorusGeometry,
     ConeGeometry,
-    PyramidGeometry
+    PyramidGeometry,
+    CustomGeometry
   }),
   Textures: Object.freeze({
     Texture2D
@@ -6529,6 +7350,9 @@ var GeraWebGL = Object.freeze({
   }),
   Controls: Object.freeze({
     OrbitControls
+  }),
+  Loaders: Object.freeze({
+    ObjMtlLoader
   }),
   Debug: Object.freeze({
     FpsCounter

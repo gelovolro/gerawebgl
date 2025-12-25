@@ -3,6 +3,7 @@ import { Matrix4 }                  from './math/matrix4.js';
 import { Vector3 }                  from './math/vector3.js';
 import { CameraMath }               from './math/camera-math.js';
 import { Geometry }                 from './geometry/geometry.js';
+import { CustomGeometry }           from './geometry/custom-geometry.js';
 import { BoxGeometry }              from './geometry/box-geometry.js';
 import { PlaneGeometry }            from './geometry/plane-geometry.js';
 import { SphereGeometry }           from './geometry/sphere-geometry.js';
@@ -29,6 +30,7 @@ import { OrbitControls }            from './controls/orbit-controls.js';
 import { Renderer }                 from './render/renderer.js';
 import { Engine, createEngine }     from './engine/engine.js';
 import { FpsCounter }               from './debug/fps-counter.js';
+import { ObjMtlLoader }             from './loader/obj-mtl-loader.js';
 
 /**
  * Main public API namespace.
@@ -70,7 +72,8 @@ export const GeraWebGL = Object.freeze({
         SphereGeometry,
         TorusGeometry,
         ConeGeometry,
-        PyramidGeometry
+        PyramidGeometry,
+        CustomGeometry
     }),
 
     Textures: Object.freeze({
@@ -90,6 +93,10 @@ export const GeraWebGL = Object.freeze({
 
     Controls: Object.freeze({
         OrbitControls
+    }),
+
+    Loaders: Object.freeze({
+        ObjMtlLoader
     }),
 
     Debug: Object.freeze({
