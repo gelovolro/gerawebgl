@@ -141,6 +141,35 @@ const DEFAULT_WIREFRAME_STATE = false;
 const LOADED_MODEL_Y_OFFSET = -5.5;
 
 /**
+ * How often FPS counter UI is refreshed (ms).
+ *
+ * @type {number}
+ */
+const FPS_COUNTER_UPDATE_INTERVAL_MS = 250;
+
+/**
+ * Exponential smoothing factor used by the FPS counter.
+ * Higher values react faster but fluctuate more.
+ *
+ * @type {number}
+ */
+const FPS_COUNTER_SMOOTHING_FACTOR = 0.15;
+
+/**
+ * FPS value considered `good` (styling threshold).
+ *
+ * @type {number}
+ */
+const FPS_COUNTER_GOOD_FPS_THRESHOLD = 55;
+
+/**
+ * FPS value considered `ok` (styling threshold).
+ *
+ * @type {number}
+ */
+const FPS_COUNTER_OK_FPS_THRESHOLD = 30;
+
+/**
  * Demo application that renders an OBJ/MTL model and provides UI for wireframe toggle and view reset.
  */
 class DemoApp {
@@ -201,6 +230,14 @@ class DemoApp {
     #loader;
 
     /**
+     * FPS counter overlay displayed by the demo.
+     *
+     * @type {GeraWebGL.Debug.FpsCounter}
+     * @private
+     */
+    #fpsCounter;
+
+    /**
      * Current wireframe enabled state.
      *
      * @type {boolean}
@@ -240,6 +277,14 @@ class DemoApp {
         this.#engine        = GeraWebGL.createEngine(this.#canvas, { fitToWindow: true });
         this.#orbitControls = this.#createOrbitControls(this.#engine.camera, this.#canvas);
         this.#loader        = new GeraWebGL.Loaders.ObjMtlLoader(this.#engine.webglRenderingContext);
+        this.#fpsCounter    = new GeraWebGL.Debug.FpsCounter({
+            updateIntervalMs : FPS_COUNTER_UPDATE_INTERVAL_MS,
+            smoothingFactor  : FPS_COUNTER_SMOOTHING_FACTOR,
+            goodFpsThreshold : FPS_COUNTER_GOOD_FPS_THRESHOLD,
+            okFpsThreshold   : FPS_COUNTER_OK_FPS_THRESHOLD
+        });
+
+        document.body.appendChild(this.#fpsCounter.domElement);
         this.#updateWireframeLabel(this.#wireframeButton, this.#wireframeEnabled);
         this.#bindUI();
         this.#loadModel();
@@ -358,6 +403,8 @@ class DemoApp {
      * @private
      */
     #onFrame(deltaTime) {
+        this.#fpsCounter.update(deltaTime);
+
         if (this.#loadedRoot) {
             this.#loadedRoot.rotation.y += deltaTime * MODEL_ROTATION_SPEED;
         }
