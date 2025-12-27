@@ -5381,445 +5381,354 @@ var OrthographicCamera = class extends Camera {
   }
 };
 
-// core/controls/orbit-controls.js
-var DEFAULT_TARGET_X = 0;
-var DEFAULT_TARGET_Y = 0;
-var DEFAULT_TARGET_Z = 0;
-var DEFAULT_DISTANCE = 6;
-var DEFAULT_MIN_DISTANCE = 0.1;
-var DEFAULT_MAX_DISTANCE = 1e3;
-var DEFAULT_AZIMUTH_RADIANS = 0.7;
-var DEFAULT_CAMERA_ROLL_RADIANS = 0;
-var DEFAULT_POLAR_RADIANS = -0.6;
-var DEFAULT_MIN_POLAR_RADIANS = -1.5;
-var DEFAULT_MAX_POLAR_RADIANS = 1.5;
-var DEFAULT_ROTATION_SPEED = 1;
-var DEFAULT_ZOOM_SPEED = 1;
-var ROTATE_BUTTON = 0;
-var ROTATION_RADIANS_PER_PIXEL = 5e-3;
-var WHEEL_DISTANCE_MULTIPLIER = 0.01;
-var WHEEL_LISTENER_OPTIONS = { passive: false };
-var POINTER_ID_RESET_VALUE = -1;
-var OrbitControls = class _OrbitControls {
+// core/scene/first-person-camera.js
+var DEFAULT_FIELD_OF_VIEW_DIVISOR = 4;
+var DEFAULT_FIELD_OF_VIEW_RADIANS = Math.PI / DEFAULT_FIELD_OF_VIEW_DIVISOR;
+var DEFAULT_ASPECT_RATIO = 1;
+var DEFAULT_NEAR = 0.1;
+var DEFAULT_FAR = 200;
+var MINIMUM_ASPECT_RATIO4 = 0;
+var MINIMUM_NEAR_CLIP_DISTANCE3 = 0;
+var MATRIX_4x4_ELEMENT_COUNT8 = 16;
+var FIRST_PERSON_CAMERA_MODE_NORMAL = "NORMAL";
+var FIRST_PERSON_CAMERA_MODE_BOBBING = "BOBBING";
+var FIRST_PERSON_CAMERA_MODES = Object.freeze({
+  NORMAL: FIRST_PERSON_CAMERA_MODE_NORMAL,
+  BOBBING: FIRST_PERSON_CAMERA_MODE_BOBBING
+});
+var FIRST_PERSON_CAMERA_MODE_SET = new Set(Object.values(FIRST_PERSON_CAMERA_MODES));
+var FirstPersonCamera = class extends Camera {
   /**
-   * Controlled camera instance.
-   *
-   * @type {Camera}
-   * @private
-   */
-  #camera;
-  /**
-   * DOM element that receives pointer/wheel input (usually the canvas).
-   *
-   * @type {HTMLElement}
-   * @private
-   */
-  #element;
-  /**
-   * Orbit target (point in world space that the camera looks at).
-   *
-   * Changing the returned vector via `.target.x = ...` will automatically mark controls as dirty.
-   *
-   * @type {Vector3}
-   * @private
-   */
-  #target;
-  /**
-   * Orbit distance from the target.
+   * Vertical field of view in radians.
    *
    * @type {number}
    * @private
    */
-  #distance;
+  #fieldOfViewRadians;
   /**
-   * Minimum orbit distance.
+   * Viewport aspect ratio (width / height).
    *
    * @type {number}
    * @private
    */
-  #minDistance;
+  #aspectRatio;
   /**
-   * Maximum orbit distance.
+   * Near clipping plane distance.
    *
    * @type {number}
    * @private
    */
-  #maxDistance;
+  #near;
   /**
-   * Azimuth angle (yaw) in radians.
+   * Far clipping plane distance.
    *
    * @type {number}
    * @private
    */
-  #azimuthRadians;
+  #far;
   /**
-   * Polar angle (pitch) in radians.
+   * Cached projection matrix buffer.
+   * The buffer is reused between frames to avoid allocations.
    *
-   * @type {number}
+   * @type {Float32Array}
    * @private
    */
-  #polarRadians;
+  #projectionMatrix;
   /**
-   * Minimum allowed polar angle (pitch) in radians.
-   *
-   * @type {number}
-   * @private
-   */
-  #minPolarRadians;
-  /**
-   * Maximum allowed polar angle (pitch) in radians.
-   *
-   * @type {number}
-   * @private
-   */
-  #maxPolarRadians;
-  /**
-   * Rotation speed multiplier.
-   *
-   * @type {number}
-   * @private
-   */
-  #rotationSpeed;
-  /**
-   * Zoom speed multiplier.
-   *
-   * @type {number}
-   * @private
-   */
-  #zoomSpeed;
-  /**
-   * True when controls need to recompute camera transform.
+   * When true, projection matrix must be recomputed.
    *
    * @type {boolean}
    * @private
    */
-  #isDirty = true;
+  #isProjectionMatrixDirty = true;
   /**
-   * Captured pointer id used during dragging.
+   * Current first-person camera mode.
    *
-   * @type {number}
+   * @type {string}
    * @private
    */
-  #capturedPointerId = POINTER_ID_RESET_VALUE;
+  #mode = FIRST_PERSON_CAMERA_MODE_NORMAL;
   /**
-   * Previous pointer X position in client pixels.
-   *
-   * @type {number}
-   * @private
+   * @param {FirstPersonCameraOptions} [options = {}] - Camera options.
    */
-  #previousPointerX = 0;
-  /**
-   * Previous pointer Y position in client pixels.
-   *
-   * @type {number}
-   * @private
-   */
-  #previousPointerY = 0;
-  /**
-   * Cached pointerdown handler reference used for `removeEventListener`.
-   *
-   * @type {function(PointerEvent): void}
-   * @private
-   */
-  #onPointerDown;
-  /**
-   * Cached pointermove handler reference used for `removeEventListener`.
-   *
-   * @type {function(PointerEvent): void}
-   * @private
-   */
-  #onPointerMove;
-  /**
-   * Cached pointerup handler reference used for `removeEventListener`.
-   *
-   * @type {function(PointerEvent): void}
-   * @private
-   */
-  #onPointerUp;
-  /**
-   * Cached wheel handler reference used for `removeEventListener`.
-   *
-   * @type {function(WheelEvent): void}
-   * @private
-   */
-  #onWheel;
-  /**
-   * Cached contextmenu handler reference used for `removeEventListener`.
-   *
-   * @type {function(MouseEvent): void}
-   * @private
-   */
-  #onContextMenu;
-  /**
-   * @param {Camera}      camera                         - Controlled camera instance.
-   * @param {HTMLElement} element                        - DOM element that receives input (usually the canvas).
-   * @param {Object}      [options]                      - Orbit options (plain object).
-   * @param {number}      [options.targetX=0]            - Orbit target X component.
-   * @param {number}      [options.targetY=0]            - Orbit target Y component.
-   * @param {number}      [options.targetZ=0]            - Orbit target Z component.
-   * @param {number}      [options.distance=6]           - Orbit distance from the target.
-   * @param {number}      [options.minDistance=0.1]      - Minimum orbit distance.
-   * @param {number}      [options.maxDistance=1000]     - Maximum orbit distance.
-   * @param {number}      [options.azimuthRadians=0.7]   - Initial yaw angle in radians.
-   * @param {number}      [options.polarRadians=-0.6]    - Initial pitch angle in radians.
-   * @param {number}      [options.minPolarRadians=-1.5] - Minimum pitch angle in radians.
-   * @param {number}      [options.maxPolarRadians=1.5]  - Maximum pitch angle in radians.
-   * @param {number}      [options.rotationSpeed=1.0]    - Rotation speed multiplier.
-   * @param {number}      [options.zoomSpeed=1.0]        - Zoom speed multiplier.
-   */
-  constructor(camera, element, options = {}) {
-    if (!(camera instanceof Camera)) {
-      throw new TypeError("`OrbitControls` expects `camera` as a `Camera` derived-instance.");
-    }
-    if (!(element instanceof HTMLElement)) {
-      throw new TypeError("`OrbitControls` expects `element` as an `HTMLElement`.");
-    }
+  constructor(options = {}) {
+    super();
     if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError("`OrbitControls` expects `options` as a plain object.");
+      throw new TypeError("`FirstPersonCamera` expects `options` as a plain object.");
     }
     const {
-      targetX = DEFAULT_TARGET_X,
-      targetY = DEFAULT_TARGET_Y,
-      targetZ = DEFAULT_TARGET_Z,
-      distance = DEFAULT_DISTANCE,
-      minDistance = DEFAULT_MIN_DISTANCE,
-      maxDistance = DEFAULT_MAX_DISTANCE,
-      azimuthRadians = DEFAULT_AZIMUTH_RADIANS,
-      polarRadians = DEFAULT_POLAR_RADIANS,
-      minPolarRadians = DEFAULT_MIN_POLAR_RADIANS,
-      maxPolarRadians = DEFAULT_MAX_POLAR_RADIANS,
-      rotationSpeed = DEFAULT_ROTATION_SPEED,
-      zoomSpeed = DEFAULT_ZOOM_SPEED
+      fieldOfViewRadians = DEFAULT_FIELD_OF_VIEW_RADIANS,
+      aspectRatio = DEFAULT_ASPECT_RATIO,
+      near = DEFAULT_NEAR,
+      far = DEFAULT_FAR,
+      mode = FIRST_PERSON_CAMERA_MODE_NORMAL
     } = options;
-    if (typeof targetX !== "number" || typeof targetY !== "number" || typeof targetZ !== "number") {
-      throw new TypeError("`OrbitControls` options: `targetX/Y/Z` must be numbers.");
+    if (typeof fieldOfViewRadians !== "number") {
+      throw new TypeError("`FirstPersonCamera` expects `fieldOfViewRadians` as a number.");
     }
-    if (typeof distance !== "number" || typeof minDistance !== "number" || typeof maxDistance !== "number") {
-      throw new TypeError("`OrbitControls` options: `distance/minDistance/maxDistance` must be numbers.");
+    if (typeof aspectRatio !== "number") {
+      throw new TypeError("`FirstPersonCamera` expects `aspectRatio` as a number.");
     }
-    if (distance <= 0 || minDistance <= 0 || maxDistance <= 0) {
-      throw new RangeError("`OrbitControls` options: `distance/minDistance/maxDistance` must be positive numbers.");
+    if (typeof near !== "number") {
+      throw new TypeError("`FirstPersonCamera` expects `near` as a number.");
     }
-    if (minDistance > maxDistance) {
-      throw new RangeError("`OrbitControls` options: `minDistance` must be less or equal to `maxDistance`.");
+    if (typeof far !== "number") {
+      throw new TypeError("`FirstPersonCamera` expects `far` as a number.");
     }
-    if (typeof azimuthRadians !== "number" || typeof polarRadians !== "number" || typeof minPolarRadians !== "number" || typeof maxPolarRadians !== "number") {
-      throw new TypeError("`OrbitControls` options: angle values must be numbers.");
+    if (aspectRatio <= MINIMUM_ASPECT_RATIO4) {
+      throw new RangeError("`FirstPersonCamera` expects `aspectRatio` to be a positive number.");
     }
-    if (minPolarRadians > maxPolarRadians) {
-      throw new RangeError("`OrbitControls` options: `minPolarRadians` must be less or equal to `maxPolarRadians`.");
+    if (near <= MINIMUM_NEAR_CLIP_DISTANCE3 || far <= near) {
+      throw new RangeError("`FirstPersonCamera` expects `0 < near < far`.");
     }
-    if (typeof rotationSpeed !== "number" || rotationSpeed <= 0) {
-      throw new RangeError("`OrbitControls` options: `rotationSpeed` must be a positive number.");
+    if (!FIRST_PERSON_CAMERA_MODE_SET.has(mode)) {
+      throw new RangeError("`FirstPersonCamera` expects `mode` to be a valid value from `FirstPersonCamera.Modes`.");
     }
-    if (typeof zoomSpeed !== "number" || zoomSpeed <= 0) {
-      throw new RangeError("`OrbitControls` options: `zoomSpeed` must be a positive number.");
-    }
-    this.#camera = camera;
-    this.#element = element;
-    this.#target = new Vector3(targetX, targetY, targetZ, () => this.#markDirty());
-    this.#distance = _OrbitControls.#clamp(distance, minDistance, maxDistance);
-    this.#minDistance = minDistance;
-    this.#maxDistance = maxDistance;
-    this.#azimuthRadians = azimuthRadians;
-    this.#polarRadians = _OrbitControls.#clamp(polarRadians, minPolarRadians, maxPolarRadians);
-    this.#minPolarRadians = minPolarRadians;
-    this.#maxPolarRadians = maxPolarRadians;
-    this.#rotationSpeed = rotationSpeed;
-    this.#zoomSpeed = zoomSpeed;
-    this.#element.style.touchAction = "none";
-    this.#onPointerDown = (event) => this.#handlePointerDown(event);
-    this.#onPointerMove = (event) => this.#handlePointerMove(event);
-    this.#onPointerUp = (event) => this.#handlePointerUp(event);
-    this.#onWheel = (event) => this.#handleWheel(event);
-    this.#onContextMenu = (event) => event.preventDefault();
-    this.#element.addEventListener("pointerdown", this.#onPointerDown);
-    window.addEventListener("pointermove", this.#onPointerMove);
-    window.addEventListener("pointerup", this.#onPointerUp);
-    this.#element.addEventListener("wheel", this.#onWheel, WHEEL_LISTENER_OPTIONS);
-    this.#element.addEventListener("contextmenu", this.#onContextMenu);
+    this.#fieldOfViewRadians = fieldOfViewRadians;
+    this.#aspectRatio = aspectRatio;
+    this.#near = near;
+    this.#far = far;
+    this.#projectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT8);
+    this.#mode = mode;
   }
   /**
-   * Orbit target (the point camera looks at).
+   * Supported first-person camera modes.
    *
-   * @returns {Vector3} - Mutable target vector (changes mark controls as dirty).
+   * @returns {{ NORMAL: string, BOBBING: string }} - Supported mode labels.
    */
-  get target() {
-    return this.#target;
+  static get Modes() {
+    return FIRST_PERSON_CAMERA_MODES;
   }
   /**
-   * Current orbit distance.
+   * Current camera mode.
    *
-   * @returns {number} - Distance value in world units.
+   * @returns {string}
    */
-  get distance() {
-    return this.#distance;
+  get mode() {
+    return this.#mode;
   }
   /**
-   * Sets orbit target components.
+   * Updates the camera mode.
    *
-   * @param {number} x - Target X component.
-   * @param {number} y - Target Y component.
-   * @param {number} z - Target Z component.
+   * @param {string} mode - New camera mode.
    */
-  setTarget(x, y, z) {
-    if (typeof x !== "number" || typeof y !== "number" || typeof z !== "number") {
-      throw new TypeError("`OrbitControls.setTarget` expects numeric `x/y/z` components.");
+  setMode(mode) {
+    if (!FIRST_PERSON_CAMERA_MODE_SET.has(mode)) {
+      throw new RangeError("`FirstPersonCamera.setMode` expects a valid mode from `FirstPersonCamera.Modes`.");
     }
-    this.#target.set(x, y, z);
-    this.#markDirty();
+    this.#mode = mode;
   }
   /**
-   * Replaces the controlled camera.
+   * @inheritdoc
+   */
+  getProjectionMatrix() {
+    if (this.#isProjectionMatrixDirty) {
+      CameraMath.writePerspectiveMatrixTo(
+        this.#projectionMatrix,
+        this.#fieldOfViewRadians,
+        this.#aspectRatio,
+        this.#near,
+        this.#far
+      );
+      this.#isProjectionMatrixDirty = false;
+    }
+    return this.#projectionMatrix;
+  }
+  /**
+   * Updates the camera aspect ratio.
    *
-   * @param {Camera} camera - New controlled camera instance.
+   * @param {number} aspectRatio - New aspect ratio.
    */
-  setCamera(camera) {
-    if (!(camera instanceof Camera)) {
-      throw new TypeError("`OrbitControls.setCamera` expects a `Camera` derived-instance.");
+  setAspectRatio(aspectRatio) {
+    if (typeof aspectRatio !== "number") {
+      throw new TypeError("`FirstPersonCamera.setAspectRatio` expects `aspectRatio` as a number.");
     }
-    this.#camera = camera;
-    this.#markDirty();
-  }
-  /**
-   * Applies the current orbit state to the camera (position + rotation).
-   */
-  update() {
-    if (this.#isDirty !== true) {
-      return;
+    if (aspectRatio <= MINIMUM_ASPECT_RATIO4) {
+      throw new RangeError("`FirstPersonCamera.setAspectRatio` expects a positive number.");
     }
-    const target = this.#target;
-    const distance = this.#distance;
-    const azimuth = this.#azimuthRadians;
-    const polar = this.#polarRadians;
-    const cosPolar = Math.cos(polar);
-    const sinPolar = Math.sin(polar);
-    const sinAzimuth = Math.sin(azimuth);
-    const cosAzimuth = Math.cos(azimuth);
-    const cameraX = target.x + sinAzimuth * cosPolar * distance;
-    const cameraY = target.y - sinPolar * distance;
-    const cameraZ = target.z + cosAzimuth * cosPolar * distance;
-    const camera = this.#camera;
-    camera.position.set(cameraX, cameraY, cameraZ);
-    camera.rotation.set(polar, azimuth, DEFAULT_CAMERA_ROLL_RADIANS);
-    this.#isDirty = false;
+    this.#aspectRatio = aspectRatio;
+    this.#isProjectionMatrixDirty = true;
   }
+};
+
+// core/scene/third-person-camera.js
+var DEFAULT_FIELD_OF_VIEW_DIVISOR2 = 4;
+var DEFAULT_FIELD_OF_VIEW_RADIANS2 = Math.PI / DEFAULT_FIELD_OF_VIEW_DIVISOR2;
+var DEFAULT_ASPECT_RATIO2 = 1;
+var DEFAULT_NEAR2 = 0.1;
+var DEFAULT_FAR2 = 200;
+var MINIMUM_ASPECT_RATIO5 = 0;
+var MINIMUM_NEAR_CLIP_DISTANCE4 = 0;
+var MATRIX_4x4_ELEMENT_COUNT9 = 16;
+var THIRD_PERSON_CAMERA_MODE_NORMAL = "NORMAL";
+var THIRD_PERSON_CAMERA_MODE_BOBBING = "BOBBING";
+var THIRD_PERSON_CAMERA_MODES = Object.freeze({
+  NORMAL: THIRD_PERSON_CAMERA_MODE_NORMAL,
+  BOBBING: THIRD_PERSON_CAMERA_MODE_BOBBING
+});
+var THIRD_PERSON_CAMERA_MODE_SET = new Set(Object.values(THIRD_PERSON_CAMERA_MODES));
+var ThirdPersonCamera = class extends Camera {
   /**
-   * Sets orbit distance (useful for UI sliders).
+   * Vertical field of view in radians.
    *
-   * @param {number} distance - New distance value.
-   */
-  setDistance(distance) {
-    if (!Number.isFinite(distance)) {
-      return;
-    }
-    this.#distance = _OrbitControls.#clamp(distance, this.#minDistance, this.#maxDistance);
-    this.#markDirty();
-  }
-  /**
-   * Disposes the controller by removing all event listeners.
-   */
-  dispose() {
-    this.#element.removeEventListener("pointerdown", this.#onPointerDown);
-    window.removeEventListener("pointermove", this.#onPointerMove);
-    window.removeEventListener("pointerup", this.#onPointerUp);
-    this.#element.removeEventListener("wheel", this.#onWheel, WHEEL_LISTENER_OPTIONS);
-    this.#element.removeEventListener("contextmenu", this.#onContextMenu);
-    this.#capturedPointerId = POINTER_ID_RESET_VALUE;
-  }
-  /**
+   * @type {number}
    * @private
    */
-  #markDirty() {
-    this.#isDirty = true;
-  }
+  #fieldOfViewRadians;
   /**
-   * @param {PointerEvent} event - Pointer event.
+   * Viewport aspect ratio (width / height).
+   *
+   * @type {number}
    * @private
    */
-  #handlePointerDown(event) {
-    if (event.button !== ROTATE_BUTTON) {
-      return;
-    }
-    if (this.#capturedPointerId !== POINTER_ID_RESET_VALUE) {
-      return;
-    }
-    this.#capturedPointerId = event.pointerId;
-    this.#previousPointerX = event.clientX;
-    this.#previousPointerY = event.clientY;
-    this.#element.setPointerCapture(event.pointerId);
-    event.preventDefault();
-  }
+  #aspectRatio;
   /**
-   * @param {PointerEvent} event - Pointer event.
+   * Near clipping plane distance.
+   *
+   * @type {number}
    * @private
    */
-  #handlePointerMove(event) {
-    if (event.pointerId !== this.#capturedPointerId) {
-      return;
-    }
-    const deltaX = event.clientX - this.#previousPointerX;
-    const deltaY = event.clientY - this.#previousPointerY;
-    this.#previousPointerX = event.clientX;
-    this.#previousPointerY = event.clientY;
-    const rotationStep = ROTATION_RADIANS_PER_PIXEL * this.#rotationSpeed;
-    this.#azimuthRadians -= deltaX * rotationStep;
-    this.#polarRadians -= deltaY * rotationStep;
-    this.#polarRadians = _OrbitControls.#clamp(
-      this.#polarRadians,
-      this.#minPolarRadians,
-      this.#maxPolarRadians
-    );
-    this.#markDirty();
-    event.preventDefault();
-  }
+  #near;
   /**
-   * @param {PointerEvent} event - Pointer event.
+   * Far clipping plane distance.
+   *
+   * @type {number}
    * @private
    */
-  #handlePointerUp(event) {
-    if (event.pointerId !== this.#capturedPointerId) {
-      return;
-    }
-    this.#capturedPointerId = POINTER_ID_RESET_VALUE;
-    event.preventDefault();
-  }
+  #far;
   /**
-   * @param {WheelEvent} event - Wheel event.
+   * Cached projection matrix buffer.
+   * The buffer is reused between frames to avoid allocations.
+   *
+   * @type {Float32Array}
    * @private
    */
-  #handleWheel(event) {
-    const delta = event.deltaY;
-    if (typeof delta !== "number") {
-      return;
-    }
-    const distanceDelta = delta * this.#zoomSpeed * WHEEL_DISTANCE_MULTIPLIER;
-    const nextDistance = this.#distance + distanceDelta;
-    this.#distance = _OrbitControls.#clamp(nextDistance, this.#minDistance, this.#maxDistance);
-    this.#markDirty();
-    event.preventDefault();
-  }
+  #projectionMatrix;
   /**
-   * @param {number} value - Value to clamp.
-   * @param {number} min   - Inclusive lower bound.
-   * @param {number} max   - Inclusive upper bound.
-   * @returns {number}     - Clamped value.
+   * When true, projection matrix must be recomputed.
+   *
+   * @type {boolean}
    * @private
    */
-  static #clamp(value, min, max) {
-    if (value < min) {
-      return min;
+  #isProjectionMatrixDirty = true;
+  /**
+   * Current third-person camera mode.
+   *
+   * @type {string}
+   * @private
+   */
+  #mode = THIRD_PERSON_CAMERA_MODE_NORMAL;
+  /**
+   * @param {ThirdPersonCameraOptions} [options = {}] - Camera options.
+   */
+  constructor(options = {}) {
+    super();
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("`ThirdPersonCamera` expects `options` as a plain object.");
     }
-    if (value > max) {
-      return max;
+    const {
+      fieldOfViewRadians = DEFAULT_FIELD_OF_VIEW_RADIANS2,
+      aspectRatio = DEFAULT_ASPECT_RATIO2,
+      near = DEFAULT_NEAR2,
+      far = DEFAULT_FAR2,
+      mode = THIRD_PERSON_CAMERA_MODE_NORMAL
+    } = options;
+    if (typeof fieldOfViewRadians !== "number") {
+      throw new TypeError("`ThirdPersonCamera` expects `fieldOfViewRadians` as a number.");
     }
-    return value;
+    if (typeof aspectRatio !== "number") {
+      throw new TypeError("`ThirdPersonCamera` expects `aspectRatio` as a number.");
+    }
+    if (typeof near !== "number") {
+      throw new TypeError("`ThirdPersonCamera` expects `near` as a number.");
+    }
+    if (typeof far !== "number") {
+      throw new TypeError("`ThirdPersonCamera` expects `far` as a number.");
+    }
+    if (aspectRatio <= MINIMUM_ASPECT_RATIO5) {
+      throw new RangeError("`ThirdPersonCamera` expects `aspectRatio` to be a positive number.");
+    }
+    if (near <= MINIMUM_NEAR_CLIP_DISTANCE4 || far <= near) {
+      throw new RangeError("`ThirdPersonCamera` expects `0 < near < far`.");
+    }
+    if (!THIRD_PERSON_CAMERA_MODE_SET.has(mode)) {
+      throw new RangeError("`ThirdPersonCamera` expects `mode` to be a valid value from `ThirdPersonCamera.Modes`.");
+    }
+    this.#fieldOfViewRadians = fieldOfViewRadians;
+    this.#aspectRatio = aspectRatio;
+    this.#near = near;
+    this.#far = far;
+    this.#projectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT9);
+    this.#mode = mode;
+  }
+  /**
+   * Supported third-person camera modes.
+   *
+   * @returns {{ NORMAL: string, BOBBING: string }} - Supported mode labels.
+   */
+  static get Modes() {
+    return THIRD_PERSON_CAMERA_MODES;
+  }
+  /**
+   * Current camera mode.
+   *
+   * @returns {string}
+   */
+  get mode() {
+    return this.#mode;
+  }
+  /**
+   * Updates the camera mode.
+   *
+   * @param {string} mode - New camera mode.
+   */
+  setMode(mode) {
+    if (!THIRD_PERSON_CAMERA_MODE_SET.has(mode)) {
+      throw new RangeError("`ThirdPersonCamera.setMode` expects a valid mode from `ThirdPersonCamera.Modes`.");
+    }
+    this.#mode = mode;
+  }
+  /**
+   * Updates the aspect ratio and marks projection cache as dirty.
+   *
+   * @param {number} aspectRatio - New viewport aspect ratio (canvas width divided by canvas height).
+   */
+  setAspectRatio(aspectRatio) {
+    if (typeof aspectRatio !== "number") {
+      throw new TypeError("`ThirdPersonCamera.setAspectRatio` expects `aspectRatio` as a number.");
+    }
+    if (aspectRatio <= MINIMUM_ASPECT_RATIO5) {
+      throw new RangeError("`ThirdPersonCamera.setAspectRatio` expects a positive number.");
+    }
+    if (aspectRatio === this.#aspectRatio) {
+      return;
+    }
+    this.#aspectRatio = aspectRatio;
+    this.#isProjectionMatrixDirty = true;
+  }
+  /**
+   * Returns the projection matrix for this camera. The returned matrix is cached and reused between calls.
+   *
+   * @returns {Float32Array} - Cached projection matrix.
+   */
+  getProjectionMatrix() {
+    if (this.#isProjectionMatrixDirty === true) {
+      CameraMath.writePerspectiveMatrixTo(
+        this.#projectionMatrix,
+        this.#fieldOfViewRadians,
+        this.#aspectRatio,
+        this.#near,
+        this.#far
+      );
+      this.#isProjectionMatrixDirty = false;
+    }
+    return this.#projectionMatrix;
   }
 };
 
 // core/render/renderer.js
 var INDEX_BUFFER_OFFSET_BYTES = 0;
-var MATRIX_4x4_ELEMENT_COUNT8 = 16;
+var MATRIX_4x4_ELEMENT_COUNT10 = 16;
 var VECTOR3_ELEMENT_COUNT2 = 3;
 var OPAQUE_OPACITY = 1;
 var MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT = 2;
@@ -5906,10 +5815,10 @@ var Renderer = class {
     }
     this.#contextWrapper = webglContext;
     this.#webglRenderingContext = webglContext.context;
-    this.#viewProjectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT8);
-    this.#finalMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT8);
-    this.#worldMatrixInverse = new Float32Array(MATRIX_4x4_ELEMENT_COUNT8);
-    this.#worldInverseTransposeMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT8);
+    this.#viewProjectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT10);
+    this.#finalMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT10);
+    this.#worldMatrixInverse = new Float32Array(MATRIX_4x4_ELEMENT_COUNT10);
+    this.#worldInverseTransposeMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT10);
     this.#cameraPosition = new Float32Array(VECTOR3_ELEMENT_COUNT2);
     this.#frameViewProjectionMatrix = this.#viewProjectionMatrix;
     this.#frameCameraPosition = this.#cameraPosition;
@@ -6019,9 +5928,9 @@ var Renderer = class {
 };
 
 // core/engine/engine.js
-var DEFAULT_FIELD_OF_VIEW_RADIANS = Math.PI / 4;
-var DEFAULT_NEAR = 0.1;
-var DEFAULT_FAR = 100;
+var DEFAULT_FIELD_OF_VIEW_RADIANS3 = Math.PI / 4;
+var DEFAULT_NEAR3 = 0.1;
+var DEFAULT_FAR3 = 100;
 var DEFAULT_INITIAL_CAMERA_Z = 5;
 var MILLISECONDS_TO_SECONDS = 1e-3;
 var DEFAULT_BOX_SIZE2 = 1;
@@ -6125,9 +6034,9 @@ var Engine = class {
       throw new TypeError("Engine expects an options object (plain object).");
     }
     const {
-      fieldOfViewRadians = DEFAULT_FIELD_OF_VIEW_RADIANS,
-      near = DEFAULT_NEAR,
-      far = DEFAULT_FAR,
+      fieldOfViewRadians = DEFAULT_FIELD_OF_VIEW_RADIANS3,
+      near = DEFAULT_NEAR3,
+      far = DEFAULT_FAR3,
       initialCameraZ = DEFAULT_INITIAL_CAMERA_Z,
       fitToWindow = false
     } = options;
@@ -7306,6 +7215,1605 @@ var ObjMtlLoader = class _ObjMtlLoader {
   }
 };
 
+// core/controls/orbit-controls.js
+var DEFAULT_TARGET_X = 0;
+var DEFAULT_TARGET_Y = 0;
+var DEFAULT_TARGET_Z = 0;
+var DEFAULT_DISTANCE = 6;
+var DEFAULT_MIN_DISTANCE = 0.1;
+var DEFAULT_MAX_DISTANCE = 1e3;
+var DEFAULT_AZIMUTH_RADIANS = 0.7;
+var DEFAULT_CAMERA_ROLL_RADIANS = 0;
+var DEFAULT_POLAR_RADIANS = -0.6;
+var DEFAULT_MIN_POLAR_RADIANS = -1.5;
+var DEFAULT_MAX_POLAR_RADIANS = 1.5;
+var DEFAULT_ROTATION_SPEED = 1;
+var DEFAULT_ZOOM_SPEED = 1;
+var ROTATE_BUTTON = 0;
+var ROTATION_RADIANS_PER_PIXEL = 5e-3;
+var WHEEL_DISTANCE_MULTIPLIER = 0.01;
+var WHEEL_LISTENER_OPTIONS = { passive: false };
+var POINTER_ID_RESET_VALUE = -1;
+var OrbitControls = class _OrbitControls {
+  /**
+   * Controlled camera instance.
+   *
+   * @type {Camera}
+   * @private
+   */
+  #camera;
+  /**
+   * DOM element that receives pointer/wheel input (usually the canvas).
+   *
+   * @type {HTMLElement}
+   * @private
+   */
+  #element;
+  /**
+   * Orbit target (point in world space that the camera looks at).
+   *
+   * Changing the returned vector via `.target.x = ...` will automatically mark controls as dirty.
+   *
+   * @type {Vector3}
+   * @private
+   */
+  #target;
+  /**
+   * Orbit distance from the target.
+   *
+   * @type {number}
+   * @private
+   */
+  #distance;
+  /**
+   * Minimum orbit distance.
+   *
+   * @type {number}
+   * @private
+   */
+  #minDistance;
+  /**
+   * Maximum orbit distance.
+   *
+   * @type {number}
+   * @private
+   */
+  #maxDistance;
+  /**
+   * Azimuth angle (yaw) in radians.
+   *
+   * @type {number}
+   * @private
+   */
+  #azimuthRadians;
+  /**
+   * Polar angle (pitch) in radians.
+   *
+   * @type {number}
+   * @private
+   */
+  #polarRadians;
+  /**
+   * Minimum allowed polar angle (pitch) in radians.
+   *
+   * @type {number}
+   * @private
+   */
+  #minPolarRadians;
+  /**
+   * Maximum allowed polar angle (pitch) in radians.
+   *
+   * @type {number}
+   * @private
+   */
+  #maxPolarRadians;
+  /**
+   * Rotation speed multiplier.
+   *
+   * @type {number}
+   * @private
+   */
+  #rotationSpeed;
+  /**
+   * Zoom speed multiplier.
+   *
+   * @type {number}
+   * @private
+   */
+  #zoomSpeed;
+  /**
+   * True when controls need to recompute camera transform.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #isDirty = true;
+  /**
+   * Captured pointer id used during dragging.
+   *
+   * @type {number}
+   * @private
+   */
+  #capturedPointerId = POINTER_ID_RESET_VALUE;
+  /**
+   * Previous pointer X position in client pixels.
+   *
+   * @type {number}
+   * @private
+   */
+  #previousPointerX = 0;
+  /**
+   * Previous pointer Y position in client pixels.
+   *
+   * @type {number}
+   * @private
+   */
+  #previousPointerY = 0;
+  /**
+   * Cached pointerdown handler reference used for `removeEventListener`.
+   *
+   * @type {function(PointerEvent): void}
+   * @private
+   */
+  #onPointerDown;
+  /**
+   * Cached pointermove handler reference used for `removeEventListener`.
+   *
+   * @type {function(PointerEvent): void}
+   * @private
+   */
+  #onPointerMove;
+  /**
+   * Cached pointerup handler reference used for `removeEventListener`.
+   *
+   * @type {function(PointerEvent): void}
+   * @private
+   */
+  #onPointerUp;
+  /**
+   * Cached wheel handler reference used for `removeEventListener`.
+   *
+   * @type {function(WheelEvent): void}
+   * @private
+   */
+  #onWheel;
+  /**
+   * Cached contextmenu handler reference used for `removeEventListener`.
+   *
+   * @type {function(MouseEvent): void}
+   * @private
+   */
+  #onContextMenu;
+  /**
+   * @param {Camera}      camera                         - Controlled camera instance.
+   * @param {HTMLElement} element                        - DOM element that receives input (usually the canvas).
+   * @param {Object}      [options]                      - Orbit options (plain object).
+   * @param {number}      [options.targetX=0]            - Orbit target X component.
+   * @param {number}      [options.targetY=0]            - Orbit target Y component.
+   * @param {number}      [options.targetZ=0]            - Orbit target Z component.
+   * @param {number}      [options.distance=6]           - Orbit distance from the target.
+   * @param {number}      [options.minDistance=0.1]      - Minimum orbit distance.
+   * @param {number}      [options.maxDistance=1000]     - Maximum orbit distance.
+   * @param {number}      [options.azimuthRadians=0.7]   - Initial yaw angle in radians.
+   * @param {number}      [options.polarRadians=-0.6]    - Initial pitch angle in radians.
+   * @param {number}      [options.minPolarRadians=-1.5] - Minimum pitch angle in radians.
+   * @param {number}      [options.maxPolarRadians=1.5]  - Maximum pitch angle in radians.
+   * @param {number}      [options.rotationSpeed=1.0]    - Rotation speed multiplier.
+   * @param {number}      [options.zoomSpeed=1.0]        - Zoom speed multiplier.
+   */
+  constructor(camera, element, options = {}) {
+    if (!(camera instanceof Camera)) {
+      throw new TypeError("`OrbitControls` expects `camera` as a `Camera` derived-instance.");
+    }
+    if (!(element instanceof HTMLElement)) {
+      throw new TypeError("`OrbitControls` expects `element` as an `HTMLElement`.");
+    }
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("`OrbitControls` expects `options` as a plain object.");
+    }
+    const {
+      targetX = DEFAULT_TARGET_X,
+      targetY = DEFAULT_TARGET_Y,
+      targetZ = DEFAULT_TARGET_Z,
+      distance = DEFAULT_DISTANCE,
+      minDistance = DEFAULT_MIN_DISTANCE,
+      maxDistance = DEFAULT_MAX_DISTANCE,
+      azimuthRadians = DEFAULT_AZIMUTH_RADIANS,
+      polarRadians = DEFAULT_POLAR_RADIANS,
+      minPolarRadians = DEFAULT_MIN_POLAR_RADIANS,
+      maxPolarRadians = DEFAULT_MAX_POLAR_RADIANS,
+      rotationSpeed = DEFAULT_ROTATION_SPEED,
+      zoomSpeed = DEFAULT_ZOOM_SPEED
+    } = options;
+    if (typeof targetX !== "number" || typeof targetY !== "number" || typeof targetZ !== "number") {
+      throw new TypeError("`OrbitControls` options: `targetX/Y/Z` must be numbers.");
+    }
+    if (typeof distance !== "number" || typeof minDistance !== "number" || typeof maxDistance !== "number") {
+      throw new TypeError("`OrbitControls` options: `distance/minDistance/maxDistance` must be numbers.");
+    }
+    if (distance <= 0 || minDistance <= 0 || maxDistance <= 0) {
+      throw new RangeError("`OrbitControls` options: `distance/minDistance/maxDistance` must be positive numbers.");
+    }
+    if (minDistance > maxDistance) {
+      throw new RangeError("`OrbitControls` options: `minDistance` must be less or equal to `maxDistance`.");
+    }
+    if (typeof azimuthRadians !== "number" || typeof polarRadians !== "number" || typeof minPolarRadians !== "number" || typeof maxPolarRadians !== "number") {
+      throw new TypeError("`OrbitControls` options: angle values must be numbers.");
+    }
+    if (minPolarRadians > maxPolarRadians) {
+      throw new RangeError("`OrbitControls` options: `minPolarRadians` must be less or equal to `maxPolarRadians`.");
+    }
+    if (typeof rotationSpeed !== "number" || rotationSpeed <= 0) {
+      throw new RangeError("`OrbitControls` options: `rotationSpeed` must be a positive number.");
+    }
+    if (typeof zoomSpeed !== "number" || zoomSpeed <= 0) {
+      throw new RangeError("`OrbitControls` options: `zoomSpeed` must be a positive number.");
+    }
+    this.#camera = camera;
+    this.#element = element;
+    this.#target = new Vector3(targetX, targetY, targetZ, () => this.#markDirty());
+    this.#distance = _OrbitControls.#clamp(distance, minDistance, maxDistance);
+    this.#minDistance = minDistance;
+    this.#maxDistance = maxDistance;
+    this.#azimuthRadians = azimuthRadians;
+    this.#polarRadians = _OrbitControls.#clamp(polarRadians, minPolarRadians, maxPolarRadians);
+    this.#minPolarRadians = minPolarRadians;
+    this.#maxPolarRadians = maxPolarRadians;
+    this.#rotationSpeed = rotationSpeed;
+    this.#zoomSpeed = zoomSpeed;
+    this.#element.style.touchAction = "none";
+    this.#onPointerDown = (event) => this.#handlePointerDown(event);
+    this.#onPointerMove = (event) => this.#handlePointerMove(event);
+    this.#onPointerUp = (event) => this.#handlePointerUp(event);
+    this.#onWheel = (event) => this.#handleWheel(event);
+    this.#onContextMenu = (event) => event.preventDefault();
+    this.#element.addEventListener("pointerdown", this.#onPointerDown);
+    window.addEventListener("pointermove", this.#onPointerMove);
+    window.addEventListener("pointerup", this.#onPointerUp);
+    this.#element.addEventListener("wheel", this.#onWheel, WHEEL_LISTENER_OPTIONS);
+    this.#element.addEventListener("contextmenu", this.#onContextMenu);
+  }
+  /**
+   * Orbit target (the point camera looks at).
+   *
+   * @returns {Vector3} - Mutable target vector (changes mark controls as dirty).
+   */
+  get target() {
+    return this.#target;
+  }
+  /**
+   * Current orbit distance.
+   *
+   * @returns {number} - Distance value in world units.
+   */
+  get distance() {
+    return this.#distance;
+  }
+  /**
+   * Sets orbit target components.
+   *
+   * @param {number} x - Target X component.
+   * @param {number} y - Target Y component.
+   * @param {number} z - Target Z component.
+   */
+  setTarget(x, y, z) {
+    if (typeof x !== "number" || typeof y !== "number" || typeof z !== "number") {
+      throw new TypeError("`OrbitControls.setTarget` expects numeric `x/y/z` components.");
+    }
+    this.#target.set(x, y, z);
+    this.#markDirty();
+  }
+  /**
+   * Replaces the controlled camera.
+   *
+   * @param {Camera} camera - New controlled camera instance.
+   */
+  setCamera(camera) {
+    if (!(camera instanceof Camera)) {
+      throw new TypeError("`OrbitControls.setCamera` expects a `Camera` derived-instance.");
+    }
+    this.#camera = camera;
+    this.#markDirty();
+  }
+  /**
+   * Applies the current orbit state to the camera (position + rotation).
+   */
+  update() {
+    if (this.#isDirty !== true) {
+      return;
+    }
+    const target = this.#target;
+    const distance = this.#distance;
+    const azimuth = this.#azimuthRadians;
+    const polar = this.#polarRadians;
+    const cosPolar = Math.cos(polar);
+    const sinPolar = Math.sin(polar);
+    const sinAzimuth = Math.sin(azimuth);
+    const cosAzimuth = Math.cos(azimuth);
+    const cameraX = target.x + sinAzimuth * cosPolar * distance;
+    const cameraY = target.y - sinPolar * distance;
+    const cameraZ = target.z + cosAzimuth * cosPolar * distance;
+    const camera = this.#camera;
+    camera.position.set(cameraX, cameraY, cameraZ);
+    camera.rotation.set(polar, azimuth, DEFAULT_CAMERA_ROLL_RADIANS);
+    this.#isDirty = false;
+  }
+  /**
+   * Sets orbit distance (useful for UI sliders).
+   *
+   * @param {number} distance - New distance value.
+   */
+  setDistance(distance) {
+    if (!Number.isFinite(distance)) {
+      return;
+    }
+    this.#distance = _OrbitControls.#clamp(distance, this.#minDistance, this.#maxDistance);
+    this.#markDirty();
+  }
+  /**
+   * Disposes the controller by removing all event listeners.
+   */
+  dispose() {
+    this.#element.removeEventListener("pointerdown", this.#onPointerDown);
+    window.removeEventListener("pointermove", this.#onPointerMove);
+    window.removeEventListener("pointerup", this.#onPointerUp);
+    this.#element.removeEventListener("wheel", this.#onWheel, WHEEL_LISTENER_OPTIONS);
+    this.#element.removeEventListener("contextmenu", this.#onContextMenu);
+    this.#capturedPointerId = POINTER_ID_RESET_VALUE;
+  }
+  /**
+   * @private
+   */
+  #markDirty() {
+    this.#isDirty = true;
+  }
+  /**
+   * @param {PointerEvent} event - Pointer event.
+   * @private
+   */
+  #handlePointerDown(event) {
+    if (event.button !== ROTATE_BUTTON) {
+      return;
+    }
+    if (this.#capturedPointerId !== POINTER_ID_RESET_VALUE) {
+      return;
+    }
+    this.#capturedPointerId = event.pointerId;
+    this.#previousPointerX = event.clientX;
+    this.#previousPointerY = event.clientY;
+    this.#element.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  }
+  /**
+   * @param {PointerEvent} event - Pointer event.
+   * @private
+   */
+  #handlePointerMove(event) {
+    if (event.pointerId !== this.#capturedPointerId) {
+      return;
+    }
+    const deltaX = event.clientX - this.#previousPointerX;
+    const deltaY = event.clientY - this.#previousPointerY;
+    this.#previousPointerX = event.clientX;
+    this.#previousPointerY = event.clientY;
+    const rotationStep = ROTATION_RADIANS_PER_PIXEL * this.#rotationSpeed;
+    this.#azimuthRadians -= deltaX * rotationStep;
+    this.#polarRadians -= deltaY * rotationStep;
+    this.#polarRadians = _OrbitControls.#clamp(
+      this.#polarRadians,
+      this.#minPolarRadians,
+      this.#maxPolarRadians
+    );
+    this.#markDirty();
+    event.preventDefault();
+  }
+  /**
+   * @param {PointerEvent} event - Pointer event.
+   * @private
+   */
+  #handlePointerUp(event) {
+    if (event.pointerId !== this.#capturedPointerId) {
+      return;
+    }
+    this.#capturedPointerId = POINTER_ID_RESET_VALUE;
+    event.preventDefault();
+  }
+  /**
+   * @param {WheelEvent} event - Wheel event.
+   * @private
+   */
+  #handleWheel(event) {
+    const delta = event.deltaY;
+    if (typeof delta !== "number") {
+      return;
+    }
+    const distanceDelta = delta * this.#zoomSpeed * WHEEL_DISTANCE_MULTIPLIER;
+    const nextDistance = this.#distance + distanceDelta;
+    this.#distance = _OrbitControls.#clamp(nextDistance, this.#minDistance, this.#maxDistance);
+    this.#markDirty();
+    event.preventDefault();
+  }
+  /**
+   * @param {number} value - Value to clamp.
+   * @param {number} min   - Inclusive lower bound.
+   * @param {number} max   - Inclusive upper bound.
+   * @returns {number}     - Clamped value.
+   * @private
+   */
+  static #clamp(value, min, max) {
+    if (value < min) {
+      return min;
+    }
+    if (value > max) {
+      return max;
+    }
+    return value;
+  }
+};
+
+// core/controls/keyboard-controls.js
+var DEFAULT_GROUND_Y = 0;
+var DEFAULT_AZIMUTH_RADIANS2 = 0;
+var DEFAULT_POLAR_RADIANS2 = -0.35;
+var DEFAULT_MIN_POLAR_RADIANS2 = -1.25;
+var DEFAULT_MAX_POLAR_RADIANS2 = 0.55;
+var DEFAULT_ROTATION_SPEED2 = 1;
+var DEFAULT_MOVE_SPEED = 3;
+var DEFAULT_RUN_SPEED_MULTIPLIER = 1.8;
+var DEFAULT_JUMP_SPEED = 4.2;
+var DEFAULT_GRAVITY_ACCELERATION = 9.8;
+var ROTATION_RADIANS_PER_PIXEL2 = 5e-3;
+var DEFAULT_BOBBING_AMPLITUDE_WALK = 0.05;
+var DEFAULT_BOBBING_AMPLITUDE_RUN = 0.09;
+var DEFAULT_BOBBING_FREQUENCY_WALK = 9;
+var DEFAULT_BOBBING_FREQUENCY_RUN = 13;
+var DEFAULT_BOBBING_PITCH_AMPLITUDE_RADIANS = 0.02;
+var ROTATE_POINTER_BUTTON = 0;
+var POINTER_ID_RESET_VALUE2 = -1;
+var ACTION_FORWARD = "forward";
+var ACTION_BACKWARD = "backward";
+var ACTION_LEFT = "left";
+var ACTION_RIGHT = "right";
+var ACTION_RUN = "run";
+var ACTION_JUMP = "jump";
+var ACTIONS = Object.freeze({
+  FORWARD: ACTION_FORWARD,
+  BACKWARD: ACTION_BACKWARD,
+  LEFT: ACTION_LEFT,
+  RIGHT: ACTION_RIGHT,
+  RUN: ACTION_RUN,
+  JUMP: ACTION_JUMP
+});
+var KEY_CODES = Object.freeze({
+  FORWARD: "KeyW",
+  BACKWARD: "KeyS",
+  LEFT: "KeyA",
+  RIGHT: "KeyD",
+  RUN: "ShiftLeft",
+  JUMP: "Space"
+});
+var EVENT_KEYDOWN = "keydown";
+var EVENT_KEYUP = "keyup";
+var EVENT_POINTERDOWN = "pointerdown";
+var EVENT_POINTERMOVE = "pointermove";
+var EVENT_POINTERUP = "pointerup";
+var EVENT_CONTEXT_MENU = "contextmenu";
+var EVENT_WINDOW_BLUR = "blur";
+var TOUCH_ACTION_NONE = "none";
+var INPUT_FORWARD = 1;
+var INPUT_BACKWARD = -1;
+var INPUT_NONE = 0;
+var SPEED_SCALE_DEFAULT = 1;
+var INPUT_EPSILON = 1e-4;
+var LOOP_START_INDEX = 0;
+var LOOP_INDEX_INCREMENT = 1;
+var MINIMUM_NON_NEGATIVE_VALUE = 0;
+var MINIMUM_POSITIVE_VALUE = 0;
+var EMPTY_STRING_LENGTH = 0;
+var KEY_VALUES = Object.freeze({
+  FORWARD: "w",
+  BACKWARD: "s",
+  LEFT: "a",
+  RIGHT: "d",
+  RUN: "shift",
+  JUMP: " ",
+  SPACEBAR: "spacebar"
+});
+var KeyboardControls = class _KeyboardControls {
+  /**
+   * Controlled camera instance.
+   *
+   * @type {Camera}
+   * @private
+   */
+  #camera;
+  /**
+   * Controlled target object (player).
+   *
+   * @type {Object3D}
+   * @private
+   */
+  #target;
+  /**
+   * DOM element, that receives pointer input (usually the canvas).
+   *
+   * @type {HTMLElement}
+   * @private
+   */
+  #element;
+  /**
+   * Controls class name for error messages.
+   *
+   * @type {string}
+   * @private
+   */
+  #controlsName;
+  /**
+   * Required camera constructor for validation.
+   *
+   * @type {Function}
+   * @private
+   */
+  #cameraConstructor;
+  /**
+   * Camera mode value, that enables bobbing.
+   *
+   * @type {string | null}
+   * @private
+   */
+  #bobbingMode;
+  /**
+   * Ground Y coordinate for landing.
+   *
+   * @type {number}
+   * @private
+   */
+  #groundY;
+  /**
+   * Azimuth angle (yaw) in radians.
+   *
+   * @type {number}
+   * @private
+   */
+  #azimuthRadians;
+  /**
+   * Polar angle (pitch) in radians.
+   *
+   * @type {number}
+   * @private
+   */
+  #polarRadians;
+  /**
+   * Minimum allowed polar angle in radians.
+   *
+   * @type {number}
+   * @private
+   */
+  #minPolarRadians;
+  /**
+   * Maximum allowed polar angle in radians.
+   *
+   * @type {number}
+   * @private
+   */
+  #maxPolarRadians;
+  /**
+   * Rotation speed multiplier.
+   *
+   * @type {number}
+   * @private
+   */
+  #rotationSpeed;
+  /**
+   * Base movement speed (walking).
+   *
+   * @type {number}
+   * @private
+   */
+  #moveSpeed;
+  /**
+   * Running speed multiplier.
+   *
+   * @type {number}
+   * @private
+   */
+  #runSpeedMultiplier;
+  /**
+   * Jump velocity.
+   *
+   * @type {number}
+   * @private
+   */
+  #jumpSpeed;
+  /**
+   * Gravity acceleration magnitude.
+   *
+   * @type {number}
+   * @private
+   */
+  #gravity;
+  /**
+   * Current vertical velocity.
+   *
+   * @type {number}
+   * @private
+   */
+  #verticalVelocity = INPUT_NONE;
+  /**
+   * True when the target is grounded.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #isGrounded = true;
+  /**
+   * Camera bobbing height while walking.
+   *
+   * @type {number}
+   * @private
+   */
+  #bobbingAmplitudeWalk;
+  /**
+   * Camera bobbing height while running.
+   *
+   * @type {number}
+   * @private
+   */
+  #bobbingAmplitudeRun;
+  /**
+   * Camera bobbing angular speed while walking.
+   *
+   * @type {number}
+   * @private
+   */
+  #bobbingFrequencyWalk;
+  /**
+   * Camera bobbing angular speed while running.
+   *
+   * @type {number}
+   * @private
+   */
+  #bobbingFrequencyRun;
+  /**
+   * Camera pitch bobbing amplitude in radians.
+   *
+   * @type {number}
+   * @private
+   */
+  #bobbingPitchAmplitude;
+  /**
+   * Current bobbing phase in radians.
+   *
+   * @type {number}
+   * @private
+   */
+  #bobbingPhase = INPUT_NONE;
+  /**
+   * Current camera bobbing offset.
+   *
+   * @type {number}
+   * @private
+   */
+  #bobbingOffset = INPUT_NONE;
+  /**
+   * Action states map.
+   *
+   * @type {Map<string, boolean>}
+   * @private
+   */
+  #actionStates = /* @__PURE__ */ new Map();
+  /**
+   * Captured pointer id used during dragging.
+   *
+   * @type {number}
+   * @private
+   */
+  #capturedPointerId = POINTER_ID_RESET_VALUE2;
+  /**
+   * Previous pointer X position in client pixels.
+   *
+   * @type {number}
+   * @private
+   */
+  #previousPointerX = INPUT_NONE;
+  /**
+   * Previous pointer Y position in client pixels.
+   *
+   * @type {number}
+   * @private
+   */
+  #previousPointerY = INPUT_NONE;
+  /**
+   * True when input listeners are enabled.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #isEnabled = true;
+  /**
+   * Cached pointerdown handler reference used for `removeEventListener`.
+   *
+   * @type {function(PointerEvent): void}
+   * @private
+   */
+  #onPointerDown;
+  /**
+   * Cached pointermove handler reference used for `removeEventListener`.
+   *
+   * @type {function(PointerEvent): void}
+   * @private
+   */
+  #onPointerMove;
+  /**
+   * Cached pointerup handler reference used for `removeEventListener`.
+   *
+   * @type {function(PointerEvent): void}
+   * @private
+   */
+  #onPointerUp;
+  /**
+   * Cached keydown handler reference used for `removeEventListener`.
+   *
+   * @type {function(KeyboardEvent): void}
+   * @private
+   */
+  #onKeyDown;
+  /**
+   * Cached keyup handler reference used for `removeEventListener`.
+   *
+   * @type {function(KeyboardEvent): void}
+   * @private
+   */
+  #onKeyUp;
+  /**
+   * Cached contextmenu handler reference used for `removeEventListener`.
+   *
+   * @type {function(MouseEvent): void}
+   * @private
+   */
+  #onContextMenu;
+  /**
+   * Cached blur handler reference used for `removeEventListener`.
+   *
+   * @type {function(): void}
+   * @private
+   */
+  #onBlur;
+  /**
+   * @param {Camera} camera                                     - Controlled camera.
+   * @param {Object3D} target                                   - Target object, that the camera follows.
+   * @param {HTMLElement} element                               - DOM element, that receives pointer input.
+   * @param {KeyboardControlsOptions} [options]                 - Optional controls configuration.
+   * @param {Object} [config]                                   - Internal configuration for derived controls.
+   * @param {Function} [config.cameraConstructor = Camera]      - Expected camera constructor for validation.
+   * @param {string} [config.controlsName = 'KeyboardControls'] - Controls class name for error messages.
+   * @param {(string|null)} [config.bobbingMode = null]         - Camera mode, that enables bobbing (or null to disable).
+   */
+  constructor(camera, target, element, options = {}, config = {}) {
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("`KeyboardControls` expects `options` as a plain object.");
+    }
+    const {
+      cameraConstructor = Camera,
+      controlsName = "KeyboardControls",
+      bobbingMode = null
+    } = config;
+    if (typeof cameraConstructor !== "function") {
+      throw new TypeError("`KeyboardControls` expects `cameraConstructor` as a function.");
+    }
+    if (typeof controlsName !== "string" || controlsName.length === 0) {
+      throw new TypeError("`KeyboardControls` expects `controlsName` as a non-empty string.");
+    }
+    if (!(camera instanceof cameraConstructor)) {
+      throw new TypeError(`\`${controlsName}\` expects \`camera\` as a \`${cameraConstructor.name}\` instance.`);
+    }
+    if (!(target instanceof Object3D)) {
+      throw new TypeError(`\`${controlsName}\` expects \`target\` as an \`Object3D\` instance.`);
+    }
+    if (!(element instanceof HTMLElement)) {
+      throw new TypeError(`\`${controlsName}\` expects \`element\` as an \`HTMLElement\`.`);
+    }
+    if (bobbingMode !== null && typeof bobbingMode !== "string") {
+      throw new TypeError("`KeyboardControls` expects `bobbingMode` as a string or null.");
+    }
+    const {
+      groundY = DEFAULT_GROUND_Y,
+      azimuthRadians = DEFAULT_AZIMUTH_RADIANS2,
+      polarRadians = DEFAULT_POLAR_RADIANS2,
+      minPolarRadians = DEFAULT_MIN_POLAR_RADIANS2,
+      maxPolarRadians = DEFAULT_MAX_POLAR_RADIANS2,
+      rotationSpeed = DEFAULT_ROTATION_SPEED2,
+      moveSpeed = DEFAULT_MOVE_SPEED,
+      runSpeedMultiplier = DEFAULT_RUN_SPEED_MULTIPLIER,
+      jumpSpeed = DEFAULT_JUMP_SPEED,
+      gravity = DEFAULT_GRAVITY_ACCELERATION,
+      bobbingAmplitudeWalk = DEFAULT_BOBBING_AMPLITUDE_WALK,
+      bobbingAmplitudeRun = DEFAULT_BOBBING_AMPLITUDE_RUN,
+      bobbingFrequencyWalk = DEFAULT_BOBBING_FREQUENCY_WALK,
+      bobbingFrequencyRun = DEFAULT_BOBBING_FREQUENCY_RUN,
+      bobbingPitchAmplitudeRadians = DEFAULT_BOBBING_PITCH_AMPLITUDE_RADIANS
+    } = options;
+    if (typeof groundY !== "number") {
+      throw new TypeError(`\`${controlsName}\` expects \`groundY\` as a number.`);
+    }
+    if (typeof azimuthRadians !== "number" || typeof polarRadians !== "number") {
+      throw new TypeError(`\`${controlsName}\` expects \`azimuthRadians\` and \`polarRadians\` as numbers.`);
+    }
+    if (typeof minPolarRadians !== "number" || typeof maxPolarRadians !== "number") {
+      throw new TypeError(`\`${controlsName}\` expects \`minPolarRadians\` and \`maxPolarRadians\` as numbers.`);
+    }
+    if (minPolarRadians > maxPolarRadians) {
+      throw new RangeError(`\`${controlsName}\` expects \`minPolarRadians\` to be <= \`maxPolarRadians\`.`);
+    }
+    if (typeof rotationSpeed !== "number" || rotationSpeed <= MINIMUM_POSITIVE_VALUE) {
+      throw new RangeError(`\`${controlsName}\` expects \`rotationSpeed\` as a positive number.`);
+    }
+    if (typeof moveSpeed !== "number" || moveSpeed <= MINIMUM_POSITIVE_VALUE) {
+      throw new RangeError(`\`${controlsName}\` expects \`moveSpeed\` as a positive number.`);
+    }
+    if (typeof runSpeedMultiplier !== "number" || runSpeedMultiplier <= MINIMUM_POSITIVE_VALUE) {
+      throw new RangeError(`\`${controlsName}\` expects \`runSpeedMultiplier\` as a positive number.`);
+    }
+    if (typeof jumpSpeed !== "number" || jumpSpeed <= MINIMUM_POSITIVE_VALUE) {
+      throw new RangeError(`\`${controlsName}\` expects \`jumpSpeed\` as a positive number.`);
+    }
+    if (typeof gravity !== "number" || gravity <= MINIMUM_POSITIVE_VALUE) {
+      throw new RangeError(`\`${controlsName}\` expects \`gravity\` as a positive number.`);
+    }
+    if (typeof bobbingAmplitudeWalk !== "number" || bobbingAmplitudeWalk < MINIMUM_NON_NEGATIVE_VALUE) {
+      throw new RangeError(`\`${controlsName}\` expects \`bobbingAmplitudeWalk\` as a non-negative number.`);
+    }
+    if (typeof bobbingAmplitudeRun !== "number" || bobbingAmplitudeRun < MINIMUM_NON_NEGATIVE_VALUE) {
+      throw new RangeError(`\`${controlsName}\` expects \`bobbingAmplitudeRun\` as a non-negative number.`);
+    }
+    if (typeof bobbingFrequencyWalk !== "number" || bobbingFrequencyWalk <= MINIMUM_POSITIVE_VALUE) {
+      throw new RangeError(`\`${controlsName}\` expects \`bobbingFrequencyWalk\` as a positive number.`);
+    }
+    if (typeof bobbingFrequencyRun !== "number" || bobbingFrequencyRun <= MINIMUM_POSITIVE_VALUE) {
+      throw new RangeError(`\`${controlsName}\` expects \`bobbingFrequencyRun\` as a positive number.`);
+    }
+    if (typeof bobbingPitchAmplitudeRadians !== "number" || bobbingPitchAmplitudeRadians < MINIMUM_NON_NEGATIVE_VALUE) {
+      throw new RangeError(`\`${controlsName}\` expects \`bobbingPitchAmplitudeRadians\` as a non-negative number.`);
+    }
+    this.#camera = camera;
+    this.#target = target;
+    this.#element = element;
+    this.#controlsName = controlsName;
+    this.#cameraConstructor = cameraConstructor;
+    this.#bobbingMode = bobbingMode;
+    this.#groundY = groundY;
+    this.#azimuthRadians = azimuthRadians;
+    this.#polarRadians = _KeyboardControls.#clamp(polarRadians, minPolarRadians, maxPolarRadians);
+    this.#minPolarRadians = minPolarRadians;
+    this.#maxPolarRadians = maxPolarRadians;
+    this.#rotationSpeed = rotationSpeed;
+    this.#moveSpeed = moveSpeed;
+    this.#runSpeedMultiplier = runSpeedMultiplier;
+    this.#jumpSpeed = jumpSpeed;
+    this.#gravity = gravity;
+    this.#bobbingAmplitudeWalk = bobbingAmplitudeWalk;
+    this.#bobbingAmplitudeRun = bobbingAmplitudeRun;
+    this.#bobbingFrequencyWalk = bobbingFrequencyWalk;
+    this.#bobbingFrequencyRun = bobbingFrequencyRun;
+    this.#bobbingPitchAmplitude = bobbingPitchAmplitudeRadians;
+    this.#element.style.touchAction = TOUCH_ACTION_NONE;
+    this.#initActionStates();
+    this.#onPointerDown = (event) => this.#handlePointerDown(event);
+    this.#onPointerMove = (event) => this.#handlePointerMove(event);
+    this.#onPointerUp = (event) => this.#handlePointerUp(event);
+    this.#onKeyDown = (event) => this.#handleKeyDown(event);
+    this.#onKeyUp = (event) => this.#handleKeyUp(event);
+    this.#onContextMenu = (event) => event.preventDefault();
+    this.#onBlur = () => this.#resetInputStates();
+    this.#addEventListeners();
+  }
+  /**
+   * Updates the controlled camera and target based on input and time delta.
+   *
+   * @param {number} deltaSeconds - Time delta in seconds.
+   */
+  update(deltaSeconds) {
+    if (typeof deltaSeconds !== "number" || Number.isFinite(deltaSeconds) !== true) {
+      throw new TypeError(`\`${this.#controlsName}.update\` expects \`deltaSeconds\` as a finite number.`);
+    }
+    const movement = this.#computeMovement(deltaSeconds);
+    this.#applyMovement(movement, deltaSeconds);
+    const cameraState = this.#computeCameraState(deltaSeconds, movement.isMoving);
+    this.applyCameraTransform(movement, cameraState, this.#camera, this.#target);
+  }
+  /**
+   * Enables or disables input listeners without destroying the controls.
+   *
+   * @param {boolean} enabled - True to enable input, false to disable.
+   */
+  setEnabled(enabled) {
+    if (typeof enabled !== "boolean") {
+      throw new TypeError(`\`${this.#controlsName}.setEnabled\` expects \`enabled\` as a boolean.`);
+    }
+    if (this.#isEnabled === enabled) {
+      return;
+    }
+    this.#isEnabled = enabled;
+    if (enabled) {
+      this.#addEventListeners();
+      return;
+    }
+    this.#removeEventListeners();
+    this.#capturedPointerId = POINTER_ID_RESET_VALUE2;
+    this.#resetInputStates();
+  }
+  /**
+   * Replaces the controlled camera.
+   *
+   * @param {Camera} camera - New controlled camera instance.
+   */
+  setCamera(camera) {
+    if (!(camera instanceof this.#cameraConstructor)) {
+      throw new TypeError(`\`${this.#controlsName}.setCamera\` expects a \`${this.#cameraConstructor.name}\` instance.`);
+    }
+    this.#camera = camera;
+  }
+  /**
+   * Replaces the target object.
+   *
+   * @param {Object3D} target - New target object.
+   */
+  setTarget(target) {
+    if (!(target instanceof Object3D)) {
+      throw new TypeError(`\`${this.#controlsName}.setTarget\` expects an \`Object3D\` instance.`);
+    }
+    this.#target = target;
+  }
+  /**
+   * Disposes the controller by removing all event listeners.
+   */
+  dispose() {
+    this.#removeEventListeners();
+    this.#capturedPointerId = POINTER_ID_RESET_VALUE2;
+    this.#resetInputStates();
+    this.#isEnabled = false;
+  }
+  /**
+   * Updates target rotation based on movement and orientation.
+   *
+   * @param {Object3D} target       - Controlled target.
+   * @param {MovementData} movement - Movement data.
+   * @param {number} azimuthRadians - Current yaw angle in radians.
+   */
+  updateTargetRotation(target, movement, azimuthRadians) {
+    if (!(target instanceof Object3D)) {
+      throw new TypeError(`\`${this.#controlsName}.updateTargetRotation\` expects \`target\` as an \`Object3D\` instance.`);
+    }
+    _KeyboardControls.assertMovementData(movement, `${this.#controlsName}.updateTargetRotation`);
+    if (typeof azimuthRadians !== "number") {
+      throw new TypeError(`\`${this.#controlsName}.updateTargetRotation\` expects \`azimuthRadians\` as a number.`);
+    }
+  }
+  /**
+   * Applies camera transforms for the active camera type.
+   *
+   * @param {MovementData} movement   - Movement data.
+   * @param {CameraState} cameraState - Derived camera state.
+   * @param {Camera} camera           - Controlled camera.
+   * @param {Object3D} target         - Controlled target.
+   */
+  applyCameraTransform(movement, cameraState, camera, target) {
+    _KeyboardControls.assertMovementData(movement, `${this.#controlsName}.applyCameraTransform`);
+    _KeyboardControls.assertCameraState(cameraState, `${this.#controlsName}.applyCameraTransform`);
+    if (!(camera instanceof this.#cameraConstructor)) {
+      throw new TypeError(`\`${this.#controlsName}.applyCameraTransform\` expects \`camera\` as a \`${this.#cameraConstructor.name}\` instance.`);
+    }
+    if (!(target instanceof Object3D)) {
+      throw new TypeError(`\`${this.#controlsName}.applyCameraTransform\` expects \`target\` as an \`Object3D\` instance.`);
+    }
+    throw new Error("`KeyboardControls.applyCameraTransform` must be implemented in a derived class.");
+  }
+  /**
+   * Initializes action state registry.
+   *
+   * @private
+   */
+  #initActionStates() {
+    const actionValues = Object.values(ACTIONS);
+    for (let index = LOOP_START_INDEX; index < actionValues.length; index += LOOP_INDEX_INCREMENT) {
+      this.#actionStates.set(actionValues[index], false);
+    }
+  }
+  /**
+   * Clears all action states.
+   *
+   * @private
+   */
+  #resetInputStates() {
+    const entries = this.#actionStates.entries();
+    for (const [action] of entries) {
+      this.#actionStates.set(action, false);
+    }
+  }
+  /**
+   * Adds input event listeners.
+   *
+   * @private
+   */
+  #addEventListeners() {
+    this.#element.addEventListener(EVENT_POINTERDOWN, this.#onPointerDown);
+    window.addEventListener(EVENT_POINTERMOVE, this.#onPointerMove);
+    window.addEventListener(EVENT_POINTERUP, this.#onPointerUp);
+    window.addEventListener(EVENT_KEYDOWN, this.#onKeyDown);
+    window.addEventListener(EVENT_KEYUP, this.#onKeyUp);
+    this.#element.addEventListener(EVENT_CONTEXT_MENU, this.#onContextMenu);
+    window.addEventListener(EVENT_WINDOW_BLUR, this.#onBlur);
+  }
+  /**
+   * Removes input event listeners.
+   *
+   * @private
+   */
+  #removeEventListeners() {
+    this.#element.removeEventListener(EVENT_POINTERDOWN, this.#onPointerDown);
+    window.removeEventListener(EVENT_POINTERMOVE, this.#onPointerMove);
+    window.removeEventListener(EVENT_POINTERUP, this.#onPointerUp);
+    window.removeEventListener(EVENT_KEYDOWN, this.#onKeyDown);
+    window.removeEventListener(EVENT_KEYUP, this.#onKeyUp);
+    this.#element.removeEventListener(EVENT_CONTEXT_MENU, this.#onContextMenu);
+    window.removeEventListener(EVENT_WINDOW_BLUR, this.#onBlur);
+  }
+  /**
+   * Computes movement intent from the current action states.
+   *
+   * @param {number} deltaSeconds - Time delta in seconds.
+   * @returns {MovementData}
+   * @private
+   */
+  #computeMovement(deltaSeconds) {
+    const forwardInput = this.#getActionValue(ACTIONS.FORWARD, ACTIONS.BACKWARD);
+    const rightInput = this.#getActionValue(ACTIONS.RIGHT, ACTIONS.LEFT);
+    const inputLength = Math.hypot(forwardInput, rightInput);
+    const isMoving = inputLength > INPUT_EPSILON;
+    const speedScale = this.#actionStates.get(ACTIONS.RUN) ? this.#runSpeedMultiplier : SPEED_SCALE_DEFAULT;
+    const speed = this.#moveSpeed * speedScale * deltaSeconds;
+    if (!isMoving) {
+      return {
+        moveX: INPUT_NONE,
+        moveZ: INPUT_NONE,
+        isMoving: false,
+        speed
+      };
+    }
+    const normalizedForward = forwardInput / inputLength;
+    const normalizedRight = rightInput / inputLength;
+    const yawSin = Math.sin(this.#azimuthRadians);
+    const yawCos = Math.cos(this.#azimuthRadians);
+    const forwardX = -yawSin;
+    const forwardZ = -yawCos;
+    const rightX = yawCos;
+    const rightZ = -yawSin;
+    const moveX = (forwardX * normalizedForward + rightX * normalizedRight) * speed;
+    const moveZ = (forwardZ * normalizedForward + rightZ * normalizedRight) * speed;
+    return {
+      moveX,
+      moveZ,
+      isMoving: true,
+      speed
+    };
+  }
+  /**
+   * Applies movement and jump physics to the target.
+   *
+   * @param {MovementData} movement - Movement data.
+   * @param {number} deltaSeconds   - Time delta in seconds.
+   * @private
+   */
+  #applyMovement(movement, deltaSeconds) {
+    _KeyboardControls.assertMovementData(movement, `${this.#controlsName}.#applyMovement`);
+    if (typeof deltaSeconds !== "number" || Number.isFinite(deltaSeconds) !== true) {
+      throw new TypeError(`\`${this.#controlsName}.#applyMovement\` expects \`deltaSeconds\` as a finite number.`);
+    }
+    const targetPosition = this.#target.position;
+    targetPosition.x += movement.moveX;
+    targetPosition.z += movement.moveZ;
+    this.updateTargetRotation(this.#target, movement, this.#azimuthRadians);
+    if (this.#actionStates.get(ACTIONS.JUMP) && this.#isGrounded) {
+      this.#verticalVelocity = this.#jumpSpeed;
+      this.#isGrounded = false;
+    }
+    if (!this.#isGrounded) {
+      this.#verticalVelocity -= this.#gravity * deltaSeconds;
+      targetPosition.y += this.#verticalVelocity * deltaSeconds;
+      if (targetPosition.y <= this.#groundY) {
+        targetPosition.y = this.#groundY;
+        this.#verticalVelocity = INPUT_NONE;
+        this.#isGrounded = true;
+      }
+    }
+  }
+  /**
+   * Computes bobbing offsets and pitch for the current frame.
+   *
+   * @param {number} deltaSeconds - Time delta in seconds.
+   * @param {boolean} isMoving    - True when target is moving.
+   * @returns {CameraState}
+   * @private
+   */
+  #computeCameraState(deltaSeconds, isMoving) {
+    if (typeof deltaSeconds !== "number" || Number.isFinite(deltaSeconds) !== true) {
+      throw new TypeError(`\`${this.#controlsName}.#computeCameraState\` expects \`deltaSeconds\` as a finite number.`);
+    }
+    if (typeof isMoving !== "boolean") {
+      throw new TypeError(`\`${this.#controlsName}.#computeCameraState\` expects \`isMoving\` as a boolean.`);
+    }
+    let bobbingOffset = INPUT_NONE;
+    let bobbingPitch = INPUT_NONE;
+    if (this.#bobbingMode && this.#camera.mode === this.#bobbingMode && isMoving) {
+      const isRunning = this.#actionStates.get(ACTIONS.RUN);
+      const frequency = isRunning ? this.#bobbingFrequencyRun : this.#bobbingFrequencyWalk;
+      const amplitude = isRunning ? this.#bobbingAmplitudeRun : this.#bobbingAmplitudeWalk;
+      this.#bobbingPhase += frequency * deltaSeconds;
+      this.#bobbingOffset = Math.sin(this.#bobbingPhase) * amplitude;
+      bobbingOffset = this.#bobbingOffset;
+      bobbingPitch = Math.sin(this.#bobbingPhase) * this.#bobbingPitchAmplitude;
+    } else {
+      this.#bobbingPhase = INPUT_NONE;
+      this.#bobbingOffset = INPUT_NONE;
+    }
+    return {
+      azimuthRadians: this.#azimuthRadians,
+      polarRadians: this.#polarRadians,
+      bobbingOffset,
+      bobbingPitch
+    };
+  }
+  /**
+   * Returns a signed input value based on forward/backward action states.
+   *
+   * @param {string} positiveAction - Action mapped to `+1`.
+   * @param {string} negativeAction - Action mapped to `-1`.
+   * @returns {number}              - Input value in range [-1, 1].
+   * @private
+   */
+  #getActionValue(positiveAction, negativeAction) {
+    const positive = this.#actionStates.get(positiveAction) ? INPUT_FORWARD : INPUT_NONE;
+    const negative = this.#actionStates.get(negativeAction) ? INPUT_BACKWARD : INPUT_NONE;
+    return positive + negative;
+  }
+  /**
+   * @param {PointerEvent} event - Pointer event.
+   * @private
+   */
+  #handlePointerDown(event) {
+    if (event === null || typeof event !== "object") {
+      throw new TypeError(`\`${this.#controlsName}.#handlePointerDown\` expects \`event\` as an object.`);
+    }
+    if (event.button !== ROTATE_POINTER_BUTTON) {
+      return;
+    }
+    if (this.#capturedPointerId !== POINTER_ID_RESET_VALUE2) {
+      return;
+    }
+    this.#capturedPointerId = event.pointerId;
+    this.#previousPointerX = event.clientX;
+    this.#previousPointerY = event.clientY;
+    this.#element.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  }
+  /**
+   * @param {PointerEvent} event - Pointer event.
+   * @private
+   */
+  #handlePointerMove(event) {
+    if (event === null || typeof event !== "object") {
+      throw new TypeError(`\`${this.#controlsName}.#handlePointerMove\` expects \`event\` as an object.`);
+    }
+    if (event.pointerId !== this.#capturedPointerId) {
+      return;
+    }
+    const deltaX = event.clientX - this.#previousPointerX;
+    const deltaY = event.clientY - this.#previousPointerY;
+    this.#previousPointerX = event.clientX;
+    this.#previousPointerY = event.clientY;
+    const rotationStep = ROTATION_RADIANS_PER_PIXEL2 * this.#rotationSpeed;
+    this.#azimuthRadians -= deltaX * rotationStep;
+    this.#polarRadians -= deltaY * rotationStep;
+    this.#polarRadians = _KeyboardControls.#clamp(
+      this.#polarRadians,
+      this.#minPolarRadians,
+      this.#maxPolarRadians
+    );
+    event.preventDefault();
+  }
+  /**
+   * @param {PointerEvent} event - Pointer event.
+   * @private
+   */
+  #handlePointerUp(event) {
+    if (event === null || typeof event !== "object") {
+      throw new TypeError(`\`${this.#controlsName}.#handlePointerUp\` expects \`event\` as an object.`);
+    }
+    if (event.pointerId !== this.#capturedPointerId) {
+      return;
+    }
+    this.#capturedPointerId = POINTER_ID_RESET_VALUE2;
+    event.preventDefault();
+  }
+  /**
+   * @param {KeyboardEvent} event - Keyboard event.
+   * @private
+   */
+  #handleKeyDown(event) {
+    if (event === null || typeof event !== "object") {
+      throw new TypeError(`\`${this.#controlsName}.#handleKeyDown\` expects \`event\` as an object.`);
+    }
+    const action = _KeyboardControls.#mapEventToAction(event);
+    if (!action) {
+      return;
+    }
+    this.#actionStates.set(action, true);
+    event.preventDefault();
+  }
+  /**
+   * @param {KeyboardEvent} event - Keyboard event.
+   * @private
+   */
+  #handleKeyUp(event) {
+    if (event === null || typeof event !== "object") {
+      throw new TypeError(`\`${this.#controlsName}.#handleKeyUp\` expects \`event\` as an object.`);
+    }
+    const action = _KeyboardControls.#mapEventToAction(event);
+    if (!action) {
+      return;
+    }
+    this.#actionStates.set(action, false);
+    event.preventDefault();
+  }
+  /**
+   * Maps keyboard events to action constants.
+   *
+   * @param {KeyboardEvent} event - Keyboard event.
+   * @returns {string | null}     - Action id or null if not mapped.
+   * @private
+   */
+  static #mapEventToAction(event) {
+    if (event === null || typeof event !== "object") {
+      throw new TypeError("`KeyboardControls.#mapEventToAction` expects `event` as an object.");
+    }
+    if (typeof event.code === "string" && event.code.length > EMPTY_STRING_LENGTH) {
+      return _KeyboardControls.#mapCodeToAction(event.code);
+    }
+    if (typeof event.key === "string" && event.key.length > EMPTY_STRING_LENGTH) {
+      return _KeyboardControls.#mapKeyToAction(event.key);
+    }
+    return null;
+  }
+  /**
+   * Maps `KeyboardEvent.key` values to actions.
+   *
+   * @param {string} key      - `KeyboardEvent.key` value.
+   * @returns {string | null} - Action id or null, if not mapped.
+   * @private
+   */
+  static #mapKeyToAction(key) {
+    if (typeof key !== "string") {
+      throw new TypeError("`KeyboardControls.#mapKeyToAction` expects `key` as a string.");
+    }
+    switch (key.toLowerCase()) {
+      case KEY_VALUES.FORWARD:
+        return ACTIONS.FORWARD;
+      case KEY_VALUES.BACKWARD:
+        return ACTIONS.BACKWARD;
+      case KEY_VALUES.LEFT:
+        return ACTIONS.LEFT;
+      case KEY_VALUES.RIGHT:
+        return ACTIONS.RIGHT;
+      case KEY_VALUES.RUN:
+        return ACTIONS.RUN;
+      case KEY_VALUES.JUMP:
+      case KEY_VALUES.SPACEBAR:
+        return ACTIONS.JUMP;
+      default:
+        return null;
+    }
+  }
+  /**
+   * Maps `KeyboardEvent.code` values to actions.
+   *
+   * @param {string} code - KeyboardEvent.code value.
+   * @returns {string | null}
+   * @private
+   */
+  static #mapCodeToAction(code) {
+    if (typeof code !== "string") {
+      throw new TypeError("`KeyboardControls.#mapCodeToAction` expects `code` as a string.");
+    }
+    switch (code) {
+      case KEY_CODES.FORWARD:
+        return ACTIONS.FORWARD;
+      case KEY_CODES.BACKWARD:
+        return ACTIONS.BACKWARD;
+      case KEY_CODES.LEFT:
+        return ACTIONS.LEFT;
+      case KEY_CODES.RIGHT:
+        return ACTIONS.RIGHT;
+      case KEY_CODES.RUN:
+        return ACTIONS.RUN;
+      case KEY_CODES.JUMP:
+        return ACTIONS.JUMP;
+      default:
+        return null;
+    }
+  }
+  /**
+   * @param {number} value - Value to clamp.
+   * @param {number} min   - Inclusive lower bound.
+   * @param {number} max   - Inclusive upper bound.
+   * @returns {number}     - Clamped value.
+   * @private
+   */
+  static #clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+  /**
+   * @param {unknown} movement - Candidate movement data.
+   * @param {string} context   - Error message context.
+   * @returns {void}
+   * @throws {TypeError} When `movement` does not match {@link MovementData}.
+   */
+  static assertMovementData(movement, context) {
+    if (movement === null || typeof movement !== "object" || Array.isArray(movement)) {
+      throw new TypeError(`\`${context}\` expects \`movement\` as an object.`);
+    }
+    if (typeof movement.moveX !== "number" || typeof movement.moveZ !== "number") {
+      throw new TypeError(`\`${context}\` expects \`movement.moveX\` and \`movement.moveZ\` as numbers.`);
+    }
+    if (typeof movement.isMoving !== "boolean") {
+      throw new TypeError(`\`${context}\` expects \`movement.isMoving\` as a boolean.`);
+    }
+    if (typeof movement.speed !== "number") {
+      throw new TypeError(`\`${context}\` expects \`movement.speed\` as a number.`);
+    }
+  }
+  /**
+   * @param {unknown} cameraState - Candidate camera state.
+   * @param {string} context      - Error message context.
+   * @returns {void}
+   * @throws {TypeError} When `cameraState` does not match {@link CameraState}.
+   */
+  static assertCameraState(cameraState, context) {
+    if (cameraState === null || typeof cameraState !== "object" || Array.isArray(cameraState)) {
+      throw new TypeError(`\`${context}\` expects \`cameraState\` as an object.`);
+    }
+    if (typeof cameraState.azimuthRadians !== "number" || typeof cameraState.polarRadians !== "number") {
+      throw new TypeError(`\`${context}\` expects \`cameraState.azimuthRadians\` and \`cameraState.polarRadians\` as numbers.`);
+    }
+    if (typeof cameraState.bobbingOffset !== "number" || typeof cameraState.bobbingPitch !== "number") {
+      throw new TypeError(`\`${context}\` expects \`cameraState.bobbingOffset\` and \`cameraState.bobbingPitch\` as numbers.`);
+    }
+  }
+};
+
+// core/controls/first-person-controls.js
+var DEFAULT_EYE_HEIGHT = 1.6;
+var DEFAULT_FIRST_PERSON_POLAR_RADIANS = 0;
+var DEFAULT_FIRST_PERSON_MIN_POLAR_RADIANS = -1.35;
+var DEFAULT_FIRST_PERSON_MAX_POLAR_RADIANS = 1.35;
+var DEFAULT_CAMERA_ROLL_RADIANS2 = 0;
+var DEFAULT_CONTROLS_NAME = "FirstPersonControls";
+var FirstPersonControls = class extends KeyboardControls {
+  /**
+   * Eye height above the target.
+   *
+   * @type {number}
+   * @private
+   */
+  #eyeHeight;
+  /**
+   * @param {FirstPersonCamera} camera                                       - Controlled first-person camera.
+   * @param {Object3D} target                                                - Target object, that the camera follows.
+   * @param {HTMLElement} element                                            - DOM element, that receives pointer input.
+   * @param {(KeyboardControlsOptions|FirstPersonControlsOptions)} [options] - Optional controls configuration.
+   */
+  constructor(camera, target, element, options = {}) {
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("`FirstPersonControls` expects `options` as a plain object.");
+    }
+    if (!(camera instanceof FirstPersonCamera)) {
+      throw new TypeError("`FirstPersonControls` expects `camera` as a `FirstPersonCamera` instance.");
+    }
+    if (!(target instanceof Object3D)) {
+      throw new TypeError("`FirstPersonControls` expects `target` as an `Object3D` instance.");
+    }
+    if (!(element instanceof HTMLElement)) {
+      throw new TypeError("`FirstPersonControls` expects `element` as an `HTMLElement`.");
+    }
+    const {
+      eyeHeight = DEFAULT_EYE_HEIGHT,
+      polarRadians = DEFAULT_FIRST_PERSON_POLAR_RADIANS,
+      minPolarRadians = DEFAULT_FIRST_PERSON_MIN_POLAR_RADIANS,
+      maxPolarRadians = DEFAULT_FIRST_PERSON_MAX_POLAR_RADIANS
+    } = options;
+    if (typeof eyeHeight !== "number" || eyeHeight <= 0) {
+      throw new RangeError("`FirstPersonControls` expects `eyeHeight` as a positive number.");
+    }
+    if (typeof polarRadians !== "number") {
+      throw new TypeError("`FirstPersonControls` expects `polarRadians` as a number.");
+    }
+    if (typeof minPolarRadians !== "number" || typeof maxPolarRadians !== "number") {
+      throw new TypeError("`FirstPersonControls` expects `minPolarRadians` and `maxPolarRadians` as numbers.");
+    }
+    if (minPolarRadians > maxPolarRadians) {
+      throw new RangeError("`FirstPersonControls` expects `minPolarRadians` to be <= `maxPolarRadians`.");
+    }
+    super(camera, target, element, {
+      ...options,
+      polarRadians,
+      minPolarRadians,
+      maxPolarRadians
+    }, {
+      cameraConstructor: FirstPersonCamera,
+      controlsName: DEFAULT_CONTROLS_NAME,
+      bobbingMode: FirstPersonCamera.Modes.BOBBING
+    });
+    this.#eyeHeight = eyeHeight;
+  }
+  /**
+   * @override
+   * @param {Object3D} target       - Controlled target.
+   * @param {MovementData} movement - Movement data.
+   * @param {number} azimuthRadians - Current yaw angle in radians.
+   */
+  updateTargetRotation(target, movement, azimuthRadians) {
+    if (!(target instanceof Object3D)) {
+      throw new TypeError("`FirstPersonControls.updateTargetRotation` expects `target` as an `Object3D` instance.");
+    }
+    KeyboardControls.assertMovementData(movement);
+    if (typeof azimuthRadians !== "number") {
+      throw new TypeError("`FirstPersonControls.updateTargetRotation` expects `azimuthRadians` as a number.");
+    }
+    target.rotation.y = azimuthRadians;
+  }
+  /**
+   * @override
+   * @param {MovementData} movement    - Movement data.
+   * @param {CameraState} cameraState  - Derived camera state.
+   * @param {FirstPersonCamera} camera - Controlled camera.
+   * @param {Object3D} target          - Controlled target.
+   */
+  applyCameraTransform(movement, cameraState, camera, target) {
+    KeyboardControls.assertMovementData(movement);
+    KeyboardControls.assertCameraState(cameraState);
+    if (!(camera instanceof FirstPersonCamera)) {
+      throw new TypeError("`FirstPersonControls.applyCameraTransform` expects `camera` as a `FirstPersonCamera` instance.");
+    }
+    if (!(target instanceof Object3D)) {
+      throw new TypeError("`FirstPersonControls.applyCameraTransform` expects `target` as an `Object3D` instance.");
+    }
+    const targetPosition = target.position;
+    camera.position.set(
+      targetPosition.x,
+      targetPosition.y + this.#eyeHeight + cameraState.bobbingOffset,
+      targetPosition.z
+    );
+    camera.rotation.set(
+      cameraState.polarRadians + cameraState.bobbingPitch,
+      cameraState.azimuthRadians,
+      DEFAULT_CAMERA_ROLL_RADIANS2
+    );
+  }
+};
+
+// core/controls/third-person-controls.js
+var DEFAULT_DISTANCE2 = 6;
+var DEFAULT_TARGET_HEIGHT = 1.4;
+var DEFAULT_CAMERA_ROLL_RADIANS3 = 0;
+var MINIMUM_POSITIVE_VALUE2 = 0;
+var DEFAULT_CONTROLS_NAME2 = "ThirdPersonControls";
+var ThirdPersonControls = class extends KeyboardControls {
+  /**
+   * Camera follow distance.
+   *
+   * @type {number}
+   * @private
+   */
+  #distance;
+  /**
+   * Look-at height offset from the target.
+   *
+   * @type {number}
+   * @private
+   */
+  #targetHeight;
+  /**
+   * @param {ThirdPersonCamera} camera                                       - Controlled third-person camera.
+   * @param {Object3D} target                                                - Target object, that the camera follows.
+   * @param {HTMLElement} element                                            - DOM element, that receives pointer input.
+   * @param {(KeyboardControlsOptions|ThirdPersonControlsOptions)} [options] - Optional controls configuration.
+   */
+  constructor(camera, target, element, options = {}) {
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("`ThirdPersonControls` expects `options` as a plain object.");
+    }
+    if (!(camera instanceof ThirdPersonCamera)) {
+      throw new TypeError("`ThirdPersonControls` expects `camera` as a `ThirdPersonCamera` instance.");
+    }
+    if (!(target instanceof Object3D)) {
+      throw new TypeError("`ThirdPersonControls` expects `target` as an `Object3D` instance.");
+    }
+    if (!(element instanceof HTMLElement)) {
+      throw new TypeError("`ThirdPersonControls` expects `element` as an `HTMLElement`.");
+    }
+    const {
+      distance = DEFAULT_DISTANCE2,
+      targetHeight = DEFAULT_TARGET_HEIGHT
+    } = options;
+    if (typeof distance !== "number" || distance <= MINIMUM_POSITIVE_VALUE2) {
+      throw new RangeError("`ThirdPersonControls` expects `distance` as a positive number.");
+    }
+    if (typeof targetHeight !== "number") {
+      throw new TypeError("`ThirdPersonControls` expects `targetHeight` as a number.");
+    }
+    super(camera, target, element, options, {
+      cameraConstructor: ThirdPersonCamera,
+      controlsName: DEFAULT_CONTROLS_NAME2,
+      bobbingMode: ThirdPersonCamera.Modes.BOBBING
+    });
+    this.#distance = distance;
+    this.#targetHeight = targetHeight;
+  }
+  /**
+   * @override
+   * @param {Object3D} target       - Controlled target.
+   * @param {MovementData} movement - Movement data.
+   * @param {number} azimuthRadians - Current yaw angle in radians.
+   */
+  updateTargetRotation(target, movement, azimuthRadians) {
+    if (!(target instanceof Object3D)) {
+      throw new TypeError("`ThirdPersonControls.updateTargetRotation` expects `target` as an `Object3D` instance.");
+    }
+    KeyboardControls.assertMovementData(movement);
+    if (typeof azimuthRadians !== "number") {
+      throw new TypeError("`ThirdPersonControls.updateTargetRotation` expects `azimuthRadians` as a number.");
+    }
+    if (!movement.isMoving) {
+      return;
+    }
+    const rotationY = Math.atan2(movement.moveX, movement.moveZ);
+    target.rotation.y = rotationY;
+  }
+  /**
+   * @override
+   * @param {MovementData} movement    - Movement data.
+   * @param {CameraState} cameraState  - Derived camera state.
+   * @param {ThirdPersonCamera} camera - Controlled camera.
+   * @param {Object3D} target          - Controlled target.
+   */
+  applyCameraTransform(movement, cameraState, camera, target) {
+    KeyboardControls.assertMovementData(movement);
+    KeyboardControls.assertCameraState(cameraState);
+    if (!(camera instanceof ThirdPersonCamera)) {
+      throw new TypeError("`ThirdPersonControls.applyCameraTransform` expects `camera` as a `ThirdPersonCamera` instance.");
+    }
+    if (!(target instanceof Object3D)) {
+      throw new TypeError("`ThirdPersonControls.applyCameraTransform` expects `target` as an `Object3D` instance.");
+    }
+    const targetPosition = target.position;
+    const targetX = targetPosition.x;
+    const targetY = targetPosition.y + this.#targetHeight;
+    const targetZ = targetPosition.z;
+    const cosPolar = Math.cos(cameraState.polarRadians);
+    const sinPolar = Math.sin(cameraState.polarRadians);
+    const sinAzimuth = Math.sin(cameraState.azimuthRadians);
+    const cosAzimuth = Math.cos(cameraState.azimuthRadians);
+    const cameraX = targetX + sinAzimuth * cosPolar * this.#distance;
+    const cameraY = targetY - sinPolar * this.#distance + cameraState.bobbingOffset;
+    const cameraZ = targetZ + cosAzimuth * cosPolar * this.#distance;
+    camera.position.set(cameraX, cameraY, cameraZ);
+    camera.rotation.set(
+      cameraState.polarRadians + cameraState.bobbingPitch,
+      cameraState.azimuthRadians,
+      DEFAULT_CAMERA_ROLL_RADIANS3
+    );
+  }
+};
+
 // core/library.js
 var GeraWebGL = Object.freeze({
   Engine,
@@ -7317,6 +8825,8 @@ var GeraWebGL = Object.freeze({
   Camera,
   PerspectiveCamera,
   OrthographicCamera,
+  FirstPersonCamera,
+  ThirdPersonCamera,
   Object3D,
   Mesh,
   // Grouped namespaces:
@@ -7349,7 +8859,10 @@ var GeraWebGL = Object.freeze({
     PhongMaterial
   }),
   Controls: Object.freeze({
-    OrbitControls
+    OrbitControls,
+    KeyboardControls,
+    ThirdPersonControls,
+    FirstPersonControls
   }),
   Loaders: Object.freeze({
     ObjMtlLoader

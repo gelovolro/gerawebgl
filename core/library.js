@@ -26,11 +26,16 @@ import { Scene }                    from './scene/scene.js';
 import { Camera }                   from './scene/camera.js';
 import { PerspectiveCamera }        from './scene/perspective-camera.js';
 import { OrthographicCamera }       from './scene/orthographic-camera.js';
-import { OrbitControls }            from './controls/orbit-controls.js';
+import { FirstPersonCamera }        from './scene/first-person-camera.js';
+import { ThirdPersonCamera }        from './scene/third-person-camera.js';
 import { Renderer }                 from './render/renderer.js';
 import { Engine, createEngine }     from './engine/engine.js';
 import { FpsCounter }               from './debug/fps-counter.js';
 import { ObjMtlLoader }             from './loader/obj-mtl-loader.js';
+import { OrbitControls }            from './controls/orbit-controls.js';
+import { KeyboardControls }         from './controls/keyboard-controls.js';
+import { FirstPersonControls }      from './controls/first-person-controls.js';
+import { ThirdPersonControls }      from './controls/third-person-controls.js';
 
 /**
  * Main public API namespace.
@@ -55,6 +60,8 @@ export const GeraWebGL = Object.freeze({
     Camera,
     PerspectiveCamera,
     OrthographicCamera,
+    FirstPersonCamera,
+    ThirdPersonCamera,
     Object3D,
     Mesh,
 
@@ -92,7 +99,10 @@ export const GeraWebGL = Object.freeze({
     }),
 
     Controls: Object.freeze({
-        OrbitControls
+        OrbitControls,
+        KeyboardControls,
+        ThirdPersonControls,
+        FirstPersonControls
     }),
 
     Loaders: Object.freeze({
