@@ -2965,6 +2965,459 @@ var PyramidGeometry = class _PyramidGeometry extends Geometry {
   }
 };
 
+// core/geometry/heightmap-geometry.js
+var DEFAULT_HEIGHTMAP_WIDTH = 1;
+var DEFAULT_HEIGHTMAP_DEPTH = 1;
+var DEFAULT_HEIGHT_SCALE = 1;
+var DEFAULT_HEIGHT_OFFSET = 0;
+var DEFAULT_SEGMENTS_X = 1;
+var DEFAULT_SEGMENTS_Z = 1;
+var MIN_SEGMENT_COUNT5 = 1;
+var MIN_POSITIVE_VALUE = 0;
+var DEFAULT_WIREFRAME_STATE = false;
+var DEFAULT_FLIP_Y = true;
+var SAMPLING_NEAREST = "nearest";
+var SAMPLING_BILINEAR = "bilinear";
+var DEFAULT_SAMPLING = SAMPLING_NEAREST;
+var DEFAULT_TERRAIN_COLOR_RED = 0.18;
+var DEFAULT_TERRAIN_COLOR_GREEN = 0.65;
+var DEFAULT_TERRAIN_COLOR_BLUE = 0.28;
+var DEFAULT_TERRAIN_COLOR = new Float32Array([
+  DEFAULT_TERRAIN_COLOR_RED,
+  DEFAULT_TERRAIN_COLOR_GREEN,
+  DEFAULT_TERRAIN_COLOR_BLUE
+]);
+var VERTICES_PER_SEGMENT_INCREMENT7 = 1;
+var NEXT_VERTEX_OFFSET6 = 1;
+var CENTER_T_OFFSET4 = 0.5;
+var VECTOR_COMPONENTS_3 = 3;
+var UV_COMPONENTS_2 = 2;
+var X_INDEX = 0;
+var Y_INDEX = 1;
+var Z_INDEX = 2;
+var U_INDEX = 0;
+var V_INDEX = 1;
+var TRIANGLE_INDEX_STRIDE2 = 3;
+var BYTES_PER_PIXEL = 4;
+var RED_CHANNEL_OFFSET = 0;
+var MAX_CHANNEL_VALUE = 255;
+var CANVAS_TAG_NAME = "canvas";
+var CANVAS_CONTEXT_2D = "2d";
+var MIN_REQUIRED_STRING_LENGTH = 1;
+var ZERO_VALUE5 = 0;
+var ONE_VALUE3 = 1;
+var ERROR_OPTIONS_PLAIN_OBJECT = "`HeightmapGeometry` expects options as a plain object.";
+var ERROR_WEBGL_CONTEXT = "`HeightmapGeometry` expects `webglContext` as a `WebGL2RenderingContext`.";
+var ERROR_HEIGHTMAP_IMAGE_DATA = "`HeightmapGeometry` expects `heightmapImageData` as an `ImageData` instance or a `HeightmapSource` with `imageData`.";
+var HEIGHTMAP_SOURCE_IMAGE_DATA_FIELD = "imageData";
+var ERROR_SIZE_VALUES = "`HeightmapGeometry` expects `width` and `depth` as positive numbers.";
+var ERROR_HEIGHT_SCALE_VALUE = "`HeightmapGeometry` expects `heightScale` as a positive number.";
+var ERROR_HEIGHT_OFFSET_VALUE = "`HeightmapGeometry` expects `heightOffset` as a finite number.";
+var ERROR_COLORS_BUFFER = "`HeightmapGeometry` expects `colors` as a `Float32Array`.";
+var ERROR_FLIP_Y_VALUE = "`HeightmapGeometry` expects `flipY` as a boolean.";
+var ERROR_WIREFRAME_VALUE = "`HeightmapGeometry` expects `isWireframe` as a boolean.";
+var ERROR_SAMPLING_VALUE = "`HeightmapGeometry` expects `sampling` to be a supported string value.";
+var ERROR_SEGMENT_VALUE = "`HeightmapGeometry` expects `{name}` to be a finite number.";
+var ERROR_SEGMENT_RANGE = "`HeightmapGeometry` expects `{name}` to be `>= {min}`.";
+var ERROR_LOAD_URL = "`HeightmapGeometry.loadFromUrl` expects url as a non-empty string.";
+var ERROR_LOAD_OPTIONS = "`HeightmapGeometry.loadFromUrl` expects options as a plain object.";
+var ERROR_CANVAS_CONTEXT = "`HeightmapGeometry.loadFromUrl` failed to acquire a 2D canvas context.";
+var ERROR_LOAD_IMAGE_PREFIX = "Failed to load the heightmap image: ";
+var SEGMENTS_X_OPTION_NAME = "segmentsX";
+var SEGMENTS_Z_OPTION_NAME = "segmentsZ";
+var IMAGE_CROSS_ORIGIN_ANON = "anonymous";
+var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
+  /**
+   * Wireframe hint for consumers.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #isWireframe;
+  /**
+   * @param {WebGL2RenderingContext} webglContext          - WebGL2 rendering context.
+   * @param {ImageData|HeightmapSource} heightmapImageData - Heightmap image data (grayscale) or a wrapped source.
+   * @param {HeightmapGeometryOptions} [options={}]        - Geometry options.
+   */
+  constructor(webglContext, heightmapImageData, options = {}) {
+    if (!(webglContext instanceof WebGL2RenderingContext)) {
+      throw new TypeError(ERROR_WEBGL_CONTEXT);
+    }
+    const imageData = _HeightmapGeometry.#normalizeHeightmapImageData(heightmapImageData);
+    const normalized = _HeightmapGeometry.#normalizeOptions(options);
+    const data = _HeightmapGeometry.#createGeometryData(imageData, normalized);
+    super(
+      webglContext,
+      data.positions,
+      data.colors,
+      data.indicesSolid,
+      data.indicesWireframe,
+      data.uvs,
+      data.normals
+    );
+    this.#isWireframe = normalized.isWireframe;
+  }
+  /**
+   * Returns the wireframe hint value from construction options.
+   *
+   * @returns {boolean}
+   */
+  get isWireframe() {
+    return this.#isWireframe;
+  }
+  /**
+   * Loads heightmap image data from a URL and returns a new `HeightmapGeometry`.
+   *
+   * @param {WebGL2RenderingContext} webglContext   - WebGL2 rendering context.
+   * @param {string} url                            - Image URL (relative or absolute).
+   * @param {HeightmapGeometryOptions} [options={}] - Geometry options.
+   * @returns {Promise<HeightmapGeometry>}          - Promise, that resolves with created geometry.
+   */
+  static async loadFromUrl(webglContext, url, options = {}) {
+    if (!(webglContext instanceof WebGL2RenderingContext)) {
+      throw new TypeError(ERROR_WEBGL_CONTEXT);
+    }
+    if (typeof url !== "string" || url.length < MIN_REQUIRED_STRING_LENGTH) {
+      throw new TypeError(ERROR_LOAD_URL);
+    }
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError(ERROR_LOAD_OPTIONS);
+    }
+    const image = await _HeightmapGeometry.#loadImage(url);
+    const imageData = _HeightmapGeometry.#createImageData(image);
+    return new _HeightmapGeometry(webglContext, imageData, options);
+  }
+  /**
+   * Normalizes constructor input to a `HeightmapGeometryOptions` object.
+   *
+   * @param {HeightmapGeometryOptions} options     - Options object.
+   * @returns {Required<HeightmapGeometryOptions>} - Normalized options.
+   * @private
+   */
+  static #normalizeOptions(options) {
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError(ERROR_OPTIONS_PLAIN_OBJECT);
+    }
+    const {
+      width = DEFAULT_HEIGHTMAP_WIDTH,
+      depth = DEFAULT_HEIGHTMAP_DEPTH,
+      heightScale = DEFAULT_HEIGHT_SCALE,
+      heightOffset = DEFAULT_HEIGHT_OFFSET,
+      segmentsX = DEFAULT_SEGMENTS_X,
+      segmentsZ = DEFAULT_SEGMENTS_Z,
+      isWireframe = DEFAULT_WIREFRAME_STATE,
+      colors = DEFAULT_TERRAIN_COLOR,
+      flipY = DEFAULT_FLIP_Y,
+      sampling = DEFAULT_SAMPLING
+    } = options;
+    if (typeof width !== "number" || typeof depth !== "number" || !Number.isFinite(width) || !Number.isFinite(depth) || width <= MIN_POSITIVE_VALUE || depth <= MIN_POSITIVE_VALUE) {
+      throw new RangeError(ERROR_SIZE_VALUES);
+    }
+    if (typeof heightScale !== "number" || !Number.isFinite(heightScale) || heightScale <= MIN_POSITIVE_VALUE) {
+      throw new RangeError(ERROR_HEIGHT_SCALE_VALUE);
+    }
+    if (typeof heightOffset !== "number" || !Number.isFinite(heightOffset)) {
+      throw new RangeError(ERROR_HEIGHT_OFFSET_VALUE);
+    }
+    if (!(colors instanceof Float32Array)) {
+      throw new TypeError(ERROR_COLORS_BUFFER);
+    }
+    if (typeof flipY !== "boolean") {
+      throw new TypeError(ERROR_FLIP_Y_VALUE);
+    }
+    if (typeof isWireframe !== "boolean") {
+      throw new TypeError(ERROR_WIREFRAME_VALUE);
+    }
+    const normalizedSampling = _HeightmapGeometry.#normalizeSampling(sampling);
+    return {
+      width,
+      depth,
+      heightScale,
+      heightOffset,
+      segmentsX: _HeightmapGeometry.#normalizeSegmentCount(segmentsX, SEGMENTS_X_OPTION_NAME),
+      segmentsZ: _HeightmapGeometry.#normalizeSegmentCount(segmentsZ, SEGMENTS_Z_OPTION_NAME),
+      isWireframe,
+      colors,
+      flipY,
+      sampling: normalizedSampling
+    };
+  }
+  /**
+   * Normalizes and validates a segment count parameter.
+   *
+   * @param {number} value      - Segment count value.
+   * @param {string} optionName - Name of the option for error messages.
+   * @returns {number}          - Normalized integer `>= 1`.
+   * @private
+   */
+  static #normalizeSegmentCount(value, optionName) {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new TypeError(ERROR_SEGMENT_VALUE.replace("{name}", optionName));
+    }
+    const intValue = Math.floor(value);
+    if (intValue < MIN_SEGMENT_COUNT5) {
+      throw new RangeError(
+        ERROR_SEGMENT_RANGE.replace("{name}", optionName).replace("{min}", String(MIN_SEGMENT_COUNT5))
+      );
+    }
+    return intValue;
+  }
+  /**
+   * Normalizes sampling mode.
+   *
+   * @param {string} sampling - Sampling mode input.
+   * @returns {string}        - Normalized sampling mode.
+   * @private
+   */
+  static #normalizeSampling(sampling) {
+    if (typeof sampling !== "string") {
+      throw new TypeError(ERROR_SAMPLING_VALUE);
+    }
+    if (sampling === SAMPLING_NEAREST || sampling === SAMPLING_BILINEAR) {
+      return sampling;
+    }
+    throw new RangeError(ERROR_SAMPLING_VALUE);
+  }
+  /**
+   * Creates full geometry data for a heightmap terrain.
+   *
+   * @param {ImageData} heightmapImageData               - Heightmap source image data.
+   * @param {Required<HeightmapGeometryOptions>} options - Normalized options.
+   * @returns {HeightmapGeometryData}                    - Geometry buffers.
+   * @private
+   */
+  static #createGeometryData(heightmapImageData, options) {
+    const widthSegments = options.segmentsX;
+    const depthSegments = options.segmentsZ;
+    const widthVertexCount = widthSegments + VERTICES_PER_SEGMENT_INCREMENT7;
+    const depthVertexCount = depthSegments + VERTICES_PER_SEGMENT_INCREMENT7;
+    const vertexCount = widthVertexCount * depthVertexCount;
+    const positions = new Float32Array(vertexCount * VECTOR_COMPONENTS_3);
+    const uvs = new Float32Array(vertexCount * UV_COMPONENTS_2);
+    let vertexIndex = ZERO_VALUE5;
+    for (let zIndex = ZERO_VALUE5; zIndex < depthVertexCount; zIndex += ONE_VALUE3) {
+      const vNormalized = zIndex / depthSegments;
+      const positionZ = (vNormalized - CENTER_T_OFFSET4) * options.depth;
+      for (let xIndex = ZERO_VALUE5; xIndex < widthVertexCount; xIndex += ONE_VALUE3) {
+        const uNormalized = xIndex / widthSegments;
+        const positionX = (uNormalized - CENTER_T_OFFSET4) * options.width;
+        const height = _HeightmapGeometry.#sampleHeight(
+          heightmapImageData,
+          uNormalized,
+          vNormalized,
+          options
+        );
+        const positionY = height * options.heightScale + options.heightOffset;
+        const positionBaseOffset = vertexIndex * VECTOR_COMPONENTS_3;
+        positions[positionBaseOffset + X_INDEX] = positionX;
+        positions[positionBaseOffset + Y_INDEX] = positionY;
+        positions[positionBaseOffset + Z_INDEX] = positionZ;
+        const uvBaseOffset = vertexIndex * UV_COMPONENTS_2;
+        uvs[uvBaseOffset + U_INDEX] = uNormalized;
+        uvs[uvBaseOffset + V_INDEX] = vNormalized;
+        vertexIndex += ONE_VALUE3;
+      }
+    }
+    const solidTriangleIndices = [];
+    for (let zIndex = ZERO_VALUE5; zIndex < depthSegments; zIndex += ONE_VALUE3) {
+      for (let xIndex = ZERO_VALUE5; xIndex < widthSegments; xIndex += ONE_VALUE3) {
+        const topLeftVertexIndex = zIndex * widthVertexCount + xIndex;
+        const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET6;
+        const bottomLeftVertexIndex = topLeftVertexIndex + widthVertexCount;
+        const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET6;
+        solidTriangleIndices.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
+        solidTriangleIndices.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
+      }
+    }
+    const indicesSolid = createIndexArray(vertexCount, solidTriangleIndices);
+    const indicesWireframe = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
+    const normals = _HeightmapGeometry.#computeVertexNormals(positions, indicesSolid, vertexCount);
+    const colors = createColorsFromSpec(vertexCount, options.colors);
+    return {
+      positions,
+      normals,
+      uvs,
+      colors,
+      indicesSolid,
+      indicesWireframe
+    };
+  }
+  /**
+   * Samples the heightmap at the given normalized UV coordinate.
+   *
+   * @param {ImageData} heightmapImageData               - Heightmap image data.
+   * @param {number} uNormalized                         - Normalized U coordinate [0..1].
+   * @param {number} vNormalized                         - Normalized V coordinate [0..1].
+   * @param {Required<HeightmapGeometryOptions>} options - Normalized options.
+   * @returns {number}                                   - Height value in [0..1].
+   * @private
+   */
+  static #sampleHeight(heightmapImageData, uNormalized, vNormalized, options) {
+    const heightmapWidth = heightmapImageData.width;
+    const heightmapHeight = heightmapImageData.height;
+    const vSample = options.flipY ? ONE_VALUE3 - vNormalized : vNormalized;
+    if (options.sampling === SAMPLING_BILINEAR) {
+      const xFloat = uNormalized * (heightmapWidth - ONE_VALUE3);
+      const yFloat = vSample * (heightmapHeight - ONE_VALUE3);
+      const x0 = Math.floor(xFloat);
+      const y0 = Math.floor(yFloat);
+      const x1 = Math.min(x0 + ONE_VALUE3, heightmapWidth - ONE_VALUE3);
+      const y1 = Math.min(y0 + ONE_VALUE3, heightmapHeight - ONE_VALUE3);
+      const tx = xFloat - x0;
+      const ty = yFloat - y0;
+      const h00 = _HeightmapGeometry.#getHeightAt(heightmapImageData, x0, y0);
+      const h10 = _HeightmapGeometry.#getHeightAt(heightmapImageData, x1, y0);
+      const h01 = _HeightmapGeometry.#getHeightAt(heightmapImageData, x0, y1);
+      const h11 = _HeightmapGeometry.#getHeightAt(heightmapImageData, x1, y1);
+      const h0 = h00 + (h10 - h00) * tx;
+      const h1 = h01 + (h11 - h01) * tx;
+      return h0 + (h1 - h0) * ty;
+    }
+    const xIndex = Math.round(uNormalized * (heightmapWidth - ONE_VALUE3));
+    const yIndex = Math.round(vSample * (heightmapHeight - ONE_VALUE3));
+    return _HeightmapGeometry.#getHeightAt(heightmapImageData, xIndex, yIndex);
+  }
+  /**
+   * Reads normalized height from image data at a pixel coordinate.
+   *
+   * @param {ImageData} heightmapImageData - Heightmap image data.
+   * @param {number} xIndex                - Pixel X coordinate.
+   * @param {number} yIndex                - Pixel Y coordinate.
+   * @returns {number}                     - Height value in [0..1].
+   * @private
+   */
+  static #getHeightAt(heightmapImageData, xIndex, yIndex) {
+    const width = heightmapImageData.width;
+    const data = heightmapImageData.data;
+    const pixelIndex = (yIndex * width + xIndex) * BYTES_PER_PIXEL;
+    const redValue = data[pixelIndex + RED_CHANNEL_OFFSET];
+    return redValue / MAX_CHANNEL_VALUE;
+  }
+  /**
+   * Computes per-vertex normals from positions and indices.
+   *
+   * @param {Float32Array} positions            - Vertex positions.
+   * @param {Uint16Array | Uint32Array} indices - Triangle indices.
+   * @param {number} vertexCount                - Total vertex count.
+   * @returns {Float32Array}                    - Vertex normals.
+   * @private
+   */
+  static #computeVertexNormals(positions, indices, vertexCount) {
+    const normals = new Float32Array(vertexCount * VECTOR_COMPONENTS_3);
+    for (let i = ZERO_VALUE5; i < indices.length; i += TRIANGLE_INDEX_STRIDE2) {
+      const indexA = indices[i + X_INDEX] * VECTOR_COMPONENTS_3;
+      const indexB = indices[i + Y_INDEX] * VECTOR_COMPONENTS_3;
+      const indexC = indices[i + Z_INDEX] * VECTOR_COMPONENTS_3;
+      const ax = positions[indexA + X_INDEX];
+      const ay = positions[indexA + Y_INDEX];
+      const az = positions[indexA + Z_INDEX];
+      const bx = positions[indexB + X_INDEX];
+      const by = positions[indexB + Y_INDEX];
+      const bz = positions[indexB + Z_INDEX];
+      const cx = positions[indexC + X_INDEX];
+      const cy = positions[indexC + Y_INDEX];
+      const cz = positions[indexC + Z_INDEX];
+      const abx = bx - ax;
+      const aby = by - ay;
+      const abz = bz - az;
+      const acx = cx - ax;
+      const acy = cy - ay;
+      const acz = cz - az;
+      const crossX = aby * acz - abz * acy;
+      const crossY = abz * acx - abx * acz;
+      const crossZ = abx * acy - aby * acx;
+      normals[indexA + X_INDEX] += crossX;
+      normals[indexA + Y_INDEX] += crossY;
+      normals[indexA + Z_INDEX] += crossZ;
+      normals[indexB + X_INDEX] += crossX;
+      normals[indexB + Y_INDEX] += crossY;
+      normals[indexB + Z_INDEX] += crossZ;
+      normals[indexC + X_INDEX] += crossX;
+      normals[indexC + Y_INDEX] += crossY;
+      normals[indexC + Z_INDEX] += crossZ;
+    }
+    for (let vertexIndex = ZERO_VALUE5; vertexIndex < vertexCount; vertexIndex += ONE_VALUE3) {
+      const baseIndex = vertexIndex * VECTOR_COMPONENTS_3;
+      const nx = normals[baseIndex + X_INDEX];
+      const ny = normals[baseIndex + Y_INDEX];
+      const nz = normals[baseIndex + Z_INDEX];
+      const length = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      if (length > ZERO_VALUE5) {
+        const invLength = ONE_VALUE3 / length;
+        normals[baseIndex + X_INDEX] = nx * invLength;
+        normals[baseIndex + Y_INDEX] = ny * invLength;
+        normals[baseIndex + Z_INDEX] = nz * invLength;
+      }
+    }
+    return normals;
+  }
+  /**
+   * Extracts `ImageData` from supported heightmap source formats.
+   *
+   * @param {ImageData|HeightmapSource} source - Heightmap source.
+   * @returns {ImageData}                      - Extracted image data.
+   * @private
+   */
+  static #normalizeHeightmapImageData(source) {
+    if (source instanceof ImageData) {
+      return source;
+    }
+    if (source === null || typeof source !== "object" || Array.isArray(source)) {
+      throw new TypeError(ERROR_HEIGHTMAP_IMAGE_DATA);
+    }
+    const imageData = source[HEIGHTMAP_SOURCE_IMAGE_DATA_FIELD];
+    if (!(imageData instanceof ImageData)) {
+      throw new TypeError(ERROR_HEIGHTMAP_IMAGE_DATA);
+    }
+    return imageData;
+  }
+  /**
+   * Loads an `HTMLImageElement` from a URL.
+   *
+   * @param {string} url                  - Image URL.
+   * @returns {Promise<HTMLImageElement>} - Promise, that resolves with a decoded image on `load`, or rejects on `error`.
+   * @private
+   */
+  static #loadImage(url) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.crossOrigin = IMAGE_CROSS_ORIGIN_ANON;
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error(ERROR_LOAD_IMAGE_PREFIX + url));
+      image.src = url;
+    });
+  }
+  /**
+   * Creates ImageData from a loaded image.
+   *
+   * @param {HTMLImageElement} image - Loaded image element.
+   * @returns {ImageData}            - Extracted image data.
+   * @private
+   */
+  static #createImageData(image) {
+    const canvas = document.createElement(CANVAS_TAG_NAME);
+    const context = canvas.getContext(CANVAS_CONTEXT_2D);
+    if (!context) {
+      throw new Error(ERROR_CANVAS_CONTEXT);
+    }
+    canvas.width = image.width;
+    canvas.height = image.height;
+    context.drawImage(image, ZERO_VALUE5, ZERO_VALUE5);
+    return context.getImageData(ZERO_VALUE5, ZERO_VALUE5, image.width, image.height);
+  }
+  /**
+   * Heightmap sampling modes.
+   *
+   * @returns {{ NEAREST: string, BILINEAR: string }}
+   */
+  static get Sampling() {
+    return Object.freeze({
+      NEAREST: SAMPLING_NEAREST,
+      BILINEAR: SAMPLING_BILINEAR
+    });
+  }
+};
+
 // core/texture/texture2d.js
 var PLACEHOLDER_TEXTURE_WIDTH = 1;
 var PLACEHOLDER_TEXTURE_HEIGHT = 1;
@@ -2974,7 +3427,7 @@ var PLACEHOLDER_PIXEL_RGBA = new Uint8Array([255, 0, 255, 255]);
 var WEBGL_TRUE_AS_INTEGER = 1;
 var WEBGL_FALSE_AS_INTEGER = 0;
 var MIN_TEXTURE_UNIT_INDEX = 0;
-var MIN_REQUIRED_STRING_LENGTH = 1;
+var MIN_REQUIRED_STRING_LENGTH2 = 1;
 var MIN_POWER_OF_TWO_VALUE = 1;
 var BIT_MASK_ONE = 1;
 var BITWISE_ZERO = 0;
@@ -3135,7 +3588,7 @@ var Texture2D = class {
    */
   async loadFromUrl(url) {
     this.#assertNotDisposed();
-    if (typeof url !== "string" || url.length < MIN_REQUIRED_STRING_LENGTH) {
+    if (typeof url !== "string" || url.length < MIN_REQUIRED_STRING_LENGTH2) {
       throw new TypeError("`Texture2D.loadFromUrl` expects url as a non-empty string.");
     }
     const image = await this.#loadImage(url);
@@ -6555,7 +7008,7 @@ var COLOR_COMPONENT_COUNT4 = 3;
 var COMPONENT_INDEX_X = 0;
 var COMPONENT_INDEX_Y = 1;
 var COMPONENT_INDEX_Z = 2;
-var ZERO_VALUE5 = 0;
+var ZERO_VALUE6 = 0;
 var FIRST_INDEX = 0;
 var SECOND_INDEX = 1;
 var THIRD_INDEX = 2;
@@ -6608,7 +7061,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
       textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX3,
       defaultColor
     } = options;
-    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE5) {
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE6) {
       throw new TypeError("`ObjMtlLoader` expects `textureUnitIndex` as a non-negative integer.");
     }
     if (defaultColor !== void 0) {
@@ -6833,7 +7286,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
     const materials = [];
     const textures = [];
     for (const group of objData.groups.values()) {
-      if (group.indices.length === ZERO_VALUE5) {
+      if (group.indices.length === ZERO_VALUE6) {
         continue;
       }
       const positions = new Float32Array(group.positions);
@@ -6974,13 +7427,13 @@ var ObjMtlLoader = class _ObjMtlLoader {
       return OBJ_INDEX_NOT_PROVIDED;
     }
     const indexValue = Number.parseInt(value, DECIMAL_RADIX);
-    if (maxLength === ZERO_VALUE5) {
+    if (maxLength === ZERO_VALUE6) {
       return OBJ_INDEX_NOT_PROVIDED;
     }
     if (Number.isNaN(indexValue) || indexValue === OBJ_INDEX_ZERO) {
       return OBJ_INDEX_NOT_PROVIDED;
     }
-    if (indexValue > ZERO_VALUE5) {
+    if (indexValue > ZERO_VALUE6) {
       return indexValue - OBJ_INDEX_OFFSET;
     }
     return maxLength + indexValue;
@@ -7010,7 +7463,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
    * @private
    */
   static #appendUv(sourceUvs, index, group) {
-    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE5 && index * UV_COMPONENT_COUNT2 < sourceUvs.length) {
+    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE6 && index * UV_COMPONENT_COUNT2 < sourceUvs.length) {
       const baseIndex = index * UV_COMPONENT_COUNT2;
       group.uvs.push(sourceUvs[baseIndex + COMPONENT_INDEX_X], sourceUvs[baseIndex + COMPONENT_INDEX_Y]);
       group.hasUvs = true;
@@ -7027,7 +7480,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
    * @private
    */
   static #appendNormal(sourceNormals, index, group) {
-    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE5 && index * NORMAL_COMPONENT_COUNT2 < sourceNormals.length) {
+    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE6 && index * NORMAL_COMPONENT_COUNT2 < sourceNormals.length) {
       const baseIndex = index * NORMAL_COMPONENT_COUNT2;
       group.normals.push(
         sourceNormals[baseIndex + COMPONENT_INDEX_X],
@@ -7049,7 +7502,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
    */
   static #generateNormals(positions, indices) {
     const normalBuffer = new Float32Array(positions.length);
-    for (let index = ZERO_VALUE5; index < indices.length; index += NORMAL_COMPONENT_COUNT2) {
+    for (let index = ZERO_VALUE6; index < indices.length; index += NORMAL_COMPONENT_COUNT2) {
       const indexA = indices[index + COMPONENT_INDEX_X] * POSITION_COMPONENT_COUNT3;
       const indexB = indices[index + COMPONENT_INDEX_Y] * POSITION_COMPONENT_COUNT3;
       const indexC = indices[index + COMPONENT_INDEX_Z] * POSITION_COMPONENT_COUNT3;
@@ -7081,12 +7534,12 @@ var ObjMtlLoader = class _ObjMtlLoader {
       normalBuffer[indexC + COMPONENT_INDEX_Y] += ny;
       normalBuffer[indexC + COMPONENT_INDEX_Z] += nz;
     }
-    for (let index = ZERO_VALUE5; index < normalBuffer.length; index += NORMAL_COMPONENT_COUNT2) {
+    for (let index = ZERO_VALUE6; index < normalBuffer.length; index += NORMAL_COMPONENT_COUNT2) {
       const nx = normalBuffer[index + COMPONENT_INDEX_X];
       const ny = normalBuffer[index + COMPONENT_INDEX_Y];
       const nz = normalBuffer[index + COMPONENT_INDEX_Z];
       const length = Math.hypot(nx, ny, nz);
-      if (length > ZERO_VALUE5) {
+      if (length > ZERO_VALUE6) {
         normalBuffer[index + COMPONENT_INDEX_X] = nx / length;
         normalBuffer[index + COMPONENT_INDEX_Y] = ny / length;
         normalBuffer[index + COMPONENT_INDEX_Z] = nz / length;
@@ -7141,7 +7594,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
    */
   static #parseFloatTriplet(parts, expected) {
     if (parts.length <= expected) {
-      return [ZERO_VALUE5, ZERO_VALUE5, ZERO_VALUE5];
+      return [ZERO_VALUE6, ZERO_VALUE6, ZERO_VALUE6];
     }
     return [
       Number.parseFloat(parts[SECOND_INDEX]),
@@ -7158,7 +7611,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
    */
   static #parseFloatPair(parts) {
     if (parts.length <= THIRD_INDEX) {
-      return [ZERO_VALUE5, ZERO_VALUE5];
+      return [ZERO_VALUE6, ZERO_VALUE6];
     }
     return [
       Number.parseFloat(parts[SECOND_INDEX]),
@@ -8843,7 +9296,8 @@ var GeraWebGL = Object.freeze({
     TorusGeometry,
     ConeGeometry,
     PyramidGeometry,
-    CustomGeometry
+    CustomGeometry,
+    HeightmapGeometry
   }),
   Textures: Object.freeze({
     Texture2D

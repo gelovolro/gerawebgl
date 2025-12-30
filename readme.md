@@ -7,6 +7,7 @@ I first developed my own WebGL library (based on v1.0) back in 2014. Now I’ve 
 - **Geometries demo:** https://gelovolro.github.io/gerawebgl/demo/geometries.html
 - **OBJ/MTL loader demo:** https://gelovolro.github.io/gerawebgl/demo/obj-mtl-demo.html
 - **Character controls demo (WASD, sprinting, jumping, mouse look, bobbing, 1st/3rd person camera):** https://gelovolro.github.io/gerawebgl/demo/character-controls.html
+- **Heightmap terrain generation demo:** https://gelovolro.github.io/gerawebgl/demo/heightmap-terrain-demo.html
 
 ## Quick start
 
@@ -32,7 +33,7 @@ High-level modules are for "get something on screen fast":
 
 - `Engine` (scene + camera + renderer + render loop)
 - Scene objects      : `Scene`, `Object3D`, `Mesh`, `Camera`, `PerspectiveCamera`, `OrthographicCamera`, `FirstPersonCamera`, `ThirdPersonCamera`
-- Built-in geometry  : `CustomGeometry`, `BoxGeometry`, `PlaneGeometry`, `SphereGeometry`, `ConeGeometry`, `TorusGeometry`, `PyramidGeometry` (all of them support segmentation)
+- Built-in geometry  : `CustomGeometry`, `BoxGeometry`, `PlaneGeometry`, `SphereGeometry`, `ConeGeometry`, `TorusGeometry`, `PyramidGeometry`, `HeightmapGeometry` (all of them support segmentation)
 - Built-in materials : `SolidColorMaterial`, `VertexColorMaterial`, `TexturedMaterial`, `NormalMaterial`, `DirectionalLightMaterial`, `LambertMaterial`, `PhongMaterial`
 - Controls           : `OrbitControls`, `KeyboardControls`, `FirstPersonControls`, `ThirdPersonControls`
 - Loader             : `ObjMtlLoader`

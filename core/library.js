@@ -10,6 +10,7 @@ import { SphereGeometry }           from './geometry/sphere-geometry.js';
 import { TorusGeometry }            from './geometry/torus-geometry.js';
 import { ConeGeometry }             from './geometry/cone-geometry.js';
 import { PyramidGeometry }          from './geometry/pyramid-geometry.js';
+import { HeightmapGeometry }        from './geometry/heightmap-geometry.js';
 import { ShaderProgram }            from './shader/shader-program.js';
 import { Material }                 from './material/material.js';
 import { VertexColorMaterial }      from './material/vertex-color-material.js';
@@ -80,7 +81,8 @@ export const GeraWebGL = Object.freeze({
         TorusGeometry,
         ConeGeometry,
         PyramidGeometry,
-        CustomGeometry
+        CustomGeometry,
+        HeightmapGeometry
     }),
 
     Textures: Object.freeze({
