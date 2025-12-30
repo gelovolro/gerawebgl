@@ -89,6 +89,83 @@ const ATTRIBUTE_NO_OFFSET = 0;
 const MODULO_ALIGNED_VALUE = 0;
 
 /**
+ * Component count for AABB min/max vectors.
+ *
+ * @type {number}
+ */
+const BOUNDING_BOX_COMPONENT_COUNT = 3;
+
+/**
+ * Starting index for vertex data traversal.
+ *
+ * @type {number}
+ */
+const POSITION_START_INDEX = 0;
+
+/**
+ * Offset for the X component in a position triplet.
+ *
+ * @type {number}
+ */
+const POSITION_X_OFFSET = 0;
+
+/**
+ * Offset for the Y component in a position triplet.
+ *
+ * @type {number}
+ */
+const POSITION_Y_OFFSET = 1;
+
+/**
+ * Offset for the Z component in a position triplet.
+ *
+ * @type {number}
+ */
+const POSITION_Z_OFFSET = 2;
+
+/**
+ * Default bounding box component value for empty geometry.
+ *
+ * @type {number}
+ */
+const EMPTY_BOUND_COMPONENT = 0.0;
+
+/**
+ * Initial value used for bounding box minimum computations.
+ *
+ * @type {number}
+ */
+const BOUND_MIN_INIT = Number.POSITIVE_INFINITY;
+
+/**
+ * Initial value used for bounding box maximum computations.
+ *
+ * @type {number}
+ */
+const BOUND_MAX_INIT = Number.NEGATIVE_INFINITY;
+
+/**
+ * Error message for invalid bounding box positions buffer.
+ *
+ * @type {string}
+ */
+const ERROR_BOUNDING_BOX_POSITIONS_TYPE = '`Geometry.#writeBoundingBox` expects positions as `Float32Array`.';
+
+/**
+ * Error message for invalid bounding box minimum buffer.
+ *
+ * @type {string}
+ */
+const ERROR_BOUNDING_BOX_MIN_TYPE = '`Geometry.#writeBoundingBox` expects `outMin` as `Float32Array(3)`.';
+
+/**
+ * Error message for invalid bounding box maximum buffer.
+ *
+ * @type {string}
+ */
+const ERROR_BOUNDING_BOX_MAX_TYPE = '`Geometry.#writeBoundingBox` expects `outMax` as `Float32Array(3)`.';
+
+/**
  * Number of indices, that form a single triangle.
  *
  * @type {number}
@@ -206,6 +283,22 @@ export class Geometry {
     #wireframeIndexComponentType;
 
     /**
+     * Local-space AABB minimum.
+     *
+     * @type {Float32Array}
+     * @private
+     */
+    #boundingBoxMin;
+
+    /**
+     * Local-space AABB maximum.
+     *
+     * @type {Float32Array}
+     * @private
+     */
+    #boundingBoxMax;
+
+    /**
      * Indicates whether this geometry instance has been disposed.
      * Disposed geometries must not be used for rendering.
      *
@@ -263,6 +356,9 @@ export class Geometry {
         this.#normalBuffer                = normals ? this.#createStaticArrayBuffer(normals) : null;
         this.#indexBufferSolid            = this.#createIndexBuffer(indicesSolid);
         this.#indexBufferWireframe        = this.#createIndexBuffer(indicesWireframe);
+        this.#boundingBoxMin              = new Float32Array(BOUNDING_BOX_COMPONENT_COUNT);
+        this.#boundingBoxMax              = new Float32Array(BOUNDING_BOX_COMPONENT_COUNT);
+        Geometry.#writeBoundingBox(positions, this.#boundingBoxMin, this.#boundingBoxMax);
         this.#configureVertexArray();
     }
 
@@ -306,6 +402,26 @@ export class Geometry {
     getIndexComponentType(wireframe) {
         this.#assertNotDisposed();
         return wireframe ? this.#wireframeIndexComponentType : this.#solidIndexComponentType;
+    }
+
+    /**
+     * Returns local-space AABB minimum.
+     *
+     * @returns {Float32Array}
+     */
+    getBoundingBoxMin() {
+        this.#assertNotDisposed();
+        return this.#boundingBoxMin;
+    }
+
+    /**
+     * Returns local-space AABB maximum.
+     *
+     * @returns {Float32Array}
+     */
+    getBoundingBoxMax() {
+        this.#assertNotDisposed();
+        return this.#boundingBoxMax;
     }
 
     /**
@@ -490,6 +606,85 @@ export class Geometry {
         if ((indicesWireframe.length % LINE_INDEX_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
             throw new Error('Geometry wireframe indices length must be a multiple of `LINE_INDEX_COMPONENT_COUNT`.');
         }
+    }
+
+    /**
+     * Writes local AABB bounds into the provided buffers.
+     *
+     * @param {Float32Array} positions - Flat vertex positions [x, y, z].
+     * @param {Float32Array} outMin    - Output min buffer.
+     * @param {Float32Array} outMax    - Output max buffer.
+     * @private
+     */
+    static #writeBoundingBox(positions, outMin, outMax) {
+        if (!(positions instanceof Float32Array)) {
+            throw new TypeError(ERROR_BOUNDING_BOX_POSITIONS_TYPE);
+        }
+
+        if (!(outMin instanceof Float32Array) || outMin.length !== BOUNDING_BOX_COMPONENT_COUNT) {
+            throw new TypeError(ERROR_BOUNDING_BOX_MIN_TYPE);
+        }
+
+        if (!(outMax instanceof Float32Array) || outMax.length !== BOUNDING_BOX_COMPONENT_COUNT) {
+            throw new TypeError(ERROR_BOUNDING_BOX_MAX_TYPE);
+        }
+
+        // Handle the empty geometry, write `empty` bounds and exit early:
+        if (positions.length === POSITION_START_INDEX) {
+            outMin[POSITION_X_OFFSET] = EMPTY_BOUND_COMPONENT;
+            outMin[POSITION_Y_OFFSET] = EMPTY_BOUND_COMPONENT;
+            outMin[POSITION_Z_OFFSET] = EMPTY_BOUND_COMPONENT;
+            outMax[POSITION_X_OFFSET] = EMPTY_BOUND_COMPONENT;
+            outMax[POSITION_Y_OFFSET] = EMPTY_BOUND_COMPONENT;
+            outMax[POSITION_Z_OFFSET] = EMPTY_BOUND_COMPONENT;
+            return;
+        }
+
+        // Initialize min/max accumulators for the AABB computation:
+        let minX = BOUND_MIN_INIT;
+        let minY = BOUND_MIN_INIT;
+        let minZ = BOUND_MIN_INIT;
+        let maxX = BOUND_MAX_INIT;
+        let maxY = BOUND_MAX_INIT;
+        let maxZ = BOUND_MAX_INIT;
+
+        for (let index = POSITION_START_INDEX; index < positions.length; index += POSITION_COMPONENT_COUNT) {
+            const x = positions[index + POSITION_X_OFFSET];
+            const y = positions[index + POSITION_Y_OFFSET];
+            const z = positions[index + POSITION_Z_OFFSET];
+
+            if (x < minX) {
+                minX = x;
+            }
+
+            if (y < minY) {
+                minY = y;
+            }
+
+            if (z < minZ) {
+                minZ = z;
+            }
+
+            if (x > maxX) {
+                maxX = x;
+            }
+
+            if (y > maxY) {
+                maxY = y;
+            }
+
+            if (z > maxZ) {
+                maxZ = z;
+            }
+        }
+
+        // Write the computed AABB bounds to the output buffers:
+        outMin[POSITION_X_OFFSET] = minX;
+        outMin[POSITION_Y_OFFSET] = minY;
+        outMin[POSITION_Z_OFFSET] = minZ;
+        outMax[POSITION_X_OFFSET] = maxX;
+        outMax[POSITION_Y_OFFSET] = maxY;
+        outMax[POSITION_Z_OFFSET] = maxZ;
     }
 
     /**

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Class: Engine</title>
+    <title>JSDoc: Class: Raycaster</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Class: Engine</h1>
+    <h1 class="page-title">Class: Raycaster</h1>
 
     
 
@@ -28,9 +28,9 @@
 
 <header>
     
-        <h2><span class="attribs"><span class="type-signature"></span></span>Engine<span class="signature">(canvas, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h2>
+        <h2><span class="attribs"><span class="type-signature"></span></span>Raycaster<span class="signature">()</span><span class="type-signature"></span></h2>
         
-            <div class="class-description">High-level convenience wrapper, that bundles the most common building blocks.</div>
+            <div class="class-description">Raycaster performs raycasting against scene meshes using their local AABB.</div>
         
     
 </header>
@@ -45,7 +45,7 @@
     
 
     
-    <h4 class="name" id="Engine"><span class="type-signature"></span>new Engine<span class="signature">(canvas, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="Raycaster"><span class="type-signature"></span>new Raycaster<span class="signature">()</span><span class="type-signature"></span></h4>
     
 
     
@@ -58,98 +58,6 @@
 
 
 
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-        <th>Attributes</th>
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>canvas</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">HTMLCanvasElement</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">Canvas used for rendering.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>options</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><a href="global.html#EngineOptions">EngineOptions</a></span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">Engine options.</td>
-        </tr>
-
-    
-    </tbody>
-</table>
 
 
 
@@ -185,7 +93,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line129">line 129</a>
+        <a href="interaction_raycaster.js.html">interaction/raycaster.js</a>, <a href="interaction_raycaster.js.html#line324">line 324</a>
     </li></ul></dd>
     
 
@@ -223,314 +131,13 @@
     
 
     
-        <h3 class="subsection-title">Classes</h3>
 
-        <dl>
-            <dt><a href="Engine.html">Engine</a></dt>
-            <dd></dd>
-        </dl>
     
 
     
 
     
 
-    
-
-    
-        <h3 class="subsection-title">Members</h3>
-
-        
-            
-<h4 class="name" id="camera"><span class="type-signature"></span>camera<span class="type-signature"></span></h4>
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line294">line 294</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="context"><span class="type-signature"></span>context<span class="type-signature"></span></h4>
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line274">line 274</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="renderer"><span class="type-signature"></span>renderer<span class="type-signature"></span></h4>
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line284">line 284</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="scene"><span class="type-signature"></span>scene<span class="type-signature"></span></h4>
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line289">line 289</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="webglRenderingContext"><span class="type-signature"></span>webglRenderingContext<span class="type-signature"></span></h4>
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line279">line 279</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
     
 
     
@@ -542,7 +149,7 @@
     
 
     
-    <h4 class="name" id="createBoxMesh"><span class="type-signature"></span>createBoxMesh<span class="signature">(options<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {<a href="Mesh.html">Mesh</a>}</span></h4>
+    <h4 class="name" id="raycast"><span class="type-signature"></span>raycast<span class="signature">(scene, camera, mouseNdc, options<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Array.&lt;<a href="global.html#Intersection">Intersection</a>>}</span></h4>
     
 
     
@@ -550,11 +157,7 @@
 
 
 <div class="description">
-    Creates a box mesh using: `BoxGeometry` + `VertexColorMaterial` by default.
-
-Ownership rules: geometry is created internally => mesh owns geometry.
-Material: if not provided then Mesh owns created `VertexColorMaterial`,
-if provided then Mesh does NOT own the material (shared user resource).
+    Performs a raycast against the given scene and returns intersections.
 </div>
 
 
@@ -592,13 +195,106 @@ if provided then Mesh does NOT own the material (shared user resource).
 
         <tr>
             
+                <td class="name"><code>scene</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="Scene.html">Scene</a></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Scene to query.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>camera</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="Camera.html">Camera</a></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Camera used to build the ray.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>mouseNdc</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Mouse coordinates in NDC space [-1..1].</td>
+        </tr>
+
+    
+
+        <tr>
+            
                 <td class="name"><code>options</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type"><a href="global.html#CreateBoxMeshOptions">CreateBoxMeshOptions</a></span>
+<span class="param-type"><a href="global.html#RaycastOptions">RaycastOptions</a></span>
 
 
             
@@ -618,7 +314,7 @@ if provided then Mesh does NOT own the material (shared user resource).
 
             
 
-            <td class="description last">Box mesh options.</td>
+            <td class="description last">Optional raycast settings.</td>
         </tr>
 
     
@@ -659,7 +355,7 @@ if provided then Mesh does NOT own the material (shared user resource).
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line308">line 308</a>
+        <a href="interaction_raycaster.js.html">interaction/raycaster.js</a>, <a href="interaction_raycaster.js.html#line334">line 334</a>
     </li></ul></dd>
     
 
@@ -687,6 +383,10 @@ if provided then Mesh does NOT own the material (shared user resource).
 <h5>Returns:</h5>
 
         
+<div class="param-desc">
+    - Intersection list.
+</div>
+
 
 
 <dl>
@@ -695,475 +395,13 @@ if provided then Mesh does NOT own the material (shared user resource).
     </dt>
     <dd>
         
-<span class="param-type"><a href="Mesh.html">Mesh</a></span>
+<span class="param-type">Array.&lt;<a href="global.html#Intersection">Intersection</a>></span>
 
 
     </dd>
 </dl>
 
     
-
-
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="render"><span class="type-signature"></span>render<span class="signature">()</span><span class="type-signature"></span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Renders a single frame.
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line333">line 333</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="setCamera"><span class="type-signature"></span>setCamera<span class="signature">(camera)</span><span class="type-signature"></span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Sets the active camera used by the engine renderer.
-</div>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>camera</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><a href="Camera.html">Camera</a></span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">New active camera instance.</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line378">line 378</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="start"><span class="type-signature"></span>start<span class="signature">(frameCallback<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Starts the `requestAnimationFrame` loop.
-</div>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-        <th>Attributes</th>
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>frameCallback</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><a href="global.html#EngineFrameCallback">EngineFrameCallback</a></span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">Optional per-frame callback.</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line343">line 343</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="stop"><span class="type-signature"></span>stop<span class="signature">()</span><span class="type-signature"></span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Stops the `requestAnimationFrame` loop.
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="engine_engine.js.html">engine/engine.js</a>, <a href="engine_engine.js.html#line362">line 362</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

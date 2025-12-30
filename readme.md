@@ -8,6 +8,7 @@ I first developed my own WebGL library (based on v1.0) back in 2014. Now I’ve 
 - **OBJ/MTL loader demo:** https://gelovolro.github.io/gerawebgl/demo/obj-mtl-demo.html
 - **Character controls demo (WASD, sprinting, jumping, mouse look, bobbing, 1st/3rd person camera):** https://gelovolro.github.io/gerawebgl/demo/character-controls.html
 - **Heightmap terrain generation demo:** https://gelovolro.github.io/gerawebgl/demo/heightmap-terrain-demo.html
+- **Raycasting demo (picking the cube):** https://gelovolro.github.io/gerawebgl/demo/picking-demo.html
 
 ## Quick start
 
@@ -36,6 +37,7 @@ High-level modules are for "get something on screen fast":
 - Built-in geometry  : `CustomGeometry`, `BoxGeometry`, `PlaneGeometry`, `SphereGeometry`, `ConeGeometry`, `TorusGeometry`, `PyramidGeometry`, `HeightmapGeometry` (all of them support segmentation)
 - Built-in materials : `SolidColorMaterial`, `VertexColorMaterial`, `TexturedMaterial`, `NormalMaterial`, `DirectionalLightMaterial`, `LambertMaterial`, `PhongMaterial`
 - Controls           : `OrbitControls`, `KeyboardControls`, `FirstPersonControls`, `ThirdPersonControls`
+- Interactions       : `Raycaster`
 - Loader             : `ObjMtlLoader`
 - Debugging          : `FpsCounter`
 

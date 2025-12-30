@@ -37,6 +37,7 @@ import { OrbitControls }            from './controls/orbit-controls.js';
 import { KeyboardControls }         from './controls/keyboard-controls.js';
 import { FirstPersonControls }      from './controls/first-person-controls.js';
 import { ThirdPersonControls }      from './controls/third-person-controls.js';
+import { Raycaster }                from './interaction/raycaster.js';
 
 /**
  * Main public API namespace.
@@ -65,6 +66,7 @@ export const GeraWebGL = Object.freeze({
     ThirdPersonCamera,
     Object3D,
     Mesh,
+    Raycaster,
 
     // Grouped namespaces:
     Math: Object.freeze({
