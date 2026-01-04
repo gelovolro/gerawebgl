@@ -4,6 +4,13 @@ import { Mesh }         from '../scene/mesh.js';
 import { Scene }        from '../scene/scene.js';
 import { Camera }       from '../scene/camera.js';
 import { WebGLContext } from '../webgl-context.js';
+import {
+    PRIMITIVE_TRIANGLES,
+    PRIMITIVE_LINES,
+    PRIMITIVE_LINE_STRIP,
+    PRIMITIVE_LINE_LOOP,
+    PRIMITIVE_POINTS
+} from '../geometry/geometry.js';
 
 /**
  * Byte offset passed to `webglRenderingContext.drawElements()` call.
@@ -59,6 +66,13 @@ const MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT = 3;
 const MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT = 4;
 
 /**
+ * Error message used, when geometry primitive is unknown.
+ *
+ * @type {string}
+ */
+const ERROR_UNKNOWN_PRIMITIVE = 'Renderer received an unknown geometry primitive.';
+
+/**
  * Canvas resize options for WebGLContext.resizeToDisplaySize().
  *
  * @typedef {Object} ResizeToDisplaySizeOptions
@@ -70,6 +84,7 @@ const MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT = 4;
  * Keeps per-frame allocations minimal (reuse matrices, reuse traversal callback).
  */
 export class Renderer {
+
     /**
      * Wrapper around the underlying WebGL2 rendering context.
      * @type {WebGLContext}
@@ -283,7 +298,8 @@ export class Renderer {
         const isWireframeEnabled = material.isWireframeEnabled();
         geometry.bindIndexBuffer(isWireframeEnabled);
 
-        const mode       = isWireframeEnabled ? renderingContext.LINES : renderingContext.TRIANGLES;
+        const primitive  = geometry.getPrimitive(isWireframeEnabled);
+        const mode       = resolvePrimitiveMode(renderingContext, primitive);
         const indexCount = geometry.getIndexCount(isWireframeEnabled);
         renderingContext.drawElements(
             mode,
@@ -291,5 +307,29 @@ export class Renderer {
             geometry.getIndexComponentType(isWireframeEnabled),
             INDEX_BUFFER_OFFSET_BYTES
         );
+    }
+}
+
+/**
+ * Maps engine primitive constants to the WebGL draw modes.
+ *
+ * @param {WebGL2RenderingContext} renderingContext - WebGL2 rendering context.
+ * @param {string} primitive                        - Geometry primitive name.
+ * @returns {number}                                - WebGL draw mode constant.
+ */
+function resolvePrimitiveMode(renderingContext, primitive) {
+    switch (primitive) {
+        case PRIMITIVE_TRIANGLES:
+            return renderingContext.TRIANGLES;
+        case PRIMITIVE_LINES:
+            return renderingContext.LINES;
+        case PRIMITIVE_LINE_STRIP:
+            return renderingContext.LINE_STRIP;
+        case PRIMITIVE_LINE_LOOP:
+            return renderingContext.LINE_LOOP;
+        case PRIMITIVE_POINTS:
+            return renderingContext.POINTS;
+        default:
+            throw new Error(ERROR_UNKNOWN_PRIMITIVE);
     }
 }

@@ -9,6 +9,7 @@ I first developed my own WebGL library (based on v1.0) back in 2014. Now I’ve 
 - **Character controls demo (WASD, sprinting, jumping, mouse look, bobbing, 1st/3rd person camera):** https://gelovolro.github.io/gerawebgl/demo/character-controls.html
 - **Heightmap terrain generation demo:** https://gelovolro.github.io/gerawebgl/demo/heightmap-terrain-demo.html
 - **Raycasting demo (picking the cube):** https://gelovolro.github.io/gerawebgl/demo/picking-demo.html
+- **Points render & 3D object path movement demo:** https://gelovolro.github.io/gerawebgl/demo/points-and-path-demo.html
 
 ## Quick start
 
@@ -33,9 +34,9 @@ engine.start((delta) => {
 High-level modules are for "get something on screen fast":
 
 - `Engine` (scene + camera + renderer + render loop)
-- Scene objects      : `Scene`, `Object3D`, `Mesh`, `Camera`, `PerspectiveCamera`, `OrthographicCamera`, `FirstPersonCamera`, `ThirdPersonCamera`
-- Built-in geometry  : `CustomGeometry`, `BoxGeometry`, `PlaneGeometry`, `SphereGeometry`, `ConeGeometry`, `TorusGeometry`, `PyramidGeometry`, `HeightmapGeometry` (all of them support segmentation)
-- Built-in materials : `SolidColorMaterial`, `VertexColorMaterial`, `TexturedMaterial`, `NormalMaterial`, `DirectionalLightMaterial`, `LambertMaterial`, `PhongMaterial`
+- Scene objects      : `Scene`, `Object3D`, `Mesh`, `Camera`, `PerspectiveCamera`, `OrthographicCamera`, `FirstPersonCamera`, `ThirdPersonCamera`, `Points`, `Line`
+- Built-in geometry  : `CustomGeometry`, `BoxGeometry`, `PlaneGeometry`, `SphereGeometry`, `ConeGeometry`, `TorusGeometry`, `PyramidGeometry`, `PointsGeometry`, `PolylineGeometry`, `TubeLineGeometry`, `HeightmapGeometry` (all of them support segmentation)
+- Built-in materials : `SolidColorMaterial`, `VertexColorMaterial`, `TexturedMaterial`, `NormalMaterial`, `DirectionalLightMaterial`, `LambertMaterial`, `PhongMaterial`, `PointsMaterial`
 - Controls           : `OrbitControls`, `KeyboardControls`, `FirstPersonControls`, `ThirdPersonControls`
 - Interactions       : `Raycaster`
 - Loader             : `ObjMtlLoader`

@@ -180,9 +180,94 @@ const TRIANGLE_INDEX_COMPONENT_COUNT = 3;
 const LINE_INDEX_COMPONENT_COUNT = 2;
 
 /**
- * Geometry represents a set of vertex buffers + index buffers, grouped under a VAO.
+ * Primitive type name of the triangle meshes.
+ *
+ * @type {string}
+ */
+export const PRIMITIVE_TRIANGLES = 'triangles';
+
+/**
+ * Primitive type name of the independent line segments.
+ *
+ * @type {string}
+ */
+export const PRIMITIVE_LINES = 'lines';
+
+/**
+ * Primitive type name of the connected line strip.
+ *
+ * @type {string}
+ */
+export const PRIMITIVE_LINE_STRIP = 'line_strip';
+
+/**
+ * Primitive type name of the closed line loop.
+ *
+ * @type {string}
+ */
+export const PRIMITIVE_LINE_LOOP = 'line_loop';
+
+/**
+ * Primitive type name of the point sprites.
+ *
+ * @type {string}
+ */
+export const PRIMITIVE_POINTS = 'points';
+
+/**
+ * Default solid primitive, used by geometry (triangles).
+ *
+ * @type {string}
+ */
+const DEFAULT_SOLID_PRIMITIVE = PRIMITIVE_TRIANGLES;
+
+/**
+ * Default wireframe primitive, used by geometry (lines).
+ *
+ * @type {string}
+ */
+const DEFAULT_WIREFRAME_PRIMITIVE = PRIMITIVE_LINES;
+
+/**
+ * Minimum index count for line strip/loop primitives.
+ *
+ * @type {number}
+ */
+const MIN_LINE_STRIP_INDEX_COUNT = 2;
+
+/**
+ * Supported primitive names.
+ *
+ * @type {Set<string>}
+ */
+const SUPPORTED_PRIMITIVES = new Set([
+    PRIMITIVE_TRIANGLES,
+    PRIMITIVE_LINES,
+    PRIMITIVE_LINE_STRIP,
+    PRIMITIVE_LINE_LOOP,
+    PRIMITIVE_POINTS
+]);
+
+/**
+ * Error message used for invalid primitive options.
+ *
+ * @type {string}
+ */
+const ERROR_INVALID_PRIMITIVE = '`Geometry` expects the primitive options to use known primitive constants.';
+
+/**
+ * Geometry primitive override options.
+ *
+ * @typedef {Object} GeometryPrimitiveOptions
+ * @property {string} [solidPrimitive=PRIMITIVE_TRIANGLES] - Solid primitive type.
+ * @property {string} [wireframePrimitive=PRIMITIVE_LINES] - Wireframe primitive type.
+ */
+
+/**
+ * Geometry represents a set of `vertex buffers + index buffers`, grouped under a VAO.
  */
 export class Geometry {
+
     /**
      * WebGL2 rendering context used to create and manage GPU resources.
      *
@@ -308,15 +393,41 @@ export class Geometry {
     #isDisposed = false;
 
     /**
-     * @param {WebGL2RenderingContext} webglContext        - WebGL2 rendering context used to create and manage GPU resources.
+     * Solid primitive type, used for rendering (triangles, lines, points, etc...).
+     *
+     * @type {string}
+     * @private
+     */
+    #solidPrimitive;
+
+    /**
+     * Wireframe primitive type, used for rendering (lines, points, etc...).
+     *
+     * @type {string}
+     * @private
+     */
+    #wireframePrimitive;
+
+    /**
+     * @param {WebGL2RenderingContext} webglContext        - WebGL2 rendering context used to create and manage the GPU resources.
      * @param {Float32Array} positions                     - [x, y, z] triples.
      * @param {Float32Array | null} colors                 - [red, green, blue] triples or null.
      * @param {Uint16Array | Uint32Array} indicesSolid     - Indices for solid triangles.
      * @param {Uint16Array | Uint32Array} indicesWireframe - Indices for wireframe lines.
      * @param {Float32Array | null} [uvs = null]           - [u, v] pairs or null.
      * @param {Float32Array | null} [normals = null]       - [x, y, z] triples or null.
+     * @param {GeometryPrimitiveOptions | null} [options]  - Primitive overrides.
      */
-    constructor(webglContext, positions, colors, indicesSolid, indicesWireframe, uvs = null, normals = null) {
+    constructor(
+        webglContext,
+        positions,
+        colors,
+        indicesSolid,
+        indicesWireframe,
+        uvs     = null,
+        normals = null,
+        options = null
+    ) {
         if (!(webglContext instanceof WebGL2RenderingContext)) {
             throw new TypeError('`Geometry` expects a `WebGL2RenderingContext`.');
         }
@@ -341,8 +452,19 @@ export class Geometry {
             throw new TypeError('`Geometry` expects indices as `Uint16Array` or `Uint32Array`.');
         }
 
+        if (options !== null && (typeof options !== 'object' || Array.isArray(options))) {
+            throw new TypeError('`Geometry` expects `options` as a plain object or null.');
+        }
+
+        const {
+            solidPrimitive     = DEFAULT_SOLID_PRIMITIVE,
+            wireframePrimitive = DEFAULT_WIREFRAME_PRIMITIVE
+        } = options || {};
+
+        Geometry.#assertPrimitiveName(solidPrimitive);
+        Geometry.#assertPrimitiveName(wireframePrimitive);
         this.#validateAttributeSizes(positions, colors, uvs, normals);
-        this.#validateIndexSizes(indicesSolid, indicesWireframe);
+        this.#validateIndexSizes(indicesSolid, indicesWireframe, solidPrimitive, wireframePrimitive);
 
         this.#webglContext                = webglContext;
         this.#solidIndexCount             = indicesSolid.length;
@@ -358,6 +480,8 @@ export class Geometry {
         this.#indexBufferWireframe        = this.#createIndexBuffer(indicesWireframe);
         this.#boundingBoxMin              = new Float32Array(BOUNDING_BOX_COMPONENT_COUNT);
         this.#boundingBoxMax              = new Float32Array(BOUNDING_BOX_COMPONENT_COUNT);
+        this.#solidPrimitive              = solidPrimitive;
+        this.#wireframePrimitive          = wireframePrimitive;
         Geometry.#writeBoundingBox(positions, this.#boundingBoxMin, this.#boundingBoxMax);
         this.#configureVertexArray();
     }
@@ -402,6 +526,17 @@ export class Geometry {
     getIndexComponentType(wireframe) {
         this.#assertNotDisposed();
         return wireframe ? this.#wireframeIndexComponentType : this.#solidIndexComponentType;
+    }
+
+    /**
+     * Returns the primitive type for solid or wireframe rendering.
+     *
+     * @param {boolean} wireframe - When true, returns wireframe primitive type.
+     * @returns {string}
+     */
+    getPrimitive(wireframe) {
+        this.#assertNotDisposed();
+        return wireframe ? this.#wireframePrimitive : this.#solidPrimitive;
     }
 
     /**
@@ -598,13 +733,60 @@ export class Geometry {
      * @param {Uint16Array | Uint32Array} indicesWireframe - Line index buffer data (2 indices per line segment).
      * @private
      */
-    #validateIndexSizes(indicesSolid, indicesWireframe) {
-        if ((indicesSolid.length % TRIANGLE_INDEX_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
-            throw new Error('Geometry solid indices length must be a multiple of `TRIANGLE_INDEX_COMPONENT_COUNT`.');
-        }
+    #validateIndexSizes(indicesSolid, indicesWireframe, solidPrimitive, wireframePrimitive) {
+        Geometry.#validateIndexSizeForPrimitive(indicesSolid, solidPrimitive, 'solid');
+        Geometry.#validateIndexSizeForPrimitive(indicesWireframe, wireframePrimitive, 'wireframe');
+    }
 
-        if ((indicesWireframe.length % LINE_INDEX_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
-            throw new Error('Geometry wireframe indices length must be a multiple of `LINE_INDEX_COMPONENT_COUNT`.');
+    /**
+     * Validates the index buffer length based on the primitive type.
+     *
+     * @param {Uint16Array | Uint32Array} indices - Index buffer.
+     * @param {string} primitive                  - Primitive type name.
+     * @param {string} label                      - Buffer label for error messages.
+     * @private
+     */
+    static #validateIndexSizeForPrimitive(indices, primitive, label) {
+        switch (primitive) {
+            case PRIMITIVE_TRIANGLES:
+                if ((indices.length % TRIANGLE_INDEX_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
+                    throw new Error(`Geometry ${label} indices length must be a multiple of TRIANGLE_INDEX_COMPONENT_COUNT.`);
+                }
+
+                return;
+
+            case PRIMITIVE_LINES:
+                if ((indices.length % LINE_INDEX_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
+                    throw new Error(`Geometry ${label} indices length must be a multiple of LINE_INDEX_COMPONENT_COUNT.`);
+                }
+
+                return;
+
+            case PRIMITIVE_LINE_STRIP:
+            case PRIMITIVE_LINE_LOOP:
+                if (indices.length < MIN_LINE_STRIP_INDEX_COUNT) {
+                    throw new Error(`Geometry ${label} indices length must be at least ${MIN_LINE_STRIP_INDEX_COUNT}.`);
+                }
+
+                return;
+
+            case PRIMITIVE_POINTS:
+                return;
+
+            default:
+                throw new Error(ERROR_INVALID_PRIMITIVE);
+        }
+    }
+
+    /**
+     * Validates primitive name.
+     *
+     * @param {string} value - Primitive name.
+     * @private
+     */
+    static #assertPrimitiveName(value) {
+        if (typeof value !== 'string' || !SUPPORTED_PRIMITIVES.has(value)) {
+            throw new TypeError(ERROR_INVALID_PRIMITIVE);
         }
     }
 

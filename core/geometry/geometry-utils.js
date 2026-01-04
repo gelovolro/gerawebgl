@@ -43,6 +43,27 @@ const MAX_UINT16_INDEX_VALUE = 0xFFFF;
 const VERTEX_COUNT_TO_MAX_INDEX_OFFSET = 1;
 
 /**
+ * Minimum vertex count.
+ *
+ * @type {number}
+ */
+const MIN_VERTEX_COUNT = 0;
+
+/**
+ * First vertex index.
+ *
+ * @type {number}
+ */
+const FIRST_VERTEX_INDEX = 0;
+
+/**
+ * Increment value for sequential indices.
+ *
+ * @type {number}
+ */
+const SEQUENTIAL_INDEX_INCREMENT = 1;
+
+/**
  * Indices per triangle (3 vertices).
  *
  * @type {number}
@@ -120,6 +141,37 @@ export function createIndexArray(vertexCount, indices) {
     }
 
     return new Uint16Array(indices);
+}
+
+/**
+ * Creates a sequential index buffer without the intermediate JS-arrays.
+ *
+ * @param {number} vertexCount          - Total vertex count.
+ * @returns {Uint16Array | Uint32Array} - Sequential index buffer.
+ * @throws {TypeError}  When `vertexCount` is not a finite number.
+ * @throws {RangeError} When `vertexCount` is negative or non-integer.
+ */
+export function createSequentialIndexArray(vertexCount) {
+    if (typeof vertexCount !== 'number' || !Number.isFinite(vertexCount)) {
+        throw new TypeError('`createSequentialIndexArray` expects `vertexCount` as a finite number.');
+    }
+
+    if (!Number.isInteger(vertexCount) || vertexCount < MIN_VERTEX_COUNT) {
+        throw new RangeError('`createSequentialIndexArray` expects `vertexCount` as a non-negative integer.');
+    }
+
+    if (vertexCount === MIN_VERTEX_COUNT) {
+        return new Uint16Array(MIN_VERTEX_COUNT);
+    }
+
+    const requiresUint32 = (vertexCount - VERTEX_COUNT_TO_MAX_INDEX_OFFSET) > MAX_UINT16_INDEX_VALUE;
+    const indexArray     = requiresUint32 ? new Uint32Array(vertexCount) : new Uint16Array(vertexCount);
+
+    for (let index = FIRST_VERTEX_INDEX; index < vertexCount; index += SEQUENTIAL_INDEX_INCREMENT) {
+        indexArray[index] = index;
+    }
+
+    return indexArray;
 }
 
 /**

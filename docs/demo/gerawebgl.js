@@ -929,6 +929,788 @@ var CameraMath = class _CameraMath {
   }
 };
 
+// core/math/vector3-math.js
+var VECTOR3_COMPONENT_COUNT = 3;
+var VECTOR3_X_INDEX = 0;
+var VECTOR3_Y_INDEX = 1;
+var VECTOR3_Z_INDEX = 2;
+var ZERO_VALUE = 0;
+var ONE_VALUE = 1;
+var DEFAULT_EPSILON = 1e-6;
+var MIN_NORMALIZE_LENGTH = 1e-8;
+var Vector3Math = class _Vector3Math {
+  /**
+   * Adds two vectors.
+   *
+   * @param {Vector3 | Float32Array} outputVector - Output vector.
+   * @param {Vector3 | Float32Array} firstVector  - First vector.
+   * @param {Vector3 | Float32Array} secondVector - Second vector.
+   * @returns {Vector3 | Float32Array}
+   * @throws {TypeError}  When any vector is invalid.
+   * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+   */
+  static add(outputVector, firstVector, secondVector) {
+    _Vector3Math.#assertVector3Like(outputVector, "outputVector");
+    _Vector3Math.#assertVector3Like(firstVector, "firstVector");
+    _Vector3Math.#assertVector3Like(secondVector, "secondVector");
+    const x = _Vector3Math.#getX(firstVector) + _Vector3Math.#getX(secondVector);
+    const y = _Vector3Math.#getY(firstVector) + _Vector3Math.#getY(secondVector);
+    const z = _Vector3Math.#getZ(firstVector) + _Vector3Math.#getZ(secondVector);
+    return _Vector3Math.#write(outputVector, x, y, z);
+  }
+  /**
+   * Subtracts the second vector from the first vector.
+   *
+   * @param {Vector3 | Float32Array} outputVector - Output vector.
+   * @param {Vector3 | Float32Array} firstVector  - First vector.
+   * @param {Vector3 | Float32Array} secondVector - Second vector.
+   * @returns {Vector3 | Float32Array}
+   * @throws {TypeError}  When any vector is invalid.
+   * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+   */
+  static sub(outputVector, firstVector, secondVector) {
+    _Vector3Math.#assertVector3Like(outputVector, "outputVector");
+    _Vector3Math.#assertVector3Like(firstVector, "firstVector");
+    _Vector3Math.#assertVector3Like(secondVector, "secondVector");
+    const x = _Vector3Math.#getX(firstVector) - _Vector3Math.#getX(secondVector);
+    const y = _Vector3Math.#getY(firstVector) - _Vector3Math.#getY(secondVector);
+    const z = _Vector3Math.#getZ(firstVector) - _Vector3Math.#getZ(secondVector);
+    return _Vector3Math.#write(outputVector, x, y, z);
+  }
+  /**
+   * Scales a vector by a scalar.
+   *
+   * @param {Vector3 | Float32Array} outputVector - Output vector.
+   * @param {Vector3 | Float32Array} inputVector  - Input vector.
+   * @param {number} scalar                       - Scalar multiplier.
+   * @returns {Vector3 | Float32Array}
+   * @throws {TypeError}  When vectors or scalar are invalid.
+   * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+   */
+  static scale(outputVector, inputVector, scalar) {
+    _Vector3Math.#assertVector3Like(outputVector, "outputVector");
+    _Vector3Math.#assertVector3Like(inputVector, "inputVector");
+    if (typeof scalar !== "number" || !Number.isFinite(scalar)) {
+      throw new TypeError("`Vector3Math.scale` expects `scalar` as a finite number.");
+    }
+    const x = _Vector3Math.#getX(inputVector) * scalar;
+    const y = _Vector3Math.#getY(inputVector) * scalar;
+    const z = _Vector3Math.#getZ(inputVector) * scalar;
+    return _Vector3Math.#write(outputVector, x, y, z);
+  }
+  /**
+   * Computes vector length.
+   *
+   * @param {Vector3 | Float32Array} inputVector - Input vector.
+   * @returns {number}
+   * @throws {TypeError}  When vector is invalid.
+   * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+   */
+  static length(inputVector) {
+    _Vector3Math.#assertVector3Like(inputVector, "inputVector");
+    const x = _Vector3Math.#getX(inputVector);
+    const y = _Vector3Math.#getY(inputVector);
+    const z = _Vector3Math.#getZ(inputVector);
+    return Math.sqrt(x * x + y * y + z * z);
+  }
+  /**
+   * Computes distance between two vectors.
+   *
+   * @param {Vector3 | Float32Array} firstVector  - First vector.
+   * @param {Vector3 | Float32Array} secondVector - Second vector.
+   * @returns {number}
+   * @throws {TypeError}  When vectors are invalid.
+   * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+   */
+  static distance(firstVector, secondVector) {
+    _Vector3Math.#assertVector3Like(firstVector, "firstVector");
+    _Vector3Math.#assertVector3Like(secondVector, "secondVector");
+    const deltaX = _Vector3Math.#getX(firstVector) - _Vector3Math.#getX(secondVector);
+    const deltaY = _Vector3Math.#getY(firstVector) - _Vector3Math.#getY(secondVector);
+    const deltaZ = _Vector3Math.#getZ(firstVector) - _Vector3Math.#getZ(secondVector);
+    return Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
+  }
+  /**
+   * Normalizes a vector.
+   *
+   * @param {Vector3 | Float32Array} outputVector - Output vector.
+   * @param {Vector3 | Float32Array} inputVector  - Input vector.
+   * @returns {Vector3 | Float32Array}
+   * @throws {TypeError}  When vectors are invalid.
+   * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+   */
+  static normalize(outputVector, inputVector) {
+    _Vector3Math.#assertVector3Like(outputVector, "outputVector");
+    _Vector3Math.#assertVector3Like(inputVector, "inputVector");
+    const vectorLength = _Vector3Math.length(inputVector);
+    if (vectorLength <= MIN_NORMALIZE_LENGTH) {
+      return _Vector3Math.#write(outputVector, ZERO_VALUE, ZERO_VALUE, ZERO_VALUE);
+    }
+    const inverseLength = ONE_VALUE / vectorLength;
+    return _Vector3Math.scale(outputVector, inputVector, inverseLength);
+  }
+  /**
+   * Computes dot product.
+   *
+   * @param {Vector3 | Float32Array} firstVector  - First vector.
+   * @param {Vector3 | Float32Array} secondVector - Second vector.
+   * @returns {number}
+   * @throws {TypeError}  When vectors are invalid.
+   * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+   */
+  static dot(firstVector, secondVector) {
+    _Vector3Math.#assertVector3Like(firstVector, "firstVector");
+    _Vector3Math.#assertVector3Like(secondVector, "secondVector");
+    return _Vector3Math.#getX(firstVector) * _Vector3Math.#getX(secondVector) + _Vector3Math.#getY(firstVector) * _Vector3Math.#getY(secondVector) + _Vector3Math.#getZ(firstVector) * _Vector3Math.#getZ(secondVector);
+  }
+  /**
+   * Computes cross product.
+   *
+   * @param {Vector3 | Float32Array} outputVector - Output vector.
+   * @param {Vector3 | Float32Array} firstVector  - First vector.
+   * @param {Vector3 | Float32Array} secondVector - Second vector.
+   * @returns {Vector3 | Float32Array}
+   * @throws {TypeError}  When vectors are invalid.
+   * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+   */
+  static cross(outputVector, firstVector, secondVector) {
+    _Vector3Math.#assertVector3Like(outputVector, "outputVector");
+    _Vector3Math.#assertVector3Like(firstVector, "firstVector");
+    _Vector3Math.#assertVector3Like(secondVector, "secondVector");
+    const firstX = _Vector3Math.#getX(firstVector);
+    const firstY = _Vector3Math.#getY(firstVector);
+    const firstZ = _Vector3Math.#getZ(firstVector);
+    const secondX = _Vector3Math.#getX(secondVector);
+    const secondY = _Vector3Math.#getY(secondVector);
+    const secondZ = _Vector3Math.#getZ(secondVector);
+    const x = firstY * secondZ - firstZ * secondY;
+    const y = firstZ * secondX - firstX * secondZ;
+    const z = firstX * secondY - firstY * secondX;
+    return _Vector3Math.#write(outputVector, x, y, z);
+  }
+  /**
+   * Linearly interpolates between vectors.
+   *
+   * @param {Vector3 | Float32Array} outputVector - Output vector.
+   * @param {Vector3 | Float32Array} startVector  - Start vector.
+   * @param {Vector3 | Float32Array} endVector    - End vector.
+   * @param {number} interpolationFactor          - Interpolation factor in [0..1].
+   * @returns {Vector3 | Float32Array}
+   * @throws {TypeError}  When vectors or interpolation factor are invalid.
+   * @throws {RangeError} When Float32Array vectors are not `length 3`.
+   */
+  static lerp(outputVector, startVector, endVector, interpolationFactor) {
+    _Vector3Math.#assertVector3Like(outputVector, "outputVector");
+    _Vector3Math.#assertVector3Like(startVector, "startVector");
+    _Vector3Math.#assertVector3Like(endVector, "endVector");
+    if (typeof interpolationFactor !== "number" || !Number.isFinite(interpolationFactor)) {
+      throw new TypeError("`Vector3Math.lerp` expects `interpolationFactor` as a finite number.");
+    }
+    const x = _Vector3Math.#getX(startVector) + (_Vector3Math.#getX(endVector) - _Vector3Math.#getX(startVector)) * interpolationFactor;
+    const y = _Vector3Math.#getY(startVector) + (_Vector3Math.#getY(endVector) - _Vector3Math.#getY(startVector)) * interpolationFactor;
+    const z = _Vector3Math.#getZ(startVector) + (_Vector3Math.#getZ(endVector) - _Vector3Math.#getZ(startVector)) * interpolationFactor;
+    return _Vector3Math.#write(outputVector, x, y, z);
+  }
+  /**
+   * Clamps vector components to the [min..max] range.
+   *
+   * @param {Vector3 | Float32Array} outputVector - Output vector.
+   * @param {Vector3 | Float32Array} inputVector  - Input vector.
+   * @param {number} min                          - Minimum component value.
+   * @param {number} max                          - Maximum component value.
+   * @returns {Vector3 | Float32Array}
+   * @throws {TypeError}  When vectors or bounds are invalid.
+   * @throws {RangeError} When Float32Array vectors are not `length 3`.
+   */
+  static clamp(outputVector, inputVector, min, max) {
+    _Vector3Math.#assertVector3Like(outputVector, "outputVector");
+    _Vector3Math.#assertVector3Like(inputVector, "inputVector");
+    if (typeof min !== "number" || typeof max !== "number" || !Number.isFinite(min) || !Number.isFinite(max)) {
+      throw new TypeError("`Vector3Math.clamp` expects `min` and `max` as finite numbers.");
+    }
+    const x = Math.max(min, Math.min(max, _Vector3Math.#getX(inputVector)));
+    const y = Math.max(min, Math.min(max, _Vector3Math.#getY(inputVector)));
+    const z = Math.max(min, Math.min(max, _Vector3Math.#getZ(inputVector)));
+    return _Vector3Math.#write(outputVector, x, y, z);
+  }
+  /**
+   * Compares two vectors with a tolerance.
+   *
+   * @param {Vector3 | Float32Array} firstVector  - First vector.
+   * @param {Vector3 | Float32Array} secondVector - Second vector.
+   * @param {number} [epsilon = 1e-6]             - Tolerance.
+   * @returns {boolean}
+   * @throws {TypeError}  When vectors or epsilon are invalid.
+   * @throws {RangeError} When Float32Array vectors are not `length 3`.
+   */
+  static approxEquals(firstVector, secondVector, epsilon = DEFAULT_EPSILON) {
+    _Vector3Math.#assertVector3Like(firstVector, "firstVector");
+    _Vector3Math.#assertVector3Like(secondVector, "secondVector");
+    if (typeof epsilon !== "number" || !Number.isFinite(epsilon)) {
+      throw new TypeError("`Vector3Math.approxEquals` expects `epsilon` as a finite number.");
+    }
+    return Math.abs(_Vector3Math.#getX(firstVector) - _Vector3Math.#getX(secondVector)) <= epsilon && Math.abs(_Vector3Math.#getY(firstVector) - _Vector3Math.#getY(secondVector)) <= epsilon && Math.abs(_Vector3Math.#getZ(firstVector) - _Vector3Math.#getZ(secondVector)) <= epsilon;
+  }
+  /**
+   * @param {Vector3 | Float32Array} vector - Vector to validate.
+   * @param {string} argumentName           - Argument name for error message.
+   * @private
+   */
+  static #assertVector3Like(vector, argumentName) {
+    if (!(vector instanceof Vector3) && !(vector instanceof Float32Array)) {
+      throw new TypeError(`\`Vector3Math\` expects \`${argumentName}\` as Vector3 or Float32Array.`);
+    }
+    if (vector instanceof Float32Array && vector.length !== VECTOR3_COMPONENT_COUNT) {
+      throw new RangeError("`Vector3Math` expects Float32Array(3) vectors.");
+    }
+  }
+  /**
+   * @param {Vector3 | Float32Array} vector - Input vector.
+   * @returns {number}
+   * @private
+   */
+  static #getX(vector) {
+    return vector instanceof Vector3 ? vector.x : vector[VECTOR3_X_INDEX];
+  }
+  /**
+   * @param {Vector3 | Float32Array} vector - Input vector.
+   * @returns {number}
+   * @private
+   */
+  static #getY(vector) {
+    return vector instanceof Vector3 ? vector.y : vector[VECTOR3_Y_INDEX];
+  }
+  /**
+   * @param {Vector3 | Float32Array} vector - Input vector.
+   * @returns {number}
+   * @private
+   */
+  static #getZ(vector) {
+    return vector instanceof Vector3 ? vector.z : vector[VECTOR3_Z_INDEX];
+  }
+  /**
+   * @param {Vector3 | Float32Array} outputVector - Output vector.
+   * @param {number} x                            - X component.
+   * @param {number} y                            - Y component.
+   * @param {number} z                            - Z component.
+   * @returns {Vector3 | Float32Array}
+   * @private
+   */
+  static #write(outputVector, x, y, z) {
+    if (outputVector instanceof Vector3) {
+      outputVector.set(x, y, z);
+      return outputVector;
+    }
+    outputVector[VECTOR3_X_INDEX] = x;
+    outputVector[VECTOR3_Y_INDEX] = y;
+    outputVector[VECTOR3_Z_INDEX] = z;
+    return outputVector;
+  }
+};
+
+// core/math/curve3.js
+var DEFAULT_SAMPLE_SEGMENTS = 32;
+var MIN_SAMPLE_SEGMENTS = 1;
+var SAMPLE_START_INDEX = 0;
+var SAMPLE_INDEX_INCREMENT = 1;
+var SAMPLE_START_PARAMETER = 0;
+var SAMPLE_END_PARAMETER = 1;
+var Curve3 = class _Curve3 {
+  /**
+   * Abstract curve base.
+   *
+   * @throws {Error} When instantiated directly.
+   */
+  constructor() {
+    if (new.target === _Curve3) {
+      throw new Error("`Curve3` is abstract and must be subclassed.");
+    }
+  }
+  /* eslint-disable */
+  /**
+   * Computes a point on the curve at normalized parameter.
+   *
+   * @param {number} normalizedParameter - Parameter in [0..1].
+   * @param {Vector3} [out]              - Optional output vector.
+   * @returns {Vector3}
+   * @throws {Error} When not implemented by subclass.
+   */
+  getPoint(normalizedParameter, out = new Vector3()) {
+    throw new Error("`Curve3.getPoint` must be implemented in subclasses.");
+  }
+  /**
+   * Computes a tangent on the curve at normalized parameter.
+   *
+   * @param {number} normalizedParameter - Parameter in [0..1].
+   * @param {Vector3} [out]              - Optional output vector.
+   * @returns {Vector3}
+   * @throws {Error} When not implemented by subclass.
+   */
+  getTangent(normalizedParameter, out = new Vector3()) {
+    throw new Error("`Curve3.getTangent` must be implemented in subclasses.");
+  }
+  /* eslint-enable */
+  /**
+   * Returns a point on the curve at normalized parameter.
+   *
+   * @param {number} normalizedParameter - Parameter in [0..1].
+   * @param {Vector3} [out]              - Optional output vector.
+   * @returns {Vector3}
+   * @throws {Error} When not implemented by subclass.
+   */
+  getPointAt(normalizedParameter, out = new Vector3()) {
+    return this.getPoint(normalizedParameter, out);
+  }
+  /**
+   * Returns a tangent on the curve at normalized parameter.
+   *
+   * @param {number} normalizedParameter - Parameter in [0..1].
+   * @param {Vector3} [out]              - Optional output vector.
+   * @returns {Vector3}
+   * @throws {Error} When not implemented by subclass.
+   */
+  getTangentAt(normalizedParameter, out = new Vector3()) {
+    return this.getTangent(normalizedParameter, out);
+  }
+  /**
+   * Samples the curve into the polyline.
+   *
+   * @param {number} [segments = 32] - Sample segment count.
+   * @returns {Vector3[]}
+   * @throws {TypeError}  When segments is not a finite number.
+   * @throws {RangeError} When segments is not an `integer >= 1`.
+   */
+  getPoints(segments = DEFAULT_SAMPLE_SEGMENTS) {
+    if (typeof segments !== "number" || !Number.isFinite(segments)) {
+      throw new TypeError("`Curve3.getPoints` expects `segments` as a finite number.");
+    }
+    if (!Number.isInteger(segments) || segments < MIN_SAMPLE_SEGMENTS) {
+      throw new RangeError("`Curve3.getPoints` expects `segments` as an integer >= 1.");
+    }
+    const points = [];
+    const segmentCount = segments;
+    const maxIndex = segmentCount;
+    for (let index = SAMPLE_START_INDEX; index <= maxIndex; index += SAMPLE_INDEX_INCREMENT) {
+      const sampleParameter = SAMPLE_START_PARAMETER + (SAMPLE_END_PARAMETER - SAMPLE_START_PARAMETER) * (index / segmentCount);
+      points.push(this.getPoint(sampleParameter, new Vector3()));
+    }
+    return points;
+  }
+};
+
+// core/math/catmull-rom-curve3.js
+var MIN_CONTROL_POINT_COUNT = 2;
+var DEFAULT_CLOSED = false;
+var CURVE_PARAMETER_MIN = 0;
+var CURVE_PARAMETER_MAX = 1;
+var ZERO_VALUE2 = 0;
+var OPEN_CURVE_LAST_SEGMENT_OFFSET = 1;
+var ONE_VALUE2 = 1;
+var TWO_VALUE = 2;
+var THREE_VALUE = 3;
+var FOUR_VALUE = 4;
+var FIVE_VALUE = 5;
+var CATMULL_ROM_TENSION = 0.5;
+var TANGENT_EPSILON = 1e-8;
+var CatmullRomCurve3 = class _CatmullRomCurve3 extends Curve3 {
+  /**
+   * Control points used to build the curve.
+   *
+   * @type {Vector3[]}
+   * @private
+   */
+  #points;
+  /**
+   * Whether the curve is closed (wraps around to the first point).
+   *
+   * @type {boolean}
+   * @private
+   */
+  #closed;
+  /**
+   * @param {Vector3[]} points               - Control points.
+   * @param {Object} [options]               - Optional options.
+   * @param {boolean} [options.closed=false] - Whether the curve is closed.
+   * @throws {TypeError}  When inputs are invalid.
+   * @throws {RangeError} When points are insufficient.
+   */
+  constructor(points, options = {}) {
+    super();
+    if (!Array.isArray(points)) {
+      throw new TypeError("`CatmullRomCurve3` expects `points` as an array of `Vector3`.");
+    }
+    if (points.length < MIN_CONTROL_POINT_COUNT) {
+      throw new RangeError("`CatmullRomCurve3` expects at least 2 control points.");
+    }
+    for (const point of points) {
+      if (!(point instanceof Vector3)) {
+        throw new TypeError("`CatmullRomCurve3` expects all points to be `Vector3` instances.");
+      }
+    }
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("`CatmullRomCurve3` expects options as a plain object.");
+    }
+    const { closed = DEFAULT_CLOSED } = options;
+    if (typeof closed !== "boolean") {
+      throw new TypeError("`CatmullRomCurve3` option `closed` must be a boolean.");
+    }
+    this.#points = points.slice();
+    this.#closed = closed;
+  }
+  /**
+   * @returns {Vector3[]}
+   */
+  get points() {
+    return this.#points;
+  }
+  /**
+   * @returns {boolean}
+   */
+  get closed() {
+    return this.#closed;
+  }
+  /**
+   * @param {number} curveParameter - Parameter in [0..1].
+   * @param {Vector3} [out]         - Optional output vector.
+   * @returns {Vector3}
+   * @throws {TypeError} When inputs are invalid.
+   */
+  getPoint(curveParameter, out = new Vector3()) {
+    if (typeof curveParameter !== "number" || !Number.isFinite(curveParameter)) {
+      throw new TypeError("`CatmullRomCurve3.getPoint` expects `curveParameter` as a finite number.");
+    }
+    if (!(out instanceof Vector3)) {
+      throw new TypeError("`CatmullRomCurve3.getPoint` expects `out` as a Vector3.");
+    }
+    const clampedCurveParameter = _CatmullRomCurve3.#clampCurveParameter(curveParameter);
+    const segmentCount = this.#closed ? this.#points.length : this.#points.length - OPEN_CURVE_LAST_SEGMENT_OFFSET;
+    const scaledCurveParameter = clampedCurveParameter * segmentCount;
+    const segmentIndex = Math.min(Math.floor(scaledCurveParameter), segmentCount - OPEN_CURVE_LAST_SEGMENT_OFFSET);
+    const segmentParameter = scaledCurveParameter - segmentIndex;
+    const previousControlPoint = this.#getPointForSegment(segmentIndex - ONE_VALUE2);
+    const startControlPoint = this.#getPointForSegment(segmentIndex);
+    const endControlPoint = this.#getPointForSegment(segmentIndex + ONE_VALUE2);
+    const nextControlPoint = this.#getPointForSegment(segmentIndex + TWO_VALUE);
+    const segmentParameterSquared = segmentParameter * segmentParameter;
+    const segmentParameterCubed = segmentParameterSquared * segmentParameter;
+    const x = CATMULL_ROM_TENSION * (TWO_VALUE * startControlPoint.x + (-previousControlPoint.x + endControlPoint.x) * segmentParameter + (TWO_VALUE * previousControlPoint.x - FIVE_VALUE * startControlPoint.x + FOUR_VALUE * endControlPoint.x - nextControlPoint.x) * segmentParameterSquared + (-previousControlPoint.x + THREE_VALUE * startControlPoint.x - THREE_VALUE * endControlPoint.x + nextControlPoint.x) * segmentParameterCubed);
+    const y = CATMULL_ROM_TENSION * (TWO_VALUE * startControlPoint.y + (-previousControlPoint.y + endControlPoint.y) * segmentParameter + (TWO_VALUE * previousControlPoint.y - FIVE_VALUE * startControlPoint.y + FOUR_VALUE * endControlPoint.y - nextControlPoint.y) * segmentParameterSquared + (-previousControlPoint.y + THREE_VALUE * startControlPoint.y - THREE_VALUE * endControlPoint.y + nextControlPoint.y) * segmentParameterCubed);
+    const z = CATMULL_ROM_TENSION * (TWO_VALUE * startControlPoint.z + (-previousControlPoint.z + endControlPoint.z) * segmentParameter + (TWO_VALUE * previousControlPoint.z - FIVE_VALUE * startControlPoint.z + FOUR_VALUE * endControlPoint.z - nextControlPoint.z) * segmentParameterSquared + (-previousControlPoint.z + THREE_VALUE * startControlPoint.z - THREE_VALUE * endControlPoint.z + nextControlPoint.z) * segmentParameterCubed);
+    return out.set(x, y, z);
+  }
+  /**
+   * @param {number} curveParameter - Parameter in [0..1].
+   * @param {Vector3} [out]         - Optional output vector.
+   * @returns {Vector3}
+   * @throws {TypeError} When inputs are invalid.
+   */
+  getTangent(curveParameter, out = new Vector3()) {
+    if (typeof curveParameter !== "number" || !Number.isFinite(curveParameter)) {
+      throw new TypeError("`CatmullRomCurve3.getTangent` expects `curveParameter` as a finite number.");
+    }
+    if (!(out instanceof Vector3)) {
+      throw new TypeError("`CatmullRomCurve3.getTangent` expects `out` as a Vector3.");
+    }
+    const clampedCurveParameter = _CatmullRomCurve3.#clampCurveParameter(curveParameter);
+    const segmentCount = this.#closed ? this.#points.length : this.#points.length - OPEN_CURVE_LAST_SEGMENT_OFFSET;
+    const scaledCurveParameter = clampedCurveParameter * segmentCount;
+    const segmentIndex = Math.min(Math.floor(scaledCurveParameter), segmentCount - OPEN_CURVE_LAST_SEGMENT_OFFSET);
+    const segmentParameter = scaledCurveParameter - segmentIndex;
+    const previousControlPoint = this.#getPointForSegment(segmentIndex - ONE_VALUE2);
+    const startControlPoint = this.#getPointForSegment(segmentIndex);
+    const endControlPoint = this.#getPointForSegment(segmentIndex + ONE_VALUE2);
+    const nextControlPoint = this.#getPointForSegment(segmentIndex + TWO_VALUE);
+    const segmentParameterSquared = segmentParameter * segmentParameter;
+    const x = CATMULL_ROM_TENSION * (-previousControlPoint.x + endControlPoint.x + TWO_VALUE * (TWO_VALUE * previousControlPoint.x - FIVE_VALUE * startControlPoint.x + FOUR_VALUE * endControlPoint.x - nextControlPoint.x) * segmentParameter + THREE_VALUE * (-previousControlPoint.x + THREE_VALUE * startControlPoint.x - THREE_VALUE * endControlPoint.x + nextControlPoint.x) * segmentParameterSquared);
+    const y = CATMULL_ROM_TENSION * (-previousControlPoint.y + endControlPoint.y + TWO_VALUE * (TWO_VALUE * previousControlPoint.y - FIVE_VALUE * startControlPoint.y + FOUR_VALUE * endControlPoint.y - nextControlPoint.y) * segmentParameter + THREE_VALUE * (-previousControlPoint.y + THREE_VALUE * startControlPoint.y - THREE_VALUE * endControlPoint.y + nextControlPoint.y) * segmentParameterSquared);
+    const z = CATMULL_ROM_TENSION * (-previousControlPoint.z + endControlPoint.z + TWO_VALUE * (TWO_VALUE * previousControlPoint.z - FIVE_VALUE * startControlPoint.z + FOUR_VALUE * endControlPoint.z - nextControlPoint.z) * segmentParameter + THREE_VALUE * (-previousControlPoint.z + THREE_VALUE * startControlPoint.z - THREE_VALUE * endControlPoint.z + nextControlPoint.z) * segmentParameterSquared);
+    const length = Math.sqrt(x * x + y * y + z * z);
+    if (length <= TANGENT_EPSILON) {
+      return out.set(ZERO_VALUE2, ZERO_VALUE2, ZERO_VALUE2);
+    }
+    return out.set(x / length, y / length, z / length);
+  }
+  /**
+   * @param {number} index - Segment index.
+   * @returns {Vector3}
+   * @private
+   */
+  #getPointForSegment(index) {
+    const pointCount = this.#points.length;
+    if (this.#closed) {
+      const wrappedIndex = (index % pointCount + pointCount) % pointCount;
+      return this.#points[wrappedIndex];
+    }
+    if (index < ZERO_VALUE2) {
+      return this.#points[ZERO_VALUE2];
+    }
+    if (index >= pointCount) {
+      return this.#points[pointCount - ONE_VALUE2];
+    }
+    return this.#points[index];
+  }
+  /**
+   * @param {number} curveParameter - Parameter value.
+   * @returns {number}
+   * @private
+   */
+  static #clampCurveParameter(curveParameter) {
+    if (curveParameter <= CURVE_PARAMETER_MIN) {
+      return CURVE_PARAMETER_MIN;
+    }
+    if (curveParameter >= CURVE_PARAMETER_MAX) {
+      return CURVE_PARAMETER_MAX;
+    }
+    return curveParameter;
+  }
+};
+
+// core/math/path3d.js
+var MIN_POINT_COUNT = 2;
+var DEFAULT_LOOP = false;
+var SEGMENT_START_INDEX = 0;
+var SEGMENT_INDEX_INCREMENT = 1;
+var ZERO_VALUE3 = 0;
+var ONE_VALUE3 = 1;
+var NORMALIZE_EPSILON = 1e-8;
+var Path3D = class _Path3D {
+  /**
+   * Internal copy of path points, used for sampling and interpolation.
+   *
+   * @type {Vector3[]}
+   * @private
+   */
+  #points;
+  /**
+   * Cached per-segment lengths (distance between consecutive points).
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #segmentLengths;
+  /**
+   * Cached cumulative segment lengths where index stores the length up to point.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #cumulativeLengths;
+  /**
+   * Total path length (sum of all segment lengths).
+   *
+   * @type {number}
+   * @private
+   */
+  #totalLength;
+  /**
+   * Whether the path is looped (wraps from the last point back to the first).
+   *
+   * @type {boolean}
+   * @private
+   */
+  #loop;
+  /**
+   * @param {Vector3[]} points             - Path points.
+   * @param {Object} [options]             - Optional options.
+   * @param {boolean} [options.loop=false] - Whether the path is looped.
+   * @throws {TypeError}  When inputs are invalid.
+   * @throws {RangeError} When points are insufficient.
+   */
+  constructor(points, options = {}) {
+    if (!Array.isArray(points)) {
+      throw new TypeError("`Path3D` expects `points` as an array of `Vector3`.");
+    }
+    if (points.length < MIN_POINT_COUNT) {
+      throw new RangeError("`Path3D` expects at least the 2 points.");
+    }
+    for (const point of points) {
+      if (!(point instanceof Vector3)) {
+        throw new TypeError("`Path3D` expects all points to be `Vector3` instances.");
+      }
+    }
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("`Path3D` expects options as a plain object.");
+    }
+    const { loop = DEFAULT_LOOP } = options;
+    if (typeof loop !== "boolean") {
+      throw new TypeError("`Path3D` option `loop` must be a boolean.");
+    }
+    this.#points = points.slice();
+    this.#loop = loop;
+    this.#segmentLengths = new Float32Array(this.#getSegmentCount());
+    this.#cumulativeLengths = new Float32Array(this.#segmentLengths.length + ONE_VALUE3);
+    this.#totalLength = ZERO_VALUE3;
+    this.#recalculateLengths();
+  }
+  /**
+   * @returns {Vector3[]}
+   */
+  get points() {
+    return this.#points;
+  }
+  /**
+   * @returns {boolean}
+   */
+  get loop() {
+    return this.#loop;
+  }
+  /**
+   * @returns {number}
+   */
+  get totalLength() {
+    return this.#totalLength;
+  }
+  /**
+   * Returns a point at normalized position along the path (arc-length parameterization).
+   *
+   * @param {number} pathParameter - Normalized path parameter in [0..1].
+   * @param {Vector3} [out]        - Optional output vector.
+   * @returns {Vector3}
+   * @throws {TypeError} When inputs are invalid.
+   */
+  getPointAt(pathParameter, out = new Vector3()) {
+    if (typeof pathParameter !== "number" || !Number.isFinite(pathParameter)) {
+      throw new TypeError("`Path3D.getPointAt` expects `pathParameter` as a finite number.");
+    }
+    if (!(out instanceof Vector3)) {
+      throw new TypeError("`Path3D.getPointAt` expects `out` as a `Vector3`.");
+    }
+    if (this.#totalLength <= ZERO_VALUE3) {
+      return out.copyFrom(this.#points[ZERO_VALUE3]);
+    }
+    const normalizedPathParameter = this.#normalizePathParameter(pathParameter);
+    const targetLength = normalizedPathParameter * this.#totalLength;
+    const segmentData = this.#findSegmentAtLength(targetLength);
+    const pointA = this.#points[segmentData.index];
+    const pointB = this.#getNextPoint(segmentData.index);
+    const segmentParameter = segmentData.length <= ZERO_VALUE3 ? ZERO_VALUE3 : (targetLength - segmentData.cumulativeLength) / segmentData.length;
+    const x = pointA.x + (pointB.x - pointA.x) * segmentParameter;
+    const y = pointA.y + (pointB.y - pointA.y) * segmentParameter;
+    const z = pointA.z + (pointB.z - pointA.z) * segmentParameter;
+    return out.set(x, y, z);
+  }
+  /**
+   * Returns a normalized tangent at normalized position along the path (arc-length parameterization).
+   *
+   * @param {number} pathParameter - Normalized path parameter in [0..1].
+   * @param {Vector3} [out]        - Optional output vector.
+   * @returns {Vector3}
+   * @throws {TypeError} When inputs are invalid.
+   */
+  getTangentAt(pathParameter, out = new Vector3()) {
+    if (typeof pathParameter !== "number" || !Number.isFinite(pathParameter)) {
+      throw new TypeError("`Path3D.getTangentAt` expects `pathParameter` as a finite number.");
+    }
+    if (!(out instanceof Vector3)) {
+      throw new TypeError("`Path3D.getTangentAt` expects `out` as a `Vector3`.");
+    }
+    const normalizedPathParameter = this.#normalizePathParameter(pathParameter);
+    const targetLength = normalizedPathParameter * this.#totalLength;
+    const segmentData = this.#findSegmentAtLength(targetLength);
+    const pointA = this.#points[segmentData.index];
+    const pointB = this.#getNextPoint(segmentData.index);
+    const deltaX = pointB.x - pointA.x;
+    const deltaY = pointB.y - pointA.y;
+    const deltaZ = pointB.z - pointA.z;
+    const tangentLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
+    if (tangentLength <= NORMALIZE_EPSILON) {
+      return out.set(ZERO_VALUE3, ZERO_VALUE3, ZERO_VALUE3);
+    }
+    return out.set(deltaX / tangentLength, deltaY / tangentLength, deltaZ / tangentLength);
+  }
+  /**
+   * @returns {number}
+   * @private
+   */
+  #getSegmentCount() {
+    return this.#loop ? this.#points.length : this.#points.length - ONE_VALUE3;
+  }
+  /**
+   * @param {number} length - Target length along the path.
+   * @returns {{index: number, length: number, cumulativeLength: number}}
+   * @private
+   */
+  #findSegmentAtLength(length) {
+    const segmentCount = this.#segmentLengths.length;
+    for (let index = SEGMENT_START_INDEX; index < segmentCount; index += SEGMENT_INDEX_INCREMENT) {
+      const segmentLength = this.#segmentLengths[index];
+      const cumulativeLength = this.#cumulativeLengths[index];
+      if (length <= cumulativeLength + segmentLength) {
+        return {
+          index,
+          length: segmentLength,
+          cumulativeLength
+        };
+      }
+    }
+    const lastIndex = segmentCount - ONE_VALUE3;
+    return {
+      index: lastIndex,
+      length: this.#segmentLengths[lastIndex],
+      cumulativeLength: this.#cumulativeLengths[lastIndex]
+    };
+  }
+  /**
+   * @param {number} index - Segment start index.
+   * @returns {Vector3}
+   * @private
+   */
+  #getNextPoint(index) {
+    if (this.#loop) {
+      const nextIndex = (index + ONE_VALUE3) % this.#points.length;
+      return this.#points[nextIndex];
+    }
+    return this.#points[Math.min(index + ONE_VALUE3, this.#points.length - ONE_VALUE3)];
+  }
+  /**
+   * @param {number} pathParameter - Path parameter to normalize.
+   * @returns {number}
+   * @private
+   */
+  #normalizePathParameter(pathParameter) {
+    if (this.#loop) {
+      const wrapped = pathParameter - Math.floor(pathParameter);
+      return wrapped < ZERO_VALUE3 ? wrapped + ONE_VALUE3 : wrapped;
+    }
+    if (pathParameter <= ZERO_VALUE3) {
+      return ZERO_VALUE3;
+    }
+    if (pathParameter >= ONE_VALUE3) {
+      return ONE_VALUE3;
+    }
+    return pathParameter;
+  }
+  /**
+   * @private
+   */
+  #recalculateLengths() {
+    const segmentCount = this.#segmentLengths.length;
+    let cumulativeLength = ZERO_VALUE3;
+    this.#cumulativeLengths[ZERO_VALUE3] = cumulativeLength;
+    for (let index = SEGMENT_START_INDEX; index < segmentCount; index += SEGMENT_INDEX_INCREMENT) {
+      const pointA = this.#points[index];
+      const pointB = this.#getNextPoint(index);
+      const length = _Path3D.#distance(pointA, pointB);
+      this.#segmentLengths[index] = length;
+      cumulativeLength += length;
+      this.#cumulativeLengths[index + ONE_VALUE3] = cumulativeLength;
+    }
+    this.#totalLength = cumulativeLength;
+  }
+  /**
+   * @param {Vector3} pointA - First point.
+   * @param {Vector3} pointB - Second point.
+   * @returns {number}
+   * @private
+   */
+  static #distance(pointA, pointB) {
+    const deltaX = pointB.x - pointA.x;
+    const deltaY = pointB.y - pointA.y;
+    const deltaZ = pointB.z - pointA.z;
+    return Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
+  }
+};
+
 // core/geometry/geometry.js
 var POSITION_ATTRIBUTE_LOCATION = 0;
 var POSITION_COMPONENT_COUNT = 3;
@@ -955,6 +1737,22 @@ var ERROR_BOUNDING_BOX_MIN_TYPE = "`Geometry.#writeBoundingBox` expects `outMin`
 var ERROR_BOUNDING_BOX_MAX_TYPE = "`Geometry.#writeBoundingBox` expects `outMax` as `Float32Array(3)`.";
 var TRIANGLE_INDEX_COMPONENT_COUNT = 3;
 var LINE_INDEX_COMPONENT_COUNT = 2;
+var PRIMITIVE_TRIANGLES = "triangles";
+var PRIMITIVE_LINES = "lines";
+var PRIMITIVE_LINE_STRIP = "line_strip";
+var PRIMITIVE_LINE_LOOP = "line_loop";
+var PRIMITIVE_POINTS = "points";
+var DEFAULT_SOLID_PRIMITIVE = PRIMITIVE_TRIANGLES;
+var DEFAULT_WIREFRAME_PRIMITIVE = PRIMITIVE_LINES;
+var MIN_LINE_STRIP_INDEX_COUNT = 2;
+var SUPPORTED_PRIMITIVES = /* @__PURE__ */ new Set([
+  PRIMITIVE_TRIANGLES,
+  PRIMITIVE_LINES,
+  PRIMITIVE_LINE_STRIP,
+  PRIMITIVE_LINE_LOOP,
+  PRIMITIVE_POINTS
+]);
+var ERROR_INVALID_PRIMITIVE = "`Geometry` expects the primitive options to use known primitive constants.";
 var Geometry = class _Geometry {
   /**
    * WebGL2 rendering context used to create and manage GPU resources.
@@ -1066,15 +1864,30 @@ var Geometry = class _Geometry {
    */
   #isDisposed = false;
   /**
-   * @param {WebGL2RenderingContext} webglContext        - WebGL2 rendering context used to create and manage GPU resources.
+   * Solid primitive type, used for rendering (triangles, lines, points, etc...).
+   *
+   * @type {string}
+   * @private
+   */
+  #solidPrimitive;
+  /**
+   * Wireframe primitive type, used for rendering (lines, points, etc...).
+   *
+   * @type {string}
+   * @private
+   */
+  #wireframePrimitive;
+  /**
+   * @param {WebGL2RenderingContext} webglContext        - WebGL2 rendering context used to create and manage the GPU resources.
    * @param {Float32Array} positions                     - [x, y, z] triples.
    * @param {Float32Array | null} colors                 - [red, green, blue] triples or null.
    * @param {Uint16Array | Uint32Array} indicesSolid     - Indices for solid triangles.
    * @param {Uint16Array | Uint32Array} indicesWireframe - Indices for wireframe lines.
    * @param {Float32Array | null} [uvs = null]           - [u, v] pairs or null.
    * @param {Float32Array | null} [normals = null]       - [x, y, z] triples or null.
+   * @param {GeometryPrimitiveOptions | null} [options]  - Primitive overrides.
    */
-  constructor(webglContext, positions, colors, indicesSolid, indicesWireframe, uvs = null, normals = null) {
+  constructor(webglContext, positions, colors, indicesSolid, indicesWireframe, uvs = null, normals = null, options = null) {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
       throw new TypeError("`Geometry` expects a `WebGL2RenderingContext`.");
     }
@@ -1093,8 +1906,17 @@ var Geometry = class _Geometry {
     if (!_Geometry.#isSupportedIndexArray(indicesSolid) || !_Geometry.#isSupportedIndexArray(indicesWireframe)) {
       throw new TypeError("`Geometry` expects indices as `Uint16Array` or `Uint32Array`.");
     }
+    if (options !== null && (typeof options !== "object" || Array.isArray(options))) {
+      throw new TypeError("`Geometry` expects `options` as a plain object or null.");
+    }
+    const {
+      solidPrimitive = DEFAULT_SOLID_PRIMITIVE,
+      wireframePrimitive = DEFAULT_WIREFRAME_PRIMITIVE
+    } = options || {};
+    _Geometry.#assertPrimitiveName(solidPrimitive);
+    _Geometry.#assertPrimitiveName(wireframePrimitive);
     this.#validateAttributeSizes(positions, colors, uvs, normals);
-    this.#validateIndexSizes(indicesSolid, indicesWireframe);
+    this.#validateIndexSizes(indicesSolid, indicesWireframe, solidPrimitive, wireframePrimitive);
     this.#webglContext = webglContext;
     this.#solidIndexCount = indicesSolid.length;
     this.#wireframeIndexCount = indicesWireframe.length;
@@ -1109,6 +1931,8 @@ var Geometry = class _Geometry {
     this.#indexBufferWireframe = this.#createIndexBuffer(indicesWireframe);
     this.#boundingBoxMin = new Float32Array(BOUNDING_BOX_COMPONENT_COUNT);
     this.#boundingBoxMax = new Float32Array(BOUNDING_BOX_COMPONENT_COUNT);
+    this.#solidPrimitive = solidPrimitive;
+    this.#wireframePrimitive = wireframePrimitive;
     _Geometry.#writeBoundingBox(positions, this.#boundingBoxMin, this.#boundingBoxMax);
     this.#configureVertexArray();
   }
@@ -1149,6 +1973,16 @@ var Geometry = class _Geometry {
   getIndexComponentType(wireframe) {
     this.#assertNotDisposed();
     return wireframe ? this.#wireframeIndexComponentType : this.#solidIndexComponentType;
+  }
+  /**
+   * Returns the primitive type for solid or wireframe rendering.
+   *
+   * @param {boolean} wireframe - When true, returns wireframe primitive type.
+   * @returns {string}
+   */
+  getPrimitive(wireframe) {
+    this.#assertNotDisposed();
+    return wireframe ? this.#wireframePrimitive : this.#solidPrimitive;
   }
   /**
    * Returns local-space AABB minimum.
@@ -1313,12 +2147,51 @@ var Geometry = class _Geometry {
    * @param {Uint16Array | Uint32Array} indicesWireframe - Line index buffer data (2 indices per line segment).
    * @private
    */
-  #validateIndexSizes(indicesSolid, indicesWireframe) {
-    if (indicesSolid.length % TRIANGLE_INDEX_COMPONENT_COUNT !== MODULO_ALIGNED_VALUE) {
-      throw new Error("Geometry solid indices length must be a multiple of `TRIANGLE_INDEX_COMPONENT_COUNT`.");
+  #validateIndexSizes(indicesSolid, indicesWireframe, solidPrimitive, wireframePrimitive) {
+    _Geometry.#validateIndexSizeForPrimitive(indicesSolid, solidPrimitive, "solid");
+    _Geometry.#validateIndexSizeForPrimitive(indicesWireframe, wireframePrimitive, "wireframe");
+  }
+  /**
+   * Validates the index buffer length based on the primitive type.
+   *
+   * @param {Uint16Array | Uint32Array} indices - Index buffer.
+   * @param {string} primitive                  - Primitive type name.
+   * @param {string} label                      - Buffer label for error messages.
+   * @private
+   */
+  static #validateIndexSizeForPrimitive(indices, primitive, label) {
+    switch (primitive) {
+      case PRIMITIVE_TRIANGLES:
+        if (indices.length % TRIANGLE_INDEX_COMPONENT_COUNT !== MODULO_ALIGNED_VALUE) {
+          throw new Error(`Geometry ${label} indices length must be a multiple of TRIANGLE_INDEX_COMPONENT_COUNT.`);
+        }
+        return;
+      case PRIMITIVE_LINES:
+        if (indices.length % LINE_INDEX_COMPONENT_COUNT !== MODULO_ALIGNED_VALUE) {
+          throw new Error(`Geometry ${label} indices length must be a multiple of LINE_INDEX_COMPONENT_COUNT.`);
+        }
+        return;
+      case PRIMITIVE_LINE_STRIP:
+      case PRIMITIVE_LINE_LOOP:
+        if (indices.length < MIN_LINE_STRIP_INDEX_COUNT) {
+          throw new Error(`Geometry ${label} indices length must be at least ${MIN_LINE_STRIP_INDEX_COUNT}.`);
+        }
+        return;
+      case PRIMITIVE_POINTS:
+        return;
+      default:
+        throw new Error(ERROR_INVALID_PRIMITIVE);
     }
-    if (indicesWireframe.length % LINE_INDEX_COMPONENT_COUNT !== MODULO_ALIGNED_VALUE) {
-      throw new Error("Geometry wireframe indices length must be a multiple of `LINE_INDEX_COMPONENT_COUNT`.");
+  }
+  /**
+   * Validates primitive name.
+   *
+   * @param {string} value - Primitive name.
+   * @private
+   */
+  static #assertPrimitiveName(value) {
+    if (typeof value !== "string" || !SUPPORTED_PRIMITIVES.has(value)) {
+      throw new TypeError(ERROR_INVALID_PRIMITIVE);
     }
   }
   /**
@@ -1458,6 +2331,9 @@ var DEFAULT_EXPECTED_PER_VERTEX_COLOR_LENGTH = 0;
 var AUTO_EXPECTED_PER_VERTEX_COLOR_LENGTH = 0;
 var MAX_UINT16_INDEX_VALUE = 65535;
 var VERTEX_COUNT_TO_MAX_INDEX_OFFSET = 1;
+var MIN_VERTEX_COUNT = 0;
+var FIRST_VERTEX_INDEX = 0;
+var SEQUENTIAL_INDEX_INCREMENT = 1;
 var TRIANGLE_INDEX_STRIDE = 3;
 var EDGE_KEY_SEPARATOR = ",";
 function createColorsFromSpec(vertexCount, colors, expectedPerVertexLength = DEFAULT_EXPECTED_PER_VERTEX_COLOR_LENGTH) {
@@ -1492,6 +2368,23 @@ function createIndexArray(vertexCount, indices) {
   }
   return new Uint16Array(indices);
 }
+function createSequentialIndexArray(vertexCount) {
+  if (typeof vertexCount !== "number" || !Number.isFinite(vertexCount)) {
+    throw new TypeError("`createSequentialIndexArray` expects `vertexCount` as a finite number.");
+  }
+  if (!Number.isInteger(vertexCount) || vertexCount < MIN_VERTEX_COUNT) {
+    throw new RangeError("`createSequentialIndexArray` expects `vertexCount` as a non-negative integer.");
+  }
+  if (vertexCount === MIN_VERTEX_COUNT) {
+    return new Uint16Array(MIN_VERTEX_COUNT);
+  }
+  const requiresUint32 = vertexCount - VERTEX_COUNT_TO_MAX_INDEX_OFFSET > MAX_UINT16_INDEX_VALUE;
+  const indexArray = requiresUint32 ? new Uint32Array(vertexCount) : new Uint16Array(vertexCount);
+  for (let index = FIRST_VERTEX_INDEX; index < vertexCount; index += SEQUENTIAL_INDEX_INCREMENT) {
+    indexArray[index] = index;
+  }
+  return indexArray;
+}
 function createWireframeIndicesFromSolidIndices(vertexCount, triangleIndices) {
   if (!(triangleIndices instanceof Uint16Array) && !(triangleIndices instanceof Uint32Array)) {
     throw new TypeError("`createWireframeIndicesFromSolidIndices` expects indices as `Uint16Array` or `Uint32Array`.");
@@ -1525,7 +2418,7 @@ var DEFAULT_COLORS = null;
 var DEFAULT_UVS = null;
 var DEFAULT_NORMALS = null;
 var POSITION_COMPONENT_COUNT2 = 3;
-var ZERO_VALUE = 0;
+var ZERO_VALUE4 = 0;
 var CustomGeometry = class _CustomGeometry extends Geometry {
   /**
    * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
@@ -1546,7 +2439,7 @@ var CustomGeometry = class _CustomGeometry extends Geometry {
     if (!(positions instanceof Float32Array)) {
       throw new TypeError("`CustomGeometry` expects `positions` as `Float32Array`.");
     }
-    if (positions.length % POSITION_COMPONENT_COUNT2 !== ZERO_VALUE) {
+    if (positions.length % POSITION_COMPONENT_COUNT2 !== ZERO_VALUE4) {
       throw new RangeError("`CustomGeometry` expects `positions` length to be a multiple of 3.");
     }
     const vertexCount = positions.length / POSITION_COMPONENT_COUNT2;
@@ -2094,8 +2987,8 @@ var HALF_SIZE_DIVISOR2 = 2;
 var VERTICES_PER_SEGMENT_INCREMENT3 = 1;
 var NEXT_VERTEX_OFFSET3 = 1;
 var UV_V_FLIP_BASE3 = 1;
-var ZERO_VALUE2 = 0;
-var ONE_VALUE = 1;
+var ZERO_VALUE5 = 0;
+var ONE_VALUE4 = 1;
 var VEC3_COMPONENT_COUNT3 = 3;
 var VEC2_COMPONENT_COUNT2 = 2;
 var TWO_PI = Math.PI * 2;
@@ -2212,9 +3105,9 @@ var SphereGeometry = class _SphereGeometry extends Geometry {
         positions[positionBaseOffset + 0] = positionX;
         positions[positionBaseOffset + 1] = positionY;
         positions[positionBaseOffset + 2] = positionZ;
-        const normalX0 = radiusX !== ZERO_VALUE2 ? positionX / (radiusX * radiusX) : ZERO_VALUE2;
-        const normalY0 = radiusY !== ZERO_VALUE2 ? positionY / (radiusY * radiusY) : ZERO_VALUE2;
-        const normalZ0 = radiusZ !== ZERO_VALUE2 ? positionZ / (radiusZ * radiusZ) : ZERO_VALUE2;
+        const normalX0 = radiusX !== ZERO_VALUE5 ? positionX / (radiusX * radiusX) : ZERO_VALUE5;
+        const normalY0 = radiusY !== ZERO_VALUE5 ? positionY / (radiusY * radiusY) : ZERO_VALUE5;
+        const normalZ0 = radiusZ !== ZERO_VALUE5 ? positionZ / (radiusZ * radiusZ) : ZERO_VALUE5;
         const inverseNormalLength = _SphereGeometry.#inverseLength(normalX0, normalY0, normalZ0);
         normals[positionBaseOffset + 0] = normalX0 * inverseNormalLength;
         normals[positionBaseOffset + 1] = normalY0 * inverseNormalLength;
@@ -2260,10 +3153,10 @@ var SphereGeometry = class _SphereGeometry extends Geometry {
    */
   static #inverseLength(x, y, z) {
     const length = Math.sqrt(x * x + y * y + z * z);
-    if (length === ZERO_VALUE2) {
-      return ZERO_VALUE2;
+    if (length === ZERO_VALUE5) {
+      return ZERO_VALUE5;
     }
-    return ONE_VALUE / length;
+    return ONE_VALUE4 / length;
   }
 };
 
@@ -2443,7 +3336,7 @@ var NORMAL_Y_UP = 1;
 var NORMAL_Y_DOWN = -1;
 var ORIGIN = 0;
 var DOUBLE_SIZE_MULTIPLIER = 2;
-var ZERO_VALUE3 = 0;
+var ZERO_VALUE6 = 0;
 var VEC3_COMPONENT_COUNT5 = 3;
 var VEC2_COMPONENT_COUNT4 = 2;
 var ZERO_VERTEX_COUNT = 0;
@@ -2622,8 +3515,8 @@ var ConeGeometry = class _ConeGeometry extends Geometry {
         normals[positionBaseOffset + 1] = NORMAL_Y_DOWN;
         normals[positionBaseOffset + 2] = NORMAL_Z_ZERO;
         const uvBaseOffset = vertexIndex * VEC2_COMPONENT_COUNT4;
-        uvs[uvBaseOffset + 0] = radiusX === ZERO_VALUE3 ? UV_CENTER : positionX / (radiusX * DOUBLE_SIZE_MULTIPLIER) + UV_CENTER;
-        uvs[uvBaseOffset + 1] = radiusZ === ZERO_VALUE3 ? UV_CENTER : positionZ / (radiusZ * DOUBLE_SIZE_MULTIPLIER) + UV_CENTER;
+        uvs[uvBaseOffset + 0] = radiusX === ZERO_VALUE6 ? UV_CENTER : positionX / (radiusX * DOUBLE_SIZE_MULTIPLIER) + UV_CENTER;
+        uvs[uvBaseOffset + 1] = radiusZ === ZERO_VALUE6 ? UV_CENTER : positionZ / (radiusZ * DOUBLE_SIZE_MULTIPLIER) + UV_CENTER;
         vertexIndex += 1;
       }
     }
@@ -2678,8 +3571,8 @@ var ConeGeometry = class _ConeGeometry extends Geometry {
    */
   static #inverseLength(x, y, z) {
     const length = Math.sqrt(x * x + y * y + z * z);
-    if (length === ZERO_VALUE3) {
-      return ZERO_VALUE3;
+    if (length === ZERO_VALUE6) {
+      return ZERO_VALUE6;
     }
     return UV_V_FLIP_BASE5 / length;
   }
@@ -2696,8 +3589,8 @@ var CENTER_T_OFFSET3 = 0.5;
 var UV_V_FLIP_BASE6 = 1;
 var VERTICES_PER_SEGMENT_INCREMENT6 = 1;
 var NEXT_VERTEX_OFFSET5 = 1;
-var ZERO_VALUE4 = 0;
-var ONE_VALUE2 = 1;
+var ZERO_VALUE7 = 0;
+var ONE_VALUE5 = 1;
 var NEGATIVE_ONE_VALUE = -1;
 var APEX_UV_U = 0.5;
 var APEX_UV_V = 0;
@@ -2796,7 +3689,7 @@ var PyramidGeometry = class _PyramidGeometry extends Geometry {
     const halfWidth = options.width / HALF_SIZE_DIVISOR5;
     const halfDepth = options.depth / HALF_SIZE_DIVISOR5;
     const halfHeight = options.height / HALF_SIZE_DIVISOR5;
-    const apexPoint = [ZERO_VALUE4, halfHeight, ZERO_VALUE4];
+    const apexPoint = [ZERO_VALUE7, halfHeight, ZERO_VALUE7];
     const positions = [];
     const normals = [];
     const uvs = [];
@@ -2920,7 +3813,7 @@ var PyramidGeometry = class _PyramidGeometry extends Geometry {
         const uNormalized = xIndex / xSegments;
         const positionX = (uNormalized - CENTER_T_OFFSET3) * fullWidth;
         positions.push(positionX, baseY, positionZ);
-        normals.push(ZERO_VALUE4, NEGATIVE_ONE_VALUE, ZERO_VALUE4);
+        normals.push(ZERO_VALUE7, NEGATIVE_ONE_VALUE, ZERO_VALUE7);
         uvs.push(uNormalized, UV_V_FLIP_BASE6 - vNormalized);
       }
     }
@@ -2958,7 +3851,7 @@ var PyramidGeometry = class _PyramidGeometry extends Geometry {
     let edgeStart = baseStart;
     let edgeEnd = baseEnd;
     let faceNormal = _PyramidGeometry.#computeFaceNormal(edgeStart, edgeEnd, apex);
-    if (_PyramidGeometry.#dot(faceNormal, outwardHint) < ZERO_VALUE4) {
+    if (_PyramidGeometry.#dot(faceNormal, outwardHint) < ZERO_VALUE7) {
       edgeStart = baseEnd;
       edgeEnd = baseStart;
       faceNormal = _PyramidGeometry.#computeFaceNormal(edgeStart, edgeEnd, apex);
@@ -3067,10 +3960,10 @@ var PyramidGeometry = class _PyramidGeometry extends Geometry {
    */
   static #inverseLength(x, y, z) {
     const length = Math.sqrt(x * x + y * y + z * z);
-    if (length === ZERO_VALUE4) {
-      return ZERO_VALUE4;
+    if (length === ZERO_VALUE7) {
+      return ZERO_VALUE7;
     }
-    return ONE_VALUE2 / length;
+    return ONE_VALUE5 / length;
   }
 };
 
@@ -3113,8 +4006,8 @@ var MAX_CHANNEL_VALUE = 255;
 var CANVAS_TAG_NAME = "canvas";
 var CANVAS_CONTEXT_2D = "2d";
 var MIN_REQUIRED_STRING_LENGTH = 1;
-var ZERO_VALUE5 = 0;
-var ONE_VALUE3 = 1;
+var ZERO_VALUE8 = 0;
+var ONE_VALUE6 = 1;
 var ERROR_OPTIONS_PLAIN_OBJECT = "`HeightmapGeometry` expects options as a plain object.";
 var ERROR_WEBGL_CONTEXT = "`HeightmapGeometry` expects `webglContext` as a `WebGL2RenderingContext`.";
 var ERROR_HEIGHTMAP_IMAGE_DATA = "`HeightmapGeometry` expects `heightmapImageData` as an `ImageData` instance or a `HeightmapSource` with `imageData`.";
@@ -3303,11 +4196,11 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
     const vertexCount = widthVertexCount * depthVertexCount;
     const positions = new Float32Array(vertexCount * VECTOR_COMPONENTS_3);
     const uvs = new Float32Array(vertexCount * UV_COMPONENTS_2);
-    let vertexIndex = ZERO_VALUE5;
-    for (let zIndex = ZERO_VALUE5; zIndex < depthVertexCount; zIndex += ONE_VALUE3) {
+    let vertexIndex = ZERO_VALUE8;
+    for (let zIndex = ZERO_VALUE8; zIndex < depthVertexCount; zIndex += ONE_VALUE6) {
       const vNormalized = zIndex / depthSegments;
       const positionZ = (vNormalized - CENTER_T_OFFSET4) * options.depth;
-      for (let xIndex = ZERO_VALUE5; xIndex < widthVertexCount; xIndex += ONE_VALUE3) {
+      for (let xIndex = ZERO_VALUE8; xIndex < widthVertexCount; xIndex += ONE_VALUE6) {
         const uNormalized = xIndex / widthSegments;
         const positionX = (uNormalized - CENTER_T_OFFSET4) * options.width;
         const height = _HeightmapGeometry.#sampleHeight(
@@ -3324,12 +4217,12 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
         const uvBaseOffset = vertexIndex * UV_COMPONENTS_2;
         uvs[uvBaseOffset + U_INDEX] = uNormalized;
         uvs[uvBaseOffset + V_INDEX] = vNormalized;
-        vertexIndex += ONE_VALUE3;
+        vertexIndex += ONE_VALUE6;
       }
     }
     const solidTriangleIndices = [];
-    for (let zIndex = ZERO_VALUE5; zIndex < depthSegments; zIndex += ONE_VALUE3) {
-      for (let xIndex = ZERO_VALUE5; xIndex < widthSegments; xIndex += ONE_VALUE3) {
+    for (let zIndex = ZERO_VALUE8; zIndex < depthSegments; zIndex += ONE_VALUE6) {
+      for (let xIndex = ZERO_VALUE8; xIndex < widthSegments; xIndex += ONE_VALUE6) {
         const topLeftVertexIndex = zIndex * widthVertexCount + xIndex;
         const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET6;
         const bottomLeftVertexIndex = topLeftVertexIndex + widthVertexCount;
@@ -3364,14 +4257,14 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
   static #sampleHeight(heightmapImageData, uNormalized, vNormalized, options) {
     const heightmapWidth = heightmapImageData.width;
     const heightmapHeight = heightmapImageData.height;
-    const vSample = options.flipY ? ONE_VALUE3 - vNormalized : vNormalized;
+    const vSample = options.flipY ? ONE_VALUE6 - vNormalized : vNormalized;
     if (options.sampling === SAMPLING_BILINEAR) {
-      const xFloat = uNormalized * (heightmapWidth - ONE_VALUE3);
-      const yFloat = vSample * (heightmapHeight - ONE_VALUE3);
+      const xFloat = uNormalized * (heightmapWidth - ONE_VALUE6);
+      const yFloat = vSample * (heightmapHeight - ONE_VALUE6);
       const x0 = Math.floor(xFloat);
       const y0 = Math.floor(yFloat);
-      const x1 = Math.min(x0 + ONE_VALUE3, heightmapWidth - ONE_VALUE3);
-      const y1 = Math.min(y0 + ONE_VALUE3, heightmapHeight - ONE_VALUE3);
+      const x1 = Math.min(x0 + ONE_VALUE6, heightmapWidth - ONE_VALUE6);
+      const y1 = Math.min(y0 + ONE_VALUE6, heightmapHeight - ONE_VALUE6);
       const tx = xFloat - x0;
       const ty = yFloat - y0;
       const h00 = _HeightmapGeometry.#getHeightAt(heightmapImageData, x0, y0);
@@ -3382,8 +4275,8 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
       const h1 = h01 + (h11 - h01) * tx;
       return h0 + (h1 - h0) * ty;
     }
-    const xIndex = Math.round(uNormalized * (heightmapWidth - ONE_VALUE3));
-    const yIndex = Math.round(vSample * (heightmapHeight - ONE_VALUE3));
+    const xIndex = Math.round(uNormalized * (heightmapWidth - ONE_VALUE6));
+    const yIndex = Math.round(vSample * (heightmapHeight - ONE_VALUE6));
     return _HeightmapGeometry.#getHeightAt(heightmapImageData, xIndex, yIndex);
   }
   /**
@@ -3413,7 +4306,7 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
    */
   static #computeVertexNormals(positions, indices, vertexCount) {
     const normals = new Float32Array(vertexCount * VECTOR_COMPONENTS_3);
-    for (let i = ZERO_VALUE5; i < indices.length; i += TRIANGLE_INDEX_STRIDE2) {
+    for (let i = ZERO_VALUE8; i < indices.length; i += TRIANGLE_INDEX_STRIDE2) {
       const indexA = indices[i + X_INDEX] * VECTOR_COMPONENTS_3;
       const indexB = indices[i + Y_INDEX] * VECTOR_COMPONENTS_3;
       const indexC = indices[i + Z_INDEX] * VECTOR_COMPONENTS_3;
@@ -3445,14 +4338,14 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
       normals[indexC + Y_INDEX] += crossY;
       normals[indexC + Z_INDEX] += crossZ;
     }
-    for (let vertexIndex = ZERO_VALUE5; vertexIndex < vertexCount; vertexIndex += ONE_VALUE3) {
+    for (let vertexIndex = ZERO_VALUE8; vertexIndex < vertexCount; vertexIndex += ONE_VALUE6) {
       const baseIndex = vertexIndex * VECTOR_COMPONENTS_3;
       const nx = normals[baseIndex + X_INDEX];
       const ny = normals[baseIndex + Y_INDEX];
       const nz = normals[baseIndex + Z_INDEX];
       const length = Math.sqrt(nx * nx + ny * ny + nz * nz);
-      if (length > ZERO_VALUE5) {
-        const invLength = ONE_VALUE3 / length;
+      if (length > ZERO_VALUE8) {
+        const invLength = ONE_VALUE6 / length;
         normals[baseIndex + X_INDEX] = nx * invLength;
         normals[baseIndex + Y_INDEX] = ny * invLength;
         normals[baseIndex + Z_INDEX] = nz * invLength;
@@ -3511,8 +4404,8 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
     }
     canvas.width = image.width;
     canvas.height = image.height;
-    context.drawImage(image, ZERO_VALUE5, ZERO_VALUE5);
-    return context.getImageData(ZERO_VALUE5, ZERO_VALUE5, image.width, image.height);
+    context.drawImage(image, ZERO_VALUE8, ZERO_VALUE8);
+    return context.getImageData(ZERO_VALUE8, ZERO_VALUE8, image.width, image.height);
   }
   /**
    * Heightmap sampling modes.
@@ -3524,6 +4417,438 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
       NEAREST: SAMPLING_NEAREST,
       BILINEAR: SAMPLING_BILINEAR
     });
+  }
+};
+
+// core/geometry/points-geometry.js
+var POSITION_COMPONENT_COUNT3 = 3;
+var POSITION_X_OFFSET2 = 0;
+var POSITION_Y_OFFSET2 = 1;
+var POSITION_Z_OFFSET2 = 2;
+var DEFAULT_COLORS2 = null;
+var DEFAULT_POSITIONS = null;
+var MIN_POINT_COUNT2 = 0;
+var PointsGeometry = class _PointsGeometry extends Geometry {
+  /**
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @param {PointsGeometryOptions} options       - Points geometry options.
+   * @throws {TypeError}  When inputs are invalid.
+   * @throws {RangeError} When positions are invalid.
+   */
+  constructor(webglContext, options = {}) {
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("`PointsGeometry` expects options as a plain object.");
+    }
+    const {
+      positions = DEFAULT_POSITIONS,
+      colors = DEFAULT_COLORS2
+    } = options;
+    if (!Array.isArray(positions)) {
+      throw new TypeError("`PointsGeometry` expects `positions` as an array of Vector3.");
+    }
+    if (positions.length < MIN_POINT_COUNT2) {
+      throw new RangeError("`PointsGeometry` expects a non-negative point count.");
+    }
+    for (const point of positions) {
+      if (!(point instanceof Vector3)) {
+        throw new TypeError("`PointsGeometry` expects all positions to be `Vector3` instances.");
+      }
+    }
+    if (colors !== null && !(colors instanceof Float32Array)) {
+      throw new TypeError("`PointsGeometry` expects `colors` as a `Float32Array` or null.");
+    }
+    const positionsBuffer = _PointsGeometry.#createPositionsArray(positions);
+    const vertexCount = positions.length;
+    const colorBuffer = colors ? createColorsFromSpec(vertexCount, colors) : null;
+    const indices = createSequentialIndexArray(vertexCount);
+    super(
+      webglContext,
+      positionsBuffer,
+      colorBuffer,
+      indices,
+      indices,
+      null,
+      null,
+      {
+        solidPrimitive: PRIMITIVE_POINTS,
+        wireframePrimitive: PRIMITIVE_POINTS
+      }
+    );
+  }
+  /**
+   * @param {Vector3[]} positions - Input positions.
+   * @returns {Float32Array}
+   * @private
+   */
+  static #createPositionsArray(positions) {
+    const buffer = new Float32Array(positions.length * POSITION_COMPONENT_COUNT3);
+    for (let index = 0; index < positions.length; index += 1) {
+      const baseIndex = index * POSITION_COMPONENT_COUNT3;
+      const point = positions[index];
+      buffer[baseIndex + POSITION_X_OFFSET2] = point.x;
+      buffer[baseIndex + POSITION_Y_OFFSET2] = point.y;
+      buffer[baseIndex + POSITION_Z_OFFSET2] = point.z;
+    }
+    return buffer;
+  }
+};
+
+// core/geometry/polyline-geometry.js
+var POSITION_COMPONENT_COUNT4 = 3;
+var POSITION_X_OFFSET3 = 0;
+var POSITION_Y_OFFSET3 = 1;
+var POSITION_Z_OFFSET3 = 2;
+var MIN_VERTEX_COUNT2 = 2;
+var DEFAULT_COLORS3 = null;
+var DEFAULT_LOOP2 = false;
+var PolylineGeometry = class _PolylineGeometry extends Geometry {
+  /**
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @param {PolylineGeometryOptions} options     - Polyline geometry options.
+   * @throws {TypeError}  When inputs are invalid.
+   * @throws {RangeError} When positions are invalid.
+   */
+  constructor(webglContext, options = {}) {
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("`PolylineGeometry` expects options as a plain object.");
+    }
+    const {
+      positions,
+      loop = DEFAULT_LOOP2,
+      colors = DEFAULT_COLORS3
+    } = options;
+    if (!Array.isArray(positions)) {
+      throw new TypeError("`PolylineGeometry` expects `positions` as an array of `Vector3`.");
+    }
+    if (positions.length < MIN_VERTEX_COUNT2) {
+      throw new RangeError("`PolylineGeometry` expects at least 2 points.");
+    }
+    for (const point of positions) {
+      if (!(point instanceof Vector3)) {
+        throw new TypeError("`PolylineGeometry` expects all positions to be the `Vector3` instances.");
+      }
+    }
+    if (typeof loop !== "boolean") {
+      throw new TypeError("`PolylineGeometry` expects `loop` as a boolean.");
+    }
+    if (colors !== null && !(colors instanceof Float32Array)) {
+      throw new TypeError("`PolylineGeometry` expects `colors` as `Float32Array` or null.");
+    }
+    const positionsBuffer = _PolylineGeometry.#createPositionsArray(positions);
+    const vertexCount = positions.length;
+    const colorBuffer = colors ? createColorsFromSpec(vertexCount, colors) : null;
+    const indices = createSequentialIndexArray(vertexCount);
+    const primitive = loop ? PRIMITIVE_LINE_LOOP : PRIMITIVE_LINE_STRIP;
+    super(
+      webglContext,
+      positionsBuffer,
+      colorBuffer,
+      indices,
+      indices,
+      null,
+      null,
+      {
+        solidPrimitive: primitive,
+        wireframePrimitive: primitive
+      }
+    );
+  }
+  /**
+   * @param {Vector3[]} positions - Input positions.
+   * @returns {Float32Array}
+   * @private
+   */
+  static #createPositionsArray(positions) {
+    const buffer = new Float32Array(positions.length * POSITION_COMPONENT_COUNT4);
+    for (let index = 0; index < positions.length; index += 1) {
+      const baseIndex = index * POSITION_COMPONENT_COUNT4;
+      const point = positions[index];
+      buffer[baseIndex + POSITION_X_OFFSET3] = point.x;
+      buffer[baseIndex + POSITION_Y_OFFSET3] = point.y;
+      buffer[baseIndex + POSITION_Z_OFFSET3] = point.z;
+    }
+    return buffer;
+  }
+};
+
+// core/geometry/tube-line-geometry.js
+var POSITION_COMPONENT_COUNT5 = 3;
+var POSITION_X_OFFSET4 = 0;
+var POSITION_Y_OFFSET4 = 1;
+var POSITION_Z_OFFSET4 = 2;
+var MIN_POINT_COUNT3 = 2;
+var DEFAULT_RADIUS = 0.05;
+var DEFAULT_WIDTH = null;
+var DEFAULT_RADIAL_SEGMENTS3 = 8;
+var MIN_RADIAL_SEGMENTS = 3;
+var DEFAULT_CLOSED2 = false;
+var CAP_TYPE_NONE = "none";
+var CAP_TYPE_FLAT = "flat";
+var DEFAULT_CAP_TYPE = CAP_TYPE_NONE;
+var ERROR_INVALID_CAP_TYPE = `\`TubeLineGeometry\` expects \`capType\` to be "${CAP_TYPE_NONE}" or "${CAP_TYPE_FLAT}".`;
+var WIDTH_TO_RADIUS_DIVISOR = 2;
+var TWO_PI4 = Math.PI * 2;
+var NORMALIZE_EPSILON2 = 1e-8;
+var UP_AXIS_X = 0;
+var UP_AXIS_Y = 1;
+var UP_AXIS_Z = 0;
+var FALLBACK_AXIS_X = 1;
+var FALLBACK_AXIS_Y = 0;
+var FALLBACK_AXIS_Z = 0;
+var SECOND_FALLBACK_AXIS_X = 0;
+var SECOND_FALLBACK_AXIS_Y = 0;
+var SECOND_FALLBACK_AXIS_Z = 1;
+var ZERO_VALUE9 = 0;
+var ONE_VALUE7 = 1;
+var TWO_VALUE2 = 2;
+var TubeLineGeometry = class _TubeLineGeometry extends Geometry {
+  /**
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @param {TubeLineGeometryOptions} options     - Tube geometry options.
+   * @throws {TypeError}  When inputs are invalid.
+   * @throws {RangeError} When numeric inputs are out of range.
+   */
+  constructor(webglContext, options = {}) {
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("`TubeLineGeometry` expects options as a plain object.");
+    }
+    const {
+      positions,
+      radius = DEFAULT_RADIUS,
+      width = DEFAULT_WIDTH,
+      radialSegments = DEFAULT_RADIAL_SEGMENTS3,
+      closed = DEFAULT_CLOSED2,
+      capType = DEFAULT_CAP_TYPE
+    } = options;
+    if (!Array.isArray(positions)) {
+      throw new TypeError("`TubeLineGeometry` expects `positions` as an array of `Vector3`.");
+    }
+    if (positions.length < MIN_POINT_COUNT3) {
+      throw new RangeError("`TubeLineGeometry` expects at least the 2 points.");
+    }
+    for (const point of positions) {
+      if (!(point instanceof Vector3)) {
+        throw new TypeError("`TubeLineGeometry` expects all positions to be the `Vector3` instances.");
+      }
+    }
+    if (typeof radius !== "number" || !Number.isFinite(radius) || radius <= ZERO_VALUE9) {
+      throw new RangeError("`TubeLineGeometry` expects `radius` as a positive number.");
+    }
+    if (width !== null && (typeof width !== "number" || !Number.isFinite(width) || width <= ZERO_VALUE9)) {
+      throw new RangeError("`TubeLineGeometry` expects `width` as a positive number or null.");
+    }
+    if (!Number.isInteger(radialSegments) || radialSegments < MIN_RADIAL_SEGMENTS) {
+      throw new RangeError("`TubeLineGeometry` expects `radialSegments` as an `integer >= 3`.");
+    }
+    if (typeof closed !== "boolean") {
+      throw new TypeError("`TubeLineGeometry` expects `closed` as a boolean.");
+    }
+    if (capType !== CAP_TYPE_NONE && capType !== CAP_TYPE_FLAT) {
+      throw new RangeError(ERROR_INVALID_CAP_TYPE);
+    }
+    const resolvedRadius = width !== null ? width / WIDTH_TO_RADIUS_DIVISOR : radius;
+    const baseVertexCount = positions.length * radialSegments;
+    const addCaps = capType === CAP_TYPE_FLAT && !closed;
+    const extraCapVertices = addCaps ? TWO_VALUE2 : ZERO_VALUE9;
+    const totalVertexCount = baseVertexCount + extraCapVertices;
+    const positionsBuffer = new Float32Array(totalVertexCount * POSITION_COMPONENT_COUNT5);
+    _TubeLineGeometry.#writeRingPositions(positionsBuffer, positions, radialSegments, resolvedRadius, closed);
+    if (addCaps) {
+      _TubeLineGeometry.#writeCapCenters(positionsBuffer, positions, baseVertexCount);
+    }
+    const indices = _TubeLineGeometry.#buildIndices(positions.length, radialSegments, closed, addCaps, baseVertexCount);
+    const wireframeIndices = createWireframeIndicesFromSolidIndices(totalVertexCount, indices);
+    super(
+      webglContext,
+      positionsBuffer,
+      null,
+      indices,
+      wireframeIndices,
+      null,
+      null,
+      {
+        solidPrimitive: PRIMITIVE_TRIANGLES,
+        wireframePrimitive: PRIMITIVE_LINES
+      }
+    );
+  }
+  /**
+   * @param {Float32Array} buffer   - Output positions buffer.
+   * @param {Vector3[]} positions   - Input path positions.
+   * @param {number} radialSegments - Radial segment count.
+   * @param {number} radius         - Tube radius.
+   * @param {boolean} closed        - Whether path is closed.
+   * @private
+   */
+  static #writeRingPositions(buffer, positions, radialSegments, radius, closed) {
+    const pointCount = positions.length;
+    for (let index = ZERO_VALUE9; index < pointCount; index += ONE_VALUE7) {
+      const previousIndex = _TubeLineGeometry.#getPreviousIndex(index, pointCount, closed);
+      const nextIndex = _TubeLineGeometry.#getNextIndex(index, pointCount, closed);
+      const tangent = _TubeLineGeometry.#computeTangent(positions[previousIndex], positions[nextIndex]);
+      const normal = _TubeLineGeometry.#computeNormal(tangent);
+      const binormal = _TubeLineGeometry.#computeBinormal(tangent, normal);
+      const ringBase = index * radialSegments;
+      const point = positions[index];
+      for (let segmentIndex = ZERO_VALUE9; segmentIndex < radialSegments; segmentIndex += ONE_VALUE7) {
+        const angle = TWO_PI4 * (segmentIndex / radialSegments);
+        const cosAngle = Math.cos(angle);
+        const sinAngle = Math.sin(angle);
+        const offsetX = (normal.x * cosAngle + binormal.x * sinAngle) * radius;
+        const offsetY = (normal.y * cosAngle + binormal.y * sinAngle) * radius;
+        const offsetZ = (normal.z * cosAngle + binormal.z * sinAngle) * radius;
+        const vertexIndex = ringBase + segmentIndex;
+        const baseIndex = vertexIndex * POSITION_COMPONENT_COUNT5;
+        buffer[baseIndex + POSITION_X_OFFSET4] = point.x + offsetX;
+        buffer[baseIndex + POSITION_Y_OFFSET4] = point.y + offsetY;
+        buffer[baseIndex + POSITION_Z_OFFSET4] = point.z + offsetZ;
+      }
+    }
+  }
+  /**
+   * @param {Float32Array} buffer    - Output positions buffer.
+   * @param {Vector3[]} positions    - Input path positions.
+   * @param {number} baseVertexCount - Base vertex count before caps.
+   * @private
+   */
+  static #writeCapCenters(buffer, positions, baseVertexCount) {
+    const startBaseIndex = baseVertexCount * POSITION_COMPONENT_COUNT5;
+    const endBaseIndex = (baseVertexCount + ONE_VALUE7) * POSITION_COMPONENT_COUNT5;
+    const startPoint = positions[ZERO_VALUE9];
+    const endPoint = positions[positions.length - ONE_VALUE7];
+    buffer[startBaseIndex + POSITION_X_OFFSET4] = startPoint.x;
+    buffer[startBaseIndex + POSITION_Y_OFFSET4] = startPoint.y;
+    buffer[startBaseIndex + POSITION_Z_OFFSET4] = startPoint.z;
+    buffer[endBaseIndex + POSITION_X_OFFSET4] = endPoint.x;
+    buffer[endBaseIndex + POSITION_Y_OFFSET4] = endPoint.y;
+    buffer[endBaseIndex + POSITION_Z_OFFSET4] = endPoint.z;
+  }
+  /**
+   * @param {number} pointCount      - Number of path points.
+   * @param {number} radialSegments  - Radial segment count.
+   * @param {boolean} closed         - Whether path is closed.
+   * @param {boolean} addCaps        - Whether caps are added.
+   * @param {number} baseVertexCount - Base vertex count before caps.
+   * @returns {Uint16Array | Uint32Array}
+   * @private
+   */
+  static #buildIndices(pointCount, radialSegments, closed, addCaps, baseVertexCount) {
+    const segmentCount = closed ? pointCount : pointCount - ONE_VALUE7;
+    const indices = [];
+    for (let segmentIndex = ZERO_VALUE9; segmentIndex < segmentCount; segmentIndex += ONE_VALUE7) {
+      const ringStart = segmentIndex * radialSegments;
+      const nextRingStart = (segmentIndex + ONE_VALUE7) % pointCount * radialSegments;
+      for (let radialIndex = ZERO_VALUE9; radialIndex < radialSegments; radialIndex += ONE_VALUE7) {
+        const nextRadialIndex = (radialIndex + ONE_VALUE7) % radialSegments;
+        const groupA = ringStart + radialIndex;
+        const groupB = ringStart + nextRadialIndex;
+        const groupC = nextRingStart + radialIndex;
+        const groupD = nextRingStart + nextRadialIndex;
+        indices.push(groupA, groupC, groupB);
+        indices.push(groupB, groupC, groupD);
+      }
+    }
+    if (addCaps) {
+      const startCenterIndex = baseVertexCount;
+      const endCenterIndex = baseVertexCount + ONE_VALUE7;
+      const startRingStart = ZERO_VALUE9;
+      const endRingStart = (pointCount - ONE_VALUE7) * radialSegments;
+      for (let radialIndex = ZERO_VALUE9; radialIndex < radialSegments; radialIndex += ONE_VALUE7) {
+        const nextRadialIndex = (radialIndex + ONE_VALUE7) % radialSegments;
+        const startA = startRingStart + radialIndex;
+        const startB = startRingStart + nextRadialIndex;
+        indices.push(startCenterIndex, startB, startA);
+        const endA = endRingStart + radialIndex;
+        const endB = endRingStart + nextRadialIndex;
+        indices.push(endCenterIndex, endA, endB);
+      }
+    }
+    return createIndexArray(baseVertexCount + (addCaps ? TWO_VALUE2 : ZERO_VALUE9), indices);
+  }
+  /**
+   * @param {number} index   - Current index.
+   * @param {number} count   - Total count.
+   * @param {boolean} closed - Whether path is closed.
+   * @returns {number}
+   * @private
+   */
+  static #getPreviousIndex(index, count, closed) {
+    if (index > ZERO_VALUE9) {
+      return index - ONE_VALUE7;
+    }
+    return closed ? count - ONE_VALUE7 : index;
+  }
+  /**
+   * @param {number} index   - Current index.
+   * @param {number} count   - Total count.
+   * @param {boolean} closed - Whether path is closed.
+   * @returns {number}
+   * @private
+   */
+  static #getNextIndex(index, count, closed) {
+    if (index < count - ONE_VALUE7) {
+      return index + ONE_VALUE7;
+    }
+    return closed ? ZERO_VALUE9 : index;
+  }
+  /**
+   * @param {Vector3} pointA - Start point.
+   * @param {Vector3} pointB - End point.
+   * @returns {Vector3}
+   * @private
+   */
+  static #computeTangent(pointA, pointB) {
+    const deltaX = pointB.x - pointA.x;
+    const deltaY = pointB.y - pointA.y;
+    const deltaZ = pointB.z - pointA.z;
+    const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
+    if (length <= NORMALIZE_EPSILON2) {
+      return new Vector3(ZERO_VALUE9, ONE_VALUE7, ZERO_VALUE9);
+    }
+    return new Vector3(deltaX / length, deltaY / length, deltaZ / length);
+  }
+  /**
+   * @param {Vector3} tangent - Tangent direction.
+   * @returns {Vector3}
+   * @private
+   */
+  static #computeNormal(tangent) {
+    let normalX = tangent.y * UP_AXIS_Z - tangent.z * UP_AXIS_Y;
+    let normalY = tangent.z * UP_AXIS_X - tangent.x * UP_AXIS_Z;
+    let normalZ = tangent.x * UP_AXIS_Y - tangent.y * UP_AXIS_X;
+    let length = Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
+    if (length <= NORMALIZE_EPSILON2) {
+      normalX = tangent.y * FALLBACK_AXIS_Z - tangent.z * FALLBACK_AXIS_Y;
+      normalY = tangent.z * FALLBACK_AXIS_X - tangent.x * FALLBACK_AXIS_Z;
+      normalZ = tangent.x * FALLBACK_AXIS_Y - tangent.y * FALLBACK_AXIS_X;
+      length = Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
+    }
+    if (length <= NORMALIZE_EPSILON2) {
+      normalX = tangent.y * SECOND_FALLBACK_AXIS_Z - tangent.z * SECOND_FALLBACK_AXIS_Y;
+      normalY = tangent.z * SECOND_FALLBACK_AXIS_X - tangent.x * SECOND_FALLBACK_AXIS_Z;
+      normalZ = tangent.x * SECOND_FALLBACK_AXIS_Y - tangent.y * SECOND_FALLBACK_AXIS_X;
+      length = Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
+    }
+    if (length <= NORMALIZE_EPSILON2) {
+      return new Vector3(ONE_VALUE7, ZERO_VALUE9, ZERO_VALUE9);
+    }
+    return new Vector3(normalX / length, normalY / length, normalZ / length);
+  }
+  /**
+   * @param {Vector3} tangent - Tangent direction.
+   * @param {Vector3} normal  - Normal vector.
+   * @returns {Vector3}
+   * @private
+   */
+  static #computeBinormal(tangent, normal) {
+    const binormalX = tangent.y * normal.z - tangent.z * normal.y;
+    const binormalY = tangent.z * normal.x - tangent.x * normal.z;
+    const binormalZ = tangent.x * normal.y - tangent.y * normal.x;
+    const length = Math.sqrt(binormalX * binormalX + binormalY * binormalY + binormalZ * binormalZ);
+    if (length <= NORMALIZE_EPSILON2) {
+      return new Vector3(ZERO_VALUE9, ZERO_VALUE9, ZERO_VALUE9);
+    }
+    return new Vector3(binormalX / length, binormalY / length, binormalZ / length);
   }
 };
 
@@ -5053,6 +6378,182 @@ var PhongMaterial = class extends DirectionalLightMaterial {
   }
 };
 
+// core/material/points-material.js
+var POSITION_ATTRIBUTE_LOCATION7 = 0;
+var COLOR_ATTRIBUTE_LOCATION3 = 1;
+var MATRIX_UNIFORM_NAME5 = "u_matrix";
+var COLOR_UNIFORM_NAME3 = "u_color";
+var POINT_SIZE_UNIFORM_NAME = "u_pointSize";
+var OPACITY_UNIFORM_NAME6 = "u_opacity";
+var USE_VERTEX_COLOR_UNIFORM_NAME = "u_useVertexColor";
+var COLOR_COMPONENT_COUNT4 = 3;
+var COLOR_COMPONENT_RED_INDEX = 0;
+var COLOR_COMPONENT_GREEN_INDEX = 1;
+var COLOR_COMPONENT_BLUE_INDEX = 2;
+var DEFAULT_COLOR3 = new Float32Array([1, 1, 1]);
+var DEFAULT_POINT_SIZE = 6;
+var MIN_POINT_SIZE = 0;
+var DEFAULT_USE_VERTEX_COLORS = false;
+var FLOAT_FALSE = 0;
+var FLOAT_TRUE = 1;
+var POINT_COORD_CENTER = 0.5;
+var POINT_COORD_RADIUS = 0.5;
+var POSITION_W_COMPONENT = 1;
+var VERTEX_SHADER_SOURCE7 = `#version 300 es
+precision mediump float;
+layout(location = ${POSITION_ATTRIBUTE_LOCATION7}) in vec3 a_position;
+layout(location = ${COLOR_ATTRIBUTE_LOCATION3}) in vec3 a_color;
+uniform mat4 ${MATRIX_UNIFORM_NAME5};
+uniform vec3 ${COLOR_UNIFORM_NAME3};
+uniform float ${POINT_SIZE_UNIFORM_NAME};
+uniform float ${USE_VERTEX_COLOR_UNIFORM_NAME};
+out vec3 v_color;
+
+void main() {
+    gl_Position  = ${MATRIX_UNIFORM_NAME5} * vec4(a_position, ${POSITION_W_COMPONENT});
+    gl_PointSize = ${POINT_SIZE_UNIFORM_NAME};
+    v_color      = mix(${COLOR_UNIFORM_NAME3}, a_color, ${USE_VERTEX_COLOR_UNIFORM_NAME});
+}
+`;
+var FRAGMENT_SHADER_SOURCE7 = `#version 300 es
+precision mediump float;
+in vec3 v_color;
+uniform float ${OPACITY_UNIFORM_NAME6};
+out vec4 outColor;
+
+void main() {
+    vec2 centered = gl_PointCoord - vec2(${POINT_COORD_CENTER}, ${POINT_COORD_CENTER});
+    float dist    = length(centered);
+
+    if (dist > ${POINT_COORD_RADIUS}) {
+        discard;
+    }
+
+    outColor = vec4(v_color, ${OPACITY_UNIFORM_NAME6});
+}
+`;
+var PointsMaterial = class extends Material {
+  /**
+   * Current RGB color stored as Float32Array([red, green, blue]).
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #color = new Float32Array(DEFAULT_COLOR3);
+  /**
+   * Point size in pixels.
+   *
+   * @type {number}
+   * @private
+   */
+  #pointSize = DEFAULT_POINT_SIZE;
+  /**
+   * Flag controlling vertex color usage.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #useVertexColors = DEFAULT_USE_VERTEX_COLORS;
+  /**
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to compile shaders.
+   * @param {PointsMaterialOptions} [options]     - Material options.
+   * @throws {TypeError}  When inputs are invalid.
+   * @throws {RangeError} When numeric inputs are out of range.
+   */
+  constructor(webglContext, options = {}) {
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError("`PointsMaterial` expects an options object (plain object).");
+    }
+    const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE7, FRAGMENT_SHADER_SOURCE7);
+    super(webglContext, shaderProgram, { ownsShaderProgram: true });
+    const {
+      color,
+      pointSize = DEFAULT_POINT_SIZE,
+      useVertexColors = DEFAULT_USE_VERTEX_COLORS
+    } = options;
+    if (color !== void 0) {
+      this.setColor(color);
+    }
+    this.setPointSize(pointSize);
+    this.setUseVertexColors(useVertexColors);
+  }
+  /**
+   * Applies per-object uniforms.
+   *
+   * @param {Float32Array} matrix4 - Transformation matrix passed as `u_matrix`.
+   */
+  apply(matrix4) {
+    this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME5, matrix4);
+    this.shaderProgram.setVector3(COLOR_UNIFORM_NAME3, this.#color);
+    this.shaderProgram.setFloat(POINT_SIZE_UNIFORM_NAME, this.#pointSize);
+    this.shaderProgram.setFloat(USE_VERTEX_COLOR_UNIFORM_NAME, this.#useVertexColors ? FLOAT_TRUE : FLOAT_FALSE);
+    this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME6, this.opacity);
+  }
+  /**
+   * Sets the RGB color.
+   *
+   * @param {Float32Array | number[]} color - [red, green, blue] in [0..1] range.
+   * @throws {TypeError} When color is invalid.
+   */
+  setColor(color) {
+    if (!Array.isArray(color) && !(color instanceof Float32Array)) {
+      throw new TypeError("`PointsMaterial.setColor` expects a number[] or `Float32Array`.");
+    }
+    if (color.length !== COLOR_COMPONENT_COUNT4) {
+      throw new TypeError("`PointsMaterial.setColor` expects exactly 3 components [red, green, blue].");
+    }
+    this.#color[COLOR_COMPONENT_RED_INDEX] = color[COLOR_COMPONENT_RED_INDEX];
+    this.#color[COLOR_COMPONENT_GREEN_INDEX] = color[COLOR_COMPONENT_GREEN_INDEX];
+    this.#color[COLOR_COMPONENT_BLUE_INDEX] = color[COLOR_COMPONENT_BLUE_INDEX];
+  }
+  /**
+   * Sets point size in pixels.
+   *
+   * @param {number} size - Point size (> 0).
+   * @throws {TypeError}  When size is not a finite number.
+   * @throws {RangeError} When size is not positive.
+   */
+  setPointSize(size) {
+    if (typeof size !== "number" || !Number.isFinite(size)) {
+      throw new TypeError("`PointsMaterial.setPointSize` expects a finite number.");
+    }
+    if (size <= MIN_POINT_SIZE) {
+      throw new RangeError("`PointsMaterial.setPointSize` expects a positive size.");
+    }
+    this.#pointSize = size;
+  }
+  /**
+   * Enables or disables vertex colors.
+   *
+   * @param {boolean} enabled - When true, uses vertex colors.
+   * @throws {TypeError} When enabled is not a boolean.
+   */
+  setUseVertexColors(enabled) {
+    if (typeof enabled !== "boolean") {
+      throw new TypeError("`PointsMaterial.setUseVertexColors` expects a boolean.");
+    }
+    this.#useVertexColors = enabled;
+  }
+  /**
+   * @returns {Float32Array}
+   */
+  get color() {
+    return this.#color;
+  }
+  /**
+   * @returns {number}
+   */
+  get pointSize() {
+    return this.#pointSize;
+  }
+  /**
+   * @returns {boolean}
+   */
+  get useVertexColors() {
+    return this.#useVertexColors;
+  }
+};
+
 // core/scene/object3d.js
 var CHILD_NOT_FOUND_INDEX = -1;
 var SINGLE_CHILD_REMOVE_COUNT = 1;
@@ -5373,6 +6874,42 @@ var Mesh = class extends Object3D {
    */
   get isDisposed() {
     return this.#isDisposed;
+  }
+};
+
+// core/scene/points.js
+var Points = class extends Mesh {
+  /**
+   * @param {Geometry} geometry - Point geometry.
+   * @param {Material} material - Points material.
+   * @throws {TypeError} When geometry or material are invalid.
+   */
+  constructor(geometry, material) {
+    if (!(geometry instanceof Geometry)) {
+      throw new TypeError("`Points` expects a `Geometry` instance.");
+    }
+    if (!(material instanceof Material)) {
+      throw new TypeError("`Points` expects a `Material` instance.");
+    }
+    super(geometry, material);
+  }
+};
+
+// core/scene/line.js
+var Line = class extends Mesh {
+  /**
+   * @param {Geometry} geometry - Line geometry.
+   * @param {Material} material - Line material.
+   * @throws {TypeError} When geometry or material are invalid.
+   */
+  constructor(geometry, material) {
+    if (!(geometry instanceof Geometry)) {
+      throw new TypeError("`Line` expects a `Geometry` instance.");
+    }
+    if (!(material instanceof Material)) {
+      throw new TypeError("`Line` expects a `Material` instance.");
+    }
+    super(geometry, material);
   }
 };
 
@@ -6296,6 +7833,7 @@ var OPAQUE_OPACITY = 1;
 var MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT = 2;
 var MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT = 3;
 var MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT = 4;
+var ERROR_UNKNOWN_PRIMITIVE = "Renderer received an unknown geometry primitive.";
 var Renderer = class {
   /**
    * Wrapper around the underlying WebGL2 rendering context.
@@ -6478,7 +8016,8 @@ var Renderer = class {
     geometry.bind();
     const isWireframeEnabled = material.isWireframeEnabled();
     geometry.bindIndexBuffer(isWireframeEnabled);
-    const mode = isWireframeEnabled ? renderingContext.LINES : renderingContext.TRIANGLES;
+    const primitive = geometry.getPrimitive(isWireframeEnabled);
+    const mode = resolvePrimitiveMode(renderingContext, primitive);
     const indexCount = geometry.getIndexCount(isWireframeEnabled);
     renderingContext.drawElements(
       mode,
@@ -6488,6 +8027,22 @@ var Renderer = class {
     );
   }
 };
+function resolvePrimitiveMode(renderingContext, primitive) {
+  switch (primitive) {
+    case PRIMITIVE_TRIANGLES:
+      return renderingContext.TRIANGLES;
+    case PRIMITIVE_LINES:
+      return renderingContext.LINES;
+    case PRIMITIVE_LINE_STRIP:
+      return renderingContext.LINE_STRIP;
+    case PRIMITIVE_LINE_LOOP:
+      return renderingContext.LINE_LOOP;
+    case PRIMITIVE_POINTS:
+      return renderingContext.POINTS;
+    default:
+      throw new Error(ERROR_UNKNOWN_PRIMITIVE);
+  }
+}
 
 // core/engine/engine.js
 var DEFAULT_FIELD_OF_VIEW_RADIANS3 = Math.PI / 4;
@@ -7107,17 +8662,17 @@ var FACE_MIN_VERTEX_COUNT = 3;
 var OBJ_INDEX_OFFSET = 1;
 var OBJ_INDEX_NOT_PROVIDED = -1;
 var OBJ_INDEX_ZERO = 0;
-var POSITION_COMPONENT_COUNT3 = 3;
+var POSITION_COMPONENT_COUNT6 = 3;
 var UV_COMPONENT_COUNT2 = 2;
 var NORMAL_COMPONENT_COUNT2 = 3;
 var FAN_FIRST_VERTEX_INDEX = 0;
 var NEXT_FACE_VERTEX_OFFSET = 1;
 var BASE_PATH_SLICE_OFFSET = 1;
-var COLOR_COMPONENT_COUNT4 = 3;
+var COLOR_COMPONENT_COUNT5 = 3;
 var COMPONENT_INDEX_X = 0;
 var COMPONENT_INDEX_Y = 1;
 var COMPONENT_INDEX_Z = 2;
-var ZERO_VALUE6 = 0;
+var ZERO_VALUE10 = 0;
 var FIRST_INDEX = 0;
 var SECOND_INDEX = 1;
 var THIRD_INDEX = 2;
@@ -7170,14 +8725,14 @@ var ObjMtlLoader = class _ObjMtlLoader {
       textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX3,
       defaultColor
     } = options;
-    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE6) {
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE10) {
       throw new TypeError("`ObjMtlLoader` expects `textureUnitIndex` as a non-negative integer.");
     }
     if (defaultColor !== void 0) {
       if (!Array.isArray(defaultColor) && !(defaultColor instanceof Float32Array)) {
         throw new TypeError("`ObjMtlLoader` expects `defaultColor` as `number[]` or `Float32Array`.");
       }
-      if (defaultColor.length !== COLOR_COMPONENT_COUNT4) {
+      if (defaultColor.length !== COLOR_COMPONENT_COUNT5) {
         throw new TypeError("`ObjMtlLoader` expects `defaultColor` to have 3 components.");
       }
       this.#defaultColor.set(defaultColor);
@@ -7266,7 +8821,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
       const keyword = parts[FIRST_INDEX];
       switch (keyword) {
         case OBJ_VERTEX_TOKEN: {
-          const vertex = _ObjMtlLoader.#parseFloatTriplet(parts, POSITION_COMPONENT_COUNT3);
+          const vertex = _ObjMtlLoader.#parseFloatTriplet(parts, POSITION_COMPONENT_COUNT6);
           positions.push(...vertex);
           break;
         }
@@ -7341,7 +8896,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
           if (!currentMaterial) {
             break;
           }
-          const color = _ObjMtlLoader.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT4);
+          const color = _ObjMtlLoader.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT5);
           currentMaterial.diffuseColor.set(color);
           break;
         }
@@ -7395,7 +8950,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
     const materials = [];
     const textures = [];
     for (const group of objData.groups.values()) {
-      if (group.indices.length === ZERO_VALUE6) {
+      if (group.indices.length === ZERO_VALUE10) {
         continue;
       }
       const positions = new Float32Array(group.positions);
@@ -7506,7 +9061,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
    */
   static #resolveFaceVertex(vertexData, positions, uvs, normals, group) {
     const indices = vertexData.split(OBJ_FACE_ATTRIBUTE_SEPARATOR);
-    const positionIndex = _ObjMtlLoader.#parseIndex(indices[FIRST_INDEX], positions.length / POSITION_COMPONENT_COUNT3);
+    const positionIndex = _ObjMtlLoader.#parseIndex(indices[FIRST_INDEX], positions.length / POSITION_COMPONENT_COUNT6);
     const uvIndex = _ObjMtlLoader.#parseIndex(indices[SECOND_INDEX], uvs.length / UV_COMPONENT_COUNT2);
     const normalIndex = _ObjMtlLoader.#parseIndex(indices[THIRD_INDEX], normals.length / NORMAL_COMPONENT_COUNT2);
     if (positionIndex === OBJ_INDEX_NOT_PROVIDED) {
@@ -7516,7 +9071,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
     if (group.vertexMap.has(vertexKey)) {
       return group.vertexMap.get(vertexKey);
     }
-    const vertexIndex = group.positions.length / POSITION_COMPONENT_COUNT3;
+    const vertexIndex = group.positions.length / POSITION_COMPONENT_COUNT6;
     group.vertexMap.set(vertexKey, vertexIndex);
     _ObjMtlLoader.#appendPosition(positions, positionIndex, group.positions);
     _ObjMtlLoader.#appendUv(uvs, uvIndex, group);
@@ -7536,13 +9091,13 @@ var ObjMtlLoader = class _ObjMtlLoader {
       return OBJ_INDEX_NOT_PROVIDED;
     }
     const indexValue = Number.parseInt(value, DECIMAL_RADIX);
-    if (maxLength === ZERO_VALUE6) {
+    if (maxLength === ZERO_VALUE10) {
       return OBJ_INDEX_NOT_PROVIDED;
     }
     if (Number.isNaN(indexValue) || indexValue === OBJ_INDEX_ZERO) {
       return OBJ_INDEX_NOT_PROVIDED;
     }
-    if (indexValue > ZERO_VALUE6) {
+    if (indexValue > ZERO_VALUE10) {
       return indexValue - OBJ_INDEX_OFFSET;
     }
     return maxLength + indexValue;
@@ -7556,7 +9111,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
    * @private
    */
   static #appendPosition(sourcePositions, index, target) {
-    const baseIndex = index * POSITION_COMPONENT_COUNT3;
+    const baseIndex = index * POSITION_COMPONENT_COUNT6;
     target.push(
       sourcePositions[baseIndex + COMPONENT_INDEX_X],
       sourcePositions[baseIndex + COMPONENT_INDEX_Y],
@@ -7572,7 +9127,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
    * @private
    */
   static #appendUv(sourceUvs, index, group) {
-    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE6 && index * UV_COMPONENT_COUNT2 < sourceUvs.length) {
+    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE10 && index * UV_COMPONENT_COUNT2 < sourceUvs.length) {
       const baseIndex = index * UV_COMPONENT_COUNT2;
       group.uvs.push(sourceUvs[baseIndex + COMPONENT_INDEX_X], sourceUvs[baseIndex + COMPONENT_INDEX_Y]);
       group.hasUvs = true;
@@ -7589,7 +9144,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
    * @private
    */
   static #appendNormal(sourceNormals, index, group) {
-    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE6 && index * NORMAL_COMPONENT_COUNT2 < sourceNormals.length) {
+    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE10 && index * NORMAL_COMPONENT_COUNT2 < sourceNormals.length) {
       const baseIndex = index * NORMAL_COMPONENT_COUNT2;
       group.normals.push(
         sourceNormals[baseIndex + COMPONENT_INDEX_X],
@@ -7611,10 +9166,10 @@ var ObjMtlLoader = class _ObjMtlLoader {
    */
   static #generateNormals(positions, indices) {
     const normalBuffer = new Float32Array(positions.length);
-    for (let index = ZERO_VALUE6; index < indices.length; index += NORMAL_COMPONENT_COUNT2) {
-      const indexA = indices[index + COMPONENT_INDEX_X] * POSITION_COMPONENT_COUNT3;
-      const indexB = indices[index + COMPONENT_INDEX_Y] * POSITION_COMPONENT_COUNT3;
-      const indexC = indices[index + COMPONENT_INDEX_Z] * POSITION_COMPONENT_COUNT3;
+    for (let index = ZERO_VALUE10; index < indices.length; index += NORMAL_COMPONENT_COUNT2) {
+      const indexA = indices[index + COMPONENT_INDEX_X] * POSITION_COMPONENT_COUNT6;
+      const indexB = indices[index + COMPONENT_INDEX_Y] * POSITION_COMPONENT_COUNT6;
+      const indexC = indices[index + COMPONENT_INDEX_Z] * POSITION_COMPONENT_COUNT6;
       const ax = positions[indexA + COMPONENT_INDEX_X];
       const ay = positions[indexA + COMPONENT_INDEX_Y];
       const az = positions[indexA + COMPONENT_INDEX_Z];
@@ -7643,12 +9198,12 @@ var ObjMtlLoader = class _ObjMtlLoader {
       normalBuffer[indexC + COMPONENT_INDEX_Y] += ny;
       normalBuffer[indexC + COMPONENT_INDEX_Z] += nz;
     }
-    for (let index = ZERO_VALUE6; index < normalBuffer.length; index += NORMAL_COMPONENT_COUNT2) {
+    for (let index = ZERO_VALUE10; index < normalBuffer.length; index += NORMAL_COMPONENT_COUNT2) {
       const nx = normalBuffer[index + COMPONENT_INDEX_X];
       const ny = normalBuffer[index + COMPONENT_INDEX_Y];
       const nz = normalBuffer[index + COMPONENT_INDEX_Z];
       const length = Math.hypot(nx, ny, nz);
-      if (length > ZERO_VALUE6) {
+      if (length > ZERO_VALUE10) {
         normalBuffer[index + COMPONENT_INDEX_X] = nx / length;
         normalBuffer[index + COMPONENT_INDEX_Y] = ny / length;
         normalBuffer[index + COMPONENT_INDEX_Z] = nz / length;
@@ -7703,7 +9258,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
    */
   static #parseFloatTriplet(parts, expected) {
     if (parts.length <= expected) {
-      return [ZERO_VALUE6, ZERO_VALUE6, ZERO_VALUE6];
+      return [ZERO_VALUE10, ZERO_VALUE10, ZERO_VALUE10];
     }
     return [
       Number.parseFloat(parts[SECOND_INDEX]),
@@ -7720,7 +9275,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
    */
   static #parseFloatPair(parts) {
     if (parts.length <= THIRD_INDEX) {
-      return [ZERO_VALUE6, ZERO_VALUE6];
+      return [ZERO_VALUE10, ZERO_VALUE10];
     }
     return [
       Number.parseFloat(parts[SECOND_INDEX]),
@@ -9723,12 +11278,18 @@ var GeraWebGL = Object.freeze({
   ThirdPersonCamera,
   Object3D,
   Mesh,
+  Points,
+  Line,
   Raycaster,
   // Grouped namespaces:
   Math: Object.freeze({
     Matrix4,
     Vector3,
-    CameraMath
+    Vector3Math,
+    CameraMath,
+    Curve3,
+    CatmullRomCurve3,
+    Path3D
   }),
   Geometries: Object.freeze({
     Geometry,
@@ -9739,7 +11300,10 @@ var GeraWebGL = Object.freeze({
     ConeGeometry,
     PyramidGeometry,
     CustomGeometry,
-    HeightmapGeometry
+    HeightmapGeometry,
+    PointsGeometry,
+    PolylineGeometry,
+    TubeLineGeometry
   }),
   Textures: Object.freeze({
     Texture2D
@@ -9752,7 +11316,8 @@ var GeraWebGL = Object.freeze({
     NormalMaterial,
     DirectionalLightMaterial,
     LambertMaterial,
-    PhongMaterial
+    PhongMaterial,
+    PointsMaterial
   }),
   Controls: Object.freeze({
     OrbitControls,

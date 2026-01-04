@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gera WebGL - points & path</title>
+    <style>
+
+        html, body {
+            margin     : 0px;
+            padding    : 0px;
+            height     : 100%;
+            background : #000000;
+            overflow   : hidden;
+        }
+
+        body {
+            overscroll-behavior : none;
+        }
+
+        canvas {
+            position     : fixed;
+            top          : 0px;
+            left         : 0px;
+            display      : block;
+            width        : 100vw;
+            height       : 100vh;
+            height       : 100dvh;
+            touch-action : none;
+        }
+
+        #ui {
+            position        : fixed;
+            top             : calc(10px + env(safe-area-inset-top));
+            left            : calc(10px + env(safe-area-inset-left));
+            z-index         : 10;
+            display         : flex;
+            flex-direction  : column;
+            gap             : 8px;
+            align-items     : flex-start;
+            max-width       : calc(100vw - 20px - env(safe-area-inset-left) - env(safe-area-inset-right));
+            background      : rgba(10, 30, 60, 0.28);
+            border          : 1px solid rgba(120, 180, 255, 0.22);
+            border-radius   : 10px;
+            padding         : 10px;
+            box-shadow      : 0px 8px 24px rgba(0, 0, 0, 0.35);
+            backdrop-filter : blur(10px);
+            pointer-events  : none;
+        }
+
+        .uiTitle {
+            font-family    : sans-serif;
+            font-size      : 14px;
+            font-weight    : 700;
+            color          : rgba(235, 247, 255, 0.95);
+            text-shadow    : 0px 1px 2px rgba(0, 0, 0, 0.35);
+            pointer-events : auto;
+        }
+
+        #ui label,
+        #ui input,
+        #ui span,
+        #ui div {
+            pointer-events : auto;
+        }
+
+        .uiRow {
+            display     : flex;
+            align-items : center;
+            gap         : 8px;
+            width       : 100%;
+            flex-wrap   : nowrap;
+        }
+
+        .uiRow label {
+            color       : #ffffff;
+            font-family : sans-serif;
+            font-size   : 14px;
+            user-select : none;
+            text-shadow : 0px 1px 2px rgba(0, 0, 0, 0.35);
+            white-space : nowrap;
+        }
+
+        .uiRow input[type="range"] {
+            width        : 150px;
+            flex         : 1 1 120px;
+            accent-color : rgba(120, 200, 255, 0.95);
+        }
+
+        .uiRow input[type="checkbox"] {
+            transform : scale(1.05);
+        }
+
+        .uiValue {
+            color                : #ffffff;
+            font-family          : sans-serif;
+            font-size            : 14px;
+            min-width            : 3.5em;
+            text-align           : right;
+            user-select          : none;
+            text-shadow          : 0px 1px 2px rgba(0, 0, 0, 0.35);
+            font-variant-numeric : tabular-nums;
+        }
+
+        .gwFpsCounter {
+            position        : fixed;
+            right           : calc(10px + env(safe-area-inset-left));
+            bottom          : calc(10px + env(safe-area-inset-bottom));
+            z-index         : 11;
+            display         : flex;
+            flex-direction  : column;
+            gap             : 6px;
+            min-width       : 128px;
+            padding         : 10px 12px;
+            background      : rgba(10, 30, 60, 0.22);
+            border          : 1px solid rgba(120, 180, 255, 0.22);
+            border-radius   : 12px;
+            box-shadow      : 0px 12px 26px rgba(0, 0, 0, 0.35);
+            backdrop-filter : blur(12px);
+            color           : rgba(235, 247, 255, 0.95);
+            user-select     : none;
+            letter-spacing  : 0.02em;
+            font-family     : ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+
+        .gwFpsCounterHeader {
+            font-family    : sans-serif;
+            font-size      : 11px;
+            font-weight    : 600;
+            text-transform : uppercase;
+            opacity        : 0.92;
+            text-shadow    : 0px 1px 2px rgba(0, 0, 0, 0.35);
+        }
+
+        .gwFpsCounterRow {
+            display         : flex;
+            justify-content : space-between;
+            gap             : 12px;
+            align-items     : baseline;
+        }
+
+        .gwFpsCounterRowLabel {
+            font-size   : 11px;
+            opacity     : 0.8;
+            text-shadow : 0px 1px 2px rgba(0, 0, 0, 0.35);
+        }
+
+        .gwFpsCounterRowValue {
+            font-size   : 16px;
+            font-weight : 700;
+            text-shadow : 0px 1px 2px rgba(0, 0, 0, 0.35);
+        }
+
+        .gwFpsCounter-good {
+            border-color : rgba(140, 255, 195, 0.32);
+            box-shadow   : 0px 12px 28px rgba(0, 0, 0, 0.35), 0px 0px 18px rgba(140, 255, 195, 0.18);
+        }
+
+        .gwFpsCounter-ok {
+            border-color : rgba(255, 220, 140, 0.32);
+            box-shadow   : 0px 12px 28px rgba(0, 0, 0, 0.35), 0px 0px 18px rgba(255, 220, 140, 0.15);
+        }
+
+        .gwFpsCounter-bad {
+            border-color : rgba(255, 140, 140, 0.32);
+            box-shadow   : 0px 12px 28px rgba(0, 0, 0, 0.35), 0px 0px 18px rgba(255, 140, 140, 0.14);
+        }
+
+        @media (max-width: 600px) {
+            #ui {
+                top       : calc(8px + env(safe-area-inset-top));
+                left      : calc(8px + env(safe-area-inset-left));
+                padding   : 10px;
+                gap       : 8px;
+                max-width : calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right));
+            }
+
+            .uiRow {
+                flex-wrap : wrap;
+            }
+
+            .uiRow label,
+            .uiValue {
+                font-size : 12px;
+            }
+
+            .uiRow input[type="range"] {
+                width : 120px;
+            }
+        }
+
+    </style>
+</head>
+
+<body>
+    <canvas id="glcanvas"></canvas>
+
+    <div id="ui">
+        <div class="uiTitle">Points and 3D object path demo</div>
+
+        <div class="uiRow">
+            <label for="speedSlider">Speed</label>
+            <input id="speedSlider" type="range" />
+            <div id="speedValue" class="uiValue">0.20</div>
+        </div>
+
+        <div class="uiRow">
+            <label for="tSlider">Time period</label>
+            <input id="tSlider" type="range" />
+            <div id="tValue" class="uiValue">0.00</div>
+        </div>
+
+        <div class="uiRow">
+            <label for="zoomSlider">Zoom</label>
+            <input id="zoomSlider" type="range" />
+            <div id="zoomValue" class="uiValue">0.0</div>
+        </div>
+
+        <div class="uiRow">
+            <label>
+                <input id="showPathCheckbox" type="checkbox" />
+                Show path
+            </label>
+        </div>
+
+        <div class="uiRow">
+            <label>
+                <input id="showDebugCheckbox" type="checkbox" />
+                Debug thick line
+            </label>
+        </div>
+    </div>
+
+    <script type="module" src="./points-and-path-demo.js"></script>
+</body>
+
+</html>
