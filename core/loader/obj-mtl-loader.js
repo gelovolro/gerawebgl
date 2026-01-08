@@ -69,11 +69,102 @@ const MTL_NEW_MATERIAL_TOKEN = 'newmtl';
 const MTL_DIFFUSE_COLOR_TOKEN = 'Kd';
 
 /**
+ * MTL token for ambient color.
+ *
+ * @type {string}
+ */
+const MTL_AMBIENT_COLOR_TOKEN = 'Ka';
+
+/**
+ * MTL token for specular color.
+ *
+ * @type {string}
+ */
+const MTL_SPECULAR_COLOR_TOKEN = 'Ks';
+
+/**
+ * MTL token for emissive color.
+ *
+ * @type {string}
+ */
+const MTL_EMISSIVE_COLOR_TOKEN = 'Ke';
+
+/**
+ * MTL token for specular exponent.
+ *
+ * @type {string}
+ */
+const MTL_SPECULAR_EXPONENT_TOKEN = 'Ns';
+
+/**
+ * MTL token for optical density.
+ *
+ * @type {string}
+ */
+const MTL_OPTICAL_DENSITY_TOKEN = 'Ni';
+
+/**
+ * MTL token for illumination model.
+ *
+ * @type {string}
+ */
+const MTL_ILLUMINATION_MODEL_TOKEN = 'illum';
+
+/**
  * MTL token for diffuse texture map.
  *
  * @type {string}
  */
 const MTL_DIFFUSE_MAP_TOKEN = 'map_Kd';
+
+/**
+ * MTL token for ambient texture map.
+ *
+ * @type {string}
+ */
+const MTL_AMBIENT_MAP_TOKEN = 'map_Ka';
+
+/**
+ * MTL token for specular texture map.
+ *
+ * @type {string}
+ */
+const MTL_SPECULAR_MAP_TOKEN = 'map_Ks';
+
+/**
+ * MTL token for alpha texture map.
+ *
+ * @type {string}
+ */
+const MTL_ALPHA_MAP_TOKEN = 'map_d';
+
+/**
+ * MTL token for bump map.
+ *
+ * @type {string}
+ */
+const MTL_BUMP_MAP_TOKEN = 'bump';
+
+/**
+ * Alternate MTL token for bump map.
+ *
+ * @type {string}
+ */
+const MTL_BUMP_MAP_ALT_TOKEN = 'map_Bump';
+
+/**
+ * MTL token for displacement map.
+ *
+ * @type {string}
+ */
+const MTL_DISPLACEMENT_MAP_TOKEN = 'disp';
+
+/**
+ * MTL token for reflection map.
+ *
+ * @type {string}
+ */
+const MTL_REFLECTION_MAP_TOKEN = 'refl';
 
 /**
  * MTL token for opacity.
@@ -125,6 +216,27 @@ const DEFAULT_OPACITY = 1.0;
 const DEFAULT_DIFFUSE_COLOR = new Float32Array([1.0, 1.0, 1.0]);
 
 /**
+ * Default specular color for materials.
+ *
+ * @type {Float32Array}
+ */
+const DEFAULT_SPECULAR_COLOR = new Float32Array([0.0, 0.0, 0.0]);
+
+/**
+ * Default ambient color for materials.
+ *
+ * @type {Float32Array}
+ */
+const DEFAULT_AMBIENT_COLOR = new Float32Array([0.0, 0.0, 0.0]);
+
+/**
+ * Default emissive color for materials.
+ *
+ * @type {Float32Array}
+ */
+const DEFAULT_EMISSIVE_COLOR = new Float32Array([0.0, 0.0, 0.0]);
+
+/**
  * Default UV coordinates, when missing in OBJ data.
  *
  * @type {number[]}
@@ -139,14 +251,28 @@ const DEFAULT_UV = [0.0, 0.0];
 const DEFAULT_NORMAL = [0.0, 0.0, 1.0];
 
 /**
- * Default base URL used for resolving relative assets.
+ * Empty string constant.
  *
  * @type {string}
  */
-const DEFAULT_BASE_URL = '';
+const EMPTY_STRING = '';
 
 /**
- * Space separator used to join split tokens back into paths/names.
+ * Hyphen separator sign.
+ *
+ * @type {string}
+ */
+const HYPHEN_SEPARATOR = '-';
+
+/**
+ * Default base URL, used for resolving relative assets.
+ *
+ * @type {string}
+ */
+const DEFAULT_BASE_URL = EMPTY_STRING;
+
+/**
+ * Space separator, used to join split tokens back into paths/names.
  *
  * @type {string}
  */
@@ -167,11 +293,74 @@ const PATH_SEPARATOR = '/';
 const LINE_SPLIT_REGEX = /\s+/u;
 
 /**
+ * Matches backslash characters in paths.
+ *
+ * @type {RegExp}
+ */
+const BACKSLASH_REGEX = /\\/gu;
+
+/**
  * Regex used to detect absolute URLs.
  *
  * @type {RegExp}
  */
 const ABSOLUTE_URL_REGEX = /^[a-zA-Z][a-zA-Z\d+.-]*:/u;
+
+/**
+ * Token, used to wrap quoted paths.
+ *
+ * @type {string}
+ */
+const QUOTE_TOKEN = '"';
+
+/**
+ * Backslash path separator.
+ *
+ * @type {string}
+ */
+const BACKSLASH_SEPARATOR = '\\';
+
+/**
+ * MTL map option for scaling.
+ *
+ * @type {string}
+ */
+const MTL_MAP_OPTION_SCALE = '-s';
+
+/**
+ * MTL map option for offset.
+ *
+ * @type {string}
+ */
+const MTL_MAP_OPTION_OFFSET = '-o';
+
+/**
+ * MTL map option for clamping.
+ *
+ * @type {string}
+ */
+const MTL_MAP_OPTION_CLAMP = '-clamp';
+
+/**
+ * MTL map option for bump multiplier.
+ *
+ * @type {string}
+ */
+const MTL_MAP_OPTION_BUMP_MULTIPLIER = '-bm';
+
+/**
+ * Count of vector components for scale/offset map options.
+ *
+ * @type {number}
+ */
+const MTL_MAP_VECTOR_COMPONENTS = 3;
+
+/**
+ * Count of scalar components for map options like `-clamp` and `-bm`.
+ *
+ * @type {number}
+ */
+const MTL_MAP_SCALAR_COMPONENTS = 1;
 
 /**
  * Face requires at least 3 vertices.
@@ -188,7 +377,7 @@ const FACE_MIN_VERTEX_COUNT = 3;
 const OBJ_INDEX_OFFSET = 1;
 
 /**
- * Value indicating that an OBJ index is not provided.
+ * Value indicating, that an OBJ index is not provided.
  *
  * @type {number}
  */
@@ -353,13 +542,36 @@ const DECIMAL_RADIX = 10;
  */
 
 /**
+ * Options used by `ObjMtlLoader.loadFromFiles`.
+ *
+ * @typedef {Object} ObjMtlLoadFromFilesOptions
+ * @property {File} objFile                      - OBJ file.
+ * @property {Map<string, File>} [mtlFiles]      - Map of MTL files by normalized path/name.
+ * @property {Map<string, string>} [assetUrlMap] - Map of asset blob URLs by normalized path/name.
+ * @property {string} [baseUrl]                  - Base URL for resolving relative references.
+ * @property {string} [textureBaseUrl]           - Base URL for resolving texture paths.
+ */
+
+/**
  * Parsed MTL material definition.
  *
  * @typedef {Object} ParsedMtlMaterial
- * @property {string} name               - Material name.
- * @property {Float32Array} diffuseColor - Diffuse RGB color.
- * @property {string | null} diffuseMap  - Diffuse texture path, if any.
- * @property {number} opacity            - Opacity multiplier.
+ * @property {string} name                     - Material name.
+ * @property {Float32Array} diffuseColor       - Diffuse RGB color.
+ * @property {Float32Array} ambientColor       - Ambient RGB color.
+ * @property {Float32Array} specularColor      - Specular RGB color.
+ * @property {Float32Array} emissiveColor      - Emissive RGB color.
+ * @property {string | null} diffuseMap        - Diffuse texture path, if any.
+ * @property {string | null} ambientMap        - Ambient texture path, if any.
+ * @property {string | null} specularMap       - Specular texture path, if any.
+ * @property {string | null} alphaMap          - Alpha texture path, if any.
+ * @property {string | null} bumpMap           - Bump texture path, if any.
+ * @property {string | null} displacementMap   - Displacement texture path, if any.
+ * @property {string | null} reflectionMap     - Reflection texture path, if any.
+ * @property {number | null} specularExponent  - Specular exponent (Ns).
+ * @property {number | null} opticalDensity    - Optical density (Ni).
+ * @property {number | null} illuminationModel - Illumination model (illum).
+ * @property {number} opacity                  - Opacity multiplier.
  */
 
 /**
@@ -499,22 +711,96 @@ export class ObjMtlLoader {
         const objText         = await ObjMtlLoader.#fetchText(objUrl);
         const objData         = ObjMtlLoader.#parseObj(objText);
         const resolvedBaseUrl = baseUrl || ObjMtlLoader.#getBasePath(objUrl);
-        const mtlLibrary      = mtlUrl || objData.materialLibraries[FIRST_INDEX];
-        let mtlData = new Map();
+        const mtlLibraries    = mtlUrl ? [mtlUrl] : objData.materialLibraries;
+        const mtlData         = new Map();
 
-        if (mtlLibrary) {
-            const mtlBaseUrl     = baseUrl || resolvedBaseUrl;
-            const resolvedMtlUrl = mtlUrl
-                ? (ABSOLUTE_URL_REGEX.test(mtlLibrary) || mtlLibrary.startsWith(PATH_SEPARATOR) || mtlLibrary.startsWith(mtlBaseUrl)
-                    ? mtlLibrary : ObjMtlLoader.#resolvePath(mtlBaseUrl, mtlLibrary))
-                : ObjMtlLoader.#resolvePath(resolvedBaseUrl, mtlLibrary);
+        if (mtlLibraries.length > ZERO_VALUE) {
+            const mtlBaseUrl = baseUrl || resolvedBaseUrl;
 
-            const mtlText = await ObjMtlLoader.#fetchText(resolvedMtlUrl);
-            mtlData       = ObjMtlLoader.#parseMtl(mtlText);
+            for (const library of mtlLibraries) {
+                if (!library) {
+                    continue;
+                }
+
+                const resolvedMtlUrl = mtlUrl
+                    ? (ABSOLUTE_URL_REGEX.test(library) || library.startsWith(PATH_SEPARATOR) || library.startsWith(mtlBaseUrl)
+                        ? library : ObjMtlLoader.#resolvePath(mtlBaseUrl, library))
+                    : ObjMtlLoader.#resolvePath(resolvedBaseUrl, library);
+
+                const mtlText   = await ObjMtlLoader.#fetchText(resolvedMtlUrl);
+                const parsedMtl = ObjMtlLoader.#parseMtl(mtlText);
+
+                for (const [name, material] of parsedMtl.entries()) {
+                    mtlData.set(name, material);
+                }
+            }
         }
 
         const resolvedTextureBase = textureBaseUrl || resolvedBaseUrl;
         return this.#buildMeshes(objData, mtlData, resolvedTextureBase);
+    }
+
+    /**
+     * Loads OBJ/MTL assets from local `File` objects.
+     *
+     * @param {ObjMtlLoadFromFilesOptions} options - Load options.
+     * @returns {Promise<ObjMtlLoadResult>}
+     */
+    async loadFromFiles(options = {}) {
+        if (options === null || typeof options !== 'object' || Array.isArray(options)) {
+            throw new TypeError('`ObjMtlLoader.loadFromFiles` expects options as a plain object.');
+        }
+
+        const {
+            objFile,
+            mtlFiles = new Map(),
+            assetUrlMap,
+            baseUrl  = DEFAULT_BASE_URL,
+            textureBaseUrl
+        } = options;
+
+        if (!(objFile instanceof File)) {
+            throw new TypeError('`ObjMtlLoader.loadFromFiles` expects `objFile` as `File`.');
+        }
+
+        if (!(mtlFiles instanceof Map)) {
+            throw new TypeError('`ObjMtlLoader.loadFromFiles` expects `mtlFiles` as `Map`, when provided.');
+        }
+
+        if (assetUrlMap !== undefined && !(assetUrlMap instanceof Map)) {
+            throw new TypeError('`ObjMtlLoader.loadFromFiles` expects `assetUrlMap` as `Map`, when provided.');
+        }
+
+        if (typeof baseUrl !== 'string') {
+            throw new TypeError('`ObjMtlLoader.loadFromFiles` expects `baseUrl` as a string.');
+        }
+
+        if (textureBaseUrl !== undefined && typeof textureBaseUrl !== 'string') {
+            throw new TypeError('`ObjMtlLoader.loadFromFiles` expects `textureBaseUrl` as a string, when provided.');
+        }
+
+        const objText         = await objFile.text();
+        const objData         = ObjMtlLoader.#parseObj(objText);
+        const resolvedBaseUrl = baseUrl || DEFAULT_BASE_URL;
+        const mtlData         = new Map();
+
+        for (const library of objData.materialLibraries) {
+            const mtlFile = ObjMtlLoader.#getFileFromMap(mtlFiles, library);
+
+            if (!mtlFile) {
+                continue;
+            }
+
+            const mtlText   = await mtlFile.text();
+            const parsedMtl = ObjMtlLoader.#parseMtl(mtlText);
+
+            for (const [name, material] of parsedMtl.entries()) {
+                mtlData.set(name, material);
+            }
+        }
+
+        const resolvedTextureBase = textureBaseUrl || resolvedBaseUrl;
+        return this.#buildMeshes(objData, mtlData, resolvedTextureBase, assetUrlMap);
     }
 
     /**
@@ -645,12 +931,34 @@ export class ObjMtlLoader {
 
                     currentMaterial = {
                         name,
-                        diffuseColor : new Float32Array(DEFAULT_DIFFUSE_COLOR),
-                        diffuseMap   : null,
-                        opacity      : DEFAULT_OPACITY
+                        diffuseColor      : new Float32Array(DEFAULT_DIFFUSE_COLOR),
+                        ambientColor      : new Float32Array(DEFAULT_AMBIENT_COLOR),
+                        specularColor     : new Float32Array(DEFAULT_SPECULAR_COLOR),
+                        emissiveColor     : new Float32Array(DEFAULT_EMISSIVE_COLOR),
+                        diffuseMap        : null,
+                        ambientMap        : null,
+                        specularMap       : null,
+                        alphaMap          : null,
+                        bumpMap           : null,
+                        displacementMap   : null,
+                        reflectionMap     : null,
+                        specularExponent  : null,
+                        opticalDensity    : null,
+                        illuminationModel : null,
+                        opacity           : DEFAULT_OPACITY
                     };
 
                     materials.set(name, currentMaterial);
+                    break;
+                }
+
+                case MTL_AMBIENT_COLOR_TOKEN: {
+                    if (!currentMaterial) {
+                        break;
+                    }
+
+                    const color = ObjMtlLoader.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT);
+                    currentMaterial.ambientColor.set(color);
                     break;
                 }
 
@@ -664,13 +972,122 @@ export class ObjMtlLoader {
                     break;
                 }
 
+                case MTL_SPECULAR_COLOR_TOKEN: {
+                    if (!currentMaterial) {
+                        break;
+                    }
+
+                    const color = ObjMtlLoader.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT);
+                    currentMaterial.specularColor.set(color);
+                    break;
+                }
+
+                case MTL_EMISSIVE_COLOR_TOKEN: {
+                    if (!currentMaterial) {
+                        break;
+                    }
+
+                    const color = ObjMtlLoader.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT);
+                    currentMaterial.emissiveColor.set(color);
+                    break;
+                }
+
+                case MTL_SPECULAR_EXPONENT_TOKEN: {
+                    if (!currentMaterial) {
+                        break;
+                    }
+
+                    currentMaterial.specularExponent = ObjMtlLoader.#parseFloatValue(parts[SECOND_INDEX]);
+                    break;
+                }
+
+                case MTL_OPTICAL_DENSITY_TOKEN: {
+                    if (!currentMaterial) {
+                        break;
+                    }
+
+                    currentMaterial.opticalDensity = ObjMtlLoader.#parseFloatValue(parts[SECOND_INDEX]);
+                    break;
+                }
+
+                case MTL_ILLUMINATION_MODEL_TOKEN: {
+                    if (!currentMaterial) {
+                        break;
+                    }
+
+                    const illumValue = Number.parseInt(parts[SECOND_INDEX], DECIMAL_RADIX);
+                    currentMaterial.illuminationModel = Number.isFinite(illumValue) ? illumValue : null;
+                    break;
+                }
+
                 case MTL_DIFFUSE_MAP_TOKEN: {
                     if (!currentMaterial) {
                         break;
                     }
 
-                    const mapPath = parts.slice(SECOND_INDEX).join(SPACE_SEPARATOR);
+                    const mapPath = ObjMtlLoader.#parseMtlMapLine(trimmed);
                     currentMaterial.diffuseMap = mapPath || null;
+                    break;
+                }
+
+                case MTL_AMBIENT_MAP_TOKEN: {
+                    if (!currentMaterial) {
+                        break;
+                    }
+
+                    const mapPath = ObjMtlLoader.#parseMtlMapLine(trimmed);
+                    currentMaterial.ambientMap = mapPath || null;
+                    break;
+                }
+
+                case MTL_SPECULAR_MAP_TOKEN: {
+                    if (!currentMaterial) {
+                        break;
+                    }
+
+                    const mapPath = ObjMtlLoader.#parseMtlMapLine(trimmed);
+                    currentMaterial.specularMap = mapPath || null;
+                    break;
+                }
+
+                case MTL_ALPHA_MAP_TOKEN: {
+                    if (!currentMaterial) {
+                        break;
+                    }
+
+                    const mapPath = ObjMtlLoader.#parseMtlMapLine(trimmed);
+                    currentMaterial.alphaMap = mapPath || null;
+                    break;
+                }
+
+                case MTL_BUMP_MAP_TOKEN:
+                case MTL_BUMP_MAP_ALT_TOKEN: {
+                    if (!currentMaterial) {
+                        break;
+                    }
+
+                    const mapPath = ObjMtlLoader.#parseMtlMapLine(trimmed);
+                    currentMaterial.bumpMap = mapPath || null;
+                    break;
+                }
+
+                case MTL_DISPLACEMENT_MAP_TOKEN: {
+                    if (!currentMaterial) {
+                        break;
+                    }
+
+                    const mapPath = ObjMtlLoader.#parseMtlMapLine(trimmed);
+                    currentMaterial.displacementMap = mapPath || null;
+                    break;
+                }
+
+                case MTL_REFLECTION_MAP_TOKEN: {
+                    if (!currentMaterial) {
+                        break;
+                    }
+
+                    const mapPath = ObjMtlLoader.#parseMtlMapLine(trimmed);
+                    currentMaterial.reflectionMap = mapPath || null;
                     break;
                 }
 
@@ -701,6 +1118,7 @@ export class ObjMtlLoader {
 
                     break;
                 }
+
                 default:
                     break;
             }
@@ -715,10 +1133,11 @@ export class ObjMtlLoader {
      * @param {{ groups: Map<string, ObjGroupData> }} objData - Parsed OBJ data.
      * @param {Map<string, ParsedMtlMaterial>} mtlData        - Parsed MTL data.
      * @param {string} textureBaseUrl                         - Base URL for textures.
+     * @param {Map<string, string>} [assetUrlMap]             - Asset URL override map.
      * @returns {Promise<ObjMtlLoadResult>}
      * @private
      */
-    async #buildMeshes(objData, mtlData, textureBaseUrl) {
+    async #buildMeshes(objData, mtlData, textureBaseUrl, assetUrlMap) {
         const root       = new Object3D();
         const meshes     = [];
         const geometries = [];
@@ -730,9 +1149,11 @@ export class ObjMtlLoader {
                 continue;
             }
 
-            const positions = new Float32Array(group.positions);
-            const uvs       = group.hasUvs ? new Float32Array(group.uvs) : null;
-            const normals   = group.needsNormals
+            const materialDefinition = mtlData.get(group.materialName) || null;
+            const positions          = new Float32Array(group.positions);
+            const hasTexture         = Boolean(materialDefinition && materialDefinition.diffuseMap);
+            const uvs                = (group.hasUvs || hasTexture) ? new Float32Array(group.uvs) : null;
+            const normals            = group.needsNormals
                 ? ObjMtlLoader.#generateNormals(positions, group.indices)
                 : new Float32Array(group.normals);
 
@@ -743,10 +1164,8 @@ export class ObjMtlLoader {
                 normals
             });
 
-            const materialDefinition = mtlData.get(group.materialName) || null;
-            const material           = await this.#createMaterial(materialDefinition, textureBaseUrl, textures);
-            const mesh               = new Mesh(geometry, material);
-
+            const material = await this.#createMaterial(materialDefinition, textureBaseUrl, textures, assetUrlMap);
+            const mesh     = new Mesh(geometry, material);
             root.add(mesh);
             meshes.push(mesh);
             geometries.push(geometry);
@@ -768,14 +1187,15 @@ export class ObjMtlLoader {
      * @param {ParsedMtlMaterial | null} definition - Parsed material definition.
      * @param {string} textureBaseUrl               - Base URL used for resolving textures.
      * @param {Texture2D[]} textures                - Output list of created textures.
+     * @param {Map<string, string>} [assetUrlMap]   - Asset URL override map.
      * @returns {Promise<SolidColorMaterial | TexturedMaterial>}
      * @private
      */
-    async #createMaterial(definition, textureBaseUrl, textures) {
+    async #createMaterial(definition, textureBaseUrl, textures, assetUrlMap) {
         const opacity = definition ? definition.opacity : DEFAULT_OPACITY;
 
         if (definition && definition.diffuseMap) {
-            const textureUrl = ObjMtlLoader.#resolvePath(textureBaseUrl, definition.diffuseMap);
+            const textureUrl = ObjMtlLoader.#resolveAssetUrl(textureBaseUrl, definition.diffuseMap, assetUrlMap);
             const texture    = await this.#getTexture(textureUrl, textures);
             const material   = new TexturedMaterial(this.#webglContext, {
                 texture,
@@ -830,9 +1250,7 @@ export class ObjMtlLoader {
             return;
         }
 
-        const vertexIndices = faceVertices.map((vertex) =>
-            ObjMtlLoader.#resolveFaceVertex(vertex, positions, uvs, normals, group)
-        );
+        const vertexIndices = faceVertices.map((vertex) => ObjMtlLoader.#resolveFaceVertex(vertex, positions, uvs, normals, group));
 
         for (let index = SECOND_INDEX; index < vertexIndices.length - NEXT_FACE_VERTEX_OFFSET; index += NEXT_FACE_VERTEX_OFFSET) {
             const firstIndex  = vertexIndices[FAN_FIRST_VERTEX_INDEX];
@@ -1129,6 +1547,136 @@ export class ObjMtlLoader {
     }
 
     /**
+     * Parses a texture map line and extracts a file path.
+     *
+     * @param {string} line - Full `map_*` line.
+     * @returns {string}
+     * @private
+     */
+    static #parseMtlMapLine(line) {
+        if (typeof line !== 'string') {
+            return EMPTY_STRING;
+        }
+
+        let sanitized      = line;
+        const commentIndex = sanitized.indexOf(COMMENT_TOKEN);
+
+        if (commentIndex !== NOT_FOUND_INDEX) {
+            sanitized = sanitized.slice(FIRST_INDEX, commentIndex);
+        }
+
+        sanitized = sanitized.trim();
+
+        if (!sanitized) {
+            return EMPTY_STRING;
+        }
+
+        const tokens = ObjMtlLoader.#splitTokens(sanitized);
+
+        if (tokens.length <= SECOND_INDEX) {
+            return EMPTY_STRING;
+        }
+
+        let index = SECOND_INDEX;
+
+        while (index < tokens.length) {
+            const token = tokens[index];
+
+            if (token.startsWith(HYPHEN_SEPARATOR)) {
+                switch (token) {
+                    case MTL_MAP_OPTION_SCALE:
+                    case MTL_MAP_OPTION_OFFSET:
+                        index += MTL_MAP_VECTOR_COMPONENTS + SECOND_INDEX;
+                        break;
+
+                    case MTL_MAP_OPTION_CLAMP:
+                    case MTL_MAP_OPTION_BUMP_MULTIPLIER:
+                        index += MTL_MAP_SCALAR_COMPONENTS + SECOND_INDEX;
+                        break;
+
+                    default:
+                        index += SECOND_INDEX;
+                        break;
+                }
+
+                continue;
+            }
+
+            return tokens.slice(index).join(SPACE_SEPARATOR);
+        }
+
+        return EMPTY_STRING;
+    }
+
+    /**
+     * Splits a line into tokens while respecting the quotes.
+     *
+     * @param {string} line - Line to split.
+     * @returns {string[]}
+     * @private
+     */
+    static #splitTokens(line) {
+        const tokens     = [];
+        let currentToken = EMPTY_STRING;
+        let inQuotes     = false;
+
+        for (const char of line) {
+            if (char === QUOTE_TOKEN) {
+                inQuotes = !inQuotes;
+                continue;
+            }
+
+            if (!inQuotes && LINE_SPLIT_REGEX.test(char)) {
+                if (currentToken) {
+                    tokens.push(currentToken);
+                    currentToken = EMPTY_STRING;
+                }
+
+                continue;
+            }
+
+            currentToken += char;
+        }
+
+        if (currentToken) {
+            tokens.push(currentToken);
+        }
+
+        return tokens;
+    }
+
+    /**
+     * Resolves an asset path using an override map, when provided.
+     *
+     * @param {string} baseUrl                    - Base URL.
+     * @param {string} path                       - Asset path.
+     * @param {Map<string, string>} [assetUrlMap] - Asset URL map.
+     * @returns {string}
+     * @private
+     */
+    static #resolveAssetUrl(baseUrl, path, assetUrlMap) {
+        if (assetUrlMap instanceof Map) {
+            const normalized = ObjMtlLoader.#normalizePath(path);
+
+            if (assetUrlMap.has(normalized)) {
+                return assetUrlMap.get(normalized);
+            }
+        }
+
+        const resolved = ObjMtlLoader.#resolvePath(baseUrl, path);
+
+        if (assetUrlMap instanceof Map) {
+            const normalizedResolved = ObjMtlLoader.#normalizePath(resolved);
+
+            if (assetUrlMap.has(normalizedResolved)) {
+                return assetUrlMap.get(normalizedResolved);
+            }
+        }
+
+        return resolved;
+    }
+
+    /**
      * Resolves a base path from a URL string.
      *
      * @param {string} url - Input URL.
@@ -1154,18 +1702,81 @@ export class ObjMtlLoader {
      * @private
      */
     static #resolvePath(baseUrl, path) {
-        if (!path) {
-            return baseUrl;
+        const normalizedBase = ObjMtlLoader.#normalizePath(baseUrl);
+        const normalizedPath = ObjMtlLoader.#normalizePath(path);
+
+        if (!normalizedPath) {
+            return normalizedBase;
         }
 
-        if (ABSOLUTE_URL_REGEX.test(path) || path.startsWith(PATH_SEPARATOR)) {
-            return path;
+        if (ABSOLUTE_URL_REGEX.test(normalizedPath) || normalizedPath.startsWith(PATH_SEPARATOR)) {
+            return normalizedPath;
         }
 
-        if (!baseUrl) {
-            return path;
+        if (!normalizedBase) {
+            return normalizedPath;
         }
 
-        return baseUrl + path;
+        if (normalizedBase.endsWith(PATH_SEPARATOR) || normalizedPath.startsWith(PATH_SEPARATOR)) {
+            return normalizedBase + normalizedPath;
+        }
+
+        return normalizedBase + PATH_SEPARATOR + normalizedPath;
+    }
+
+    /**
+     * Normalizes a path string by trimming and unquoting.
+     *
+     * @param {string} path - Input path.
+     * @returns {string}
+     * @private
+     */
+    static #normalizePath(path) {
+        if (typeof path !== 'string') {
+            return EMPTY_STRING;
+        }
+
+        let normalized = path.trim();
+
+        if (normalized.startsWith(QUOTE_TOKEN) && normalized.endsWith(QUOTE_TOKEN) && normalized.length > SECOND_INDEX) {
+            normalized = normalized.slice(SECOND_INDEX, normalized.length - SECOND_INDEX);
+        }
+
+        if (normalized.includes(BACKSLASH_SEPARATOR)) {
+            normalized = normalized.replace(BACKSLASH_REGEX, PATH_SEPARATOR);
+        }
+
+        return normalized.trim();
+    }
+
+    /**
+     * Returns a file entry from map using the normalized path or basename.
+     *
+     * @param {Map<string, File>} fileMap - File map.
+     * @param {string} path               - File path.
+     * @returns {File | null}
+     * @private
+     */
+    static #getFileFromMap(fileMap, path) {
+        if (!fileMap || !path) {
+            return null;
+        }
+
+        const normalized = ObjMtlLoader.#normalizePath(path);
+
+        if (fileMap.has(normalized)) {
+            return fileMap.get(normalized);
+        }
+
+        const basenameIndex = normalized.lastIndexOf(PATH_SEPARATOR);
+        const basename      = basenameIndex === NOT_FOUND_INDEX
+            ? normalized
+            : normalized.slice(basenameIndex + BASE_PATH_SLICE_OFFSET);
+
+        if (fileMap.has(basename)) {
+            return fileMap.get(basename);
+        }
+
+        return null;
     }
 }

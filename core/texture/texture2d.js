@@ -174,6 +174,7 @@ export class Texture2D {
 
         this.#texture = texture;
         this.#bindTexture();
+
         webglContext.texImage2D(
             webglContext.TEXTURE_2D,
             BASE_MIPMAP_LEVEL,
@@ -186,8 +187,8 @@ export class Texture2D {
             PLACEHOLDER_PIXEL_RGBA
         );
 
-        webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_WRAP_S, webglContext.CLAMP_TO_EDGE);
-        webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_WRAP_T, webglContext.CLAMP_TO_EDGE);
+        webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_WRAP_S, webglContext.REPEAT);
+        webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_WRAP_T, webglContext.REPEAT);
         webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_MIN_FILTER, webglContext.LINEAR);
         webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_MAG_FILTER, webglContext.LINEAR);
         this.#unbindTexture();
