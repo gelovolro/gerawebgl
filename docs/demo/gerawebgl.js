@@ -4853,6 +4853,33 @@ var TubeLineGeometry = class _TubeLineGeometry extends Geometry {
 };
 
 // core/texture/texture2d.js
+var DEFAULT_FLIP_Y2 = true;
+var MIPMAP_POLICY_NONE = 0;
+var MIPMAP_POLICY_ALWAYS = 1;
+var MIPMAP_POLICY_AUTO = 2;
+var DEFAULT_MIPMAP_POLICY = MIPMAP_POLICY_AUTO;
+var CROSS_ORIGIN_ANONYMOUS = "anonymous";
+var CROSS_ORIGIN_USE_CREDENTIALS = "use-credentials";
+var ERROR_EXPECTS_WEBGL2_CONTEXT = "`Texture2D` expects `WebGL2RenderingContext`.";
+var ERROR_EXPECTS_OPTIONS_OBJECT = "`Texture2D` expects options as an object.";
+var ERROR_EXPECTS_FLIPY_BOOLEAN = "`Texture2D` expects `options.flipY` as boolean.";
+var ERROR_FAILED_CREATE_TEXTURE = "Failed to create `WebGLTexture`.";
+var ERROR_EXPECTS_WRAP_S_ENUM = "`Texture2D` expects `options.wrapS` as the valid WebGL wrap mode.";
+var ERROR_EXPECTS_WRAP_T_ENUM = "`Texture2D` expects `options.wrapT` as the valid WebGL wrap mode.";
+var ERROR_EXPECTS_MIN_FILTER_ENUM = "`Texture2D` expects `options.minFilter` as the valid WebGL min filter.";
+var ERROR_EXPECTS_MAG_FILTER_ENUM = "`Texture2D` expects `options.magFilter` as the valid WebGL mag filter.";
+var ERROR_EXPECTS_MIPMAP_POLICY = "`Texture2D` expects `options.mipmapPolicy` as the valid mipmap policy.";
+var ERROR_MIPMAP_POLICY_CONFLICT = "`Texture2D` cannot use the mipmap min filter, when mipmap policy is NONE.";
+var ERROR_MIPMAP_AUTO_POT_REQUIRED_FOR_MIPMAP_FILTER = "`Texture2D` cannot apply a mipmap min filter with the auto policy for a `non power-of-two` texture. Use `MIPMAP_POLICY_ALWAYS` or the non-mipmap min filter.";
+var ERROR_EXPECTS_SAMPLER_OPTIONS_OBJECT = "`Texture2D.setSamplerParams` expects options as an object.";
+var ERROR_EXPECTS_TEXTURE_UNIT_INDEX = "`Texture2D.bind` expects `textureUnitIndex` as a non-negative integer.";
+var ERROR_TEXTURE_UNIT_INDEX_OUT_OF_RANGE_PREFIX = "`Texture2D.bind` texture unit index is out of range. Max allowed index is ";
+var ERROR_EXPECTS_URL_STRING = "`Texture2D.loadFromUrl` expects url as a non-empty string.";
+var ERROR_INSTANCE_DISPOSED = "`Texture2D` instance is disposed.";
+var ERROR_EXPECTS_LOAD_OPTIONS_OBJECT = "`Texture2D.loadFromUrl` expects options as an object.";
+var ERROR_EXPECTS_CROSS_ORIGIN = "`Texture2D.loadFromUrl` expects `options.crossOrigin` as `anonymous`, `use-credentials` or null.";
+var ERROR_FAILED_LOAD_IMAGE_PREFIX = "Failed to load the texture image: ";
+var ERROR_FAILED_READ_MAX_TEXTURE_UNITS = "Failed to read WebGL `MAX_COMBINED_TEXTURE_IMAGE_UNITS`.";
 var PLACEHOLDER_TEXTURE_WIDTH = 1;
 var PLACEHOLDER_TEXTURE_HEIGHT = 1;
 var TEXTURE_BORDER_VALUE = 0;
@@ -4867,7 +4894,7 @@ var BIT_MASK_ONE = 1;
 var BITWISE_ZERO = 0;
 var Texture2D = class {
   /**
-   * WebGL2 rendering context used to create, upload and dispose the underlying WebGL texture.
+   * WebGL2 rendering context, used to: create, upload and dispose the underlying WebGL texture.
    *
    * @type {WebGL2RenderingContext}
    * @private
@@ -4887,6 +4914,48 @@ var Texture2D = class {
    * @private
    */
   #flipY;
+  /**
+   * Current wrap mode for S-coordinate.
+   *
+   * @type {number}
+   * @private
+   */
+  #wrapS;
+  /**
+   * Current wrap mode for T-coordinate.
+   *
+   * @type {number}
+   * @private
+   */
+  #wrapT;
+  /**
+   * Current minification filter.
+   *
+   * @type {number}
+   * @private
+   */
+  #minFilter;
+  /**
+   * Current magnification filter.
+   *
+   * @type {number}
+   * @private
+   */
+  #magFilter;
+  /**
+   * Current mipmap generation policy.
+   *
+   * @type {number}
+   * @private
+   */
+  #mipmapPolicy;
+  /**
+   * Indicates whether the min filter was explicitly set by the user.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #hasExplicitMinFilter = false;
   /**
    * Current texture width in pixels. Initialized to placeholder size and updated after a successful upload.
    *
@@ -4916,26 +4985,67 @@ var Texture2D = class {
    */
   #isDisposed = false;
   /**
-   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create and manage GPU resources.
-   * @param {Object} [options]                    - Optional texture creation options.
-   * @param {boolean} [options.flipY = true]      - Whether to flip the image data vertically on upload.
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context, used to create and manage the GPU resources.
+   * @param {Texture2DOptions} [options]          - Optional texture creation options.
+   * @throws {TypeError} When provided arguments do not match expected types or supported enums.
    */
   constructor(webglContext, options = {}) {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
-      throw new TypeError("`Texture2D` expects `WebGL2RenderingContext`.");
+      throw new TypeError(ERROR_EXPECTS_WEBGL2_CONTEXT);
     }
-    if (options === null || typeof options !== "object") {
-      throw new TypeError("`Texture2D` expects options as an object.");
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError(ERROR_EXPECTS_OPTIONS_OBJECT);
     }
-    const { flipY = true } = options;
+    const {
+      flipY = DEFAULT_FLIP_Y2,
+      wrapS,
+      wrapT,
+      minFilter,
+      magFilter,
+      mipmapPolicy = DEFAULT_MIPMAP_POLICY
+    } = options;
     if (typeof flipY !== "boolean") {
-      throw new TypeError("`Texture2D` expects `options.flipY` as boolean.");
+      throw new TypeError(ERROR_EXPECTS_FLIPY_BOOLEAN);
     }
     this.#webglContext = webglContext;
+    if (!this.#isValidMipmapPolicy(mipmapPolicy)) {
+      throw new TypeError(ERROR_EXPECTS_MIPMAP_POLICY);
+    }
+    const hasMinFilterProperty = Object.prototype.hasOwnProperty.call(options, "minFilter");
+    const isResetMinFilter = hasMinFilterProperty && minFilter === null;
+    const hasExplicitMinFilter = hasMinFilterProperty && !isResetMinFilter;
+    const hasExplicitWrapS = Object.prototype.hasOwnProperty.call(options, "wrapS");
+    const hasExplicitWrapT = Object.prototype.hasOwnProperty.call(options, "wrapT");
+    const hasExplicitMagFilter = Object.prototype.hasOwnProperty.call(options, "magFilter");
+    const resolvedWrapS = hasExplicitWrapS ? wrapS : webglContext.REPEAT;
+    const resolvedWrapT = hasExplicitWrapT ? wrapT : webglContext.REPEAT;
+    const resolvedMinFilter = hasExplicitMinFilter ? minFilter : webglContext.LINEAR;
+    const resolvedMagFilter = hasExplicitMagFilter ? magFilter : webglContext.LINEAR;
+    if (hasExplicitWrapS && !this.#isValidWrapMode(resolvedWrapS)) {
+      throw new TypeError(ERROR_EXPECTS_WRAP_S_ENUM);
+    }
+    if (hasExplicitWrapT && !this.#isValidWrapMode(resolvedWrapT)) {
+      throw new TypeError(ERROR_EXPECTS_WRAP_T_ENUM);
+    }
+    if (hasExplicitMinFilter && !this.#isValidMinFilter(resolvedMinFilter)) {
+      throw new TypeError(ERROR_EXPECTS_MIN_FILTER_ENUM);
+    }
+    if (hasExplicitMagFilter && !this.#isValidMagFilter(resolvedMagFilter)) {
+      throw new TypeError(ERROR_EXPECTS_MAG_FILTER_ENUM);
+    }
+    if (mipmapPolicy === MIPMAP_POLICY_NONE && hasExplicitMinFilter && this.#isMipmapMinFilter(resolvedMinFilter)) {
+      throw new TypeError(ERROR_MIPMAP_POLICY_CONFLICT);
+    }
     this.#flipY = flipY;
+    this.#wrapS = resolvedWrapS;
+    this.#wrapT = resolvedWrapT;
+    this.#minFilter = resolvedMinFilter;
+    this.#magFilter = resolvedMagFilter;
+    this.#mipmapPolicy = mipmapPolicy;
+    this.#hasExplicitMinFilter = hasExplicitMinFilter;
     const texture = webglContext.createTexture();
     if (!texture) {
-      throw new Error("Failed to create `WebGLTexture`.");
+      throw new Error(ERROR_FAILED_CREATE_TEXTURE);
     }
     this.#texture = texture;
     this.#bindTexture();
@@ -4950,10 +5060,7 @@ var Texture2D = class {
       webglContext.UNSIGNED_BYTE,
       PLACEHOLDER_PIXEL_RGBA
     );
-    webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_WRAP_S, webglContext.REPEAT);
-    webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_WRAP_T, webglContext.REPEAT);
-    webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_MIN_FILTER, webglContext.LINEAR);
-    webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_MAG_FILTER, webglContext.LINEAR);
+    this.#applySamplerParams();
     this.#unbindTexture();
   }
   /**
@@ -4966,7 +5073,7 @@ var Texture2D = class {
     return this.#texture;
   }
   /**
-   * Returns the width of the uploaded image (or placeholder width until loaded).
+   * Returns the width of the uploaded image (or the placeholder width until loaded).
    *
    * @returns {number}
    */
@@ -5003,29 +5110,107 @@ var Texture2D = class {
   /**
    * Binds this texture to a texture unit.
    *
-   * @param {number} textureUnitIndex - Index of the texture unit (0 => N).
+   * @param {number} textureUnitIndex - Index of the texture unit.
    */
   bind(textureUnitIndex) {
     this.#assertNotDisposed();
     if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < MIN_TEXTURE_UNIT_INDEX) {
-      throw new TypeError("`Texture2D.bind` expects `textureUnitIndex` as a non-negative integer.");
+      throw new TypeError(ERROR_EXPECTS_TEXTURE_UNIT_INDEX);
     }
     const webglContext = this.#webglContext;
+    const maxUnits = webglContext.getParameter(webglContext.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
+    if (!Number.isInteger(maxUnits) || maxUnits <= MIN_TEXTURE_UNIT_INDEX) {
+      throw new Error(ERROR_FAILED_READ_MAX_TEXTURE_UNITS);
+    }
+    if (textureUnitIndex >= maxUnits) {
+      throw new RangeError(`${ERROR_TEXTURE_UNIT_INDEX_OUT_OF_RANGE_PREFIX}${maxUnits - 1}.`);
+    }
     webglContext.activeTexture(webglContext.TEXTURE0 + textureUnitIndex);
     webglContext.bindTexture(webglContext.TEXTURE_2D, this.#texture);
   }
   /**
+   * Updates sampler parameters for this texture.
+   *
+   * @param {Texture2DOptions} [options] - Sampler options to update.
+   * @throws {TypeError} When provided arguments do not match expected types or supported enums.
+   */
+  setSamplerParams(options = {}) {
+    this.#assertNotDisposed();
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError(ERROR_EXPECTS_SAMPLER_OPTIONS_OBJECT);
+    }
+    const hasExplicitWrapS = Object.prototype.hasOwnProperty.call(options, "wrapS");
+    const hasExplicitWrapT = Object.prototype.hasOwnProperty.call(options, "wrapT");
+    const hasMinFilterProperty = Object.prototype.hasOwnProperty.call(options, "minFilter");
+    const isResetMinFilter = hasMinFilterProperty && options.minFilter === null;
+    const hasExplicitMinFilter = hasMinFilterProperty && !isResetMinFilter;
+    const hasExplicitMagFilter = Object.prototype.hasOwnProperty.call(options, "magFilter");
+    const hasExplicitMipmapPolicy = Object.prototype.hasOwnProperty.call(options, "mipmapPolicy");
+    const nextWrapS = hasExplicitWrapS ? options.wrapS : this.#wrapS;
+    const nextWrapT = hasExplicitWrapT ? options.wrapT : this.#wrapT;
+    const nextMinFilter = isResetMinFilter ? this.#webglContext.LINEAR : hasExplicitMinFilter ? options.minFilter : this.#minFilter;
+    const nextMagFilter = hasExplicitMagFilter ? options.magFilter : this.#magFilter;
+    const nextMipmapPolicy = hasExplicitMipmapPolicy ? options.mipmapPolicy : this.#mipmapPolicy;
+    const nextHasExplicitMinFilter = isResetMinFilter ? false : hasExplicitMinFilter ? true : this.#hasExplicitMinFilter;
+    if (hasExplicitWrapS && !this.#isValidWrapMode(nextWrapS)) {
+      throw new TypeError(ERROR_EXPECTS_WRAP_S_ENUM);
+    }
+    if (hasExplicitWrapT && !this.#isValidWrapMode(nextWrapT)) {
+      throw new TypeError(ERROR_EXPECTS_WRAP_T_ENUM);
+    }
+    if (hasExplicitMinFilter && !this.#isValidMinFilter(nextMinFilter)) {
+      throw new TypeError(ERROR_EXPECTS_MIN_FILTER_ENUM);
+    }
+    if (hasExplicitMagFilter && !this.#isValidMagFilter(nextMagFilter)) {
+      throw new TypeError(ERROR_EXPECTS_MAG_FILTER_ENUM);
+    }
+    if (hasExplicitMipmapPolicy && !this.#isValidMipmapPolicy(nextMipmapPolicy)) {
+      throw new TypeError(ERROR_EXPECTS_MIPMAP_POLICY);
+    }
+    if (nextMipmapPolicy === MIPMAP_POLICY_NONE && nextHasExplicitMinFilter && this.#isMipmapMinFilter(nextMinFilter)) {
+      throw new TypeError(ERROR_MIPMAP_POLICY_CONFLICT);
+    }
+    this.#wrapS = nextWrapS;
+    this.#wrapT = nextWrapT;
+    this.#minFilter = nextMinFilter;
+    this.#magFilter = nextMagFilter;
+    this.#mipmapPolicy = nextMipmapPolicy;
+    this.#hasExplicitMinFilter = nextHasExplicitMinFilter;
+    this.#bindTexture();
+    try {
+      if (this.#isLoaded) {
+        const mipmapsGenerated = this.#maybeGenerateMipmaps();
+        this.#syncMinFilterWithMipmaps(mipmapsGenerated);
+      } else if (!this.#hasExplicitMinFilter && this.#isMipmapMinFilter(this.#minFilter)) {
+        this.#minFilter = this.#webglContext.LINEAR;
+      }
+      this.#applySamplerParams();
+    } finally {
+      this.#unbindTexture();
+    }
+  }
+  /**
    * Loads an image from the given URL and uploads it into this WebGL texture.
    *
-   * @param {string} url      - Image URL (relative or absolute).
-   * @returns {Promise<void>} - Promise that resolves after successful GPU upload, or rejects on `load/decode/upload` error.
+   * @param {string} url                     - Image URL (relative or absolute).
+   * @param {Texture2DLoadOptions} [options] - Optional load options.
+   * @returns {Promise<void>}                - Promise, that resolves after successful GPU upload, or rejects on `load/decode/upload` error.
+   * @throws {TypeError} When arguments are invalid.
    */
-  async loadFromUrl(url) {
+  async loadFromUrl(url, options = {}) {
     this.#assertNotDisposed();
     if (typeof url !== "string" || url.length < MIN_REQUIRED_STRING_LENGTH2) {
-      throw new TypeError("`Texture2D.loadFromUrl` expects url as a non-empty string.");
+      throw new TypeError(ERROR_EXPECTS_URL_STRING);
     }
-    const image = await this.#loadImage(url);
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError(ERROR_EXPECTS_LOAD_OPTIONS_OBJECT);
+    }
+    const hasCrossOrigin = Object.prototype.hasOwnProperty.call(options, "crossOrigin");
+    const crossOrigin = hasCrossOrigin ? options.crossOrigin : null;
+    if (hasCrossOrigin && crossOrigin !== null && crossOrigin !== CROSS_ORIGIN_ANONYMOUS && crossOrigin !== CROSS_ORIGIN_USE_CREDENTIALS) {
+      throw new TypeError(ERROR_EXPECTS_CROSS_ORIGIN);
+    }
+    const image = await this.#loadImage(url, crossOrigin);
     this.#assertNotDisposed();
     this.#uploadImage(image);
   }
@@ -5042,15 +5227,19 @@ var Texture2D = class {
   /**
    * Loads an `HTMLImageElement` from a URL.
    *
-   * @param {string} url                  - Image URL.
-   * @returns {Promise<HTMLImageElement>} - Promise, that resolves with a decoded image on `load`, or rejects on `error`.
+   * @param {string} url                         - Image URL.
+   * @param {(string|null)} [crossOrigin = null] - Optional CORS mode: `anonymous/use-credentials`.
+   * @returns {Promise<HTMLImageElement>}        - Promise, that resolves with a decoded image on `load`, or rejects on `error`.
    * @private
    */
-  #loadImage(url) {
+  #loadImage(url, crossOrigin = null) {
     return new Promise((resolve, reject) => {
       const image = new Image();
+      if (typeof crossOrigin === "string") {
+        image.crossOrigin = crossOrigin;
+      }
       image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error(`Failed to load texture image: ${url}`));
+      image.onerror = () => reject(new Error(`${ERROR_FAILED_LOAD_IMAGE_PREFIX}${url}`));
       image.src = url;
     });
   }
@@ -5062,31 +5251,136 @@ var Texture2D = class {
    */
   #uploadImage(image) {
     const webglContext = this.#webglContext;
+    const previousFlipY = webglContext.getParameter(webglContext.UNPACK_FLIP_Y_WEBGL);
     this.#bindTexture();
-    webglContext.pixelStorei(
-      webglContext.UNPACK_FLIP_Y_WEBGL,
-      this.#flipY ? WEBGL_TRUE_AS_INTEGER : WEBGL_FALSE_AS_INTEGER
-    );
-    webglContext.texImage2D(
-      webglContext.TEXTURE_2D,
-      BASE_MIPMAP_LEVEL,
-      webglContext.RGBA,
-      webglContext.RGBA,
-      webglContext.UNSIGNED_BYTE,
-      image
-    );
-    this.#width = image.width;
-    this.#height = image.height;
-    this.#isLoaded = true;
-    if (this.#isPowerOfTwo(this.#width) && this.#isPowerOfTwo(this.#height)) {
-      webglContext.generateMipmap(webglContext.TEXTURE_2D);
-      webglContext.texParameteri(
-        webglContext.TEXTURE_2D,
-        webglContext.TEXTURE_MIN_FILTER,
-        webglContext.LINEAR_MIPMAP_LINEAR
+    try {
+      webglContext.pixelStorei(
+        webglContext.UNPACK_FLIP_Y_WEBGL,
+        this.#flipY ? WEBGL_TRUE_AS_INTEGER : WEBGL_FALSE_AS_INTEGER
       );
+      webglContext.texImage2D(
+        webglContext.TEXTURE_2D,
+        BASE_MIPMAP_LEVEL,
+        webglContext.RGBA,
+        webglContext.RGBA,
+        webglContext.UNSIGNED_BYTE,
+        image
+      );
+      this.#width = image.width;
+      this.#height = image.height;
+      this.#isLoaded = true;
+      const mipmapsGenerated = this.#maybeGenerateMipmaps();
+      this.#syncMinFilterWithMipmaps(mipmapsGenerated);
+      this.#applySamplerParams();
+    } finally {
+      webglContext.pixelStorei(
+        webglContext.UNPACK_FLIP_Y_WEBGL,
+        previousFlipY ? WEBGL_TRUE_AS_INTEGER : WEBGL_FALSE_AS_INTEGER
+      );
+      this.#unbindTexture();
     }
-    this.#unbindTexture();
+  }
+  /**
+   * Applies current sampler parameters to the bound texture.
+   *
+   * @private
+   */
+  #applySamplerParams() {
+    const webglContext = this.#webglContext;
+    webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_WRAP_S, this.#wrapS);
+    webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_WRAP_T, this.#wrapT);
+    webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_MIN_FILTER, this.#minFilter);
+    webglContext.texParameteri(webglContext.TEXTURE_2D, webglContext.TEXTURE_MAG_FILTER, this.#magFilter);
+  }
+  /**
+   * Generates mipmaps, when the policy allows it.
+   *
+   * @returns {boolean} True, when mipmaps were generated.
+   * @private
+   */
+  #maybeGenerateMipmaps() {
+    if (this.#mipmapPolicy === MIPMAP_POLICY_NONE) {
+      return false;
+    }
+    if (this.#mipmapPolicy === MIPMAP_POLICY_AUTO && !(this.#isPowerOfTwo(this.#width) && this.#isPowerOfTwo(this.#height))) {
+      if (this.#hasExplicitMinFilter && this.#isMipmapMinFilter(this.#minFilter)) {
+        throw new TypeError(ERROR_MIPMAP_AUTO_POT_REQUIRED_FOR_MIPMAP_FILTER);
+      }
+      return false;
+    }
+    this.#webglContext.generateMipmap(this.#webglContext.TEXTURE_2D);
+    return true;
+  }
+  /**
+   * Updates minification filter, based on mipmap availability and explicit overrides.
+   *
+   * @param {boolean} mipmapsGenerated - True, when mipmaps were generated.
+   * @private
+   */
+  #syncMinFilterWithMipmaps(mipmapsGenerated) {
+    if (mipmapsGenerated) {
+      if (!this.#hasExplicitMinFilter) {
+        this.#minFilter = this.#webglContext.LINEAR_MIPMAP_LINEAR;
+      }
+      return;
+    }
+    if (!this.#hasExplicitMinFilter && this.#isMipmapMinFilter(this.#minFilter)) {
+      this.#minFilter = this.#webglContext.LINEAR;
+    }
+  }
+  /**
+   * Checks whether a value is a valid wrap mode.
+   *
+   * @param {number} value - Wrap mode value to validate.
+   * @returns {boolean} True, when value is a supported wrap mode.
+   * @private
+   */
+  #isValidWrapMode(value) {
+    const webglContext = this.#webglContext;
+    return value === webglContext.REPEAT || value === webglContext.CLAMP_TO_EDGE || value === webglContext.MIRRORED_REPEAT;
+  }
+  /**
+   * Checks whether a value is a valid minification filter.
+   *
+   * @param {number} value - Filter value to validate.
+   * @returns {boolean} True, when value is a supported min filter.
+   * @private
+   */
+  #isValidMinFilter(value) {
+    const webglContext = this.#webglContext;
+    return value === webglContext.NEAREST || value === webglContext.LINEAR || value === webglContext.NEAREST_MIPMAP_NEAREST || value === webglContext.LINEAR_MIPMAP_NEAREST || value === webglContext.NEAREST_MIPMAP_LINEAR || value === webglContext.LINEAR_MIPMAP_LINEAR;
+  }
+  /**
+   * Checks whether a value is a valid magnification filter.
+   *
+   * @param {number} value - Filter value to validate.
+   * @returns {boolean} True, when value is a supported mag filter.
+   * @private
+   */
+  #isValidMagFilter(value) {
+    const webglContext = this.#webglContext;
+    return value === webglContext.NEAREST || value === webglContext.LINEAR;
+  }
+  /**
+   * Checks whether a value is a valid mipmap policy.
+   *
+   * @param {number} value - Policy value to validate.
+   * @returns {boolean} True, when value is a supported policy.
+   * @private
+   */
+  #isValidMipmapPolicy(value) {
+    return value === MIPMAP_POLICY_NONE || value === MIPMAP_POLICY_ALWAYS || value === MIPMAP_POLICY_AUTO;
+  }
+  /**
+   * Checks whether a min filter value uses mipmaps.
+   *
+   * @param {number} value - Filter value to validate.
+   * @returns {boolean} True, when the filter expects mipmaps.
+   * @private
+   */
+  #isMipmapMinFilter(value) {
+    const webglContext = this.#webglContext;
+    return value === webglContext.NEAREST_MIPMAP_NEAREST || value === webglContext.LINEAR_MIPMAP_NEAREST || value === webglContext.NEAREST_MIPMAP_LINEAR || value === webglContext.LINEAR_MIPMAP_LINEAR;
   }
   /**
    * Checks whether an integer value is a `power-of-two`.
@@ -5115,7 +5409,7 @@ var Texture2D = class {
    */
   #assertNotDisposed() {
     if (this.#isDisposed) {
-      throw new Error("`Texture2D` instance is disposed.");
+      throw new Error(ERROR_INSTANCE_DISPOSED);
     }
   }
 };

@@ -159,7 +159,7 @@ const LOCAL_STATUS_NO_OBJ_FILES = 'No OBJ files found in the selected folder.';
  *
  * @type {string}
  */
-const LOCAL_STATUS_FOLDER_READY = 'Folder ready. Click “Load from folder”.';
+const LOCAL_STATUS_FOLDER_READY = 'Folder ready. Click `Load from folder`.';
 
 /**
  * Local status label, when folder selection is missing.
@@ -1138,7 +1138,6 @@ class ObjMtlDemoApp {
     #addFileUrlToMap(assetUrlMap, file, url) {
         const normalizedPath = this.#normalizePath(file.webkitRelativePath || file.name);
         const baseName       = this.#getBasename(normalizedPath);
-
         assetUrlMap.set(normalizedPath, url);
 
         if (!assetUrlMap.has(baseName)) {
@@ -1299,7 +1298,7 @@ class ObjMtlDemoApp {
     }
 
     /**
-     * Splits a line into tokens while respecting quotes.
+     * Splits a line into tokens while respecting the quotes.
      *
      * @param {string} line - Input line.
      * @returns {string[]}

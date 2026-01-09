@@ -42,14 +42,6 @@ High-level modules are for "get something on screen fast":
 - Loader             : `ObjMtlLoader`
 - Debugging          : `FpsCounter`
 
-Example:
-
-```js
-const engine = GeraWebGL.createEngine(canvas);
-const cube   = engine.createBoxMesh({ size: 1.0 });
-engine.scene.add(cube);
-```
-
 ### Low-level
 
 Low-level modules are for custom shaders and direct WebGL control. Example:
