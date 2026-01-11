@@ -8927,7 +8927,602 @@ var FpsCounter = class _FpsCounter {
   }
 };
 
-// core/loader/obj-mtl-loader.js
+// core/loaders/obj-mtl/obj-geometry-builder.js
+var POSITION_COMPONENT_COUNT6 = 3;
+var UV_COMPONENT_COUNT2 = 2;
+var NORMAL_COMPONENT_COUNT2 = 3;
+var COLOR_COMPONENT_COUNT5 = 3;
+var DEFAULT_UV = [0, 0];
+var DEFAULT_NORMAL = [0, 0, 1];
+var OBJ_INDEX_NOT_PROVIDED = -1;
+var ZERO_VALUE10 = 0;
+var FIRST_INDEX = 0;
+var SECOND_INDEX = 1;
+var THIRD_INDEX = 2;
+var COMPONENT_INDEX_X = 0;
+var COMPONENT_INDEX_Y = 1;
+var COMPONENT_INDEX_Z = 2;
+var VERTEX_KEY_SEPARATOR = "|";
+var LOOP_INCREMENT = 1;
+var ERROR_WEBGL_CONTEXT_TYPE = "`ObjGeometryBuilder` expects a `WebGL2RenderingContext`.";
+var ERROR_PARSED_DATA_TYPE = "`ObjGeometryBuilder.build` expects parsed OBJ data as an object.";
+var TYPEOF_OBJECT = "object";
+var ObjGeometryBuilder = class _ObjGeometryBuilder {
+  /**
+   * WebGL2 rendering context used to create the geometries.
+   *
+   * @type {WebGL2RenderingContext}
+   * @private
+   */
+  #webglContext;
+  /**
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @throws {TypeError} When `webglContext` is not a `WebGL2RenderingContext`.
+   */
+  constructor(webglContext) {
+    if (!(webglContext instanceof WebGL2RenderingContext)) {
+      throw new TypeError(ERROR_WEBGL_CONTEXT_TYPE);
+    }
+    this.#webglContext = webglContext;
+  }
+  /**
+   * Builds the geometry for parsed OBJ data.
+   *
+   * @param {ObjParsedData} parsedData - Parsed OBJ data.
+   * @returns {ObjGeometryBuildResult} - Build result, which is containing the root node, mesh creation entries and created geometries.
+   * @throws {TypeError} When `parsedData` is invalid.
+   */
+  build(parsedData) {
+    if (parsedData === null || typeof parsedData !== TYPEOF_OBJECT || Array.isArray(parsedData)) {
+      throw new TypeError(ERROR_PARSED_DATA_TYPE);
+    }
+    const root = new Object3D();
+    const entries = [];
+    const geometries = [];
+    for (const objectData of parsedData.objects) {
+      const objectNode = new Object3D();
+      root.add(objectNode);
+      for (const groupData of objectData.groups) {
+        const groupNode = new Object3D();
+        objectNode.add(groupNode);
+        for (const chunk of groupData.materialChunks) {
+          if (!chunk.triangles.length) {
+            continue;
+          }
+          const geometryData = this.#buildGeometryForChunk(chunk, parsedData);
+          const geometry = new CustomGeometry(this.#webglContext, geometryData);
+          const usesVertexColors = Boolean(geometryData.colors);
+          entries.push({
+            parent: groupNode,
+            geometry,
+            materialName: chunk.materialName,
+            usesVertexColors
+          });
+          geometries.push(geometry);
+        }
+      }
+    }
+    return {
+      root,
+      entries,
+      geometries
+    };
+  }
+  /**
+   * Builds the geometry data for a material chunk.
+   *
+   * @param {ObjMaterialChunk} chunk   - Material chunk.
+   * @param {ObjParsedData} parsedData - Parsed OBJ data.
+   * @returns {Object}                 - Geometry buffers for the chunk.
+   * @private
+   */
+  #buildGeometryForChunk(chunk, parsedData) {
+    const positions = [];
+    const uvs = [];
+    const normals = [];
+    const colors = parsedData.hasVertexColors ? [] : null;
+    const indices = [];
+    if (chunk.smoothingGroup === ZERO_VALUE10) {
+      this.#appendFlatGeometry(chunk, parsedData, positions, uvs, normals, colors, indices);
+    } else {
+      this.#appendSmoothGeometry(chunk, parsedData, positions, uvs, normals, colors, indices);
+    }
+    return {
+      positions: new Float32Array(positions),
+      indices,
+      uvs: new Float32Array(uvs),
+      normals: new Float32Array(normals),
+      colors: colors ? new Float32Array(colors) : null
+    };
+  }
+  /**
+   * Appends the flat-shaded geometry data.
+   *
+   * @param {ObjMaterialChunk} chunk    - Material chunk.
+   * @param {ObjParsedData} parsedData  - Parsed OBJ data.
+   * @param {number[]} positionsOut     - Output positions.
+   * @param {number[]} uvsOut           - Output UVs.
+   * @param {number[]} normalsOut       - Output normals.
+   * @param {number[] | null} colorsOut - Output colors.
+   * @param {number[]} indicesOut       - Output indices.
+   * @returns {void}                    - Appends the flat-shaded vertex data into the provided output buffers.
+   * @private
+   */
+  #appendFlatGeometry(chunk, parsedData, positionsOut, uvsOut, normalsOut, colorsOut, indicesOut) {
+    const positions = parsedData.positions;
+    const uvs = parsedData.uvs;
+    const normals = parsedData.normals;
+    const colors = parsedData.colors;
+    let vertexIndex = ZERO_VALUE10;
+    for (const triangle of chunk.triangles) {
+      const faceNormal = this.#computeFaceNormal(triangle, positions);
+      for (const vertex of triangle) {
+        const positionIndex = vertex.positionIndex;
+        const uvIndex = vertex.uvIndex;
+        const normalIndex = vertex.normalIndex;
+        _ObjGeometryBuilder.#appendPosition(positions, positionIndex, positionsOut);
+        _ObjGeometryBuilder.#appendUv(uvs, uvIndex, uvsOut);
+        if (normalIndex !== OBJ_INDEX_NOT_PROVIDED) {
+          _ObjGeometryBuilder.#appendNormal(normals, normalIndex, normalsOut);
+        } else {
+          normalsOut.push(
+            faceNormal[COMPONENT_INDEX_X],
+            faceNormal[COMPONENT_INDEX_Y],
+            faceNormal[COMPONENT_INDEX_Z]
+          );
+        }
+        if (colorsOut) {
+          _ObjGeometryBuilder.#appendColor(colors, positionIndex, colorsOut);
+        }
+        indicesOut.push(vertexIndex);
+        vertexIndex += LOOP_INCREMENT;
+      }
+    }
+  }
+  /**
+   * Appends the smooth-shaded geometry data.
+   *
+   * @param {ObjMaterialChunk} chunk    - Material chunk.
+   * @param {ObjParsedData} parsedData  - Parsed OBJ data.
+   * @param {number[]} positionsOut     - Output positions.
+   * @param {number[]} uvsOut           - Output UVs.
+   * @param {number[]} normalsOut       - Output normals.
+   * @param {number[] | null} colorsOut - Output colors.
+   * @param {number[]} indicesOut       - Output indices.
+   * @returns {void}                    - Appends the smooth-shaded vertex data into the provided output buffers, reusing the shared vertices, when possible.
+   * @private
+   */
+  #appendSmoothGeometry(chunk, parsedData, positionsOut, uvsOut, normalsOut, colorsOut, indicesOut) {
+    const positions = parsedData.positions;
+    const uvs = parsedData.uvs;
+    const normals = parsedData.normals;
+    const colors = parsedData.colors;
+    const vertexMap = /* @__PURE__ */ new Map();
+    const normalAccumulator = this.#buildNormalAccumulator(chunk, positions);
+    for (const triangle of chunk.triangles) {
+      for (const vertex of triangle) {
+        const key = _ObjGeometryBuilder.#buildVertexKey(vertex);
+        if (vertexMap.has(key)) {
+          indicesOut.push(vertexMap.get(key));
+          continue;
+        }
+        const positionIndex = vertex.positionIndex;
+        const uvIndex = vertex.uvIndex;
+        const normalIndex = vertex.normalIndex;
+        const nextIndex = positionsOut.length / POSITION_COMPONENT_COUNT6;
+        vertexMap.set(key, nextIndex);
+        _ObjGeometryBuilder.#appendPosition(positions, positionIndex, positionsOut);
+        _ObjGeometryBuilder.#appendUv(uvs, uvIndex, uvsOut);
+        if (normalIndex !== OBJ_INDEX_NOT_PROVIDED) {
+          _ObjGeometryBuilder.#appendNormal(normals, normalIndex, normalsOut);
+        } else {
+          const smoothNormal = normalAccumulator.get(key) || DEFAULT_NORMAL;
+          normalsOut.push(
+            smoothNormal[COMPONENT_INDEX_X],
+            smoothNormal[COMPONENT_INDEX_Y],
+            smoothNormal[COMPONENT_INDEX_Z]
+          );
+        }
+        if (colorsOut) {
+          _ObjGeometryBuilder.#appendColor(colors, positionIndex, colorsOut);
+        }
+        indicesOut.push(nextIndex);
+      }
+    }
+  }
+  /**
+   * Builds a normal accumulator map for smooth shading.
+   *
+   * @param {ObjMaterialChunk} chunk  - Material chunk.
+   * @param {number[]} positions      - Source positions.
+   * @returns {Map<string, number[]>} - Map of the `accumulated normalized` normals, keyed by the unique vertex key.
+   * @private
+   */
+  #buildNormalAccumulator(chunk, positions) {
+    const accumulators = /* @__PURE__ */ new Map();
+    for (const triangle of chunk.triangles) {
+      const faceNormal = this.#computeFaceNormal(triangle, positions);
+      for (const vertex of triangle) {
+        if (vertex.normalIndex !== OBJ_INDEX_NOT_PROVIDED) {
+          continue;
+        }
+        const key = _ObjGeometryBuilder.#buildVertexKey(vertex);
+        const current = accumulators.get(key) || [ZERO_VALUE10, ZERO_VALUE10, ZERO_VALUE10];
+        current[COMPONENT_INDEX_X] += faceNormal[COMPONENT_INDEX_X];
+        current[COMPONENT_INDEX_Y] += faceNormal[COMPONENT_INDEX_Y];
+        current[COMPONENT_INDEX_Z] += faceNormal[COMPONENT_INDEX_Z];
+        accumulators.set(key, current);
+      }
+    }
+    for (const [key, normal] of accumulators.entries()) {
+      const length = Math.hypot(normal[COMPONENT_INDEX_X], normal[COMPONENT_INDEX_Y], normal[COMPONENT_INDEX_Z]);
+      if (length > ZERO_VALUE10) {
+        normal[COMPONENT_INDEX_X] /= length;
+        normal[COMPONENT_INDEX_Y] /= length;
+        normal[COMPONENT_INDEX_Z] /= length;
+      }
+      accumulators.set(key, normal);
+    }
+    return accumulators;
+  }
+  /**
+   * Computes a face normal for a triangle.
+   *
+   * @param {ObjFaceVertex[]} triangle - Triangle vertices.
+   * @param {number[]} positions       - Source positions.
+   * @returns {number[]}               - Normalized face normal as an `[x, y, z]` array.
+   * @private
+   */
+  #computeFaceNormal(triangle, positions) {
+    const vertexA = triangle[FIRST_INDEX];
+    const vertexB = triangle[SECOND_INDEX];
+    const vertexC = triangle[THIRD_INDEX];
+    const ax = _ObjGeometryBuilder.#getPositionComponent(positions, vertexA.positionIndex, COMPONENT_INDEX_X);
+    const ay = _ObjGeometryBuilder.#getPositionComponent(positions, vertexA.positionIndex, COMPONENT_INDEX_Y);
+    const az = _ObjGeometryBuilder.#getPositionComponent(positions, vertexA.positionIndex, COMPONENT_INDEX_Z);
+    const bx = _ObjGeometryBuilder.#getPositionComponent(positions, vertexB.positionIndex, COMPONENT_INDEX_X);
+    const by = _ObjGeometryBuilder.#getPositionComponent(positions, vertexB.positionIndex, COMPONENT_INDEX_Y);
+    const bz = _ObjGeometryBuilder.#getPositionComponent(positions, vertexB.positionIndex, COMPONENT_INDEX_Z);
+    const cx = _ObjGeometryBuilder.#getPositionComponent(positions, vertexC.positionIndex, COMPONENT_INDEX_X);
+    const cy = _ObjGeometryBuilder.#getPositionComponent(positions, vertexC.positionIndex, COMPONENT_INDEX_Y);
+    const cz = _ObjGeometryBuilder.#getPositionComponent(positions, vertexC.positionIndex, COMPONENT_INDEX_Z);
+    const abx = bx - ax;
+    const aby = by - ay;
+    const abz = bz - az;
+    const acx = cx - ax;
+    const acy = cy - ay;
+    const acz = cz - az;
+    const nx = aby * acz - abz * acy;
+    const ny = abz * acx - abx * acz;
+    const nz = abx * acy - aby * acx;
+    const length = Math.hypot(nx, ny, nz);
+    if (length > ZERO_VALUE10) {
+      return [nx / length, ny / length, nz / length];
+    }
+    return DEFAULT_NORMAL;
+  }
+  /**
+   * Appends a position to the target buffer.
+   *
+   * @param {number[]} sourcePositions - Source positions.
+   * @param {number} index             - Position index.
+   * @param {number[]} target          - Target positions buffer.
+   * @returns {void}                   - Appends the referenced position triplet to the target buffer.
+   * @private
+   */
+  static #appendPosition(sourcePositions, index, target) {
+    const baseIndex = index * POSITION_COMPONENT_COUNT6;
+    target.push(
+      sourcePositions[baseIndex + COMPONENT_INDEX_X],
+      sourcePositions[baseIndex + COMPONENT_INDEX_Y],
+      sourcePositions[baseIndex + COMPONENT_INDEX_Z]
+    );
+  }
+  /**
+   * Appends a UV to the target buffer.
+   *
+   * @param {number[]} sourceUvs - Source UVs.
+   * @param {number} index       - UV index.
+   * @param {number[]} target    - Target UV buffer.
+   * @returns {void}             - Appends the referenced UV pair to the target buffer or the default UV, when missing/invalid.
+   * @private
+   */
+  static #appendUv(sourceUvs, index, target) {
+    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE10 && index * UV_COMPONENT_COUNT2 < sourceUvs.length) {
+      const baseIndex = index * UV_COMPONENT_COUNT2;
+      target.push(sourceUvs[baseIndex + COMPONENT_INDEX_X], sourceUvs[baseIndex + COMPONENT_INDEX_Y]);
+      return;
+    }
+    target.push(DEFAULT_UV[COMPONENT_INDEX_X], DEFAULT_UV[COMPONENT_INDEX_Y]);
+  }
+  /**
+   * Appends a normal to the target buffer.
+   *
+   * @param {number[]} sourceNormals - Source normals.
+   * @param {number} index           - Normal index.
+   * @param {number[]} target        - Target normal buffer.
+   * @returns {void}                 - Appends the referenced normal triplet to the target buffer or the default normal, when missing/invalid.
+   * @private
+   */
+  static #appendNormal(sourceNormals, index, target) {
+    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE10 && index * NORMAL_COMPONENT_COUNT2 < sourceNormals.length) {
+      const baseIndex = index * NORMAL_COMPONENT_COUNT2;
+      target.push(
+        sourceNormals[baseIndex + COMPONENT_INDEX_X],
+        sourceNormals[baseIndex + COMPONENT_INDEX_Y],
+        sourceNormals[baseIndex + COMPONENT_INDEX_Z]
+      );
+      return;
+    }
+    target.push(DEFAULT_NORMAL[COMPONENT_INDEX_X], DEFAULT_NORMAL[COMPONENT_INDEX_Y], DEFAULT_NORMAL[COMPONENT_INDEX_Z]);
+  }
+  /**
+   * Appends a color to the target buffer.
+   *
+   * @param {number[]} sourceColors - Source colors.
+   * @param {number} index          - Color index.
+   * @param {number[]} target       - Target colors buffer.
+   * @returns {void}                - Appends the referenced RGB triplet to the target buffer.
+   * @private
+   */
+  static #appendColor(sourceColors, index, target) {
+    const baseIndex = index * COLOR_COMPONENT_COUNT5;
+    target.push(
+      sourceColors[baseIndex + COMPONENT_INDEX_X],
+      sourceColors[baseIndex + COMPONENT_INDEX_Y],
+      sourceColors[baseIndex + COMPONENT_INDEX_Z]
+    );
+  }
+  /**
+   * Builds a unique vertex key from the indices.
+   *
+   * @param {ObjFaceVertex} vertex - Face vertex.
+   * @returns {string}             - Unique vertex key built from the OBJ indices.
+   * @private
+   */
+  static #buildVertexKey(vertex) {
+    return String(vertex.positionIndex) + VERTEX_KEY_SEPARATOR + String(vertex.uvIndex) + VERTEX_KEY_SEPARATOR + String(vertex.normalIndex);
+  }
+  /**
+   * Reads the position component from the source array.
+   *
+   * @param {number[]} positions - Source positions.
+   * @param {number} index       - Vertex index.
+   * @param {number} component   - Component offset.
+   * @returns {number}           - Requested position component value for the given vertex index.
+   * @private
+   */
+  static #getPositionComponent(positions, index, component) {
+    return positions[index * POSITION_COMPONENT_COUNT6 + component];
+  }
+};
+
+// core/loaders/obj-mtl/mtl-texture-cache.js
+var ERROR_WEBGL_CONTEXT_TYPE2 = "`TextureCache` expects a `WebGL2RenderingContext`.";
+var ERROR_TEXTURE_URL_TYPE = "`TextureCache.getTexture` expects `url` as a string.";
+var ERROR_OUTPUT_LIST_TYPE = "`TextureCache.getTexture` expects `output` as an array.";
+var TYPEOF_STRING = "string";
+var MtlTextureCache = class {
+  /**
+   * WebGL2 rendering context, used to create textures.
+   *
+   * @type {WebGL2RenderingContext}
+   * @private
+   */
+  #webglContext;
+  /**
+   * Cache map of textures by URL.
+   *
+   * @type {Map<string, Texture2D>}
+   * @private
+   */
+  #cache = /* @__PURE__ */ new Map();
+  /**
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @throws {TypeError} When `webglContext` is not `WebGL2RenderingContext`.
+   */
+  constructor(webglContext) {
+    if (!(webglContext instanceof WebGL2RenderingContext)) {
+      throw new TypeError(ERROR_WEBGL_CONTEXT_TYPE2);
+    }
+    this.#webglContext = webglContext;
+  }
+  /**
+   * Returns cached or newly loaded texture.
+   *
+   * @param {string} url           - Texture URL.
+   * @param {Texture2D[]} output   - Output list of created textures.
+   * @returns {Promise<Texture2D>} - Promise, that resolves with the cached or newly created `Texture2D` instance for the given URL.
+   * @throws {TypeError} When url or output are invalid.
+   */
+  async getTexture(url, output) {
+    if (typeof url !== TYPEOF_STRING) {
+      throw new TypeError(ERROR_TEXTURE_URL_TYPE);
+    }
+    if (!Array.isArray(output)) {
+      throw new TypeError(ERROR_OUTPUT_LIST_TYPE);
+    }
+    if (this.#cache.has(url)) {
+      return this.#cache.get(url);
+    }
+    const texture = new Texture2D(this.#webglContext);
+    await texture.loadFromUrl(url);
+    this.#cache.set(url, texture);
+    output.push(texture);
+    return texture;
+  }
+};
+
+// core/loaders/obj-mtl/obj-material-factory.js
+var DEFAULT_TEXTURE_UNIT_INDEX3 = 0;
+var DEFAULT_OPACITY2 = 1;
+var COLOR_COMPONENT_COUNT6 = 3;
+var DEFAULT_DIFFUSE_COLOR = new Float32Array([1, 1, 1]);
+var DEFAULT_SHININESS2 = 16;
+var MIN_SHININESS = 1;
+var MAX_SHININESS = 128;
+var ZERO_VALUE11 = 0;
+var FIRST_INDEX2 = 0;
+var SECOND_INDEX2 = 1;
+var THIRD_INDEX2 = 2;
+var ERROR_WEBGL_CONTEXT_TYPE3 = "`ObjMaterialFactory` expects a `WebGL2RenderingContext`.";
+var ERROR_OPTIONS_TYPE = "`ObjMaterialFactory` expects options as a plain object.";
+var ERROR_TEXTURE_UNIT_INDEX_TYPE = "`ObjMaterialFactory` expects `textureUnitIndex` as a non-negative integer.";
+var ERROR_DEFAULT_COLOR_TYPE = "`ObjMaterialFactory` expects `defaultColor` as `number[]` or `Float32Array`.";
+var ERROR_DEFAULT_COLOR_LENGTH = "`ObjMaterialFactory` expects `defaultColor` to have 3 components.";
+var ERROR_TEXTURE_CACHE_TYPE = "`ObjMaterialFactory` expects `textureCache` as `MtlTextureCache`.";
+var ERROR_TEXTURES_OUTPUT_TYPE = "`ObjMaterialFactory.createMaterial` expects `textures` as an array.";
+var TYPEOF_OBJECT2 = "object";
+var TYPEOF_NUMBER = "number";
+var ObjMaterialFactory = class _ObjMaterialFactory {
+  /**
+   * WebGL2 rendering context used to create the materials.
+   *
+   * @type {WebGL2RenderingContext}
+   * @private
+   */
+  #webglContext;
+  /**
+   * Texture unit index, used for the textured materials.
+   *
+   * @type {number}
+   * @private
+   */
+  #textureUnitIndex;
+  /**
+   * Default diffuse color used, when no material info is available.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #defaultColor = new Float32Array(DEFAULT_DIFFUSE_COLOR);
+  /**
+   * Texture cache, used for loading the textures.
+   *
+   * @type {MtlTextureCache}
+   * @private
+   */
+  #textureCache;
+  /**
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @param {ObjMaterialFactoryOptions} [options] - Factory options.
+   * @throws {TypeError} When the inputs are invalid.
+   */
+  constructor(webglContext, options = {}) {
+    if (!(webglContext instanceof WebGL2RenderingContext)) {
+      throw new TypeError(ERROR_WEBGL_CONTEXT_TYPE3);
+    }
+    if (options === null || typeof options !== TYPEOF_OBJECT2 || Array.isArray(options)) {
+      throw new TypeError(ERROR_OPTIONS_TYPE);
+    }
+    const {
+      textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX3,
+      defaultColor,
+      textureCache
+    } = options;
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE11) {
+      throw new TypeError(ERROR_TEXTURE_UNIT_INDEX_TYPE);
+    }
+    if (defaultColor !== void 0) {
+      if (!Array.isArray(defaultColor) && !(defaultColor instanceof Float32Array)) {
+        throw new TypeError(ERROR_DEFAULT_COLOR_TYPE);
+      }
+      if (defaultColor.length !== COLOR_COMPONENT_COUNT6) {
+        throw new TypeError(ERROR_DEFAULT_COLOR_LENGTH);
+      }
+      this.#defaultColor.set(defaultColor);
+    }
+    if (textureCache !== void 0 && !(textureCache instanceof MtlTextureCache)) {
+      throw new TypeError(ERROR_TEXTURE_CACHE_TYPE);
+    }
+    this.#webglContext = webglContext;
+    this.#textureUnitIndex = textureUnitIndex;
+    this.#textureCache = textureCache || new MtlTextureCache(webglContext);
+  }
+  /**
+   * Creates a material instance, based on MTL data.
+   *
+   * @param {Object | null} definition          - Parsed material definition.
+   * @param {string | null} textureUrl          - Resolved diffuse texture URL.
+   * @param {Array} textures                    - Output list of created textures.
+   * @param {boolean} [useVertexColors = false] - Whether the vertex colors are available.
+   * @returns {Promise<LambertMaterial | PhongMaterial | TexturedMaterial | VertexColorMaterial>} - Promise, that resolves with the created material instance, based on the parsed MTL definition and the available inputs.
+   * @throws {TypeError} When textures output is invalid.
+   */
+  async createMaterial(definition, textureUrl, textures, useVertexColors = false) {
+    if (!Array.isArray(textures)) {
+      throw new TypeError(ERROR_TEXTURES_OUTPUT_TYPE);
+    }
+    const opacity = definition ? definition.opacity : DEFAULT_OPACITY2;
+    if (definition && definition.diffuseMap && textureUrl) {
+      const texture = await this.#textureCache.getTexture(textureUrl, textures);
+      const material = new TexturedMaterial(this.#webglContext, {
+        texture,
+        ownsTexture: false,
+        textureUnitIndex: this.#textureUnitIndex
+      });
+      material.setOpacity(opacity);
+      return material;
+    }
+    if (useVertexColors && !this.#hasSpecularInfo(definition)) {
+      const material = new VertexColorMaterial(this.#webglContext);
+      material.setOpacity(opacity);
+      return material;
+    }
+    if (this.#hasSpecularInfo(definition)) {
+      const diffuseColor = definition ? definition.diffuseColor : this.#defaultColor;
+      const specularColor = definition ? definition.specularColor : new Float32Array(COLOR_COMPONENT_COUNT6);
+      const shininess = _ObjMaterialFactory.#clampShininess(definition ? definition.specularExponent : null);
+      const material = new PhongMaterial(this.#webglContext, {
+        color: diffuseColor,
+        specularColor,
+        shininess
+      });
+      material.setOpacity(opacity);
+      return material;
+    }
+    if (definition) {
+      const material = new LambertMaterial(this.#webglContext, { color: definition.diffuseColor });
+      material.setOpacity(opacity);
+      return material;
+    }
+    const fallbackMaterial = new LambertMaterial(this.#webglContext, { color: this.#defaultColor });
+    fallbackMaterial.setOpacity(opacity);
+    return fallbackMaterial;
+  }
+  /**
+   * Determines whether the material has specular data.
+   *
+   * @param {Object | null} definition - Parsed material definition.
+   * @returns {boolean}                - True, when the definition contains the specular exponent or the non-zero specular color.
+   * @private
+   */
+  #hasSpecularInfo(definition) {
+    if (!definition) {
+      return false;
+    }
+    if (definition.specularExponent !== null) {
+      return true;
+    }
+    const specular = definition.specularColor;
+    return Boolean(specular && (specular[FIRST_INDEX2] > ZERO_VALUE11 || specular[SECOND_INDEX2] > ZERO_VALUE11 || specular[THIRD_INDEX2] > ZERO_VALUE11));
+  }
+  /**
+   * Clamps the shininess value into the allowed range.
+   *
+   * @param {number | null} value - Specular exponent.
+   * @returns {number}            - Clamped shininess value within the allowed range (falls back to the default, when input is invalid).
+   * @private
+   */
+  static #clampShininess(value) {
+    if (typeof value !== TYPEOF_NUMBER || !Number.isFinite(value)) {
+      return DEFAULT_SHININESS2;
+    }
+    return Math.min(Math.max(value, MIN_SHININESS), MAX_SHININESS);
+  }
+};
+
+// core/loaders/obj-mtl/obj-parser.js
 var COMMENT_TOKEN = "#";
 var OBJ_VERTEX_TOKEN = "v";
 var OBJ_TEXCOORD_TOKEN = "vt";
@@ -8935,6 +9530,586 @@ var OBJ_NORMAL_TOKEN = "vn";
 var OBJ_FACE_TOKEN = "f";
 var OBJ_MATERIAL_LIB_TOKEN = "mtllib";
 var OBJ_USE_MATERIAL_TOKEN = "usemtl";
+var OBJ_OBJECT_TOKEN = "o";
+var OBJ_GROUP_TOKEN = "g";
+var OBJ_SMOOTHING_TOKEN = "s";
+var OBJ_FACE_ATTRIBUTE_SEPARATOR = "/";
+var DEFAULT_MATERIAL_NAME = "default";
+var DEFAULT_OBJECT_NAME = "default";
+var DEFAULT_GROUP_NAME = "default";
+var SPACE_SEPARATOR = " ";
+var EMPTY_STRING = "";
+var LINE_SPLIT_REGEX = /\s+/u;
+var LINE_BREAK_REGEX = /\r?\n/u;
+var QUOTE_TOKEN = '"';
+var NOT_FOUND_INDEX = -1;
+var TYPEOF_STRING2 = "string";
+var FACE_MIN_VERTEX_COUNT = 3;
+var POSITION_COMPONENT_COUNT7 = 3;
+var UV_COMPONENT_COUNT3 = 2;
+var NORMAL_COMPONENT_COUNT3 = 3;
+var COLOR_COMPONENT_COUNT7 = 3;
+var COLOR_START_INDEX = POSITION_COMPONENT_COUNT7 + SECOND_INDEX3;
+var DEFAULT_SMOOTHING_GROUP = 0;
+var SMOOTHING_OFF_TOKEN = "off";
+var SMOOTHING_ON_TOKEN = "on";
+var OBJ_INDEX_OFFSET = 1;
+var OBJ_INDEX_NOT_PROVIDED2 = -1;
+var OBJ_INDEX_ZERO = 0;
+var DECIMAL_RADIX = 10;
+var FIRST_INDEX3 = 0;
+var SECOND_INDEX3 = 1;
+var THIRD_INDEX3 = 2;
+var FOURTH_INDEX = 3;
+var FAN_FIRST_VERTEX_INDEX = 0;
+var NEXT_FACE_VERTEX_OFFSET = 1;
+var CHUNK_KEY_SEPARATOR = "::";
+var ERROR_MISSING_POSITION_INDEX = "OBJ face vertex is missing the position index.";
+var ERROR_OBJ_TEXT_TYPE = "`ObjParser.parse` expects `objText` as a string.";
+var DEFAULT_VERTEX_COLOR2 = [1, 1, 1];
+var ObjParser = class _ObjParser {
+  /**
+   * Parsed positions array.
+   *
+   * @type {number[]}
+   * @private
+   */
+  #positions = [];
+  /**
+   * Parsed UV array.
+   *
+   * @type {number[]}
+   * @private
+   */
+  #uvs = [];
+  /**
+   * Parsed normals array.
+   *
+   * @type {number[]}
+   * @private
+   */
+  #normals = [];
+  /**
+   * Parsed vertex colors array.
+   *
+   * @type {number[]}
+   * @private
+   */
+  #colors = [];
+  /**
+   * Parsed material library references.
+   *
+   * @type {string[]}
+   * @private
+   */
+  #materialLibraries = [];
+  /**
+   * Parsed objects.
+   *
+   * @type {ObjParsedObject[]}
+   * @private
+   */
+  #objects = [];
+  /**
+   * Flag indicating whether any vertex colors are present.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #hasVertexColors = false;
+  /**
+   * Current object being populated.
+   *
+   * @type {ObjParsedObject | null}
+   * @private
+   */
+  #currentObject = null;
+  /**
+   * Current group being populated.
+   *
+   * @type {ObjParsedGroup | null}
+   * @private
+   */
+  #currentGroup = null;
+  /**
+   * Current material name.
+   *
+   * @type {string}
+   * @private
+   */
+  #currentMaterialName = DEFAULT_MATERIAL_NAME;
+  /**
+   * Current smoothing group.
+   *
+   * @type {number}
+   * @private
+   */
+  #currentSmoothingGroup = DEFAULT_SMOOTHING_GROUP;
+  /**
+   * Parses the OBJ text into structured data.
+   *
+   * @param {string} objText  - OBJ file contents.
+   * @returns {ObjParsedData} - Parsed OBJ data including geometry arrays, material libraries, and `object/group/chunk` structure.
+   * @throws {TypeError} When `objText` is not a string.
+   */
+  parse(objText) {
+    if (typeof objText !== TYPEOF_STRING2) {
+      throw new TypeError(ERROR_OBJ_TEXT_TYPE);
+    }
+    this.#resetState();
+    const lines = objText.split(LINE_BREAK_REGEX);
+    for (const line of lines) {
+      this.#parseLine(line);
+    }
+    return {
+      materialLibraries: this.#materialLibraries,
+      positions: this.#positions,
+      uvs: this.#uvs,
+      normals: this.#normals,
+      colors: this.#hasVertexColors ? this.#colors : [],
+      hasVertexColors: this.#hasVertexColors,
+      objects: this.#objects
+    };
+  }
+  /**
+   * Resets the internal parsing state.
+   *
+   * @returns {void}
+   * @private
+   */
+  #resetState() {
+    this.#positions = [];
+    this.#uvs = [];
+    this.#normals = [];
+    this.#colors = [];
+    this.#materialLibraries = [];
+    this.#objects = [];
+    this.#hasVertexColors = false;
+    this.#currentMaterialName = DEFAULT_MATERIAL_NAME;
+    this.#currentSmoothingGroup = DEFAULT_SMOOTHING_GROUP;
+    this.#currentObject = this.#getOrCreateObject(DEFAULT_OBJECT_NAME);
+    this.#currentGroup = this.#getOrCreateGroup(this.#currentObject, DEFAULT_GROUP_NAME);
+    this.#getOrCreateMaterialChunk(this.#currentGroup, this.#currentMaterialName, this.#currentSmoothingGroup);
+  }
+  /**
+   * Parses a single OBJ line.
+   *
+   * @param {string} line - Input line.
+   * @returns {void}
+   * @private
+   */
+  #parseLine(line) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith(COMMENT_TOKEN)) {
+      return;
+    }
+    const parts = trimmed.split(LINE_SPLIT_REGEX);
+    const keyword = parts[FIRST_INDEX3];
+    switch (keyword) {
+      case OBJ_VERTEX_TOKEN:
+        this.#parseVertex(parts);
+        break;
+      case OBJ_TEXCOORD_TOKEN:
+        this.#parseUv(parts);
+        break;
+      case OBJ_NORMAL_TOKEN:
+        this.#parseNormal(parts);
+        break;
+      case OBJ_MATERIAL_LIB_TOKEN:
+        this.#parseMaterialLibrary(trimmed);
+        break;
+      case OBJ_USE_MATERIAL_TOKEN:
+        this.#parseUseMaterial(parts);
+        break;
+      case OBJ_OBJECT_TOKEN:
+        this.#parseObject(parts);
+        break;
+      case OBJ_GROUP_TOKEN:
+        this.#parseGroup(parts);
+        break;
+      case OBJ_SMOOTHING_TOKEN:
+        this.#parseSmoothing(parts);
+        break;
+      case OBJ_FACE_TOKEN:
+        this.#parseFace(parts);
+        break;
+      default:
+        break;
+    }
+  }
+  /**
+   * Parses a vertex position (and optional vertex color).
+   *
+   * @param {string[]} parts - Split line parts.
+   * @returns {void}
+   * @private
+   */
+  #parseVertex(parts) {
+    const position = _ObjParser.#parseFloatTriplet(parts, POSITION_COMPONENT_COUNT7);
+    this.#positions.push(...position);
+    if (parts.length >= COLOR_START_INDEX + COLOR_COMPONENT_COUNT7) {
+      if (!this.#hasVertexColors) {
+        this.#hasVertexColors = true;
+        this.#fillMissingColors();
+      }
+      const color = _ObjParser.#parseFloatTripletFromOffset(parts, COLOR_START_INDEX);
+      this.#colors.push(...color);
+      return;
+    }
+    if (this.#hasVertexColors) {
+      const defaultColor = _ObjParser.#getDefaultVertexColor();
+      this.#colors.push(...defaultColor);
+    }
+  }
+  /**
+   * Parses a UV coordinate.
+   *
+   * @param {string[]} parts - Split line parts.
+   * @returns {void}
+   * @private
+   */
+  #parseUv(parts) {
+    const uv = _ObjParser.#parseFloatPair(parts);
+    this.#uvs.push(...uv);
+  }
+  /**
+   * Parses a vertex normal.
+   *
+   * @param {string[]} parts - Split line parts.
+   * @returns {void}
+   * @private
+   */
+  #parseNormal(parts) {
+    const normal = _ObjParser.#parseFloatTriplet(parts, NORMAL_COMPONENT_COUNT3);
+    this.#normals.push(...normal);
+  }
+  /**
+   * Parses `mtllib` line and stores all referenced files.
+   *
+   * @param {string} line - Full line text.
+   * @returns {void}
+   * @private
+   */
+  #parseMaterialLibrary(line) {
+    const tokens = _ObjParser.#splitTokens(line);
+    if (tokens.length <= SECOND_INDEX3) {
+      return;
+    }
+    const libraries = tokens.slice(SECOND_INDEX3);
+    for (const library of libraries) {
+      if (library) {
+        this.#materialLibraries.push(library);
+      }
+    }
+  }
+  /**
+   * Parses `usemtl` line and sets current material.
+   *
+   * @param {string[]} parts - Split line parts.
+   * @returns {void}
+   * @private
+   */
+  #parseUseMaterial(parts) {
+    const materialName = parts.slice(SECOND_INDEX3).join(SPACE_SEPARATOR) || DEFAULT_MATERIAL_NAME;
+    this.#currentMaterialName = materialName;
+    this.#getOrCreateMaterialChunk(this.#currentGroup, this.#currentMaterialName, this.#currentSmoothingGroup);
+  }
+  /**
+   * Parses `o` line and sets current object.
+   *
+   * @param {string[]} parts - Split line parts.
+   * @returns {void}
+   * @private
+   */
+  #parseObject(parts) {
+    const objectName = parts.slice(SECOND_INDEX3).join(SPACE_SEPARATOR) || DEFAULT_OBJECT_NAME;
+    this.#currentObject = this.#getOrCreateObject(objectName);
+    this.#currentGroup = this.#getOrCreateGroup(this.#currentObject, DEFAULT_GROUP_NAME);
+    this.#getOrCreateMaterialChunk(this.#currentGroup, this.#currentMaterialName, this.#currentSmoothingGroup);
+  }
+  /**
+   * Parses `g` line and sets current group.
+   *
+   * @param {string[]} parts - Split line parts.
+   * @returns {void}
+   * @private
+   */
+  #parseGroup(parts) {
+    const groupName = parts.slice(SECOND_INDEX3).join(SPACE_SEPARATOR) || DEFAULT_GROUP_NAME;
+    this.#currentGroup = this.#getOrCreateGroup(this.#currentObject, groupName);
+    this.#getOrCreateMaterialChunk(this.#currentGroup, this.#currentMaterialName, this.#currentSmoothingGroup);
+  }
+  /**
+   * Parses the smoothing group line.
+   *
+   * @param {string[]} parts - Split line parts.
+   * @returns {void}
+   * @private
+   */
+  #parseSmoothing(parts) {
+    const smoothingValue = parts[SECOND_INDEX3] || SMOOTHING_OFF_TOKEN;
+    if (smoothingValue === SMOOTHING_OFF_TOKEN || smoothingValue === String(DEFAULT_SMOOTHING_GROUP)) {
+      this.#currentSmoothingGroup = DEFAULT_SMOOTHING_GROUP;
+    } else if (smoothingValue === SMOOTHING_ON_TOKEN) {
+      this.#currentSmoothingGroup = OBJ_INDEX_OFFSET;
+    } else {
+      const parsed = Number.parseInt(smoothingValue, DECIMAL_RADIX);
+      this.#currentSmoothingGroup = Number.isFinite(parsed) ? parsed : OBJ_INDEX_OFFSET;
+    }
+    this.#getOrCreateMaterialChunk(this.#currentGroup, this.#currentMaterialName, this.#currentSmoothingGroup);
+  }
+  /**
+   * Parses a face line and appends the triangles to current chunk.
+   *
+   * @param {string[]} parts - Face line parts.
+   * @returns {void}
+   * @throws {Error} When position index is missing.
+   * @private
+   */
+  #parseFace(parts) {
+    const faceVertices = parts.slice(SECOND_INDEX3);
+    if (faceVertices.length < FACE_MIN_VERTEX_COUNT) {
+      return;
+    }
+    const vertices = faceVertices.map((vertex) => this.#resolveFaceVertex(vertex));
+    const chunk = this.#getOrCreateMaterialChunk(this.#currentGroup, this.#currentMaterialName, this.#currentSmoothingGroup);
+    for (let index = SECOND_INDEX3; index < vertices.length - NEXT_FACE_VERTEX_OFFSET; index += NEXT_FACE_VERTEX_OFFSET) {
+      const firstVertex = vertices[FAN_FIRST_VERTEX_INDEX];
+      const secondVertex = vertices[index];
+      const thirdVertex = vertices[index + NEXT_FACE_VERTEX_OFFSET];
+      chunk.triangles.push([firstVertex, secondVertex, thirdVertex]);
+    }
+  }
+  /**
+   * Resolves a face vertex definition into the indices.
+   *
+   * @param {string} vertexData - Face vertex string.
+   * @returns {ObjFaceVertex}   - Resolved face vertex indices.
+   * @throws {Error} When position index is missing.
+   * @private
+   */
+  #resolveFaceVertex(vertexData) {
+    const indices = vertexData.split(OBJ_FACE_ATTRIBUTE_SEPARATOR);
+    const positionIndex = _ObjParser.#parseIndex(indices[FIRST_INDEX3], this.#positions.length / POSITION_COMPONENT_COUNT7);
+    const uvIndex = _ObjParser.#parseIndex(indices[SECOND_INDEX3], this.#uvs.length / UV_COMPONENT_COUNT3);
+    const normalIndex = _ObjParser.#parseIndex(indices[THIRD_INDEX3], this.#normals.length / NORMAL_COMPONENT_COUNT3);
+    if (positionIndex === OBJ_INDEX_NOT_PROVIDED2) {
+      throw new Error(ERROR_MISSING_POSITION_INDEX);
+    }
+    return {
+      positionIndex,
+      uvIndex,
+      normalIndex
+    };
+  }
+  /**
+   * Creates or returns a parsed object entry.
+   *
+   * @param {string} name       - Object name.
+   * @returns {ObjParsedObject} - Existing or newly created object entry for the given name.
+   * @private
+   */
+  #getOrCreateObject(name) {
+    const targetName = name || DEFAULT_OBJECT_NAME;
+    const existing = this.#objects.find((object2) => object2.name === targetName);
+    if (existing) {
+      return existing;
+    }
+    const object = {
+      name: targetName,
+      groups: [],
+      groupMap: /* @__PURE__ */ new Map()
+    };
+    this.#objects.push(object);
+    return object;
+  }
+  /**
+   * Creates or returns a parsed group entry.
+   *
+   * @param {ObjParsedObject} object - Target object.
+   * @param {string} name            - Group name.
+   * @returns {ObjParsedGroup}       - Existing or newly created group entry for the given name within the object.
+   * @private
+   */
+  #getOrCreateGroup(object, name) {
+    const targetName = name || DEFAULT_GROUP_NAME;
+    if (object.groupMap.has(targetName)) {
+      return object.groupMap.get(targetName);
+    }
+    const group = {
+      name: targetName,
+      materialChunks: [],
+      chunkMap: /* @__PURE__ */ new Map()
+    };
+    object.groups.push(group);
+    object.groupMap.set(targetName, group);
+    return group;
+  }
+  /**
+   * Creates or returns a material chunk for a group.
+   *
+   * @param {ObjParsedGroup} group  - Target group.
+   * @param {string} materialName   - Material name.
+   * @param {number} smoothingGroup - Smoothing group.
+   * @returns {ObjMaterialChunk}    - Existing or newly created material chunk for the material name and the smoothing group.
+   * @private
+   */
+  #getOrCreateMaterialChunk(group, materialName, smoothingGroup) {
+    const materialKey = materialName || DEFAULT_MATERIAL_NAME;
+    const key = materialKey + CHUNK_KEY_SEPARATOR + String(smoothingGroup);
+    if (group.chunkMap.has(key)) {
+      return group.chunkMap.get(key);
+    }
+    const chunk = {
+      materialName: materialKey,
+      smoothingGroup,
+      triangles: []
+    };
+    group.materialChunks.push(chunk);
+    group.chunkMap.set(key, chunk);
+    return chunk;
+  }
+  /**
+   * Fills missing colors with defaults for already parsed vertices.
+   *
+   * @returns {void}
+   * @private
+   */
+  #fillMissingColors() {
+    const vertexCount = this.#positions.length / POSITION_COMPONENT_COUNT7;
+    const defaultColor = _ObjParser.#getDefaultVertexColor();
+    for (let index = this.#colors.length / COLOR_COMPONENT_COUNT7; index < vertexCount; index += NEXT_FACE_VERTEX_OFFSET) {
+      this.#colors.push(...defaultColor);
+    }
+  }
+  /**
+   * Parses the OBJ index string into the zero-based index.
+   *
+   * @param {string} value     - OBJ index string.
+   * @param {number} maxLength - Maximum element count.
+   * @returns {number}         - Zero-based index, resolved from the OBJ indexing rules, or `-1`, when missing/invalid.
+   * @private
+   */
+  static #parseIndex(value, maxLength) {
+    if (!value) {
+      return OBJ_INDEX_NOT_PROVIDED2;
+    }
+    const indexValue = Number.parseInt(value, DECIMAL_RADIX);
+    if (maxLength === DEFAULT_SMOOTHING_GROUP) {
+      return OBJ_INDEX_NOT_PROVIDED2;
+    }
+    if (Number.isNaN(indexValue) || indexValue === OBJ_INDEX_ZERO) {
+      return OBJ_INDEX_NOT_PROVIDED2;
+    }
+    if (indexValue > DEFAULT_SMOOTHING_GROUP) {
+      return indexValue - OBJ_INDEX_OFFSET;
+    }
+    return maxLength + indexValue;
+  }
+  /**
+   * Parses the float triplet from the line parts.
+   *
+   * @param {string[]} parts  - Line parts.
+   * @param {number} expected - Expected component count.
+   * @returns {number[]}      - Parsed float triplet `[x, y, z]` (returns zeros, when components are missing).
+   * @private
+   */
+  static #parseFloatTriplet(parts, expected) {
+    if (parts.length <= expected) {
+      return [DEFAULT_SMOOTHING_GROUP, DEFAULT_SMOOTHING_GROUP, DEFAULT_SMOOTHING_GROUP];
+    }
+    return [
+      Number.parseFloat(parts[SECOND_INDEX3]),
+      Number.parseFloat(parts[THIRD_INDEX3]),
+      Number.parseFloat(parts[FOURTH_INDEX])
+    ];
+  }
+  /**
+   * Parses the float pair from the line parts.
+   *
+   * @param {string[]} parts - Line parts.
+   * @returns {number[]}     - Parsed float pair `[u, v]` (returns zeros, when components are missing).
+   * @private
+   */
+  static #parseFloatPair(parts) {
+    if (parts.length <= THIRD_INDEX3) {
+      return [DEFAULT_SMOOTHING_GROUP, DEFAULT_SMOOTHING_GROUP];
+    }
+    return [
+      Number.parseFloat(parts[SECOND_INDEX3]),
+      Number.parseFloat(parts[THIRD_INDEX3])
+    ];
+  }
+  /**
+   * Parses the float triplet starting from a specific offset.
+   *
+   * @param {string[]} parts - Line parts.
+   * @param {number} offset  - Offset index for the first component.
+   * @returns {number[]}     - Parsed float triplet starting at `offset` (returns zeros, when components are missing).
+   * @private
+   */
+  static #parseFloatTripletFromOffset(parts, offset) {
+    if (parts.length <= offset + THIRD_INDEX3) {
+      return [DEFAULT_SMOOTHING_GROUP, DEFAULT_SMOOTHING_GROUP, DEFAULT_SMOOTHING_GROUP];
+    }
+    return [
+      Number.parseFloat(parts[offset]),
+      Number.parseFloat(parts[offset + SECOND_INDEX3]),
+      Number.parseFloat(parts[offset + THIRD_INDEX3])
+    ];
+  }
+  /**
+   * Splits a line into tokens, while respecting quotes.
+   *
+   * @param {string} line - Line to split.
+   * @returns {string[]}  - Tokenized line parts with the quoted substrings, preserved as single tokens.
+   * @private
+   */
+  static #splitTokens(line) {
+    let sanitized = line;
+    const commentIndex = sanitized.indexOf(COMMENT_TOKEN);
+    if (commentIndex !== NOT_FOUND_INDEX) {
+      sanitized = sanitized.slice(FIRST_INDEX3, commentIndex);
+    }
+    sanitized = sanitized.trim();
+    if (!sanitized) {
+      return [];
+    }
+    const tokens = [];
+    let currentToken = EMPTY_STRING;
+    let inQuotes = false;
+    for (const char of sanitized) {
+      if (char === QUOTE_TOKEN) {
+        inQuotes = !inQuotes;
+        continue;
+      }
+      if (!inQuotes && LINE_SPLIT_REGEX.test(char)) {
+        if (currentToken) {
+          tokens.push(currentToken);
+          currentToken = EMPTY_STRING;
+        }
+        continue;
+      }
+      currentToken += char;
+    }
+    if (currentToken) {
+      tokens.push(currentToken);
+    }
+    return tokens;
+  }
+  /**
+   * Returns default vertex color (white).
+   *
+   * @returns {number[]} - Default vertex color triplet (the white color).
+   * @private
+   */
+  static #getDefaultVertexColor() {
+    return DEFAULT_VERTEX_COLOR2;
+  }
+};
+
+// core/loaders/obj-mtl/mtl-parser.js
+var COMMENT_TOKEN2 = "#";
 var MTL_NEW_MATERIAL_TOKEN = "newmtl";
 var MTL_DIFFUSE_COLOR_TOKEN = "Kd";
 var MTL_AMBIENT_COLOR_TOKEN = "Ka";
@@ -8953,55 +10128,364 @@ var MTL_DISPLACEMENT_MAP_TOKEN = "disp";
 var MTL_REFLECTION_MAP_TOKEN = "refl";
 var MTL_OPACITY_TOKEN = "d";
 var MTL_TRANSPARENCY_TOKEN = "Tr";
-var OBJ_FACE_ATTRIBUTE_SEPARATOR = "/";
-var DEFAULT_MATERIAL_NAME = "default";
-var DEFAULT_TEXTURE_UNIT_INDEX3 = 0;
-var DEFAULT_OPACITY2 = 1;
-var DEFAULT_DIFFUSE_COLOR = new Float32Array([1, 1, 1]);
-var DEFAULT_SPECULAR_COLOR2 = new Float32Array([0, 0, 0]);
-var DEFAULT_AMBIENT_COLOR = new Float32Array([0, 0, 0]);
-var DEFAULT_EMISSIVE_COLOR = new Float32Array([0, 0, 0]);
-var DEFAULT_UV = [0, 0];
-var DEFAULT_NORMAL = [0, 0, 1];
-var EMPTY_STRING = "";
-var HYPHEN_SEPARATOR = "-";
-var DEFAULT_BASE_URL = EMPTY_STRING;
-var SPACE_SEPARATOR = " ";
-var PATH_SEPARATOR = "/";
-var LINE_SPLIT_REGEX = /\s+/u;
-var BACKSLASH_REGEX = /\\/gu;
-var ABSOLUTE_URL_REGEX = /^[a-zA-Z][a-zA-Z\d+.-]*:/u;
-var QUOTE_TOKEN = '"';
-var BACKSLASH_SEPARATOR = "\\";
 var MTL_MAP_OPTION_SCALE = "-s";
 var MTL_MAP_OPTION_OFFSET = "-o";
 var MTL_MAP_OPTION_CLAMP = "-clamp";
 var MTL_MAP_OPTION_BUMP_MULTIPLIER = "-bm";
 var MTL_MAP_VECTOR_COMPONENTS = 3;
 var MTL_MAP_SCALAR_COMPONENTS = 1;
-var FACE_MIN_VERTEX_COUNT = 3;
-var OBJ_INDEX_OFFSET = 1;
-var OBJ_INDEX_NOT_PROVIDED = -1;
-var OBJ_INDEX_ZERO = 0;
-var POSITION_COMPONENT_COUNT6 = 3;
-var UV_COMPONENT_COUNT2 = 2;
-var NORMAL_COMPONENT_COUNT2 = 3;
-var FAN_FIRST_VERTEX_INDEX = 0;
-var NEXT_FACE_VERTEX_OFFSET = 1;
+var COLOR_COMPONENT_COUNT8 = 3;
+var DEFAULT_OPACITY3 = 1;
+var DEFAULT_DIFFUSE_COLOR2 = new Float32Array([1, 1, 1]);
+var DEFAULT_SPECULAR_COLOR2 = new Float32Array([0, 0, 0]);
+var DEFAULT_AMBIENT_COLOR = new Float32Array([0, 0, 0]);
+var DEFAULT_EMISSIVE_COLOR = new Float32Array([0, 0, 0]);
+var ZERO_VALUE12 = 0;
+var EMPTY_STRING2 = "";
+var SPACE_SEPARATOR2 = " ";
+var LINE_SPLIT_REGEX2 = /\s+/u;
+var LINE_BREAK_REGEX2 = /\r?\n/u;
+var HYPHEN_SEPARATOR = "-";
+var QUOTE_TOKEN2 = '"';
+var NOT_FOUND_INDEX2 = -1;
+var FIRST_INDEX4 = 0;
+var SECOND_INDEX4 = 1;
+var THIRD_INDEX4 = 2;
+var FOURTH_INDEX2 = 3;
+var DECIMAL_RADIX2 = 10;
+var TYPEOF_STRING3 = "string";
+var ERROR_MTL_TEXT_TYPE = "`MtlParser.parse` expects `mtlText` as a string.";
+var MtlParser = class _MtlParser {
+  /**
+   * Parses MTL text into material definitions.
+   *
+   * @param {string} mtlText                   - MTL file contents.
+   * @returns {Map<string, ParsedMtlMaterial>} - Map of parsed materials keyed by the material name.
+   * @throws {TypeError} When mtlText is not a string.
+   */
+  parse(mtlText) {
+    if (typeof mtlText !== TYPEOF_STRING3) {
+      throw new TypeError(ERROR_MTL_TEXT_TYPE);
+    }
+    const materials = /* @__PURE__ */ new Map();
+    const lines = mtlText.split(LINE_BREAK_REGEX2);
+    let currentMaterial = null;
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith(COMMENT_TOKEN2)) {
+        continue;
+      }
+      const parts = trimmed.split(LINE_SPLIT_REGEX2);
+      const keyword = parts[FIRST_INDEX4];
+      switch (keyword) {
+        case MTL_NEW_MATERIAL_TOKEN: {
+          const name = parts.slice(SECOND_INDEX4).join(SPACE_SEPARATOR2);
+          if (!name) {
+            currentMaterial = null;
+            break;
+          }
+          currentMaterial = {
+            name,
+            diffuseColor: new Float32Array(DEFAULT_DIFFUSE_COLOR2),
+            ambientColor: new Float32Array(DEFAULT_AMBIENT_COLOR),
+            specularColor: new Float32Array(DEFAULT_SPECULAR_COLOR2),
+            emissiveColor: new Float32Array(DEFAULT_EMISSIVE_COLOR),
+            diffuseMap: null,
+            ambientMap: null,
+            specularMap: null,
+            alphaMap: null,
+            bumpMap: null,
+            displacementMap: null,
+            reflectionMap: null,
+            specularExponent: null,
+            opticalDensity: null,
+            illuminationModel: null,
+            opacity: DEFAULT_OPACITY3
+          };
+          materials.set(name, currentMaterial);
+          break;
+        }
+        case MTL_AMBIENT_COLOR_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          const color = _MtlParser.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT8);
+          currentMaterial.ambientColor.set(color);
+          break;
+        }
+        case MTL_DIFFUSE_COLOR_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          const color = _MtlParser.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT8);
+          currentMaterial.diffuseColor.set(color);
+          break;
+        }
+        case MTL_SPECULAR_COLOR_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          const color = _MtlParser.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT8);
+          currentMaterial.specularColor.set(color);
+          break;
+        }
+        case MTL_EMISSIVE_COLOR_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          const color = _MtlParser.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT8);
+          currentMaterial.emissiveColor.set(color);
+          break;
+        }
+        case MTL_SPECULAR_EXPONENT_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          currentMaterial.specularExponent = _MtlParser.#parseFloatValue(parts[SECOND_INDEX4]);
+          break;
+        }
+        case MTL_OPTICAL_DENSITY_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          currentMaterial.opticalDensity = _MtlParser.#parseFloatValue(parts[SECOND_INDEX4]);
+          break;
+        }
+        case MTL_ILLUMINATION_MODEL_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          const illumValue = Number.parseInt(parts[SECOND_INDEX4], DECIMAL_RADIX2);
+          currentMaterial.illuminationModel = Number.isFinite(illumValue) ? illumValue : null;
+          break;
+        }
+        case MTL_DIFFUSE_MAP_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          const mapPath = _MtlParser.#parseMtlMapLine(trimmed);
+          currentMaterial.diffuseMap = mapPath || null;
+          break;
+        }
+        case MTL_AMBIENT_MAP_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          const mapPath = _MtlParser.#parseMtlMapLine(trimmed);
+          currentMaterial.ambientMap = mapPath || null;
+          break;
+        }
+        case MTL_SPECULAR_MAP_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          const mapPath = _MtlParser.#parseMtlMapLine(trimmed);
+          currentMaterial.specularMap = mapPath || null;
+          break;
+        }
+        case MTL_ALPHA_MAP_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          const mapPath = _MtlParser.#parseMtlMapLine(trimmed);
+          currentMaterial.alphaMap = mapPath || null;
+          break;
+        }
+        case MTL_BUMP_MAP_TOKEN:
+        case MTL_BUMP_MAP_ALT_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          const mapPath = _MtlParser.#parseMtlMapLine(trimmed);
+          currentMaterial.bumpMap = mapPath || null;
+          break;
+        }
+        case MTL_DISPLACEMENT_MAP_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          const mapPath = _MtlParser.#parseMtlMapLine(trimmed);
+          currentMaterial.displacementMap = mapPath || null;
+          break;
+        }
+        case MTL_REFLECTION_MAP_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          const mapPath = _MtlParser.#parseMtlMapLine(trimmed);
+          currentMaterial.reflectionMap = mapPath || null;
+          break;
+        }
+        case MTL_OPACITY_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          const value = _MtlParser.#parseFloatValue(parts[SECOND_INDEX4]);
+          if (value !== null) {
+            currentMaterial.opacity = value;
+          }
+          break;
+        }
+        case MTL_TRANSPARENCY_TOKEN: {
+          if (!currentMaterial) {
+            break;
+          }
+          const value = _MtlParser.#parseFloatValue(parts[SECOND_INDEX4]);
+          if (value !== null) {
+            currentMaterial.opacity = DEFAULT_OPACITY3 - value;
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+    return materials;
+  }
+  /**
+   * Parses a float triplet from line parts.
+   *
+   * @param {string[]} parts  - Line parts.
+   * @param {number} expected - Expected component count.
+   * @returns {number[]}      - Array of parsed float components, returns zeros when values are missing.
+   * @private
+   */
+  static #parseFloatTriplet(parts, expected) {
+    if (parts.length <= expected) {
+      return [ZERO_VALUE12, ZERO_VALUE12, ZERO_VALUE12];
+    }
+    return [
+      Number.parseFloat(parts[SECOND_INDEX4]),
+      Number.parseFloat(parts[THIRD_INDEX4]),
+      Number.parseFloat(parts[FOURTH_INDEX2])
+    ];
+  }
+  /**
+   * Parses a float value from string.
+   *
+   * @param {string} value    - String value.
+   * @returns {number | null} - Parsed finite float value, or `null` when the input is empty or not a finite number.
+   * @private
+   */
+  static #parseFloatValue(value) {
+    if (!value) {
+      return null;
+    }
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  /**
+   * Parses a texture map line and extracts a file path.
+   *
+   * @param {string} line - Full `map_*` line.
+   * @returns {string}    - Extracted texture path from the `map_*` line, returns an empty string when not found.
+   * @private
+   */
+  static #parseMtlMapLine(line) {
+    if (typeof line !== TYPEOF_STRING3) {
+      return EMPTY_STRING2;
+    }
+    let sanitized = line;
+    const commentIndex = sanitized.indexOf(COMMENT_TOKEN2);
+    if (commentIndex !== NOT_FOUND_INDEX2) {
+      sanitized = sanitized.slice(FIRST_INDEX4, commentIndex);
+    }
+    sanitized = sanitized.trim();
+    if (!sanitized) {
+      return EMPTY_STRING2;
+    }
+    const tokens = _MtlParser.#splitTokens(sanitized);
+    if (tokens.length <= SECOND_INDEX4) {
+      return EMPTY_STRING2;
+    }
+    let index = SECOND_INDEX4;
+    while (index < tokens.length) {
+      const token = tokens[index];
+      if (token.startsWith(HYPHEN_SEPARATOR)) {
+        switch (token) {
+          case MTL_MAP_OPTION_SCALE:
+          case MTL_MAP_OPTION_OFFSET:
+            index += MTL_MAP_VECTOR_COMPONENTS + SECOND_INDEX4;
+            break;
+          case MTL_MAP_OPTION_CLAMP:
+          case MTL_MAP_OPTION_BUMP_MULTIPLIER:
+            index += MTL_MAP_SCALAR_COMPONENTS + SECOND_INDEX4;
+            break;
+          default:
+            index += SECOND_INDEX4;
+            break;
+        }
+        continue;
+      }
+      return tokens.slice(index).join(SPACE_SEPARATOR2);
+    }
+    return EMPTY_STRING2;
+  }
+  /**
+   * Splits a line into tokens, while respecting the quotes.
+   *
+   * @param {string} line - Line to split.
+   * @returns {string[]}  - Tokenized line parts with quotes preserved as a single token.
+   * @private
+   */
+  static #splitTokens(line) {
+    const tokens = [];
+    let currentToken = EMPTY_STRING2;
+    let inQuotes = false;
+    for (const char of line) {
+      if (char === QUOTE_TOKEN2) {
+        inQuotes = !inQuotes;
+        continue;
+      }
+      if (!inQuotes && LINE_SPLIT_REGEX2.test(char)) {
+        if (currentToken) {
+          tokens.push(currentToken);
+          currentToken = EMPTY_STRING2;
+        }
+        continue;
+      }
+      currentToken += char;
+    }
+    if (currentToken) {
+      tokens.push(currentToken);
+    }
+    return tokens;
+  }
+};
+
+// core/loaders/obj-mtl/obj-mtl-loader.js
+var DEFAULT_TEXTURE_UNIT_INDEX4 = 0;
+var DEFAULT_DIFFUSE_COLOR3 = new Float32Array([1, 1, 1]);
+var EMPTY_STRING3 = "";
+var DEFAULT_BASE_URL = EMPTY_STRING3;
+var PATH_SEPARATOR = "/";
+var BACKSLASH_SEPARATOR = "\\";
+var BACKSLASH_REGEX = /\\/gu;
+var ABSOLUTE_URL_REGEX = /^[a-zA-Z][a-zA-Z\d+.-]*:/u;
+var QUOTE_TOKEN3 = '"';
+var NOT_FOUND_INDEX3 = -1;
+var SECOND_INDEX5 = 1;
 var BASE_PATH_SLICE_OFFSET = 1;
-var COLOR_COMPONENT_COUNT5 = 3;
-var COMPONENT_INDEX_X = 0;
-var COMPONENT_INDEX_Y = 1;
-var COMPONENT_INDEX_Z = 2;
-var ZERO_VALUE10 = 0;
-var FIRST_INDEX = 0;
-var SECOND_INDEX = 1;
-var THIRD_INDEX = 2;
-var FOURTH_INDEX = 3;
-var NOT_FOUND_INDEX = -1;
-var VERTEX_KEY_SEPARATOR = "|";
-var ERROR_MISSING_POSITION_INDEX = "OBJ face vertex is missing position index.";
-var DECIMAL_RADIX = 10;
+var ZERO_VALUE13 = 0;
+var COLOR_COMPONENT_COUNT9 = 3;
+var TYPEOF_STRING4 = "string";
+var TYPEOF_OBJECT3 = "object";
+var ERROR_WEBGL_CONTEXT_TYPE4 = "`ObjMtlLoader` expects a `WebGL2RenderingContext`.";
+var ERROR_OPTIONS_TYPE2 = "`ObjMtlLoader` expects options as a plain object.";
+var ERROR_TEXTURE_UNIT_INDEX_TYPE2 = "`ObjMtlLoader` expects `textureUnitIndex` as a non-negative integer.";
+var ERROR_DEFAULT_COLOR_TYPE2 = "`ObjMtlLoader` expects `defaultColor` as `number[]` or `Float32Array`.";
+var ERROR_DEFAULT_COLOR_LENGTH2 = "`ObjMtlLoader` expects `defaultColor` to have 3 components.";
+var ERROR_LOAD_OPTIONS_TYPE = "`ObjMtlLoader` expects load options as a plain object.";
+var ERROR_OBJ_URL_TYPE = "`ObjMtlLoader.loadFromUrls` expects `objUrl` as a string.";
+var ERROR_MTL_URL_TYPE = "`ObjMtlLoader.loadFromUrls` expects `mtlUrl` as a string, when provided.";
+var ERROR_BASE_URL_TYPE = "`ObjMtlLoader.loadFromUrls` expects `baseUrl` as a string.";
+var ERROR_TEXTURE_BASE_URL_TYPE = "`ObjMtlLoader.loadFromUrls` expects `textureBaseUrl` as a string, when provided.";
+var ERROR_OBJ_FILE_TYPE = "`ObjMtlLoader.loadFromFiles` expects `objFile` as `File`.";
+var ERROR_MTL_FILES_TYPE = "`ObjMtlLoader.loadFromFiles` expects `mtlFiles` as `Map`, when provided.";
+var ERROR_ASSET_URL_MAP_TYPE = "`ObjMtlLoader.loadFromFiles` expects `assetUrlMap` as `Map`, when provided.";
+var ERROR_FILES_BASE_URL_TYPE = "`ObjMtlLoader.loadFromFiles` expects `baseUrl` as a string.";
+var ERROR_FILES_TEXTURE_BASE_URL_TYPE = "`ObjMtlLoader.loadFromFiles` expects `textureBaseUrl` as a string, when provided.";
+var ERROR_FETCH_FAILED_PREFIX = "Failed to fetch resource: ";
 var ObjMtlLoader = class _ObjMtlLoader {
   /**
    * WebGL2 rendering context used to create GPU resources.
@@ -9023,53 +10507,92 @@ var ObjMtlLoader = class _ObjMtlLoader {
    * @type {Float32Array}
    * @private
    */
-  #defaultColor = new Float32Array(DEFAULT_DIFFUSE_COLOR);
+  #defaultColor = new Float32Array(DEFAULT_DIFFUSE_COLOR3);
   /**
-   * Cache of loaded textures by URL.
+   * OBJ parser instance.
    *
-   * @type {Map<string, Texture2D>}
+   * @type {ObjParser}
    * @private
    */
-  #textureCache = /* @__PURE__ */ new Map();
+  #objParser;
+  /**
+   * MTL parser instance.
+   *
+   * @type {MtlParser}
+   * @private
+   */
+  #mtlParser;
+  /**
+   * Geometry builder instance.
+   *
+   * @type {ObjGeometryBuilder}
+   * @private
+   */
+  #geometryBuilder;
+  /**
+   * Material factory instance.
+   *
+   * @type {ObjMaterialFactory}
+   * @private
+   */
+  #materialFactory;
+  /**
+   * Texture cache shared across materials.
+   *
+   * @type {MtlTextureCache}
+   * @private
+   */
+  #textureCache;
   /**
    * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
    * @param {ObjMtlLoaderOptions} [options]       - Loader options.
+   * @throws {TypeError} When inputs are invalid.
    */
   constructor(webglContext, options = {}) {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
-      throw new TypeError("`ObjMtlLoader` expects a `WebGL2RenderingContext`.");
+      throw new TypeError(ERROR_WEBGL_CONTEXT_TYPE4);
     }
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError("`ObjMtlLoader` expects options as a plain object.");
+    if (options === null || typeof options !== TYPEOF_OBJECT3 || Array.isArray(options)) {
+      throw new TypeError(ERROR_OPTIONS_TYPE2);
     }
     const {
-      textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX3,
+      textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX4,
       defaultColor
     } = options;
-    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE10) {
-      throw new TypeError("`ObjMtlLoader` expects `textureUnitIndex` as a non-negative integer.");
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE13) {
+      throw new TypeError(ERROR_TEXTURE_UNIT_INDEX_TYPE2);
     }
     if (defaultColor !== void 0) {
       if (!Array.isArray(defaultColor) && !(defaultColor instanceof Float32Array)) {
-        throw new TypeError("`ObjMtlLoader` expects `defaultColor` as `number[]` or `Float32Array`.");
+        throw new TypeError(ERROR_DEFAULT_COLOR_TYPE2);
       }
-      if (defaultColor.length !== COLOR_COMPONENT_COUNT5) {
-        throw new TypeError("`ObjMtlLoader` expects `defaultColor` to have 3 components.");
+      if (defaultColor.length !== COLOR_COMPONENT_COUNT9) {
+        throw new TypeError(ERROR_DEFAULT_COLOR_LENGTH2);
       }
       this.#defaultColor.set(defaultColor);
     }
     this.#webglContext = webglContext;
     this.#textureUnitIndex = textureUnitIndex;
+    this.#textureCache = new MtlTextureCache(this.#webglContext);
+    this.#objParser = new ObjParser();
+    this.#mtlParser = new MtlParser();
+    this.#geometryBuilder = new ObjGeometryBuilder(this.#webglContext);
+    this.#materialFactory = new ObjMaterialFactory(this.#webglContext, {
+      textureUnitIndex: this.#textureUnitIndex,
+      defaultColor: this.#defaultColor,
+      textureCache: this.#textureCache
+    });
   }
   /**
-   * Loads OBJ/MTL assets from URLs and creates meshes.
+   * Loads the OBJ/MTL assets from URLs and creates the meshes.
    *
    * @param {ObjMtlLoadFromUrlsOptions} options - Load options.
    * @returns {Promise<ObjMtlLoadResult>}
+   * @throws {TypeError} When options are invalid.
    */
   async loadFromUrls(options = {}) {
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError("`ObjMtlLoader.loadFromUrls` expects options as a plain object.");
+    if (options === null || typeof options !== TYPEOF_OBJECT3 || Array.isArray(options)) {
+      throw new TypeError(ERROR_LOAD_OPTIONS_TYPE);
     }
     const {
       objUrl,
@@ -9077,24 +10600,24 @@ var ObjMtlLoader = class _ObjMtlLoader {
       baseUrl = DEFAULT_BASE_URL,
       textureBaseUrl
     } = options;
-    if (typeof objUrl !== "string") {
-      throw new TypeError("`ObjMtlLoader.loadFromUrls` expects `objUrl` as a string.");
+    if (typeof objUrl !== TYPEOF_STRING4) {
+      throw new TypeError(ERROR_OBJ_URL_TYPE);
     }
-    if (mtlUrl !== void 0 && typeof mtlUrl !== "string") {
-      throw new TypeError("`ObjMtlLoader.loadFromUrls` expects `mtlUrl` as a string, when provided.");
+    if (mtlUrl !== void 0 && typeof mtlUrl !== TYPEOF_STRING4) {
+      throw new TypeError(ERROR_MTL_URL_TYPE);
     }
-    if (typeof baseUrl !== "string") {
-      throw new TypeError("`ObjMtlLoader.loadFromUrls` expects `baseUrl` as a string.");
+    if (typeof baseUrl !== TYPEOF_STRING4) {
+      throw new TypeError(ERROR_BASE_URL_TYPE);
     }
-    if (textureBaseUrl !== void 0 && typeof textureBaseUrl !== "string") {
-      throw new TypeError("`ObjMtlLoader.loadFromUrls` expects `textureBaseUrl` as a string, when provided.");
+    if (textureBaseUrl !== void 0 && typeof textureBaseUrl !== TYPEOF_STRING4) {
+      throw new TypeError(ERROR_TEXTURE_BASE_URL_TYPE);
     }
     const objText = await _ObjMtlLoader.#fetchText(objUrl);
-    const objData = _ObjMtlLoader.#parseObj(objText);
+    const objData = this.#objParser.parse(objText);
     const resolvedBaseUrl = baseUrl || _ObjMtlLoader.#getBasePath(objUrl);
     const mtlLibraries = mtlUrl ? [mtlUrl] : objData.materialLibraries;
     const mtlData = /* @__PURE__ */ new Map();
-    if (mtlLibraries.length > ZERO_VALUE10) {
+    if (mtlLibraries.length > ZERO_VALUE13) {
       const mtlBaseUrl = baseUrl || resolvedBaseUrl;
       for (const library of mtlLibraries) {
         if (!library) {
@@ -9102,7 +10625,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
         }
         const resolvedMtlUrl = mtlUrl ? ABSOLUTE_URL_REGEX.test(library) || library.startsWith(PATH_SEPARATOR) || library.startsWith(mtlBaseUrl) ? library : _ObjMtlLoader.#resolvePath(mtlBaseUrl, library) : _ObjMtlLoader.#resolvePath(resolvedBaseUrl, library);
         const mtlText = await _ObjMtlLoader.#fetchText(resolvedMtlUrl);
-        const parsedMtl = _ObjMtlLoader.#parseMtl(mtlText);
+        const parsedMtl = this.#mtlParser.parse(mtlText);
         for (const [name, material] of parsedMtl.entries()) {
           mtlData.set(name, material);
         }
@@ -9112,14 +10635,15 @@ var ObjMtlLoader = class _ObjMtlLoader {
     return this.#buildMeshes(objData, mtlData, resolvedTextureBase);
   }
   /**
-   * Loads OBJ/MTL assets from local `File` objects.
+   * Loads OBJ/MTL assets from the local `File` objects.
    *
    * @param {ObjMtlLoadFromFilesOptions} options - Load options.
-   * @returns {Promise<ObjMtlLoadResult>}
+   * @returns {Promise<ObjMtlLoadResult>} - Promise, that resolves with the created scene root and all created assets.
+   * @throws {TypeError} When options are invalid.
    */
   async loadFromFiles(options = {}) {
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError("`ObjMtlLoader.loadFromFiles` expects options as a plain object.");
+    if (options === null || typeof options !== TYPEOF_OBJECT3 || Array.isArray(options)) {
+      throw new TypeError(ERROR_LOAD_OPTIONS_TYPE);
     }
     const {
       objFile,
@@ -9129,22 +10653,22 @@ var ObjMtlLoader = class _ObjMtlLoader {
       textureBaseUrl
     } = options;
     if (!(objFile instanceof File)) {
-      throw new TypeError("`ObjMtlLoader.loadFromFiles` expects `objFile` as `File`.");
+      throw new TypeError(ERROR_OBJ_FILE_TYPE);
     }
     if (!(mtlFiles instanceof Map)) {
-      throw new TypeError("`ObjMtlLoader.loadFromFiles` expects `mtlFiles` as `Map`, when provided.");
+      throw new TypeError(ERROR_MTL_FILES_TYPE);
     }
     if (assetUrlMap !== void 0 && !(assetUrlMap instanceof Map)) {
-      throw new TypeError("`ObjMtlLoader.loadFromFiles` expects `assetUrlMap` as `Map`, when provided.");
+      throw new TypeError(ERROR_ASSET_URL_MAP_TYPE);
     }
-    if (typeof baseUrl !== "string") {
-      throw new TypeError("`ObjMtlLoader.loadFromFiles` expects `baseUrl` as a string.");
+    if (typeof baseUrl !== TYPEOF_STRING4) {
+      throw new TypeError(ERROR_FILES_BASE_URL_TYPE);
     }
-    if (textureBaseUrl !== void 0 && typeof textureBaseUrl !== "string") {
-      throw new TypeError("`ObjMtlLoader.loadFromFiles` expects `textureBaseUrl` as a string, when provided.");
+    if (textureBaseUrl !== void 0 && typeof textureBaseUrl !== TYPEOF_STRING4) {
+      throw new TypeError(ERROR_FILES_TEXTURE_BASE_URL_TYPE);
     }
     const objText = await objFile.text();
-    const objData = _ObjMtlLoader.#parseObj(objText);
+    const objData = this.#objParser.parse(objText);
     const resolvedBaseUrl = baseUrl || DEFAULT_BASE_URL;
     const mtlData = /* @__PURE__ */ new Map();
     for (const library of objData.materialLibraries) {
@@ -9153,7 +10677,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
         continue;
       }
       const mtlText = await mtlFile.text();
-      const parsedMtl = _ObjMtlLoader.#parseMtl(mtlText);
+      const parsedMtl = this.#mtlParser.parse(mtlText);
       for (const [name, material] of parsedMtl.entries()) {
         mtlData.set(name, material);
       }
@@ -9164,298 +10688,47 @@ var ObjMtlLoader = class _ObjMtlLoader {
   /**
    * Fetches text content by URL.
    *
-   * @param {string} url - URL to fetch.
-   * @returns {Promise<string>}
+   * @param {string} url        - URL to fetch.
+   * @returns {Promise<string>} - Promise, that resolves with the response body as text.
+   * @throws {Error} When the fetch fails.
    * @private
    */
   static async #fetchText(url) {
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`Failed to fetch resource: ${url}`);
+      throw new Error(ERROR_FETCH_FAILED_PREFIX + url);
     }
     return response.text();
   }
   /**
-   * Parses OBJ text into structured data.
-   *
-   * @param {string} objText - OBJ file contents.
-   * @returns {{ materialLibraries: string[], groups: Map<string, ObjGroupData> }}
-   * @private
-   */
-  static #parseObj(objText) {
-    const positions = [];
-    const uvs = [];
-    const normals = [];
-    const materialLibraries = [];
-    const groups = /* @__PURE__ */ new Map();
-    let currentMaterial = DEFAULT_MATERIAL_NAME;
-    _ObjMtlLoader.#getOrCreateGroup(groups, currentMaterial);
-    const lines = objText.split(/\r?\n/u);
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith(COMMENT_TOKEN)) {
-        continue;
-      }
-      const parts = trimmed.split(LINE_SPLIT_REGEX);
-      const keyword = parts[FIRST_INDEX];
-      switch (keyword) {
-        case OBJ_VERTEX_TOKEN: {
-          const vertex = _ObjMtlLoader.#parseFloatTriplet(parts, POSITION_COMPONENT_COUNT6);
-          positions.push(...vertex);
-          break;
-        }
-        case OBJ_TEXCOORD_TOKEN: {
-          const uv = _ObjMtlLoader.#parseFloatPair(parts);
-          uvs.push(...uv);
-          break;
-        }
-        case OBJ_NORMAL_TOKEN: {
-          const normal = _ObjMtlLoader.#parseFloatTriplet(parts, NORMAL_COMPONENT_COUNT2);
-          normals.push(...normal);
-          break;
-        }
-        case OBJ_MATERIAL_LIB_TOKEN: {
-          const libName = parts.slice(SECOND_INDEX).join(SPACE_SEPARATOR);
-          if (libName) {
-            materialLibraries.push(libName);
-          }
-          break;
-        }
-        case OBJ_USE_MATERIAL_TOKEN: {
-          const materialName = parts.slice(SECOND_INDEX).join(SPACE_SEPARATOR) || DEFAULT_MATERIAL_NAME;
-          currentMaterial = materialName;
-          _ObjMtlLoader.#getOrCreateGroup(groups, currentMaterial);
-          break;
-        }
-        case OBJ_FACE_TOKEN: {
-          _ObjMtlLoader.#parseFace(parts, positions, uvs, normals, groups.get(currentMaterial));
-          break;
-        }
-        default:
-          break;
-      }
-    }
-    return { materialLibraries, groups };
-  }
-  /**
-   * Parses MTL text into material definitions.
-   *
-   * @param {string} mtlText - MTL file contents.
-   * @returns {Map<string, ParsedMtlMaterial>}
-   * @private
-   */
-  static #parseMtl(mtlText) {
-    const materials = /* @__PURE__ */ new Map();
-    const lines = mtlText.split(/\r?\n/u);
-    let currentMaterial = null;
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith(COMMENT_TOKEN)) {
-        continue;
-      }
-      const parts = trimmed.split(LINE_SPLIT_REGEX);
-      const keyword = parts[FIRST_INDEX];
-      switch (keyword) {
-        case MTL_NEW_MATERIAL_TOKEN: {
-          const name = parts.slice(SECOND_INDEX).join(SPACE_SEPARATOR);
-          if (!name) {
-            currentMaterial = null;
-            break;
-          }
-          currentMaterial = {
-            name,
-            diffuseColor: new Float32Array(DEFAULT_DIFFUSE_COLOR),
-            ambientColor: new Float32Array(DEFAULT_AMBIENT_COLOR),
-            specularColor: new Float32Array(DEFAULT_SPECULAR_COLOR2),
-            emissiveColor: new Float32Array(DEFAULT_EMISSIVE_COLOR),
-            diffuseMap: null,
-            ambientMap: null,
-            specularMap: null,
-            alphaMap: null,
-            bumpMap: null,
-            displacementMap: null,
-            reflectionMap: null,
-            specularExponent: null,
-            opticalDensity: null,
-            illuminationModel: null,
-            opacity: DEFAULT_OPACITY2
-          };
-          materials.set(name, currentMaterial);
-          break;
-        }
-        case MTL_AMBIENT_COLOR_TOKEN: {
-          if (!currentMaterial) {
-            break;
-          }
-          const color = _ObjMtlLoader.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT5);
-          currentMaterial.ambientColor.set(color);
-          break;
-        }
-        case MTL_DIFFUSE_COLOR_TOKEN: {
-          if (!currentMaterial) {
-            break;
-          }
-          const color = _ObjMtlLoader.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT5);
-          currentMaterial.diffuseColor.set(color);
-          break;
-        }
-        case MTL_SPECULAR_COLOR_TOKEN: {
-          if (!currentMaterial) {
-            break;
-          }
-          const color = _ObjMtlLoader.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT5);
-          currentMaterial.specularColor.set(color);
-          break;
-        }
-        case MTL_EMISSIVE_COLOR_TOKEN: {
-          if (!currentMaterial) {
-            break;
-          }
-          const color = _ObjMtlLoader.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT5);
-          currentMaterial.emissiveColor.set(color);
-          break;
-        }
-        case MTL_SPECULAR_EXPONENT_TOKEN: {
-          if (!currentMaterial) {
-            break;
-          }
-          currentMaterial.specularExponent = _ObjMtlLoader.#parseFloatValue(parts[SECOND_INDEX]);
-          break;
-        }
-        case MTL_OPTICAL_DENSITY_TOKEN: {
-          if (!currentMaterial) {
-            break;
-          }
-          currentMaterial.opticalDensity = _ObjMtlLoader.#parseFloatValue(parts[SECOND_INDEX]);
-          break;
-        }
-        case MTL_ILLUMINATION_MODEL_TOKEN: {
-          if (!currentMaterial) {
-            break;
-          }
-          const illumValue = Number.parseInt(parts[SECOND_INDEX], DECIMAL_RADIX);
-          currentMaterial.illuminationModel = Number.isFinite(illumValue) ? illumValue : null;
-          break;
-        }
-        case MTL_DIFFUSE_MAP_TOKEN: {
-          if (!currentMaterial) {
-            break;
-          }
-          const mapPath = _ObjMtlLoader.#parseMtlMapLine(trimmed);
-          currentMaterial.diffuseMap = mapPath || null;
-          break;
-        }
-        case MTL_AMBIENT_MAP_TOKEN: {
-          if (!currentMaterial) {
-            break;
-          }
-          const mapPath = _ObjMtlLoader.#parseMtlMapLine(trimmed);
-          currentMaterial.ambientMap = mapPath || null;
-          break;
-        }
-        case MTL_SPECULAR_MAP_TOKEN: {
-          if (!currentMaterial) {
-            break;
-          }
-          const mapPath = _ObjMtlLoader.#parseMtlMapLine(trimmed);
-          currentMaterial.specularMap = mapPath || null;
-          break;
-        }
-        case MTL_ALPHA_MAP_TOKEN: {
-          if (!currentMaterial) {
-            break;
-          }
-          const mapPath = _ObjMtlLoader.#parseMtlMapLine(trimmed);
-          currentMaterial.alphaMap = mapPath || null;
-          break;
-        }
-        case MTL_BUMP_MAP_TOKEN:
-        case MTL_BUMP_MAP_ALT_TOKEN: {
-          if (!currentMaterial) {
-            break;
-          }
-          const mapPath = _ObjMtlLoader.#parseMtlMapLine(trimmed);
-          currentMaterial.bumpMap = mapPath || null;
-          break;
-        }
-        case MTL_DISPLACEMENT_MAP_TOKEN: {
-          if (!currentMaterial) {
-            break;
-          }
-          const mapPath = _ObjMtlLoader.#parseMtlMapLine(trimmed);
-          currentMaterial.displacementMap = mapPath || null;
-          break;
-        }
-        case MTL_REFLECTION_MAP_TOKEN: {
-          if (!currentMaterial) {
-            break;
-          }
-          const mapPath = _ObjMtlLoader.#parseMtlMapLine(trimmed);
-          currentMaterial.reflectionMap = mapPath || null;
-          break;
-        }
-        case MTL_OPACITY_TOKEN: {
-          if (!currentMaterial) {
-            break;
-          }
-          const value = _ObjMtlLoader.#parseFloatValue(parts[SECOND_INDEX]);
-          if (value !== null) {
-            currentMaterial.opacity = value;
-          }
-          break;
-        }
-        case MTL_TRANSPARENCY_TOKEN: {
-          if (!currentMaterial) {
-            break;
-          }
-          const value = _ObjMtlLoader.#parseFloatValue(parts[SECOND_INDEX]);
-          if (value !== null) {
-            currentMaterial.opacity = DEFAULT_OPACITY2 - value;
-          }
-          break;
-        }
-        default:
-          break;
-      }
-    }
-    return materials;
-  }
-  /**
    * Creates meshes for parsed OBJ/MTL data.
    *
-   * @param {{ groups: Map<string, ObjGroupData> }} objData - Parsed OBJ data.
-   * @param {Map<string, ParsedMtlMaterial>} mtlData        - Parsed MTL data.
-   * @param {string} textureBaseUrl                         - Base URL for textures.
-   * @param {Map<string, string>} [assetUrlMap]             - Asset URL override map.
-   * @returns {Promise<ObjMtlLoadResult>}
+   * @param {Object} objData                    - Parsed OBJ data.
+   * @param {Map<string, Object>} mtlData       - Parsed MTL data.
+   * @param {string} textureBaseUrl             - Base URL for textures.
+   * @param {Map<string, string>} [assetUrlMap] - Asset URL override map.
+   * @returns {Promise<ObjMtlLoadResult>}       - Promise, that resolves with the created root object and all created assets.
    * @private
    */
   async #buildMeshes(objData, mtlData, textureBaseUrl, assetUrlMap) {
-    const root = new Object3D();
+    const buildResult = this.#geometryBuilder.build(objData);
+    const root = buildResult.root;
     const meshes = [];
-    const geometries = [];
+    const geometries = buildResult.geometries;
     const materials = [];
     const textures = [];
-    for (const group of objData.groups.values()) {
-      if (group.indices.length === ZERO_VALUE10) {
-        continue;
-      }
-      const materialDefinition = mtlData.get(group.materialName) || null;
-      const positions = new Float32Array(group.positions);
-      const hasTexture = Boolean(materialDefinition && materialDefinition.diffuseMap);
-      const uvs = group.hasUvs || hasTexture ? new Float32Array(group.uvs) : null;
-      const normals = group.needsNormals ? _ObjMtlLoader.#generateNormals(positions, group.indices) : new Float32Array(group.normals);
-      const geometry = new CustomGeometry(this.#webglContext, {
-        positions,
-        indices: group.indices,
-        uvs,
-        normals
-      });
-      const material = await this.#createMaterial(materialDefinition, textureBaseUrl, textures, assetUrlMap);
-      const mesh = new Mesh(geometry, material);
-      root.add(mesh);
+    for (const entry of buildResult.entries) {
+      const materialDefinition = mtlData.get(entry.materialName) || null;
+      const textureUrl = materialDefinition && materialDefinition.diffuseMap ? _ObjMtlLoader.#resolveAssetUrl(textureBaseUrl, materialDefinition.diffuseMap, assetUrlMap) : null;
+      const material = await this.#materialFactory.createMaterial(
+        materialDefinition,
+        textureUrl,
+        textures,
+        entry.usesVertexColors
+      );
+      const mesh = new Mesh(entry.geometry, material);
+      entry.parent.add(mesh);
       meshes.push(mesh);
-      geometries.push(geometry);
       materials.push(material);
     }
     return {
@@ -9467,406 +10740,12 @@ var ObjMtlLoader = class _ObjMtlLoader {
     };
   }
   /**
-   * Creates a material instance based on MTL data.
-   *
-   * @param {ParsedMtlMaterial | null} definition - Parsed material definition.
-   * @param {string} textureBaseUrl               - Base URL used for resolving textures.
-   * @param {Texture2D[]} textures                - Output list of created textures.
-   * @param {Map<string, string>} [assetUrlMap]   - Asset URL override map.
-   * @returns {Promise<SolidColorMaterial | TexturedMaterial>}
-   * @private
-   */
-  async #createMaterial(definition, textureBaseUrl, textures, assetUrlMap) {
-    const opacity = definition ? definition.opacity : DEFAULT_OPACITY2;
-    if (definition && definition.diffuseMap) {
-      const textureUrl = _ObjMtlLoader.#resolveAssetUrl(textureBaseUrl, definition.diffuseMap, assetUrlMap);
-      const texture = await this.#getTexture(textureUrl, textures);
-      const material2 = new TexturedMaterial(this.#webglContext, {
-        texture,
-        ownsTexture: false,
-        textureUnitIndex: this.#textureUnitIndex
-      });
-      material2.setOpacity(opacity);
-      return material2;
-    }
-    const color = definition ? definition.diffuseColor : this.#defaultColor;
-    const material = new SolidColorMaterial(this.#webglContext, { color });
-    material.setOpacity(opacity);
-    return material;
-  }
-  /**
-   * Returns cached or newly loaded texture.
-   *
-   * @param {string} url         - Texture URL.
-   * @param {Texture2D[]} output - Output list of created textures.
-   * @returns {Promise<Texture2D>}
-   * @private
-   */
-  async #getTexture(url, output) {
-    if (this.#textureCache.has(url)) {
-      return this.#textureCache.get(url);
-    }
-    const texture = new Texture2D(this.#webglContext);
-    await texture.loadFromUrl(url);
-    this.#textureCache.set(url, texture);
-    output.push(texture);
-    return texture;
-  }
-  /**
-   * Parses a face and appends data to the current group.
-   *
-   * @param {string[]} parts     - Face line parts.
-   * @param {number[]} positions - Source positions.
-   * @param {number[]} uvs       - Source uvs.
-   * @param {number[]} normals   - Source normals.
-   * @param {ObjGroupData} group - Target group data.
-   * @private
-   */
-  static #parseFace(parts, positions, uvs, normals, group) {
-    const faceVertices = parts.slice(SECOND_INDEX);
-    if (faceVertices.length < FACE_MIN_VERTEX_COUNT) {
-      return;
-    }
-    const vertexIndices = faceVertices.map((vertex) => _ObjMtlLoader.#resolveFaceVertex(vertex, positions, uvs, normals, group));
-    for (let index = SECOND_INDEX; index < vertexIndices.length - NEXT_FACE_VERTEX_OFFSET; index += NEXT_FACE_VERTEX_OFFSET) {
-      const firstIndex = vertexIndices[FAN_FIRST_VERTEX_INDEX];
-      const secondIndex = vertexIndices[index];
-      const thirdIndex = vertexIndices[index + NEXT_FACE_VERTEX_OFFSET];
-      group.indices.push(firstIndex, secondIndex, thirdIndex);
-    }
-  }
-  /**
-   * Resolves a face vertex and appends data to group buffers.
-   *
-   * @param {string} vertexData  - Face vertex string.
-   * @param {number[]} positions - Source positions.
-   * @param {number[]} uvs       - Source uvs.
-   * @param {number[]} normals   - Source normals.
-   * @param {ObjGroupData} group - Target group data.
-   * @returns {number}           - Index of the resolved vertex.
-   * @private
-   */
-  static #resolveFaceVertex(vertexData, positions, uvs, normals, group) {
-    const indices = vertexData.split(OBJ_FACE_ATTRIBUTE_SEPARATOR);
-    const positionIndex = _ObjMtlLoader.#parseIndex(indices[FIRST_INDEX], positions.length / POSITION_COMPONENT_COUNT6);
-    const uvIndex = _ObjMtlLoader.#parseIndex(indices[SECOND_INDEX], uvs.length / UV_COMPONENT_COUNT2);
-    const normalIndex = _ObjMtlLoader.#parseIndex(indices[THIRD_INDEX], normals.length / NORMAL_COMPONENT_COUNT2);
-    if (positionIndex === OBJ_INDEX_NOT_PROVIDED) {
-      throw new Error(ERROR_MISSING_POSITION_INDEX);
-    }
-    const vertexKey = _ObjMtlLoader.#buildVertexKey(positionIndex, uvIndex, normalIndex);
-    if (group.vertexMap.has(vertexKey)) {
-      return group.vertexMap.get(vertexKey);
-    }
-    const vertexIndex = group.positions.length / POSITION_COMPONENT_COUNT6;
-    group.vertexMap.set(vertexKey, vertexIndex);
-    _ObjMtlLoader.#appendPosition(positions, positionIndex, group.positions);
-    _ObjMtlLoader.#appendUv(uvs, uvIndex, group);
-    _ObjMtlLoader.#appendNormal(normals, normalIndex, group);
-    return vertexIndex;
-  }
-  /**
-   * Parses an OBJ index string into a zero-based index.
-   *
-   * @param {string} value     - OBJ index string.
-   * @param {number} maxLength - Maximum element count.
-   * @returns {number}
-   * @private
-   */
-  static #parseIndex(value, maxLength) {
-    if (!value) {
-      return OBJ_INDEX_NOT_PROVIDED;
-    }
-    const indexValue = Number.parseInt(value, DECIMAL_RADIX);
-    if (maxLength === ZERO_VALUE10) {
-      return OBJ_INDEX_NOT_PROVIDED;
-    }
-    if (Number.isNaN(indexValue) || indexValue === OBJ_INDEX_ZERO) {
-      return OBJ_INDEX_NOT_PROVIDED;
-    }
-    if (indexValue > ZERO_VALUE10) {
-      return indexValue - OBJ_INDEX_OFFSET;
-    }
-    return maxLength + indexValue;
-  }
-  /**
-   * Appends a position to the target buffer.
-   *
-   * @param {number[]} sourcePositions - Source positions.
-   * @param {number} index             - Position index.
-   * @param {number[]} target          - Target positions buffer.
-   * @private
-   */
-  static #appendPosition(sourcePositions, index, target) {
-    const baseIndex = index * POSITION_COMPONENT_COUNT6;
-    target.push(
-      sourcePositions[baseIndex + COMPONENT_INDEX_X],
-      sourcePositions[baseIndex + COMPONENT_INDEX_Y],
-      sourcePositions[baseIndex + COMPONENT_INDEX_Z]
-    );
-  }
-  /**
-   * Appends a UV to the target buffer.
-   *
-   * @param {number[]} sourceUvs - Source UVs.
-   * @param {number} index       - UV index.
-   * @param {ObjGroupData} group - Group data.
-   * @private
-   */
-  static #appendUv(sourceUvs, index, group) {
-    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE10 && index * UV_COMPONENT_COUNT2 < sourceUvs.length) {
-      const baseIndex = index * UV_COMPONENT_COUNT2;
-      group.uvs.push(sourceUvs[baseIndex + COMPONENT_INDEX_X], sourceUvs[baseIndex + COMPONENT_INDEX_Y]);
-      group.hasUvs = true;
-      return;
-    }
-    group.uvs.push(DEFAULT_UV[COMPONENT_INDEX_X], DEFAULT_UV[COMPONENT_INDEX_Y]);
-  }
-  /**
-   * Appends a normal to the target buffer.
-   *
-   * @param {number[]} sourceNormals - Source normals.
-   * @param {number} index           - Normal index.
-   * @param {ObjGroupData} group     - Group data.
-   * @private
-   */
-  static #appendNormal(sourceNormals, index, group) {
-    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE10 && index * NORMAL_COMPONENT_COUNT2 < sourceNormals.length) {
-      const baseIndex = index * NORMAL_COMPONENT_COUNT2;
-      group.normals.push(
-        sourceNormals[baseIndex + COMPONENT_INDEX_X],
-        sourceNormals[baseIndex + COMPONENT_INDEX_Y],
-        sourceNormals[baseIndex + COMPONENT_INDEX_Z]
-      );
-      return;
-    }
-    group.needsNormals = true;
-    group.normals.push(DEFAULT_NORMAL[COMPONENT_INDEX_X], DEFAULT_NORMAL[COMPONENT_INDEX_Y], DEFAULT_NORMAL[COMPONENT_INDEX_Z]);
-  }
-  /**
-   * Generates vertex normals, when missing.
-   *
-   * @param {Float32Array} positions - Vertex positions.
-   * @param {number[]} indices       - Triangle indices.
-   * @returns {Float32Array}
-   * @private
-   */
-  static #generateNormals(positions, indices) {
-    const normalBuffer = new Float32Array(positions.length);
-    for (let index = ZERO_VALUE10; index < indices.length; index += NORMAL_COMPONENT_COUNT2) {
-      const indexA = indices[index + COMPONENT_INDEX_X] * POSITION_COMPONENT_COUNT6;
-      const indexB = indices[index + COMPONENT_INDEX_Y] * POSITION_COMPONENT_COUNT6;
-      const indexC = indices[index + COMPONENT_INDEX_Z] * POSITION_COMPONENT_COUNT6;
-      const ax = positions[indexA + COMPONENT_INDEX_X];
-      const ay = positions[indexA + COMPONENT_INDEX_Y];
-      const az = positions[indexA + COMPONENT_INDEX_Z];
-      const bx = positions[indexB + COMPONENT_INDEX_X];
-      const by = positions[indexB + COMPONENT_INDEX_Y];
-      const bz = positions[indexB + COMPONENT_INDEX_Z];
-      const cx = positions[indexC + COMPONENT_INDEX_X];
-      const cy = positions[indexC + COMPONENT_INDEX_Y];
-      const cz = positions[indexC + COMPONENT_INDEX_Z];
-      const abx = bx - ax;
-      const aby = by - ay;
-      const abz = bz - az;
-      const acx = cx - ax;
-      const acy = cy - ay;
-      const acz = cz - az;
-      const nx = aby * acz - abz * acy;
-      const ny = abz * acx - abx * acz;
-      const nz = abx * acy - aby * acx;
-      normalBuffer[indexA + COMPONENT_INDEX_X] += nx;
-      normalBuffer[indexA + COMPONENT_INDEX_Y] += ny;
-      normalBuffer[indexA + COMPONENT_INDEX_Z] += nz;
-      normalBuffer[indexB + COMPONENT_INDEX_X] += nx;
-      normalBuffer[indexB + COMPONENT_INDEX_Y] += ny;
-      normalBuffer[indexB + COMPONENT_INDEX_Z] += nz;
-      normalBuffer[indexC + COMPONENT_INDEX_X] += nx;
-      normalBuffer[indexC + COMPONENT_INDEX_Y] += ny;
-      normalBuffer[indexC + COMPONENT_INDEX_Z] += nz;
-    }
-    for (let index = ZERO_VALUE10; index < normalBuffer.length; index += NORMAL_COMPONENT_COUNT2) {
-      const nx = normalBuffer[index + COMPONENT_INDEX_X];
-      const ny = normalBuffer[index + COMPONENT_INDEX_Y];
-      const nz = normalBuffer[index + COMPONENT_INDEX_Z];
-      const length = Math.hypot(nx, ny, nz);
-      if (length > ZERO_VALUE10) {
-        normalBuffer[index + COMPONENT_INDEX_X] = nx / length;
-        normalBuffer[index + COMPONENT_INDEX_Y] = ny / length;
-        normalBuffer[index + COMPONENT_INDEX_Z] = nz / length;
-      }
-    }
-    return normalBuffer;
-  }
-  /**
-   * Builds a unique vertex key from indices.
-   *
-   * @param {number} positionIndex - Position index.
-   * @param {number} uvIndex       - UV index.
-   * @param {number} normalIndex   - Normal index.
-   * @returns {string}
-   * @private
-   */
-  static #buildVertexKey(positionIndex, uvIndex, normalIndex) {
-    return String(positionIndex) + VERTEX_KEY_SEPARATOR + String(uvIndex) + VERTEX_KEY_SEPARATOR + String(normalIndex);
-  }
-  /**
-   * Creates or returns a group entry for a material.
-   *
-   * @param {Map<string, ObjGroupData>} groups - Group map.
-   * @param {string} materialName              - Material name.
-   * @returns {ObjGroupData}
-   * @private
-   */
-  static #getOrCreateGroup(groups, materialName) {
-    if (groups.has(materialName)) {
-      return groups.get(materialName);
-    }
-    const group = {
-      materialName,
-      positions: [],
-      uvs: [],
-      normals: [],
-      indices: [],
-      vertexMap: /* @__PURE__ */ new Map(),
-      hasUvs: false,
-      needsNormals: false
-    };
-    groups.set(materialName, group);
-    return group;
-  }
-  /**
-   * Parses a float triplet from line parts.
-   *
-   * @param {string[]} parts  - Line parts.
-   * @param {number} expected - Expected component count.
-   * @returns {number[]}
-   * @private
-   */
-  static #parseFloatTriplet(parts, expected) {
-    if (parts.length <= expected) {
-      return [ZERO_VALUE10, ZERO_VALUE10, ZERO_VALUE10];
-    }
-    return [
-      Number.parseFloat(parts[SECOND_INDEX]),
-      Number.parseFloat(parts[THIRD_INDEX]),
-      Number.parseFloat(parts[FOURTH_INDEX])
-    ];
-  }
-  /**
-   * Parses a float pair from line parts.
-   *
-   * @param {string[]} parts - Line parts.
-   * @returns {number[]}
-   * @private
-   */
-  static #parseFloatPair(parts) {
-    if (parts.length <= THIRD_INDEX) {
-      return [ZERO_VALUE10, ZERO_VALUE10];
-    }
-    return [
-      Number.parseFloat(parts[SECOND_INDEX]),
-      Number.parseFloat(parts[THIRD_INDEX])
-    ];
-  }
-  /**
-   * Parses a float value from string.
-   *
-   * @param {string} value - String value.
-   * @returns {number | null}
-   * @private
-   */
-  static #parseFloatValue(value) {
-    if (!value) {
-      return null;
-    }
-    const parsed = Number.parseFloat(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  /**
-   * Parses a texture map line and extracts a file path.
-   *
-   * @param {string} line - Full `map_*` line.
-   * @returns {string}
-   * @private
-   */
-  static #parseMtlMapLine(line) {
-    if (typeof line !== "string") {
-      return EMPTY_STRING;
-    }
-    let sanitized = line;
-    const commentIndex = sanitized.indexOf(COMMENT_TOKEN);
-    if (commentIndex !== NOT_FOUND_INDEX) {
-      sanitized = sanitized.slice(FIRST_INDEX, commentIndex);
-    }
-    sanitized = sanitized.trim();
-    if (!sanitized) {
-      return EMPTY_STRING;
-    }
-    const tokens = _ObjMtlLoader.#splitTokens(sanitized);
-    if (tokens.length <= SECOND_INDEX) {
-      return EMPTY_STRING;
-    }
-    let index = SECOND_INDEX;
-    while (index < tokens.length) {
-      const token = tokens[index];
-      if (token.startsWith(HYPHEN_SEPARATOR)) {
-        switch (token) {
-          case MTL_MAP_OPTION_SCALE:
-          case MTL_MAP_OPTION_OFFSET:
-            index += MTL_MAP_VECTOR_COMPONENTS + SECOND_INDEX;
-            break;
-          case MTL_MAP_OPTION_CLAMP:
-          case MTL_MAP_OPTION_BUMP_MULTIPLIER:
-            index += MTL_MAP_SCALAR_COMPONENTS + SECOND_INDEX;
-            break;
-          default:
-            index += SECOND_INDEX;
-            break;
-        }
-        continue;
-      }
-      return tokens.slice(index).join(SPACE_SEPARATOR);
-    }
-    return EMPTY_STRING;
-  }
-  /**
-   * Splits a line into tokens while respecting the quotes.
-   *
-   * @param {string} line - Line to split.
-   * @returns {string[]}
-   * @private
-   */
-  static #splitTokens(line) {
-    const tokens = [];
-    let currentToken = EMPTY_STRING;
-    let inQuotes = false;
-    for (const char of line) {
-      if (char === QUOTE_TOKEN) {
-        inQuotes = !inQuotes;
-        continue;
-      }
-      if (!inQuotes && LINE_SPLIT_REGEX.test(char)) {
-        if (currentToken) {
-          tokens.push(currentToken);
-          currentToken = EMPTY_STRING;
-        }
-        continue;
-      }
-      currentToken += char;
-    }
-    if (currentToken) {
-      tokens.push(currentToken);
-    }
-    return tokens;
-  }
-  /**
    * Resolves an asset path using an override map, when provided.
    *
    * @param {string} baseUrl                    - Base URL.
    * @param {string} path                       - Asset path.
    * @param {Map<string, string>} [assetUrlMap] - Asset URL map.
-   * @returns {string}
+   * @returns {string}                          - Asset URL resolved from `assetUrlMap`, when matched - otherwise resolved against `baseUrl`.
    * @private
    */
   static #resolveAssetUrl(baseUrl, path, assetUrlMap) {
@@ -9889,22 +10768,22 @@ var ObjMtlLoader = class _ObjMtlLoader {
    * Resolves a base path from a URL string.
    *
    * @param {string} url - Input URL.
-   * @returns {string}
+   * @returns {string}   - Base URL path or an empty string, when no slash is present.
    * @private
    */
   static #getBasePath(url) {
     const lastSlashIndex = url.lastIndexOf(PATH_SEPARATOR);
-    if (lastSlashIndex === NOT_FOUND_INDEX) {
+    if (lastSlashIndex === NOT_FOUND_INDEX3) {
       return DEFAULT_BASE_URL;
     }
-    return url.slice(FIRST_INDEX, lastSlashIndex + BASE_PATH_SLICE_OFFSET);
+    return url.slice(ZERO_VALUE13, lastSlashIndex + BASE_PATH_SLICE_OFFSET);
   }
   /**
    * Resolves a relative path against a base URL.
    *
    * @param {string} baseUrl - Base URL.
    * @param {string} path    - Path to resolve.
-   * @returns {string}
+   * @returns {string}       - Resolved URL string, absolute paths are returned as-is - otherwise resolved against `baseUrl`.
    * @private
    */
   static #resolvePath(baseUrl, path) {
@@ -9928,16 +10807,16 @@ var ObjMtlLoader = class _ObjMtlLoader {
    * Normalizes a path string by trimming and unquoting.
    *
    * @param {string} path - Input path.
-   * @returns {string}
+   * @returns {string}    - Normalized path string.
    * @private
    */
   static #normalizePath(path) {
-    if (typeof path !== "string") {
-      return EMPTY_STRING;
+    if (typeof path !== TYPEOF_STRING4) {
+      return EMPTY_STRING3;
     }
     let normalized = path.trim();
-    if (normalized.startsWith(QUOTE_TOKEN) && normalized.endsWith(QUOTE_TOKEN) && normalized.length > SECOND_INDEX) {
-      normalized = normalized.slice(SECOND_INDEX, normalized.length - SECOND_INDEX);
+    if (normalized.startsWith(QUOTE_TOKEN3) && normalized.endsWith(QUOTE_TOKEN3) && normalized.length > SECOND_INDEX5) {
+      normalized = normalized.slice(SECOND_INDEX5, normalized.length - SECOND_INDEX5);
     }
     if (normalized.includes(BACKSLASH_SEPARATOR)) {
       normalized = normalized.replace(BACKSLASH_REGEX, PATH_SEPARATOR);
@@ -9949,7 +10828,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
    *
    * @param {Map<string, File>} fileMap - File map.
    * @param {string} path               - File path.
-   * @returns {File | null}
+   * @returns {File | null}             - Matched file entry by normalized path or basename or `null`, when not found.
    * @private
    */
   static #getFileFromMap(fileMap, path) {
@@ -9961,7 +10840,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
       return fileMap.get(normalized);
     }
     const basenameIndex = normalized.lastIndexOf(PATH_SEPARATOR);
-    const basename = basenameIndex === NOT_FOUND_INDEX ? normalized : normalized.slice(basenameIndex + BASE_PATH_SLICE_OFFSET);
+    const basename = basenameIndex === NOT_FOUND_INDEX3 ? normalized : normalized.slice(basenameIndex + BASE_PATH_SLICE_OFFSET);
     if (fileMap.has(basename)) {
       return fileMap.get(basename);
     }
@@ -11594,7 +12473,7 @@ var MATRIX_INDEX_31 = 13;
 var MATRIX_INDEX_32 = 14;
 var MATRIX_INDEX_33 = 15;
 var LOOP_START_INDEX2 = 0;
-var LOOP_INCREMENT = 1;
+var LOOP_INCREMENT2 = 1;
 var VECTOR_INDEX_X = 0;
 var VECTOR_INDEX_Y = 1;
 var VECTOR_INDEX_Z = 2;
@@ -11618,7 +12497,7 @@ var MOUSE_NDC_Y_KEY = "y";
 var ERROR_SCENE_TYPE = "`Raycaster.raycast` expects scene as a `Scene` instance.";
 var ERROR_CAMERA_TYPE = "`Raycaster.raycast` expects camera as a `Camera` instance.";
 var ERROR_MOUSE_NDC_TYPE = "`Raycaster.raycast` expects `mouseNdc` as an object with numeric x/y.";
-var ERROR_OPTIONS_TYPE = "`Raycaster.raycast` expects options as a plain object.";
+var ERROR_OPTIONS_TYPE3 = "`Raycaster.raycast` expects options as a plain object.";
 var ERROR_OPTION_RECURSIVE_TYPE = "`Raycaster.raycast` option recursive must be a boolean.";
 var ERROR_OPTION_FILTER_TYPE = "`Raycaster.raycast` option filter must be a function or null.";
 var ERROR_OPTION_SORT_TYPE = "`Raycaster.raycast` option sort must be a boolean.";
@@ -11647,7 +12526,7 @@ var Raycaster = class _Raycaster {
       throw new TypeError(ERROR_MOUSE_NDC_TYPE);
     }
     if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError(ERROR_OPTIONS_TYPE);
+      throw new TypeError(ERROR_OPTIONS_TYPE3);
     }
     const recursive = OPTION_RECURSIVE_KEY in options ? options[OPTION_RECURSIVE_KEY] : DEFAULT_RECURSIVE;
     const filter = OPTION_FILTER_KEY in options ? options[OPTION_FILTER_KEY] : DEFAULT_FILTER;
@@ -11672,7 +12551,7 @@ var Raycaster = class _Raycaster {
       scene.traverse((object) => _Raycaster.#collectIntersection(object, ray, filter, intersections));
     } else {
       const children = scene.children;
-      for (let index = LOOP_START_INDEX2; index < children.length; index += LOOP_INCREMENT) {
+      for (let index = LOOP_START_INDEX2; index < children.length; index += LOOP_INCREMENT2) {
         _Raycaster.#collectIntersection(children[index], ray, filter, intersections);
       }
     }

@@ -42,7 +42,7 @@ import { ThirdPersonCamera }        from './scene/third-person-camera.js';
 import { Renderer }                 from './render/renderer.js';
 import { Engine, createEngine }     from './engine/engine.js';
 import { FpsCounter }               from './debug/fps-counter.js';
-import { ObjMtlLoader }             from './loader/obj-mtl-loader.js';
+import { ObjMtlLoader }             from './loaders/obj-mtl/obj-mtl-loader.js';
 import { OrbitControls }            from './controls/orbit-controls.js';
 import { KeyboardControls }         from './controls/keyboard-controls.js';
 import { FirstPersonControls }      from './controls/first-person-controls.js';
