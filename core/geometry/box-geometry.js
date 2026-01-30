@@ -436,8 +436,10 @@ export class BoxGeometry extends Geometry {
                 const topRightVertexIndex    = topLeftVertexIndex    + NEXT_VERTEX_OFFSET;
                 const bottomLeftVertexIndex  = topLeftVertexIndex    + uVertexCount;
                 const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET;
-                indicesSolid.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
-                indicesSolid.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
+                // indicesSolid.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
+                // indicesSolid.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
+                indicesSolid.push(topLeftVertexIndex, topRightVertexIndex, bottomLeftVertexIndex);
+                indicesSolid.push(topRightVertexIndex, bottomRightVertexIndex, bottomLeftVertexIndex);
             }
         }
 

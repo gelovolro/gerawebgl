@@ -1,5 +1,8 @@
-import { CustomGeometry } from '../../geometry/custom-geometry.js';
-import { Object3D }       from '../../scene/object3d.js';
+import { CustomGeometry }   from '../../geometry/custom-geometry.js';
+import { PointsGeometry }   from '../../geometry/points-geometry.js';
+import { PolylineGeometry } from '../../geometry/polyline-geometry.js';
+import { Object3D }         from '../../scene/object3d.js';
+import { Vector3 }          from '../../math/vector3.js';
 
 /**
  * Number of components for position vectors.
@@ -114,6 +117,34 @@ const VERTEX_KEY_SEPARATOR = '|';
 const LOOP_INCREMENT = 1;
 
 /**
+ * Minimum vertex count required for line geometry.
+ *
+ * @type {number}
+ */
+const LINE_MIN_VERTEX_COUNT = 2;
+
+/**
+ * Geometry entry type for meshes.
+ *
+ * @type {string}
+ */
+const ENTRY_TYPE_MESH = 'mesh';
+
+/**
+ * Geometry entry type for points.
+ *
+ * @type {string}
+ */
+const ENTRY_TYPE_POINTS = 'points';
+
+/**
+ * Geometry entry type for lines.
+ *
+ * @type {string}
+ */
+const ENTRY_TYPE_LINE = 'line';
+
+/**
  * Error message for invalid WebGL context.
  *
  * @type {string}
@@ -150,6 +181,8 @@ const TYPEOF_OBJECT = 'object';
  * @property {string} materialName         - Material name.
  * @property {number} smoothingGroup       - Smoothing group (0 = off).
  * @property {ObjFaceVertex[][]} triangles - Triangulated faces.
+ * @property {number[]} points             - Point indices.
+ * @property {number[][]} lines            - Line index arrays.
  */
 
 /**
@@ -184,8 +217,9 @@ const TYPEOF_OBJECT = 'object';
  * Output entry for mesh creation.
  *
  * @typedef {Object} ObjMeshEntry
+ * @property {string} entryType         - Entry type (mesh/points/line).
  * @property {Object3D} parent          - Parent node for the mesh.
- * @property {CustomGeometry} geometry  - Geometry instance.
+ * @property {CustomGeometry | PointsGeometry | PolylineGeometry} geometry - Geometry instance.
  * @property {string} materialName      - Material name used by the chunk.
  * @property {boolean} usesVertexColors - True, when geometry includes vertex colors.
  */
@@ -249,22 +283,48 @@ export class ObjGeometryBuilder {
                 objectNode.add(groupNode);
 
                 for (const chunk of groupData.materialChunks) {
-                    if (!chunk.triangles.length) {
-                        continue;
+                    if (chunk.triangles.length) {
+                        const geometryData     = this.#buildGeometryForChunk(chunk, parsedData);
+                        const geometry         = new CustomGeometry(this.#webglContext, geometryData);
+                        const usesVertexColors = Boolean(geometryData.colors);
+
+                        entries.push({
+                            entryType       : ENTRY_TYPE_MESH,
+                            parent          : groupNode,
+                            geometry,
+                            materialName    : chunk.materialName,
+                            usesVertexColors
+                        });
+
+                        geometries.push(geometry);
                     }
 
-                    const geometryData     = this.#buildGeometryForChunk(chunk, parsedData);
-                    const geometry         = new CustomGeometry(this.#webglContext, geometryData);
-                    const usesVertexColors = Boolean(geometryData.colors);
+                    if (chunk.points.length) {
+                        const geometry = this.#buildPointsGeometry(chunk, parsedData);
+                        entries.push({
+                            entryType       : ENTRY_TYPE_POINTS,
+                            parent          : groupNode,
+                            geometry,
+                            materialName    : chunk.materialName,
+                            usesVertexColors: false
+                        });
+                        geometries.push(geometry);
+                    }
 
-                    entries.push({
-                        parent          : groupNode,
-                        geometry,
-                        materialName    : chunk.materialName,
-                        usesVertexColors
-                    });
+                    if (chunk.lines.length) {
+                        const lineGeometries = this.#buildLineGeometries(chunk, parsedData);
 
-                    geometries.push(geometry);
+                        for (const geometry of lineGeometries) {
+                            entries.push({
+                                entryType       : ENTRY_TYPE_LINE,
+                                parent          : groupNode,
+                                geometry,
+                                materialName    : chunk.materialName,
+                                usesVertexColors: false
+                            });
+                            geometries.push(geometry);
+                        }
+                    }
                 }
             }
         }
@@ -304,6 +364,41 @@ export class ObjGeometryBuilder {
             normals   : new Float32Array(normals),
             colors    : colors ? new Float32Array(colors) : null
         };
+    }
+
+    /**
+     * Builds points geometry for a chunk.
+     *
+     * @param {ObjMaterialChunk} chunk   - Material chunk.
+     * @param {ObjParsedData} parsedData - Parsed OBJ data.
+     * @returns {PointsGeometry}         - Points geometry.
+     * @private
+     */
+    #buildPointsGeometry(chunk, parsedData) {
+        const positions = ObjGeometryBuilder.#buildVectorPositions(chunk.points, parsedData.positions);
+        return new PointsGeometry(this.#webglContext, { positions });
+    }
+
+    /**
+     * Builds line geometries for a chunk.
+     *
+     * @param {ObjMaterialChunk} chunk   - Material chunk.
+     * @param {ObjParsedData} parsedData - Parsed OBJ data.
+     * @returns {PolylineGeometry[]}     - Line geometries.
+     * @private
+     */
+    #buildLineGeometries(chunk, parsedData) {
+        const result = [];
+
+        for (const lineIndices of chunk.lines) {
+            const positions = ObjGeometryBuilder.#buildVectorPositions(lineIndices, parsedData.positions);
+
+            if (positions.length >= LINE_MIN_VERTEX_COUNT) {
+                result.push(new PolylineGeometry(this.#webglContext, { positions }));
+            }
+        }
+
+        return result;
     }
 
     /**
@@ -490,13 +585,13 @@ export class ObjGeometryBuilder {
         const acy = cy - ay;
         const acz = cz - az;
 
-        // Computing the face normal as a cross product (AB * AC).
+        // Computing the face normal as a cross product (AB * AC):
         const nx = (aby * acz) - (abz * acy);
         const ny = (abz * acx) - (abx * acz);
         const nz = (abx * acy) - (aby * acx);
         const length = Math.hypot(nx, ny, nz);
 
-        // Normalizing the `normal-vector` (fallbacking to the default normal for degenerate triangles).
+        // Normalizing the `normal-vector` (fallbacking to the default normal for degenerate triangles):
         if (length > ZERO_VALUE) {
             return [nx / length, ny / length, nz / length];
         }
@@ -526,9 +621,9 @@ export class ObjGeometryBuilder {
      * Appends a UV to the target buffer.
      *
      * @param {number[]} sourceUvs - Source UVs.
-     * @param {number} index       - UV index.
-     * @param {number[]} target    - Target UV buffer.
-     * @returns {void}             - Appends the referenced UV pair to the target buffer or the default UV, when missing/invalid.
+     * @param {number} index       - UV-index.
+     * @param {number[]} target    - Target UV-buffer.
+     * @returns {void}             - Appends the referenced UV-pair to the target buffer or the default UV, when missing/invalid.
      * @private
      */
     static #appendUv(sourceUvs, index, target) {
@@ -562,7 +657,11 @@ export class ObjGeometryBuilder {
             return;
         }
 
-        target.push(DEFAULT_NORMAL[COMPONENT_INDEX_X], DEFAULT_NORMAL[COMPONENT_INDEX_Y], DEFAULT_NORMAL[COMPONENT_INDEX_Z]);
+        target.push(
+            DEFAULT_NORMAL[COMPONENT_INDEX_X],
+            DEFAULT_NORMAL[COMPONENT_INDEX_Y],
+            DEFAULT_NORMAL[COMPONENT_INDEX_Z]
+        );
     }
 
     /**
@@ -571,7 +670,7 @@ export class ObjGeometryBuilder {
      * @param {number[]} sourceColors - Source colors.
      * @param {number} index          - Color index.
      * @param {number[]} target       - Target colors buffer.
-     * @returns {void}                - Appends the referenced RGB triplet to the target buffer.
+     * @returns {void}                - Appends the referenced RGB-triplet to the target buffer.
      * @private
      */
     static #appendColor(sourceColors, index, target) {
@@ -607,5 +706,27 @@ export class ObjGeometryBuilder {
      */
     static #getPositionComponent(positions, index, component) {
         return positions[(index * POSITION_COMPONENT_COUNT) + component];
+    }
+
+    /**
+     * Builds Vector3 positions from indices.
+     *
+     * @param {number[]} indices   - Position indices.
+     * @param {number[]} positions - Flat positions array.
+     * @returns {Vector3[]}        - Vector3 positions.
+     * @private
+     */
+    static #buildVectorPositions(indices, positions) {
+        const result = [];
+
+        for (const index of indices) {
+            const baseIndex = index * POSITION_COMPONENT_COUNT;
+            const x = positions[baseIndex + COMPONENT_INDEX_X];
+            const y = positions[baseIndex + COMPONENT_INDEX_Y];
+            const z = positions[baseIndex + COMPONENT_INDEX_Z];
+            result.push(new Vector3(x, y, z));
+        }
+
+        return result;
     }
 }

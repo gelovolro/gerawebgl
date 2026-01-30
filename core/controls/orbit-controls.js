@@ -95,6 +95,13 @@ const DEFAULT_ROTATION_SPEED = 1.0;
 const DEFAULT_ZOOM_SPEED = 1.0;
 
 /**
+ * Default rotation enabled state.
+ *
+ * @type {boolean}
+ */
+const DEFAULT_ROTATION_ENABLED = true;
+
+/**
  * The mouse button id used for rotation.
  *
  * @type {number}
@@ -130,6 +137,13 @@ const WHEEL_LISTENER_OPTIONS = { passive: false };
  * @type {number}
  */
 const POINTER_ID_RESET_VALUE = -1;
+
+/**
+ * Error message for invalid rotation enabled values.
+ *
+ * @type {string}
+ */
+const ERROR_ROTATION_ENABLED_TYPE = '`OrbitControls.setRotationEnabled` expects a boolean.';
 
 /**
  * Orbit controller, that rotates a camera around a target point.
@@ -241,6 +255,14 @@ export class OrbitControls {
      * @private
      */
     #zoomSpeed;
+
+    /**
+     * Flag controlling whether rotation input is enabled.
+     *
+     * @type {boolean}
+     * @private
+     */
+    #rotationEnabled = DEFAULT_ROTATION_ENABLED;
 
     /**
      * True when controls need to recompute camera transform.
@@ -516,6 +538,35 @@ export class OrbitControls {
     }
 
     /**
+     * Enables or disables the pointer-driven rotation.
+     *
+     * @param {boolean} enabled - Whether the rotation input is enabled.
+     * @returns {void}
+     * @throws {TypeError} When the enabled flag is invalid.
+     */
+    setRotationEnabled(enabled) {
+        if (typeof enabled !== 'boolean') {
+            throw new TypeError(ERROR_ROTATION_ENABLED_TYPE);
+        }
+
+        this.#rotationEnabled = enabled;
+
+        if (!enabled && this.#capturedPointerId !== POINTER_ID_RESET_VALUE) {
+            this.#element.releasePointerCapture(this.#capturedPointerId);
+            this.#capturedPointerId = POINTER_ID_RESET_VALUE;
+        }
+    }
+
+    /**
+     * Returns the current state of the pointer-driven camera rotation input.
+     *
+     * @returns {boolean} - True if the rotation input is enabled, otherwise false.
+     */
+    isRotationEnabled() {
+        return this.#rotationEnabled;
+    }
+
+    /**
      * Disposes the controller by removing all event listeners.
      */
     dispose() {
@@ -539,6 +590,10 @@ export class OrbitControls {
      * @private
      */
     #handlePointerDown(event) {
+        if (!this.#rotationEnabled) {
+            return;
+        }
+
         if (event.button !== ROTATE_BUTTON) {
             return;
         }
@@ -559,6 +614,10 @@ export class OrbitControls {
      * @private
      */
     #handlePointerMove(event) {
+        if (!this.#rotationEnabled) {
+            return;
+        }
+
         if (event.pointerId !== this.#capturedPointerId) {
             return;
         }

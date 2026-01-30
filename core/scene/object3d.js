@@ -87,7 +87,7 @@ export class Object3D {
     }
 
     /**
-     * @param {Object3D} child - Child node to attach to this object (re-parented if it already has a parent).
+     * @param {Object3D} child - Child node to attach to this object (reparented, if it already has a parent).
      */
     add(child) {
         if (!(child instanceof Object3D)) {
@@ -127,14 +127,27 @@ export class Object3D {
     }
 
     /**
-     * @param {Float32Array | null} parentWorldMatrix - Parent world matrix, or null when updating a root node.
+     * Updates world matrices.
+     *
+     * @param {Float32Array | null | Object} inputMatrix            - Parent world matrix or options object.
+     * @param {Float32Array | null} [inputMatrix.parentWorldMatrix] - Parent world matrix override (root, when null).
+     * @returns {void}
+     * @throws {TypeError} When inputs are invalid.
      */
-    updateWorldMatrix(parentWorldMatrix) {
-        if (parentWorldMatrix !== null && !(parentWorldMatrix instanceof Float32Array)) {
-            throw new TypeError('Object3D.updateWorldMatrix expects a Float32Array or null.');
+    updateWorldMatrix(inputMatrix) {
+        let resolvedParentWorldMatrix = inputMatrix;
+
+        if (inputMatrix !== null && typeof inputMatrix === 'object' && !(inputMatrix instanceof Float32Array)) {
+            resolvedParentWorldMatrix = ('parentWorldMatrix' in inputMatrix)
+                ? inputMatrix.parentWorldMatrix
+                : null;
         }
 
-        this.#updateWorldMatrixRecursive(parentWorldMatrix, false);
+        if (resolvedParentWorldMatrix !== null && !(resolvedParentWorldMatrix instanceof Float32Array)) {
+            throw new TypeError('`Object3D.updateWorldMatrix` expects `Float32Array` or null.');
+        }
+
+        this.#updateWorldMatrixRecursive(resolvedParentWorldMatrix, false);
     }
 
     /**

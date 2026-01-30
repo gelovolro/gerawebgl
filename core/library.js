@@ -28,6 +28,7 @@ import { DirectionalLightMaterial } from './material/directional-light-material.
 import { LambertMaterial }          from './material/lambert-material.js';
 import { PhongMaterial }            from './material/phong-material.js';
 import { PointsMaterial }           from './material/points-material.js';
+import { MtlStandardMaterial }      from './material/mtl-standard-material.js';
 import { Texture2D }                from './texture/texture2d.js';
 import { Object3D }                 from './scene/object3d.js';
 import { Mesh }                     from './scene/mesh.js';
@@ -42,12 +43,17 @@ import { ThirdPersonCamera }        from './scene/third-person-camera.js';
 import { Renderer }                 from './render/renderer.js';
 import { Engine, createEngine }     from './engine/engine.js';
 import { FpsCounter }               from './debug/fps-counter.js';
+import { LightGizmo }               from './debug/light-gizmo.js';
+import { TransformGizmo }           from './debug/transform-gizmo.js';
 import { ObjMtlLoader }             from './loaders/obj-mtl/obj-mtl-loader.js';
 import { OrbitControls }            from './controls/orbit-controls.js';
 import { KeyboardControls }         from './controls/keyboard-controls.js';
 import { FirstPersonControls }      from './controls/first-person-controls.js';
 import { ThirdPersonControls }      from './controls/third-person-controls.js';
 import { Raycaster }                from './interaction/raycaster.js';
+import { Light }                    from './light/light.js';
+import { DirectionalLight }         from './light/directional-light.js';
+import { AmbientLight }             from './light/ambient-light.js';
 
 /**
  * Main public API namespace.
@@ -79,6 +85,9 @@ export const GeraWebGL = Object.freeze({
     Points,
     Line,
     Raycaster,
+    Light,
+    DirectionalLight,
+    AmbientLight,
 
     // Grouped namespaces:
     Math: Object.freeze({
@@ -119,7 +128,8 @@ export const GeraWebGL = Object.freeze({
         DirectionalLightMaterial,
         LambertMaterial,
         PhongMaterial,
-        PointsMaterial
+        PointsMaterial,
+        MtlStandardMaterial
     }),
 
     Controls: Object.freeze({
@@ -134,7 +144,9 @@ export const GeraWebGL = Object.freeze({
     }),
 
     Debug: Object.freeze({
-        FpsCounter
+        FpsCounter,
+        LightGizmo,
+        TransformGizmo
     }),
 
     // Low-level access (shaders, manual uniforms/attributes):

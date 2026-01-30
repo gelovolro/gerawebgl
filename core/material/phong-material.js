@@ -10,6 +10,8 @@ import {
     LIGHT_DIRECTION_UNIFORM_NAME,
     CAMERA_POSITION_UNIFORM_NAME,
     AMBIENT_STRENGTH_UNIFORM_NAME,
+    DIRECTIONAL_STRENGTH_UNIFORM_NAME,
+    LIGHTING_ENABLED_UNIFORM_NAME,
     OPACITY_UNIFORM_NAME,
     VECTOR3_ELEMENT_COUNT
 } from './directional-light-material.js';
@@ -98,16 +100,24 @@ uniform vec3  ${SPECULAR_COLOR_UNIFORM_NAME};
 uniform vec3  ${LIGHT_DIRECTION_UNIFORM_NAME};
 uniform vec3  ${CAMERA_POSITION_UNIFORM_NAME};
 uniform float ${AMBIENT_STRENGTH_UNIFORM_NAME};
+uniform float ${DIRECTIONAL_STRENGTH_UNIFORM_NAME};
+uniform float ${LIGHTING_ENABLED_UNIFORM_NAME};
 uniform float ${SPECULAR_STRENGTH_UNIFORM_NAME};
 uniform float ${SHININESS_UNIFORM_NAME};
 uniform float ${OPACITY_UNIFORM_NAME};
 out vec4 outColor;
 
 void main() {
-    vec3 surface_normal      = normalize(v_normal);
+    vec3 surface_normal = normalize(v_normal);
+
+    if (!gl_FrontFacing) {
+        surface_normal = -surface_normal;
+    }
+
     vec3 light_direction     = normalize(${LIGHT_DIRECTION_UNIFORM_NAME});
     vec3 view_direction      = normalize(${CAMERA_POSITION_UNIFORM_NAME} - v_worldPosition);
-    float diffuse_intensity  = max(dot(surface_normal, light_direction), 0.0);
+    float lighting_enabled   = ${LIGHTING_ENABLED_UNIFORM_NAME};
+    float diffuse_intensity  = max(dot(surface_normal, light_direction), 0.0) * ${DIRECTIONAL_STRENGTH_UNIFORM_NAME};
     float specular_intensity = 0.0;
 
     if (diffuse_intensity > 0.0) {
@@ -117,8 +127,11 @@ void main() {
     }
 
     vec3 ambient  = ${COLOR_UNIFORM_NAME} * ${AMBIENT_STRENGTH_UNIFORM_NAME};
-    vec3 diffuse  = ${COLOR_UNIFORM_NAME} * diffuse_intensity;
-    vec3 specular = ${SPECULAR_COLOR_UNIFORM_NAME} * (specular_intensity * ${SPECULAR_STRENGTH_UNIFORM_NAME});
+    vec3 diffuse  = ${COLOR_UNIFORM_NAME} * (diffuse_intensity * lighting_enabled);
+    vec3 specular = ${SPECULAR_COLOR_UNIFORM_NAME}
+        * (specular_intensity * ${SPECULAR_STRENGTH_UNIFORM_NAME}
+        * ${DIRECTIONAL_STRENGTH_UNIFORM_NAME} * lighting_enabled);
+
     vec3 rgb = ambient + diffuse + specular;
     outColor = vec4(rgb, ${OPACITY_UNIFORM_NAME});
 }
@@ -139,7 +152,7 @@ void main() {
 /**
  * Phong material with one directional light.
  *
- * This material expects geometry to provide normals at attribute location 3.
+ * This material expects geometry to provide normals at attribute `location 3`.
  */
 export class PhongMaterial extends DirectionalLightMaterial {
 
@@ -170,7 +183,7 @@ export class PhongMaterial extends DirectionalLightMaterial {
     /**
      * Creates a new `PhongMaterial`.
      *
-     * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to compile shaders.
+     * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context, used to compile shaders.
      * @param {PhongMaterialOptions} [options]      - Material options.
      */
     constructor(webglContext, options = {}) {
@@ -180,10 +193,10 @@ export class PhongMaterial extends DirectionalLightMaterial {
 
         const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
         super(webglContext, shaderProgram, options, { ownsShaderProgram: true });
-
         this.#specularColor.set(DEFAULT_SPECULAR_COLOR);
         this.#specularStrength = DEFAULT_SPECULAR_STRENGTH;
-        this.#shininess = DEFAULT_SHININESS;
+        this.#shininess        = DEFAULT_SHININESS;
+
         const { specularColor, specularStrength, shininess } = options;
 
         if (specularColor !== undefined) {
@@ -207,15 +220,15 @@ export class PhongMaterial extends DirectionalLightMaterial {
      * @protected
      */
     applyAdditionalUniforms(worldMatrix, cameraPosition) {
-        this.shaderProgram.setMatrix4(WORLD_MATRIX_UNIFORM_NAME, worldMatrix);
-        this.shaderProgram.setVector3(CAMERA_POSITION_UNIFORM_NAME, cameraPosition);
-        this.shaderProgram.setVector3(SPECULAR_COLOR_UNIFORM_NAME, this.#specularColor);
-        this.shaderProgram.setFloat(SPECULAR_STRENGTH_UNIFORM_NAME, this.#specularStrength);
-        this.shaderProgram.setFloat(SHININESS_UNIFORM_NAME, this.#shininess);
+        this.shaderProgram.setMatrix4(WORLD_MATRIX_UNIFORM_NAME    , worldMatrix);
+        this.shaderProgram.setVector3(CAMERA_POSITION_UNIFORM_NAME , cameraPosition);
+        this.shaderProgram.setVector3(SPECULAR_COLOR_UNIFORM_NAME  , this.#specularColor);
+        this.shaderProgram.setFloat(SPECULAR_STRENGTH_UNIFORM_NAME , this.#specularStrength);
+        this.shaderProgram.setFloat(SHININESS_UNIFORM_NAME         , this.#shininess);
     }
 
     /**
-     * Sets the specular RGB color.
+     * Sets the specular RGB-color.
      *
      * @param {Float32Array | number[]} color - [red, green, blue] in [0..1] range.
      */

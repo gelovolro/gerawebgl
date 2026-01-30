@@ -795,8 +795,8 @@ class DemoApp {
 
         this.#orbitControls.update();
         const activeCameraTransform = DemoApp.#captureTransform(activeCamera);
-        DemoApp.#applyTransform(this.#perspectiveCamera, activeCameraTransform);
-        DemoApp.#applyTransform(this.#orthographicCamera, activeCameraTransform);
+        DemoApp.#applyTransform(this.#perspectiveCamera  , activeCameraTransform);
+        DemoApp.#applyTransform(this.#orthographicCamera , activeCameraTransform);
 
         const webglContext              = this.#engine.webglRenderingContext;
         this.#sharedVertexColorMaterial = new GeraWebGL.Materials.VertexColorMaterial(webglContext);
@@ -825,6 +825,7 @@ class DemoApp {
 
         this.#cube = this.#createCubeForCurrentMode();
         this.#engine.scene.add(this.#cube);
+
         this.#bindUI();
         this.#updateWireframeButtonLabel();
         this.#updateRecreateButtonLabel();

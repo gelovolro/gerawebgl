@@ -368,7 +368,7 @@ export class Raycaster {
             throw new TypeError(ERROR_OPTION_SORT_TYPE);
         }
 
-        scene.updateWorldMatrix(null);
+        scene.updateWorldMatrix({ parentWorldMatrix: null });
 
         const viewMatrix                  = camera.getViewMatrix();
         const projectionMatrix            = camera.getProjectionMatrix();

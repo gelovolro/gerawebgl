@@ -1,9 +1,12 @@
-import { Matrix4 }      from '../math/matrix4.js';
-import { Object3D }     from '../scene/object3d.js';
-import { Mesh }         from '../scene/mesh.js';
-import { Scene }        from '../scene/scene.js';
-import { Camera }       from '../scene/camera.js';
-import { WebGLContext } from '../webgl-context.js';
+import { Matrix4 }                  from '../math/matrix4.js';
+import { Object3D }                 from '../scene/object3d.js';
+import { Mesh }                     from '../scene/mesh.js';
+import { Scene }                    from '../scene/scene.js';
+import { Camera }                   from '../scene/camera.js';
+import { WebGLContext }             from '../webgl-context.js';
+import { DirectionalLightMaterial } from '../material/directional-light-material.js';
+import { DirectionalLight }         from '../light/directional-light.js';
+import { AmbientLight }             from '../light/ambient-light.js';
 import {
     PRIMITIVE_TRIANGLES,
     PRIMITIVE_LINES,
@@ -37,7 +40,7 @@ const MATRIX_4x4_ELEMENT_COUNT = 16;
 const VECTOR3_ELEMENT_COUNT = 3;
 
 /**
- * Opacity value that is considered fully opaque.
+ * Opacity value, that is considered fully opaque.
  *
  * @type {number}
  */
@@ -51,7 +54,7 @@ const OPAQUE_OPACITY = 1.0;
 const MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT = 2;
 
 /**
- * `Material.apply()` parameter count when it expects: finalMatrix, worldMatrix, worldInverseTransposeMatrix.
+ * `Material.apply()` parameter count, when it expects: finalMatrix, worldMatrix, worldInverseTransposeMatrix.
  *
  * @type {number}
  */
@@ -73,15 +76,36 @@ const MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT = 4;
 const ERROR_UNKNOWN_PRIMITIVE = 'Renderer received an unknown geometry primitive.';
 
 /**
- * Canvas resize options for WebGLContext.resizeToDisplaySize().
+ * Stack empty length, used for traversal loops.
+ *
+ * @type {number}
+ */
+const STACK_EMPTY_LENGTH = 0;
+
+/**
+ * Start index for the loop iterations.
+ *
+ * @type {number}
+ */
+const LOOP_START_INDEX = 0;
+
+/**
+ * Loop increment step.
+ *
+ * @type {number}
+ */
+const LOOP_INCREMENT = 1;
+
+/**
+ * Canvas resize options for `WebGLContext.resizeToDisplaySize()`.
  *
  * @typedef {Object} ResizeToDisplaySizeOptions
- * @property {boolean} [fitToWindow] - If true, resizes canvas to match the window size.
+ * @property {boolean} [fitToWindow] - If true, resizes the canvas to match the window size.
  */
 
 /**
  * High-level renderer, that draws a scene from the perspective of a camera.
- * Keeps per-frame allocations minimal (reuse matrices, reuse traversal callback).
+ * Keeps per-frame allocations minimal (reuse the matrices, reuse the traversal callback).
  */
 export class Renderer {
 
@@ -167,6 +191,30 @@ export class Renderer {
     #traverseCallback;
 
     /**
+     * Reused stack for the light search traversal.
+     *
+     * @type {Object3D[]}
+     * @private
+     */
+    #lightSearchStack;
+
+    /**
+     * Cached active directional light for the current frame.
+     *
+     * @type {DirectionalLight | null}
+     * @private
+     */
+    #activeDirectionalLight = null;
+
+    /**
+     * Cached active ambient light for the current frame.
+     *
+     * @type {AmbientLight | null}
+     * @private
+     */
+    #activeAmbientLight = null;
+
+    /**
      * @param {WebGLContext} webglContext - Wrapper around the underlying WebGL2 rendering context.
      */
     constructor(webglContext) {
@@ -183,6 +231,7 @@ export class Renderer {
         this.#cameraPosition              = new Float32Array(VECTOR3_ELEMENT_COUNT);
         this.#frameViewProjectionMatrix   = this.#viewProjectionMatrix;
         this.#frameCameraPosition         = this.#cameraPosition;
+        this.#lightSearchStack            = [];
 
         // Allocate the traverse callback once (no per-frame function allocations):
         this.#traverseCallback = (x) => this.#renderVisitedObject(x);
@@ -226,7 +275,9 @@ export class Renderer {
         this.#cameraPosition[1]   = cameraPosition.y;
         this.#cameraPosition[2]   = cameraPosition.z;
         this.#frameCameraPosition = this.#cameraPosition;
-        scene.updateWorldMatrix(null);
+
+        scene.updateWorldMatrix({ parentWorldMatrix: null });
+        this.#findActiveLights(scene);
         scene.traverse(this.#traverseCallback);
     }
 
@@ -260,6 +311,17 @@ export class Renderer {
             this.#frameViewProjectionMatrix,
             worldMatrix
         );
+
+        if (material instanceof DirectionalLightMaterial) {
+            if (this.#activeDirectionalLight) {
+                material.setLightDirection(this.#activeDirectionalLight.getDirection());
+                material.setDirectionalStrength(this.#activeDirectionalLight.getStrength());
+            }
+
+            if (this.#activeAmbientLight) {
+                material.setAmbientStrength(this.#activeAmbientLight.getStrength());
+            }
+        }
 
         material.use();
         const materialOpacity = material.opacity;
@@ -301,12 +363,49 @@ export class Renderer {
         const primitive  = geometry.getPrimitive(isWireframeEnabled);
         const mode       = resolvePrimitiveMode(renderingContext, primitive);
         const indexCount = geometry.getIndexCount(isWireframeEnabled);
+
         renderingContext.drawElements(
             mode,
             indexCount,
             geometry.getIndexComponentType(isWireframeEnabled),
             INDEX_BUFFER_OFFSET_BYTES
         );
+    }
+
+    /**
+     * Finds the active lights for the current frame.
+     *
+     * @param {Scene} scene - Scene to search.
+     * @returns {void}
+     * @private
+     */
+    #findActiveLights(scene) {
+        this.#activeDirectionalLight = null;
+        this.#activeAmbientLight     = null;
+
+        const stack  = this.#lightSearchStack;
+        stack.length = STACK_EMPTY_LENGTH;
+        stack.push(scene);
+
+        while (stack.length > STACK_EMPTY_LENGTH && (this.#activeDirectionalLight === null || this.#activeAmbientLight === null)) {
+            const node = stack.pop();
+
+            if (this.#activeDirectionalLight === null
+                && node instanceof DirectionalLight
+                && node.isEnabled()) {
+                this.#activeDirectionalLight = node;
+            } else if (this.#activeAmbientLight === null
+                && node instanceof AmbientLight
+                && node.isEnabled()) {
+                this.#activeAmbientLight = node;
+            }
+
+            const children = node.children;
+
+            for (let index = LOOP_START_INDEX; index < children.length; index += LOOP_INCREMENT) {
+                stack.push(children[index]);
+            }
+        }
     }
 }
 

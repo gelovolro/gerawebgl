@@ -1,3 +1,5 @@
+import { MaterialNameNormalizer } from './material-name-normalizer.js';
+
 /**
  * Token, that starts a comment line in MTL files.
  *
@@ -104,6 +106,13 @@ const MTL_BUMP_MAP_TOKEN = 'bump';
 const MTL_BUMP_MAP_ALT_TOKEN = 'map_Bump';
 
 /**
+ * Additional lowercase MTL token for the bump map.
+ *
+ * @type {string}
+ */
+const MTL_BUMP_MAP_LOWER_TOKEN = 'map_bump';
+
+/**
  * MTL token for displacement map.
  *
  * @type {string}
@@ -160,11 +169,151 @@ const MTL_MAP_OPTION_CLAMP = '-clamp';
 const MTL_MAP_OPTION_BUMP_MULTIPLIER = '-bm';
 
 /**
- * Count of vector components for scale/offset map options.
+ * MTL map option for the U-blending.
+ *
+ * @type {string}
+ */
+const MTL_MAP_OPTION_BLENDU = '-blendu';
+
+/**
+ * MTL map option for the V-blending.
+ *
+ * @type {string}
+ */
+const MTL_MAP_OPTION_BLENDV = '-blendv';
+
+/**
+ * MTL map option for the image channel.
+ *
+ * @type {string}
+ */
+const MTL_MAP_OPTION_IMFCHAN = '-imfchan';
+
+/**
+ * MTL map option for base and gain.
+ *
+ * @type {string}
+ */
+const MTL_MAP_OPTION_MM = '-mm';
+
+/**
+ * MTL map option for the texture resolution.
+ *
+ * @type {string}
+ */
+const MTL_MAP_OPTION_TEXRES = '-texres';
+
+/**
+ * MTL map option for the texture type.
+ *
+ * @type {string}
+ */
+const MTL_MAP_OPTION_TYPE = '-type';
+
+/**
+ * Default offset for the texture map options.
+ *
+ * @type {Float32Array}
+ */
+const DEFAULT_MAP_OFFSET = new Float32Array([0.0, 0.0]);
+
+/**
+ * Default scale for the texture map options.
+ *
+ * @type {Float32Array}
+ */
+const DEFAULT_MAP_SCALE = new Float32Array([1.0, 1.0]);
+
+/**
+ * Default clamp flag for the texture maps.
+ *
+ * @type {boolean}
+ */
+const DEFAULT_MAP_CLAMP = false;
+
+/**
+ * Default bump multiplier value.
  *
  * @type {number}
  */
-const MTL_MAP_VECTOR_COMPONENTS = 3;
+const DEFAULT_BUMP_MULTIPLIER = 1.0;
+
+/**
+ * Token, representing the `on` value in map options.
+ *
+ * @type {string}
+ */
+const CLAMP_ON_TOKEN = 'on';
+
+/**
+ * Token, representing the `off` value in map options.
+ *
+ * @type {string}
+ */
+const CLAMP_OFF_TOKEN = 'off';
+
+/**
+ * Token for numeric value `1`.
+ *
+ * @type {string}
+ */
+const CLAMP_ON_NUMERIC_TOKEN = '1';
+
+/**
+ * Token for numeric value `0`.
+ *
+ * @type {string}
+ */
+const CLAMP_OFF_NUMERIC_TOKEN = '0';
+
+/**
+ * Count of vector components for scale/offset map options (UV only).
+ *
+ * @type {number}
+ */
+const MTL_MAP_UV_COMPONENTS = 2;
+
+/**
+ * Optional third component for scale/offset map options.
+ *
+ * @type {number}
+ */
+const MTL_MAP_OPTIONAL_VECTOR_COMPONENTS = 1;
+
+/**
+ * Count of components for the blend options.
+ *
+ * @type {number}
+ */
+const MTL_MAP_BLEND_COMPONENTS = 1;
+
+/**
+ * Count of components for the image channel option.
+ *
+ * @type {number}
+ */
+const MTL_MAP_IMFCHAN_COMPONENTS = 1;
+
+/**
+ * Count of components for the base/gain option.
+ *
+ * @type {number}
+ */
+const MTL_MAP_MM_COMPONENTS = 2;
+
+/**
+ * Count of components for the texture resolution option.
+ *
+ * @type {number}
+ */
+const MTL_MAP_TEXRES_COMPONENTS = 1;
+
+/**
+ * Count of components for the type option.
+ *
+ * @type {number}
+ */
+const MTL_MAP_TYPE_COMPONENTS = 1;
 
 /**
  * Count of scalar components for map options like `-clamp` and `-bm`.
@@ -174,7 +323,7 @@ const MTL_MAP_VECTOR_COMPONENTS = 3;
 const MTL_MAP_SCALAR_COMPONENTS = 1;
 
 /**
- * Number of components for RGB color.
+ * Number of components for the RGB-color.
  *
  * @type {number}
  */
@@ -251,6 +400,13 @@ const LINE_SPLIT_REGEX = /\s+/u;
 const LINE_BREAK_REGEX = /\r?\n/u;
 
 /**
+ * Regular expression for validating numeric map tokens.
+ *
+ * @type {RegExp}
+ */
+const MAP_FLOAT_TOKEN_REGEX = /^[+-]?(?:\d+\.?\d*|\d*\.?\d+)(?:[eE][+-]?\d+)?$/u;
+
+/**
  * Hyphen separator sign.
  *
  * @type {string}
@@ -323,35 +479,43 @@ const ERROR_MTL_TEXT_TYPE = '`MtlParser.parse` expects `mtlText` as a string.';
 /**
  * Parsed MTL material definition.
  *
- * NOTE: The following fields are parsed, but not applied yet by the material factory:
- * `ambientMap`, `specularMap`, `alphaMap`, `bumpMap`, `displacementMap`, `reflectionMap`, `opticalDensity`, `illuminationModel`.
- *
  * @typedef {Object} ParsedMtlMaterial
- * @property {string} name                     - Material name.
- * @property {Float32Array} diffuseColor       - Diffuse RGB color.
- * @property {Float32Array} ambientColor       - Ambient RGB color (parsed-only).
- * @property {Float32Array} specularColor      - Specular RGB color.
- * @property {Float32Array} emissiveColor      - Emissive RGB color (parsed-only).
- * @property {string | null} diffuseMap        - Diffuse texture path, if any.
- * @property {string | null} ambientMap        - Ambient texture path (parsed-only).
- * @property {string | null} specularMap       - Specular texture path (parsed-only).
- * @property {string | null} alphaMap          - Alpha texture path (parsed-only).
- * @property {string | null} bumpMap           - Bump texture path (parsed-only).
- * @property {string | null} displacementMap   - Displacement texture path (parsed-only).
- * @property {string | null} reflectionMap     - Reflection texture path (parsed-only).
- * @property {number | null} specularExponent  - Specular exponent (Ns).
- * @property {number | null} opticalDensity    - Optical density (parsed-only).
- * @property {number | null} illuminationModel - Illumination model (parsed-only).
- * @property {number} opacity                  - Opacity multiplier.
+ * @property {string} name                                - Material name.
+ * @property {Float32Array} diffuseColor                  - Diffuse RGB color.
+ * @property {Float32Array} ambientColor                  - Ambient RGB color (parsed-only).
+ * @property {Float32Array} specularColor                 - Specular RGB color.
+ * @property {Float32Array} emissiveColor                 - Emissive RGB color (parsed-only).
+ * @property {ParsedMtlTextureMap | null} diffuseMap      - Diffuse texture data, if any.
+ * @property {ParsedMtlTextureMap | null} ambientMap      - Ambient texture data (parsed-only).
+ * @property {ParsedMtlTextureMap | null} specularMap     - Specular texture data (parsed-only).
+ * @property {ParsedMtlTextureMap | null} alphaMap        - Alpha texture data (parsed-only).
+ * @property {ParsedMtlTextureMap | null} bumpMap         - Bump texture data (parsed-only).
+ * @property {ParsedMtlTextureMap | null} displacementMap - Displacement texture data (parsed-only).
+ * @property {ParsedMtlTextureMap | null} reflectionMap   - Reflection texture data (parsed-only).
+ * @property {number | null} specularExponent             - Specular exponent (Ns).
+ * @property {number | null} opticalDensity               - Optical density (parsed-only).
+ * @property {number | null} illuminationModel            - Illumination model (parsed-only).
+ * @property {number} opacity                             - Opacity multiplier.
  */
 
 /**
- * Parser for MTL material libraries.
+ * Parsed MTL texture map data.
+ *
+ * @typedef {Object} ParsedMtlTextureMap
+ * @property {string} path           - Texture path.
+ * @property {Float32Array} offset   - UV offset as `[u, v]`.
+ * @property {Float32Array} scale    - UV scale as `[u, v]`.
+ * @property {boolean} clamp         - True when clamping is enabled.
+ * @property {number} bumpMultiplier - Bump multiplier value.
+ */
+
+/**
+ * Parser for the MTL material libraries.
  */
 export class MtlParser {
 
     /**
-     * Parses MTL text into material definitions.
+     * Parses the MTL text into the material definitions.
      *
      * @param {string} mtlText                   - MTL file contents.
      * @returns {Map<string, ParsedMtlMaterial>} - Map of parsed materials keyed by the material name.
@@ -378,7 +542,8 @@ export class MtlParser {
 
             switch (keyword) {
                 case MTL_NEW_MATERIAL_TOKEN: {
-                    const name = parts.slice(SECOND_INDEX).join(SPACE_SEPARATOR);
+                    const rawName = parts.slice(SECOND_INDEX).join(SPACE_SEPARATOR);
+                    const name = rawName ? MaterialNameNormalizer.normalize(rawName) : EMPTY_STRING;
 
                     if (!name) {
                         currentMaterial = null;
@@ -481,8 +646,8 @@ export class MtlParser {
                         break;
                     }
 
-                    const mapPath = MtlParser.#parseMtlMapLine(trimmed);
-                    currentMaterial.diffuseMap = mapPath || null;
+                    const mapData = MtlParser.#parseMtlMapLine(trimmed);
+                    currentMaterial.diffuseMap = mapData;
                     break;
                 }
 
@@ -491,8 +656,8 @@ export class MtlParser {
                         break;
                     }
 
-                    const mapPath = MtlParser.#parseMtlMapLine(trimmed);
-                    currentMaterial.ambientMap = mapPath || null;
+                    const mapData = MtlParser.#parseMtlMapLine(trimmed);
+                    currentMaterial.ambientMap = mapData;
                     break;
                 }
 
@@ -501,8 +666,8 @@ export class MtlParser {
                         break;
                     }
 
-                    const mapPath = MtlParser.#parseMtlMapLine(trimmed);
-                    currentMaterial.specularMap = mapPath || null;
+                    const mapData = MtlParser.#parseMtlMapLine(trimmed);
+                    currentMaterial.specularMap = mapData;
                     break;
                 }
 
@@ -511,19 +676,20 @@ export class MtlParser {
                         break;
                     }
 
-                    const mapPath = MtlParser.#parseMtlMapLine(trimmed);
-                    currentMaterial.alphaMap = mapPath || null;
+                    const mapData = MtlParser.#parseMtlMapLine(trimmed);
+                    currentMaterial.alphaMap = mapData;
                     break;
                 }
 
                 case MTL_BUMP_MAP_TOKEN:
-                case MTL_BUMP_MAP_ALT_TOKEN: {
+                case MTL_BUMP_MAP_ALT_TOKEN:
+                case MTL_BUMP_MAP_LOWER_TOKEN: {
                     if (!currentMaterial) {
                         break;
                     }
 
-                    const mapPath = MtlParser.#parseMtlMapLine(trimmed);
-                    currentMaterial.bumpMap = mapPath || null;
+                    const mapData = MtlParser.#parseMtlMapLine(trimmed);
+                    currentMaterial.bumpMap = mapData;
                     break;
                 }
 
@@ -532,8 +698,8 @@ export class MtlParser {
                         break;
                     }
 
-                    const mapPath = MtlParser.#parseMtlMapLine(trimmed);
-                    currentMaterial.displacementMap = mapPath || null;
+                    const mapData = MtlParser.#parseMtlMapLine(trimmed);
+                    currentMaterial.displacementMap = mapData;
                     break;
                 }
 
@@ -542,8 +708,8 @@ export class MtlParser {
                         break;
                     }
 
-                    const mapPath = MtlParser.#parseMtlMapLine(trimmed);
-                    currentMaterial.reflectionMap = mapPath || null;
+                    const mapData = MtlParser.#parseMtlMapLine(trimmed);
+                    currentMaterial.reflectionMap = mapData;
                     break;
                 }
 
@@ -620,15 +786,15 @@ export class MtlParser {
     }
 
     /**
-     * Parses a texture map line and extracts a file path.
+     * Parses the texture map line and extracts the file path.
      *
-     * @param {string} line - Full `map_*` line.
-     * @returns {string}    - Extracted texture path from the `map_*` line, returns an empty string when not found.
+     * @param {string} line                  - Full `map_*` line.
+     * @returns {ParsedMtlTextureMap | null} - Parsed texture map data, or null when no path is found.
      * @private
      */
     static #parseMtlMapLine(line) {
         if (typeof line !== TYPEOF_STRING) {
-            return EMPTY_STRING;
+            return null;
         }
 
         let sanitized      = line;
@@ -641,16 +807,17 @@ export class MtlParser {
         sanitized = sanitized.trim();
 
         if (!sanitized) {
-            return EMPTY_STRING;
+            return null;
         }
 
         const tokens = MtlParser.#splitTokens(sanitized);
 
         if (tokens.length <= SECOND_INDEX) {
-            return EMPTY_STRING;
+            return null;
         }
 
-        let index = SECOND_INDEX;
+        const mapData = MtlParser.#createDefaultTextureMap();
+        let index     = SECOND_INDEX;
 
         while (index < tokens.length) {
             const token = tokens[index];
@@ -658,13 +825,42 @@ export class MtlParser {
             if (token.startsWith(HYPHEN_SEPARATOR)) {
                 switch (token) {
                     case MTL_MAP_OPTION_SCALE:
+                        index = MtlParser.#consumeMapVectorOption(mapData.scale, tokens, index, DEFAULT_MAP_SCALE);
+                        break;
+
                     case MTL_MAP_OPTION_OFFSET:
-                        index += MTL_MAP_VECTOR_COMPONENTS + SECOND_INDEX;
+                        index = MtlParser.#consumeMapVectorOption(mapData.offset, tokens, index, DEFAULT_MAP_OFFSET);
                         break;
 
                     case MTL_MAP_OPTION_CLAMP:
-                    case MTL_MAP_OPTION_BUMP_MULTIPLIER:
+                        mapData.clamp = MtlParser.#parseClampToken(tokens[index + SECOND_INDEX]);
                         index += MTL_MAP_SCALAR_COMPONENTS + SECOND_INDEX;
+                        break;
+
+                    case MTL_MAP_OPTION_BUMP_MULTIPLIER:
+                        mapData.bumpMultiplier = MtlParser.#parseFloatValue(tokens[index + SECOND_INDEX]) ?? DEFAULT_BUMP_MULTIPLIER;
+                        index += MTL_MAP_SCALAR_COMPONENTS + SECOND_INDEX;
+                        break;
+
+                    case MTL_MAP_OPTION_BLENDU:
+                    case MTL_MAP_OPTION_BLENDV:
+                        index += MTL_MAP_BLEND_COMPONENTS + SECOND_INDEX;
+                        break;
+
+                    case MTL_MAP_OPTION_IMFCHAN:
+                        index += MTL_MAP_IMFCHAN_COMPONENTS + SECOND_INDEX;
+                        break;
+
+                    case MTL_MAP_OPTION_MM:
+                        index += MTL_MAP_MM_COMPONENTS + SECOND_INDEX;
+                        break;
+
+                    case MTL_MAP_OPTION_TEXRES:
+                        index += MTL_MAP_TEXRES_COMPONENTS + SECOND_INDEX;
+                        break;
+
+                    case MTL_MAP_OPTION_TYPE:
+                        index += MTL_MAP_TYPE_COMPONENTS + SECOND_INDEX;
                         break;
 
                     default:
@@ -675,14 +871,22 @@ export class MtlParser {
                 continue;
             }
 
-            return tokens.slice(index).join(SPACE_SEPARATOR);
+            const rawPath = tokens.slice(index).join(SPACE_SEPARATOR);
+            const path    = MtlParser.#normalizeQuotedPath(rawPath);
+
+            if (!path) {
+                return null;
+            }
+
+            mapData.path = path;
+            return mapData;
         }
 
-        return EMPTY_STRING;
+        return null;
     }
 
     /**
-     * Splits a line into tokens, while respecting the quotes.
+     * Splits the line into tokens, while respecting the quotes.
      *
      * @param {string} line - Line to split.
      * @returns {string[]}  - Tokenized line parts with quotes preserved as a single token.
@@ -716,5 +920,140 @@ export class MtlParser {
         }
 
         return tokens;
+    }
+
+    /**
+     * Creates a default texture map definition.
+     *
+     * @returns {ParsedMtlTextureMap} - Parsed texture map object with defaults.
+     * @private
+     */
+    static #createDefaultTextureMap() {
+        return {
+            path           : EMPTY_STRING,
+            offset         : new Float32Array(DEFAULT_MAP_OFFSET),
+            scale          : new Float32Array(DEFAULT_MAP_SCALE),
+            clamp          : DEFAULT_MAP_CLAMP,
+            bumpMultiplier : DEFAULT_BUMP_MULTIPLIER
+        };
+    }
+
+    /**
+     * Applies the vector map option to the target array.
+     *
+     * @param {Float32Array} target   - Target vector array.
+     * @param {string[]} tokens       - Parsed tokens.
+     * @param {number} startIndex     - Index of the first component.
+     * @param {Float32Array} fallback - Fallback vector.
+     * @returns {void}
+     * @private
+     */
+    static #applyMapVector(target, tokens, startIndex, fallback) {
+        const x = MtlParser.#parseMapFloatToken(tokens[startIndex], fallback[FIRST_INDEX]);
+        const y = MtlParser.#parseMapFloatToken(tokens[startIndex + SECOND_INDEX], fallback[SECOND_INDEX]);
+        target[FIRST_INDEX]  = x;
+        target[SECOND_INDEX] = y;
+    }
+
+    /**
+     * Consumes map vector options (scale/offset), handling the optional third component.
+     *
+     * @param {Float32Array} target   - Target vector array.
+     * @param {string[]} tokens       - Parsed tokens.
+     * @param {number} optionIndex    - Index of the option token.
+     * @param {Float32Array} fallback - Fallback vector.
+     * @returns {number}              - Next index to continue parsing.
+     * @private
+     */
+    static #consumeMapVectorOption(target, tokens, optionIndex, fallback) {
+        const startIndex = optionIndex + SECOND_INDEX;
+        MtlParser.#applyMapVector(target, tokens, startIndex, fallback);
+
+        let nextIndex    = startIndex + MTL_MAP_UV_COMPONENTS;
+        const thirdToken = tokens[nextIndex];
+
+        if (MtlParser.#isNumericToken(thirdToken) && tokens.length > nextIndex + SECOND_INDEX) {
+            nextIndex += MTL_MAP_OPTIONAL_VECTOR_COMPONENTS;
+        }
+
+        return nextIndex;
+    }
+
+    /**
+     * Parses a float token for map options.
+     *
+     * @param {string} token    - Token value.
+     * @param {number} fallback - Fallback value.
+     * @returns {number}        - Parsed float value or fallback.
+     * @private
+     */
+    static #parseMapFloatToken(token, fallback) {
+        if (!MtlParser.#isNumericToken(token)) {
+            return fallback;
+        }
+
+        const parsed = Number.parseFloat(token);
+        return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
+    /**
+     * Checks if the token is a numeric value.
+     *
+     * @param {string} token - Token value.
+     * @returns {boolean}    - True when token is numeric.
+     * @private
+     */
+    static #isNumericToken(token) {
+        if (typeof token !== TYPEOF_STRING) {
+            return false;
+        }
+
+        return MAP_FLOAT_TOKEN_REGEX.test(token);
+    }
+
+    /**
+     * Parses clamp option token.
+     *
+     * @param {string} token - Clamp option token.
+     * @returns {boolean}    - True when clamp should be enabled.
+     * @private
+     */
+    static #parseClampToken(token) {
+        if (!token) {
+            return DEFAULT_MAP_CLAMP;
+        }
+
+        const normalized = token.toLowerCase();
+
+        if (normalized === CLAMP_ON_TOKEN || normalized === CLAMP_ON_NUMERIC_TOKEN) {
+            return true;
+        }
+
+        if (normalized === CLAMP_OFF_TOKEN || normalized === CLAMP_OFF_NUMERIC_TOKEN) {
+            return false;
+        }
+
+        return DEFAULT_MAP_CLAMP;
+    }
+
+    /**
+     * Normalizes a quoted path string.
+     *
+     * @param {string} path - Path token.
+     * @returns {string}    - Normalized path without the wrapping quotes.
+     * @private
+     */
+    static #normalizeQuotedPath(path) {
+        if (typeof path !== TYPEOF_STRING) {
+            return EMPTY_STRING;
+        }
+
+        let normalized = path.trim();
+
+        if (normalized.startsWith(QUOTE_TOKEN) && normalized.endsWith(QUOTE_TOKEN) && normalized.length > SECOND_INDEX) {
+            normalized = normalized.slice(SECOND_INDEX, normalized.length - SECOND_INDEX);
+        }
+
+        return normalized.trim();
     }
 }

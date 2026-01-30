@@ -2787,8 +2787,8 @@ var BoxGeometry = class _BoxGeometry extends Geometry {
         const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET;
         const bottomLeftVertexIndex = topLeftVertexIndex + uVertexCount;
         const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET;
-        indicesSolid.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
-        indicesSolid.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
+        indicesSolid.push(topLeftVertexIndex, topRightVertexIndex, bottomLeftVertexIndex);
+        indicesSolid.push(topRightVertexIndex, bottomRightVertexIndex, bottomLeftVertexIndex);
       }
     }
     return uVertexCount * vVertexCount;
@@ -6257,13 +6257,27 @@ var COLOR_UNIFORM_NAME2 = "u_color";
 var LIGHT_DIRECTION_UNIFORM_NAME = "u_lightDirection";
 var CAMERA_POSITION_UNIFORM_NAME = "u_cameraPosition";
 var AMBIENT_STRENGTH_UNIFORM_NAME = "u_ambientStrength";
+var DIRECTIONAL_STRENGTH_UNIFORM_NAME = "u_directionalStrength";
+var LIGHTING_ENABLED_UNIFORM_NAME = "u_lightingEnabled";
 var OPACITY_UNIFORM_NAME5 = "u_opacity";
 var VECTOR3_ELEMENT_COUNT = 3;
 var DEFAULT_COLOR2 = new Float32Array([0.85, 0.85, 0.85]);
 var DEFAULT_LIGHT_DIRECTION = new Float32Array([0.5, 0.7, 1]);
 var DEFAULT_AMBIENT_STRENGTH = 0.2;
+var DEFAULT_DIRECTIONAL_STRENGTH = 1;
+var DEFAULT_LIGHTING_ENABLED = 1;
 var MIN_DIRECTION_LENGTH_SQUARED = 0;
+var FLOAT_FALSE = 0;
+var FLOAT_TRUE = 1;
+var MIN_LIGHTING_ENABLED = 0;
+var MAX_LIGHTING_ENABLED = 1;
+var DIRECTIONAL_STRENGTH_DISABLED = 0;
+var LIGHTING_ENABLED_THRESHOLD = 0.5;
 var INVERSE_LENGTH_NUMERATOR = 1;
+var ERROR_LIGHTING_ENABLED_TYPE = "`DirectionalLightMaterial.setLightingEnabled` expects a boolean or a finite number.";
+var ERROR_LIGHTING_ENABLED_RANGE = "`DirectionalLightMaterial.setLightingEnabled` expects a value in [0..1].";
+var ERROR_DIRECTIONAL_STRENGTH_TYPE = "`DirectionalLightMaterial.setDirectionalStrength` expects a finite number.";
+var ERROR_DIRECTIONAL_ENABLED_TYPE = "`DirectionalLightMaterial.setDirectionalEnabled` expects a boolean.";
 var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material {
   /**
    * Diffuse/base color (RGB).
@@ -6287,9 +6301,23 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
    */
   #ambientStrength = DEFAULT_AMBIENT_STRENGTH;
   /**
+   * Directional strength multiplier.
+   *
+   * @type {number}
+   * @private
+   */
+  #directionalStrength = DEFAULT_DIRECTIONAL_STRENGTH;
+  /**
+   * Lighting enabled flag stored as a float.
+   *
+   * @type {number}
+   * @private
+   */
+  #lightingEnabled = DEFAULT_LIGHTING_ENABLED;
+  /**
    * Creates a new directional-light material.
    *
-   * @param {WebGL2RenderingContext} webglContext                   - WebGL2 rendering context used to create GPU resources.
+   * @param {WebGL2RenderingContext} webglContext                   - WebGL2 rendering context used to create the GPU resources.
    * @param {ShaderProgram} shaderProgram                           - Compiled shader program instance.
    * @param {DirectionalLightMaterialOptions} [options]             - Common material options.
    * @param {DirectionalLightMaterialBaseOptions} [materialOptions] - Material base options.
@@ -6311,7 +6339,14 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
     this.#color.set(DEFAULT_COLOR2);
     this.setLightDirection(DEFAULT_LIGHT_DIRECTION);
     this.#ambientStrength = DEFAULT_AMBIENT_STRENGTH;
-    const { color, lightDirection, ambientStrength } = options;
+    this.#directionalStrength = DEFAULT_DIRECTIONAL_STRENGTH;
+    const {
+      color,
+      lightDirection,
+      ambientStrength,
+      directionalStrength,
+      lightingEnabled
+    } = options;
     if (color !== void 0) {
       this.setColor(color);
     }
@@ -6320,6 +6355,12 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
     }
     if (ambientStrength !== void 0) {
       this.setAmbientStrength(ambientStrength);
+    }
+    if (directionalStrength !== void 0) {
+      this.setDirectionalStrength(directionalStrength);
+    }
+    if (lightingEnabled !== void 0) {
+      this.setLightingEnabled(lightingEnabled);
     }
   }
   /**
@@ -6342,6 +6383,8 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
     this.shaderProgram.setVector3(COLOR_UNIFORM_NAME2, this.#color);
     this.shaderProgram.setVector3(LIGHT_DIRECTION_UNIFORM_NAME, this.#lightDirection);
     this.shaderProgram.setFloat(AMBIENT_STRENGTH_UNIFORM_NAME, this.#ambientStrength);
+    this.shaderProgram.setFloat(DIRECTIONAL_STRENGTH_UNIFORM_NAME, this.#directionalStrength);
+    this.shaderProgram.setFloat(LIGHTING_ENABLED_UNIFORM_NAME, this.#lightingEnabled);
     this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME5, this.opacity);
     this.applyAdditionalUniforms(worldMatrix, cameraPosition);
   }
@@ -6399,26 +6442,87 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
     this.#ambientStrength = value;
   }
   /**
-   * Returns the internal diffuse/base color buffer.
+   * Sets directional strength multiplier.
    *
-   * @returns {Float32Array}
+   * @param {number} value - Directional strength multiplier.
+   * @returns {void}
+   * @throws {TypeError} When the value is invalid.
+   */
+  setDirectionalStrength(value) {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new TypeError(ERROR_DIRECTIONAL_STRENGTH_TYPE);
+    }
+    this.#directionalStrength = value;
+  }
+  /**
+   * Enables or disables the directional light contribution.
+   *
+   * @param {boolean} enabled - Whether directional lighting should be enabled.
+   * @returns {void}
+   * @throws {TypeError} When the value is invalid.
+   */
+  setDirectionalEnabled(enabled) {
+    if (typeof enabled !== "boolean") {
+      throw new TypeError(ERROR_DIRECTIONAL_ENABLED_TYPE);
+    }
+    this.#directionalStrength = enabled ? DEFAULT_DIRECTIONAL_STRENGTH : DIRECTIONAL_STRENGTH_DISABLED;
+  }
+  /**
+   * Sets lighting enabled state.
+   *
+   * @param {boolean | number} enabled - Boolean or a [0..1] numeric flag.
+   * @returns {void}
+   * @throws {TypeError}  When the value type is invalid.
+   * @throws {RangeError} When the value is outside [0..1].
+   */
+  setLightingEnabled(enabled) {
+    if (typeof enabled === "boolean") {
+      this.#lightingEnabled = enabled ? FLOAT_TRUE : FLOAT_FALSE;
+      return;
+    }
+    if (typeof enabled !== "number" || !Number.isFinite(enabled)) {
+      throw new TypeError(ERROR_LIGHTING_ENABLED_TYPE);
+    }
+    if (enabled < MIN_LIGHTING_ENABLED || enabled > MAX_LIGHTING_ENABLED) {
+      throw new RangeError(ERROR_LIGHTING_ENABLED_RANGE);
+    }
+    this.#lightingEnabled = enabled;
+  }
+  /**
+   * @returns {boolean} - Returns current lighting enabled state.
+   */
+  isLightingEnabled() {
+    return this.#lightingEnabled > LIGHTING_ENABLED_THRESHOLD;
+  }
+  /**
+   * @returns {Float32Array} - Returns the internal diffuse/base color buffer.
    */
   get color() {
     return this.#color;
   }
   /**
-   * Returns the internal normalized light direction buffer.
-   *
-   * @returns {Float32Array}
+   * @returns {Float32Array} - Returns the internal normalized light direction buffer.
    */
   get lightDirection() {
     return this.#lightDirection;
   }
   /**
-   * @returns {number} Ambient strength multiplier.
+   * @returns {number} - Ambient strength multiplier.
    */
   get ambientStrength() {
     return this.#ambientStrength;
+  }
+  /**
+   * @returns {number} - Returns the directional strength multiplier value.
+   */
+  getDirectionalStrength() {
+    return this.#directionalStrength;
+  }
+  /**
+   * @returns {number} - Gettet for the directional strength multiplier.
+   */
+  get directionalStrength() {
+    return this.#directionalStrength;
   }
   /**
    * Validates a vector3-like input.
@@ -6471,14 +6575,22 @@ in vec3 v_normal;
 uniform vec3  ${COLOR_UNIFORM_NAME2};
 uniform vec3  ${LIGHT_DIRECTION_UNIFORM_NAME};
 uniform float ${AMBIENT_STRENGTH_UNIFORM_NAME};
+uniform float ${DIRECTIONAL_STRENGTH_UNIFORM_NAME};
+uniform float ${LIGHTING_ENABLED_UNIFORM_NAME};
 uniform float ${OPACITY_UNIFORM_NAME5};
 out vec4 outColor;
 
 void main() {
-    vec3 surface_normal     = normalize(v_normal);
+    vec3 surface_normal = normalize(v_normal);
+
+    if (!gl_FrontFacing) {
+        surface_normal = -surface_normal;
+    }
+
     vec3 light_direction    = normalize(${LIGHT_DIRECTION_UNIFORM_NAME});
-    float diffuse_intensity = max(dot(surface_normal, light_direction), 0.0);
-    float light_intensity   = clamp(${AMBIENT_STRENGTH_UNIFORM_NAME} + diffuse_intensity, 0.0, 1.0);
+    float diffuse_intensity = max(dot(surface_normal, light_direction), 0.0) * ${DIRECTIONAL_STRENGTH_UNIFORM_NAME};
+    float lit_intensity     = clamp(${AMBIENT_STRENGTH_UNIFORM_NAME} + diffuse_intensity, 0.0, 1.0);
+    float light_intensity   = mix(1.0, lit_intensity, ${LIGHTING_ENABLED_UNIFORM_NAME});
     outColor                = vec4(${COLOR_UNIFORM_NAME2} * light_intensity, ${OPACITY_UNIFORM_NAME5});
 }
 `;
@@ -6530,16 +6642,24 @@ uniform vec3  ${SPECULAR_COLOR_UNIFORM_NAME};
 uniform vec3  ${LIGHT_DIRECTION_UNIFORM_NAME};
 uniform vec3  ${CAMERA_POSITION_UNIFORM_NAME};
 uniform float ${AMBIENT_STRENGTH_UNIFORM_NAME};
+uniform float ${DIRECTIONAL_STRENGTH_UNIFORM_NAME};
+uniform float ${LIGHTING_ENABLED_UNIFORM_NAME};
 uniform float ${SPECULAR_STRENGTH_UNIFORM_NAME};
 uniform float ${SHININESS_UNIFORM_NAME};
 uniform float ${OPACITY_UNIFORM_NAME5};
 out vec4 outColor;
 
 void main() {
-    vec3 surface_normal      = normalize(v_normal);
+    vec3 surface_normal = normalize(v_normal);
+
+    if (!gl_FrontFacing) {
+        surface_normal = -surface_normal;
+    }
+
     vec3 light_direction     = normalize(${LIGHT_DIRECTION_UNIFORM_NAME});
     vec3 view_direction      = normalize(${CAMERA_POSITION_UNIFORM_NAME} - v_worldPosition);
-    float diffuse_intensity  = max(dot(surface_normal, light_direction), 0.0);
+    float lighting_enabled   = ${LIGHTING_ENABLED_UNIFORM_NAME};
+    float diffuse_intensity  = max(dot(surface_normal, light_direction), 0.0) * ${DIRECTIONAL_STRENGTH_UNIFORM_NAME};
     float specular_intensity = 0.0;
 
     if (diffuse_intensity > 0.0) {
@@ -6549,8 +6669,11 @@ void main() {
     }
 
     vec3 ambient  = ${COLOR_UNIFORM_NAME2} * ${AMBIENT_STRENGTH_UNIFORM_NAME};
-    vec3 diffuse  = ${COLOR_UNIFORM_NAME2} * diffuse_intensity;
-    vec3 specular = ${SPECULAR_COLOR_UNIFORM_NAME} * (specular_intensity * ${SPECULAR_STRENGTH_UNIFORM_NAME});
+    vec3 diffuse  = ${COLOR_UNIFORM_NAME2} * (diffuse_intensity * lighting_enabled);
+    vec3 specular = ${SPECULAR_COLOR_UNIFORM_NAME}
+        * (specular_intensity * ${SPECULAR_STRENGTH_UNIFORM_NAME}
+        * ${DIRECTIONAL_STRENGTH_UNIFORM_NAME} * lighting_enabled);
+
     vec3 rgb = ambient + diffuse + specular;
     outColor = vec4(rgb, ${OPACITY_UNIFORM_NAME5});
 }
@@ -6580,7 +6703,7 @@ var PhongMaterial = class extends DirectionalLightMaterial {
   /**
    * Creates a new `PhongMaterial`.
    *
-   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to compile shaders.
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context, used to compile shaders.
    * @param {PhongMaterialOptions} [options]      - Material options.
    */
   constructor(webglContext, options = {}) {
@@ -6618,7 +6741,7 @@ var PhongMaterial = class extends DirectionalLightMaterial {
     this.shaderProgram.setFloat(SHININESS_UNIFORM_NAME, this.#shininess);
   }
   /**
-   * Sets the specular RGB color.
+   * Sets the specular RGB-color.
    *
    * @param {Float32Array | number[]} color - [red, green, blue] in [0..1] range.
    */
@@ -6688,8 +6811,8 @@ var DEFAULT_COLOR3 = new Float32Array([1, 1, 1]);
 var DEFAULT_POINT_SIZE = 6;
 var MIN_POINT_SIZE = 0;
 var DEFAULT_USE_VERTEX_COLORS = false;
-var FLOAT_FALSE = 0;
-var FLOAT_TRUE = 1;
+var FLOAT_FALSE2 = 0;
+var FLOAT_TRUE2 = 1;
 var POINT_COORD_CENTER = 0.5;
 var POINT_COORD_RADIUS = 0.5;
 var POSITION_W_COMPONENT = 1;
@@ -6780,7 +6903,7 @@ var PointsMaterial = class extends Material {
     this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME5, matrix4);
     this.shaderProgram.setVector3(COLOR_UNIFORM_NAME3, this.#color);
     this.shaderProgram.setFloat(POINT_SIZE_UNIFORM_NAME, this.#pointSize);
-    this.shaderProgram.setFloat(USE_VERTEX_COLOR_UNIFORM_NAME, this.#useVertexColors ? FLOAT_TRUE : FLOAT_FALSE);
+    this.shaderProgram.setFloat(USE_VERTEX_COLOR_UNIFORM_NAME, this.#useVertexColors ? FLOAT_TRUE2 : FLOAT_FALSE2);
     this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME6, this.opacity);
   }
   /**
@@ -6848,6 +6971,994 @@ var PointsMaterial = class extends Material {
   }
 };
 
+// core/material/mtl-standard-material.js
+var UV_ATTRIBUTE_LOCATION3 = 2;
+var TYPEOF_OBJECT = "object";
+var TYPEOF_BOOLEAN = "boolean";
+var TYPEOF_NUMBER = "number";
+var DIFFUSE_MAP_UNIFORM_NAME = "u_diffuseMap";
+var AMBIENT_MAP_UNIFORM_NAME = "u_ambientMap";
+var SPECULAR_MAP_UNIFORM_NAME = "u_specularMap";
+var ALPHA_MAP_UNIFORM_NAME = "u_alphaMap";
+var BUMP_MAP_UNIFORM_NAME = "u_bumpMap";
+var DISPLACEMENT_MAP_UNIFORM_NAME = "u_displacementMap";
+var REFLECTION_MAP_UNIFORM_NAME = "u_reflectionMap";
+var AMBIENT_COLOR_UNIFORM_NAME = "u_ambientColor";
+var SPECULAR_COLOR_UNIFORM_NAME2 = "u_specularColor";
+var EMISSIVE_COLOR_UNIFORM_NAME = "u_emissiveColor";
+var SPECULAR_STRENGTH_UNIFORM_NAME2 = "u_specularStrength";
+var SHININESS_UNIFORM_NAME2 = "u_shininess";
+var SPECULAR_ENABLED_UNIFORM_NAME = "u_useSpecular";
+var OPTICAL_DENSITY_UNIFORM_NAME = "u_opticalDensity";
+var BUMP_MULTIPLIER_UNIFORM_NAME = "u_bumpMultiplier";
+var DISPLACEMENT_SCALE_UNIFORM_NAME = "u_displacementScale";
+var DIFFUSE_UV_OFFSET_UNIFORM_NAME = "u_diffuseUvOffset";
+var DIFFUSE_UV_SCALE_UNIFORM_NAME = "u_diffuseUvScale";
+var AMBIENT_UV_OFFSET_UNIFORM_NAME = "u_ambientUvOffset";
+var AMBIENT_UV_SCALE_UNIFORM_NAME = "u_ambientUvScale";
+var SPECULAR_UV_OFFSET_UNIFORM_NAME = "u_specularUvOffset";
+var SPECULAR_UV_SCALE_UNIFORM_NAME = "u_specularUvScale";
+var ALPHA_UV_OFFSET_UNIFORM_NAME = "u_alphaUvOffset";
+var ALPHA_UV_SCALE_UNIFORM_NAME = "u_alphaUvScale";
+var BUMP_UV_OFFSET_UNIFORM_NAME = "u_bumpUvOffset";
+var BUMP_UV_SCALE_UNIFORM_NAME = "u_bumpUvScale";
+var DISPLACEMENT_UV_OFFSET_UNIFORM_NAME = "u_displacementUvOffset";
+var DISPLACEMENT_UV_SCALE_UNIFORM_NAME = "u_displacementUvScale";
+var REFLECTION_UV_OFFSET_UNIFORM_NAME = "u_reflectionUvOffset";
+var REFLECTION_UV_SCALE_UNIFORM_NAME = "u_reflectionUvScale";
+var USE_DIFFUSE_MAP_UNIFORM_NAME = "u_useDiffuseMap";
+var USE_AMBIENT_MAP_UNIFORM_NAME = "u_useAmbientMap";
+var USE_SPECULAR_MAP_UNIFORM_NAME = "u_useSpecularMap";
+var USE_ALPHA_MAP_UNIFORM_NAME = "u_useAlphaMap";
+var USE_BUMP_MAP_UNIFORM_NAME = "u_useBumpMap";
+var USE_DISPLACEMENT_MAP_UNIFORM_NAME = "u_useDisplacementMap";
+var USE_REFLECTION_MAP_UNIFORM_NAME = "u_useReflectionMap";
+var LIGHTING_ENABLED_THRESHOLD2 = 0.5;
+var DEFAULT_DIFFUSE_COLOR = new Float32Array([1, 1, 1]);
+var DEFAULT_AMBIENT_COLOR = new Float32Array([1, 1, 1]);
+var DEFAULT_SPECULAR_COLOR2 = new Float32Array([1, 1, 1]);
+var DEFAULT_EMISSIVE_COLOR = new Float32Array([0, 0, 0]);
+var DEFAULT_SHININESS2 = 16;
+var DEFAULT_SPECULAR_STRENGTH2 = 1;
+var DEFAULT_OPTICAL_DENSITY = 1;
+var DEFAULT_BUMP_MULTIPLIER = 1;
+var DEFAULT_DISPLACEMENT_SCALE = 0.1;
+var DEFAULT_UV_OFFSET = new Float32Array([0, 0]);
+var DEFAULT_UV_SCALE = new Float32Array([1, 1]);
+var FLOAT_FALSE3 = 0;
+var FLOAT_TRUE3 = 1;
+var DEFAULT_DIFFUSE_TEXTURE_UNIT = 0;
+var DEFAULT_AMBIENT_TEXTURE_UNIT = 1;
+var DEFAULT_SPECULAR_TEXTURE_UNIT = 2;
+var DEFAULT_ALPHA_TEXTURE_UNIT = 3;
+var DEFAULT_BUMP_TEXTURE_UNIT = 4;
+var DEFAULT_DISPLACEMENT_TEXTURE_UNIT = 5;
+var DEFAULT_REFLECTION_TEXTURE_UNIT = 6;
+var ZERO_VALUE10 = 0;
+var ERROR_OPTIONS_OBJECT = "`MtlStandardMaterial` expects an options object (plain object).";
+var ERROR_SHININESS_TYPE = "`MtlStandardMaterial.setShininess` expects a finite number.";
+var ERROR_SPECULAR_STRENGTH_TYPE = "`MtlStandardMaterial.setSpecularStrength` expects a finite number.";
+var ERROR_SPECULAR_ENABLED_TYPE = "`MtlStandardMaterial.setSpecularEnabled` expects a boolean.";
+var ERROR_OPTICAL_DENSITY_TYPE = "`MtlStandardMaterial.setOpticalDensity` expects a finite number.";
+var ERROR_BUMP_MULTIPLIER_TYPE = "`MtlStandardMaterial.setBumpMultiplier` expects a finite number.";
+var ERROR_DISPLACEMENT_SCALE_TYPE = "`MtlStandardMaterial.setDisplacementScale` expects a finite number.";
+var ERROR_EXPECTS_TEXTURE_SUFFIX = " expects texture as Texture2D.";
+var ERROR_EXPECTS_OPTIONS_OBJECT_SUFFIX = " expects options as a plain object.";
+var ERROR_EXPECTS_TEXTURE_UNIT_INDEX_SUFFIX = " expects options.textureUnitIndex as a non-negative integer.";
+var ERROR_EXPECTS_VECTOR2_TYPE_SUFFIX = " expects a number[] or Float32Array.";
+var ERROR_EXPECTS_VECTOR2_COMPONENTS_SUFFIX = " expects exactly 2 components.";
+var ERROR_EXPECTS_VECTOR3_COMPONENTS_SUFFIX = " expects exactly 3 components.";
+var VERTEX_SHADER_SOURCE8 = `#version 300 es
+precision mediump float;
+layout(location = ${POSITION_ATTRIBUTE_LOCATION6}) in vec3 a_position;
+layout(location = ${NORMAL_ATTRIBUTE_LOCATION3}) in vec3 a_normal;
+layout(location = ${UV_ATTRIBUTE_LOCATION3}) in vec2 a_uv;
+uniform mat4 ${FINAL_MATRIX_UNIFORM_NAME};
+uniform mat4 ${WORLD_MATRIX_UNIFORM_NAME};
+uniform mat4 ${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME};
+uniform sampler2D ${DISPLACEMENT_MAP_UNIFORM_NAME};
+uniform float ${USE_DISPLACEMENT_MAP_UNIFORM_NAME};
+uniform float ${DISPLACEMENT_SCALE_UNIFORM_NAME};
+uniform vec2 ${DISPLACEMENT_UV_OFFSET_UNIFORM_NAME};
+uniform vec2 ${DISPLACEMENT_UV_SCALE_UNIFORM_NAME};
+out vec3 v_worldPosition;
+out vec3 v_normal;
+out vec2 v_uv;
+
+void main() {
+    vec2 disp_uv = (a_uv * ${DISPLACEMENT_UV_SCALE_UNIFORM_NAME}) + ${DISPLACEMENT_UV_OFFSET_UNIFORM_NAME};
+    float displacement = 0.0;
+
+    if (${USE_DISPLACEMENT_MAP_UNIFORM_NAME} > 0.5) {
+        displacement = texture(${DISPLACEMENT_MAP_UNIFORM_NAME}, disp_uv).r * ${DISPLACEMENT_SCALE_UNIFORM_NAME};
+    }
+
+    vec3 displaced_position = a_position + (a_normal * displacement);
+    gl_Position = ${FINAL_MATRIX_UNIFORM_NAME} * vec4(displaced_position, 1.0);
+    v_worldPosition = (${WORLD_MATRIX_UNIFORM_NAME} * vec4(displaced_position, 1.0)).xyz;
+    v_normal = (${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME} * vec4(a_normal, 0.0)).xyz;
+    v_uv = a_uv;
+}
+`;
+var FRAGMENT_SHADER_SOURCE8 = `#version 300 es
+precision mediump float;
+in vec3 v_worldPosition;
+in vec3 v_normal;
+in vec2 v_uv;
+uniform vec3 ${COLOR_UNIFORM_NAME2};
+uniform vec3 ${AMBIENT_COLOR_UNIFORM_NAME};
+uniform vec3 ${SPECULAR_COLOR_UNIFORM_NAME2};
+uniform vec3 ${EMISSIVE_COLOR_UNIFORM_NAME};
+uniform vec3 ${LIGHT_DIRECTION_UNIFORM_NAME};
+uniform vec3 ${CAMERA_POSITION_UNIFORM_NAME};
+uniform float ${AMBIENT_STRENGTH_UNIFORM_NAME};
+uniform float ${DIRECTIONAL_STRENGTH_UNIFORM_NAME};
+uniform float ${LIGHTING_ENABLED_UNIFORM_NAME};
+uniform float ${SPECULAR_STRENGTH_UNIFORM_NAME2};
+uniform float ${SHININESS_UNIFORM_NAME2};
+uniform float ${SPECULAR_ENABLED_UNIFORM_NAME};
+uniform float ${OPACITY_UNIFORM_NAME5};
+uniform float ${OPTICAL_DENSITY_UNIFORM_NAME};
+uniform float ${BUMP_MULTIPLIER_UNIFORM_NAME};
+uniform sampler2D ${DIFFUSE_MAP_UNIFORM_NAME};
+uniform sampler2D ${AMBIENT_MAP_UNIFORM_NAME};
+uniform sampler2D ${SPECULAR_MAP_UNIFORM_NAME};
+uniform sampler2D ${ALPHA_MAP_UNIFORM_NAME};
+uniform sampler2D ${BUMP_MAP_UNIFORM_NAME};
+uniform sampler2D ${REFLECTION_MAP_UNIFORM_NAME};
+uniform vec2 ${DIFFUSE_UV_OFFSET_UNIFORM_NAME};
+uniform vec2 ${DIFFUSE_UV_SCALE_UNIFORM_NAME};
+uniform vec2 ${AMBIENT_UV_OFFSET_UNIFORM_NAME};
+uniform vec2 ${AMBIENT_UV_SCALE_UNIFORM_NAME};
+uniform vec2 ${SPECULAR_UV_OFFSET_UNIFORM_NAME};
+uniform vec2 ${SPECULAR_UV_SCALE_UNIFORM_NAME};
+uniform vec2 ${ALPHA_UV_OFFSET_UNIFORM_NAME};
+uniform vec2 ${ALPHA_UV_SCALE_UNIFORM_NAME};
+uniform vec2 ${BUMP_UV_OFFSET_UNIFORM_NAME};
+uniform vec2 ${BUMP_UV_SCALE_UNIFORM_NAME};
+uniform vec2 ${REFLECTION_UV_OFFSET_UNIFORM_NAME};
+uniform vec2 ${REFLECTION_UV_SCALE_UNIFORM_NAME};
+uniform float ${USE_DIFFUSE_MAP_UNIFORM_NAME};
+uniform float ${USE_AMBIENT_MAP_UNIFORM_NAME};
+uniform float ${USE_SPECULAR_MAP_UNIFORM_NAME};
+uniform float ${USE_ALPHA_MAP_UNIFORM_NAME};
+uniform float ${USE_BUMP_MAP_UNIFORM_NAME};
+uniform float ${USE_REFLECTION_MAP_UNIFORM_NAME};
+out vec4 outColor;
+
+vec2 apply_uv(vec2 base_uv, vec2 offset, vec2 scale) {
+    return (base_uv * scale) + offset;
+}
+
+vec3 compute_bump_normal(vec3 normal, vec2 uv) {
+    vec3 tangent_normal = texture(${BUMP_MAP_UNIFORM_NAME}, uv).xyz * 2.0 - 1.0;
+    tangent_normal.xy *= ${BUMP_MULTIPLIER_UNIFORM_NAME};
+    tangent_normal = normalize(tangent_normal);
+
+    vec3 dp1 = dFdx(v_worldPosition);
+    vec3 dp2 = dFdy(v_worldPosition);
+    vec2 duv1 = dFdx(uv);
+    vec2 duv2 = dFdy(uv);
+    vec3 tangent = normalize(dp1 * duv2.y - dp2 * duv1.y);
+    vec3 bitangent = normalize(-dp1 * duv2.x + dp2 * duv1.x);
+    mat3 tbn = mat3(tangent, bitangent, normal);
+    return normalize(tbn * tangent_normal);
+}
+
+vec2 compute_reflection_uv(vec3 normal, vec3 view_dir) {
+    vec3 reflect_dir = reflect(-view_dir, normal);
+    float m = 2.0 * sqrt(reflect_dir.x * reflect_dir.x
+        + reflect_dir.y * reflect_dir.y
+        + (reflect_dir.z + 1.0) * (reflect_dir.z + 1.0));
+    return (reflect_dir.xy / m) + vec2(0.5, 0.5);
+}
+
+void main() {
+    vec3 diffuse_color = ${COLOR_UNIFORM_NAME2};
+    vec3 diffuse_map_color = vec3(1.0);
+    if (${USE_DIFFUSE_MAP_UNIFORM_NAME} > 0.5) {
+        vec2 diff_uv = apply_uv(v_uv, ${DIFFUSE_UV_OFFSET_UNIFORM_NAME}, ${DIFFUSE_UV_SCALE_UNIFORM_NAME});
+        diffuse_map_color = texture(${DIFFUSE_MAP_UNIFORM_NAME}, diff_uv).rgb;
+        diffuse_color *= diffuse_map_color;
+    }
+
+    float alpha = ${OPACITY_UNIFORM_NAME5};
+    if (${USE_ALPHA_MAP_UNIFORM_NAME} > 0.5) {
+        vec2 alpha_uv = apply_uv(v_uv, ${ALPHA_UV_OFFSET_UNIFORM_NAME}, ${ALPHA_UV_SCALE_UNIFORM_NAME});
+        alpha *= texture(${ALPHA_MAP_UNIFORM_NAME}, alpha_uv).r;
+    }
+
+    if (${LIGHTING_ENABLED_UNIFORM_NAME} <= ${LIGHTING_ENABLED_THRESHOLD2}) {
+        vec3 unlit_color = diffuse_color;
+        if (${USE_DIFFUSE_MAP_UNIFORM_NAME} > 0.5) {
+            unlit_color = diffuse_map_color;
+        }
+        vec3 rgb = unlit_color + ${EMISSIVE_COLOR_UNIFORM_NAME};
+        outColor = vec4(rgb, alpha);
+        return;
+    }
+
+    vec3 normal = normalize(v_normal);
+    vec3 view_dir = normalize(${CAMERA_POSITION_UNIFORM_NAME} - v_worldPosition);
+
+    if (${USE_BUMP_MAP_UNIFORM_NAME} > 0.5) {
+        vec2 bump_uv = apply_uv(v_uv, ${BUMP_UV_OFFSET_UNIFORM_NAME}, ${BUMP_UV_SCALE_UNIFORM_NAME});
+        normal = compute_bump_normal(normal, bump_uv);
+    }
+
+    if (!gl_FrontFacing) {
+        normal = -normal;
+    }
+
+    vec3 ambient_tint = ${AMBIENT_COLOR_UNIFORM_NAME};
+    if (${USE_AMBIENT_MAP_UNIFORM_NAME} > 0.5) {
+        vec2 amb_uv = apply_uv(v_uv, ${AMBIENT_UV_OFFSET_UNIFORM_NAME}, ${AMBIENT_UV_SCALE_UNIFORM_NAME});
+        ambient_tint *= texture(${AMBIENT_MAP_UNIFORM_NAME}, amb_uv).rgb;
+    }
+
+    vec3 specular_color = ${SPECULAR_COLOR_UNIFORM_NAME2};
+    if (${USE_SPECULAR_MAP_UNIFORM_NAME} > 0.5) {
+        vec2 spec_uv = apply_uv(v_uv, ${SPECULAR_UV_OFFSET_UNIFORM_NAME}, ${SPECULAR_UV_SCALE_UNIFORM_NAME});
+        specular_color *= texture(${SPECULAR_MAP_UNIFORM_NAME}, spec_uv).rgb;
+    }
+
+    vec3 light_direction = normalize(${LIGHT_DIRECTION_UNIFORM_NAME});
+    float diffuse_intensity = max(dot(normal, light_direction), 0.0);
+    vec3 ambient = diffuse_color * ambient_tint * ${AMBIENT_STRENGTH_UNIFORM_NAME};
+    vec3 diffuse = diffuse_color * (diffuse_intensity * ${DIRECTIONAL_STRENGTH_UNIFORM_NAME});
+
+    float specular_intensity = 0.0;
+    if (${SPECULAR_ENABLED_UNIFORM_NAME} > 0.5 && diffuse_intensity > 0.0) {
+        vec3 reflection_direction = reflect(-light_direction, normal);
+        float specular_base = max(dot(view_dir, reflection_direction), 0.0);
+        specular_intensity = pow(specular_base, ${SHININESS_UNIFORM_NAME2});
+    }
+
+    vec3 specular = specular_color * (specular_intensity * ${SPECULAR_STRENGTH_UNIFORM_NAME2}
+        * ${DIRECTIONAL_STRENGTH_UNIFORM_NAME});
+    vec3 emissive = ${EMISSIVE_COLOR_UNIFORM_NAME};
+    vec3 rgb = ambient + diffuse + specular + emissive;
+
+    if (${USE_REFLECTION_MAP_UNIFORM_NAME} > 0.5) {
+        vec2 refl_uv = compute_reflection_uv(normal, view_dir);
+        vec2 refl_uv_scaled = apply_uv(refl_uv, ${REFLECTION_UV_OFFSET_UNIFORM_NAME}, ${REFLECTION_UV_SCALE_UNIFORM_NAME});
+        vec3 refl_color = texture(${REFLECTION_MAP_UNIFORM_NAME}, refl_uv_scaled).rgb;
+        float refl_strength = clamp(${OPTICAL_DENSITY_UNIFORM_NAME} - 1.0, 0.0, 1.0);
+        rgb = mix(rgb, refl_color, refl_strength);
+    }
+
+    outColor = vec4(rgb, alpha);
+}
+`;
+var MtlStandardMaterial = class _MtlStandardMaterial extends DirectionalLightMaterial {
+  /**
+   * Fallback texture used, when a map is not assigned.
+   *
+   * @type {Texture2D}
+   * @private
+   */
+  #fallbackTexture;
+  /**
+   * Diffuse texture.
+   *
+   * @type {Texture2D}
+   * @private
+   */
+  #diffuseTexture;
+  /**
+   * Ambient texture.
+   *
+   * @type {Texture2D}
+   * @private
+   */
+  #ambientTexture;
+  /**
+   * Specular texture.
+   *
+   * @type {Texture2D}
+   * @private
+   */
+  #specularTexture;
+  /**
+   * Alpha texture.
+   *
+   * @type {Texture2D}
+   * @private
+   */
+  #alphaTexture;
+  /**
+   * Bump texture.
+   *
+   * @type {Texture2D}
+   * @private
+   */
+  #bumpTexture;
+  /**
+   * Displacement texture.
+   *
+   * @type {Texture2D}
+   * @private
+   */
+  #displacementTexture;
+  /**
+   * Reflection texture.
+   *
+   * @type {Texture2D}
+   * @private
+   */
+  #reflectionTexture;
+  /**
+   * Diffuse texture unit index.
+   *
+   * @type {number}
+   * @private
+   */
+  #diffuseTextureUnit = DEFAULT_DIFFUSE_TEXTURE_UNIT;
+  /**
+   * Ambient texture unit index.
+   *
+   * @type {number}
+   * @private
+   */
+  #ambientTextureUnit = DEFAULT_AMBIENT_TEXTURE_UNIT;
+  /**
+   * Specular texture unit index.
+   *
+   * @type {number}
+   * @private
+   */
+  #specularTextureUnit = DEFAULT_SPECULAR_TEXTURE_UNIT;
+  /**
+   * Alpha texture unit index.
+   *
+   * @type {number}
+   * @private
+   */
+  #alphaTextureUnit = DEFAULT_ALPHA_TEXTURE_UNIT;
+  /**
+   * Bump texture unit index.
+   *
+   * @type {number}
+   * @private
+   */
+  #bumpTextureUnit = DEFAULT_BUMP_TEXTURE_UNIT;
+  /**
+   * Displacement texture unit index.
+   *
+   * @type {number}
+   * @private
+   */
+  #displacementTextureUnit = DEFAULT_DISPLACEMENT_TEXTURE_UNIT;
+  /**
+   * Reflection texture unit index.
+   *
+   * @type {number}
+   * @private
+   */
+  #reflectionTextureUnit = DEFAULT_REFLECTION_TEXTURE_UNIT;
+  /**
+   * Ambient color.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #ambientColor = new Float32Array(DEFAULT_AMBIENT_COLOR);
+  /**
+   * Specular color.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #specularColor = new Float32Array(DEFAULT_SPECULAR_COLOR2);
+  /**
+   * Emissive color.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #emissiveColor = new Float32Array(DEFAULT_EMISSIVE_COLOR);
+  /**
+   * Shininess exponent.
+   *
+   * @type {number}
+   * @private
+   */
+  #shininess = DEFAULT_SHININESS2;
+  /**
+   * Specular strength multiplier.
+   *
+   * @type {number}
+   * @private
+   */
+  #specularStrength = DEFAULT_SPECULAR_STRENGTH2;
+  /**
+   * Optical density value.
+   *
+   * @type {number}
+   * @private
+   */
+  #opticalDensity = DEFAULT_OPTICAL_DENSITY;
+  /**
+   * Bump multiplier.
+   *
+   * @type {number}
+   * @private
+   */
+  #bumpMultiplier = DEFAULT_BUMP_MULTIPLIER;
+  /**
+   * Displacement scale factor.
+   *
+   * @type {number}
+   * @private
+   */
+  #displacementScale = DEFAULT_DISPLACEMENT_SCALE;
+  /**
+   * Flag, controlling the specular lighting.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #specularEnabled = true;
+  /**
+   * Diffuse UV-offset.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #diffuseUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
+  /**
+   * Diffuse UV-scale.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #diffuseUvScale = new Float32Array(DEFAULT_UV_SCALE);
+  /**
+   * Ambient UV-offset.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #ambientUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
+  /**
+   * Ambient UV-scale.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #ambientUvScale = new Float32Array(DEFAULT_UV_SCALE);
+  /**
+   * Specular UV-offset.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #specularUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
+  /**
+   * Specular UV-scale.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #specularUvScale = new Float32Array(DEFAULT_UV_SCALE);
+  /**
+   * Alpha UV-offset.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #alphaUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
+  /**
+   * Alpha UV-scale.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #alphaUvScale = new Float32Array(DEFAULT_UV_SCALE);
+  /**
+   * Bump UV-offset.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #bumpUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
+  /**
+   * Bump UV-scale.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #bumpUvScale = new Float32Array(DEFAULT_UV_SCALE);
+  /**
+   * Displacement UV-offset.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #displacementUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
+  /**
+   * Displacement UV-scale.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #displacementUvScale = new Float32Array(DEFAULT_UV_SCALE);
+  /**
+   * Reflection UV-offset.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #reflectionUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
+  /**
+   * Reflection UV-scale.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #reflectionUvScale = new Float32Array(DEFAULT_UV_SCALE);
+  /**
+   * Flag, indicating the diffuse map usage.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #useDiffuseMap = false;
+  /**
+   * Flag, indicating the ambient map usage.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #useAmbientMap = false;
+  /**
+   * Flag, indicating the specular map usage.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #useSpecularMap = false;
+  /**
+   * Flag, indicating the alpha map usage.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #useAlphaMap = false;
+  /**
+   * Flag, indicating the bump map usage.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #useBumpMap = false;
+  /**
+   * Flag, indicating the displacement map usage.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #useDisplacementMap = false;
+  /**
+   * Flag, indicating the reflection map usage.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #useReflectionMap = false;
+  /**
+   * Creates a new MTL standard material.
+   *
+   * @param {WebGL2RenderingContext} webglContext  - WebGL2 rendering context, used to compile the shaders.
+   * @param {MtlStandardMaterialOptions} [options] - Material options.
+   */
+  constructor(webglContext, options = {}) {
+    if (options === null || typeof options !== TYPEOF_OBJECT || Array.isArray(options)) {
+      throw new TypeError(ERROR_OPTIONS_OBJECT);
+    }
+    const {
+      diffuseColor,
+      ambientColor,
+      specularColor,
+      emissiveColor,
+      lightDirection,
+      ambientStrength,
+      shininess,
+      specularStrength,
+      opticalDensity
+    } = options;
+    super(
+      webglContext,
+      new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE8, FRAGMENT_SHADER_SOURCE8),
+      {
+        color: diffuseColor || DEFAULT_DIFFUSE_COLOR,
+        lightDirection,
+        ambientStrength
+      },
+      { ownsShaderProgram: true }
+    );
+    this.#fallbackTexture = new Texture2D(webglContext);
+    this.#diffuseTexture = this.#fallbackTexture;
+    this.#ambientTexture = this.#fallbackTexture;
+    this.#specularTexture = this.#fallbackTexture;
+    this.#alphaTexture = this.#fallbackTexture;
+    this.#bumpTexture = this.#fallbackTexture;
+    this.#displacementTexture = this.#fallbackTexture;
+    this.#reflectionTexture = this.#fallbackTexture;
+    this.setAmbientColor(ambientColor || DEFAULT_AMBIENT_COLOR);
+    this.setSpecularColor(specularColor || DEFAULT_SPECULAR_COLOR2);
+    this.setEmissiveColor(emissiveColor || DEFAULT_EMISSIVE_COLOR);
+    if (shininess !== void 0) {
+      this.setShininess(shininess);
+    }
+    if (specularStrength !== void 0) {
+      this.setSpecularStrength(specularStrength);
+    }
+    if (opticalDensity !== void 0) {
+      this.setOpticalDensity(opticalDensity);
+    }
+  }
+  /**
+   * Uploads per-object uniforms specific to the standard material.
+   *
+   * @param {Float32Array} worldMatrix    - World matrix.
+   * @param {Float32Array} cameraPosition - Camera position.
+   * @protected
+   */
+  applyAdditionalUniforms(worldMatrix, cameraPosition) {
+    this.shaderProgram.setMatrix4(WORLD_MATRIX_UNIFORM_NAME, worldMatrix);
+    this.shaderProgram.setVector3(CAMERA_POSITION_UNIFORM_NAME, cameraPosition);
+    this.shaderProgram.setVector3(AMBIENT_COLOR_UNIFORM_NAME, this.#ambientColor);
+    this.shaderProgram.setVector3(SPECULAR_COLOR_UNIFORM_NAME2, this.#specularColor);
+    this.shaderProgram.setVector3(EMISSIVE_COLOR_UNIFORM_NAME, this.#emissiveColor);
+    this.shaderProgram.setFloat(SPECULAR_STRENGTH_UNIFORM_NAME2, this.#specularStrength);
+    this.shaderProgram.setFloat(SHININESS_UNIFORM_NAME2, this.#shininess);
+    this.shaderProgram.setFloat(SPECULAR_ENABLED_UNIFORM_NAME, this.#specularEnabled ? FLOAT_TRUE3 : FLOAT_FALSE3);
+    this.shaderProgram.setFloat(OPTICAL_DENSITY_UNIFORM_NAME, this.#opticalDensity);
+    this.shaderProgram.setFloat(BUMP_MULTIPLIER_UNIFORM_NAME, this.#bumpMultiplier);
+    this.shaderProgram.setFloat(DISPLACEMENT_SCALE_UNIFORM_NAME, this.#displacementScale);
+    this.shaderProgram.setVector2(DIFFUSE_UV_OFFSET_UNIFORM_NAME, this.#diffuseUvOffset);
+    this.shaderProgram.setVector2(DIFFUSE_UV_SCALE_UNIFORM_NAME, this.#diffuseUvScale);
+    this.shaderProgram.setVector2(AMBIENT_UV_OFFSET_UNIFORM_NAME, this.#ambientUvOffset);
+    this.shaderProgram.setVector2(AMBIENT_UV_SCALE_UNIFORM_NAME, this.#ambientUvScale);
+    this.shaderProgram.setVector2(SPECULAR_UV_OFFSET_UNIFORM_NAME, this.#specularUvOffset);
+    this.shaderProgram.setVector2(SPECULAR_UV_SCALE_UNIFORM_NAME, this.#specularUvScale);
+    this.shaderProgram.setVector2(ALPHA_UV_OFFSET_UNIFORM_NAME, this.#alphaUvOffset);
+    this.shaderProgram.setVector2(ALPHA_UV_SCALE_UNIFORM_NAME, this.#alphaUvScale);
+    this.shaderProgram.setVector2(BUMP_UV_OFFSET_UNIFORM_NAME, this.#bumpUvOffset);
+    this.shaderProgram.setVector2(BUMP_UV_SCALE_UNIFORM_NAME, this.#bumpUvScale);
+    this.shaderProgram.setVector2(DISPLACEMENT_UV_OFFSET_UNIFORM_NAME, this.#displacementUvOffset);
+    this.shaderProgram.setVector2(DISPLACEMENT_UV_SCALE_UNIFORM_NAME, this.#displacementUvScale);
+    this.shaderProgram.setVector2(REFLECTION_UV_OFFSET_UNIFORM_NAME, this.#reflectionUvOffset);
+    this.shaderProgram.setVector2(REFLECTION_UV_SCALE_UNIFORM_NAME, this.#reflectionUvScale);
+    this.shaderProgram.setFloat(USE_DIFFUSE_MAP_UNIFORM_NAME, this.#useDiffuseMap ? FLOAT_TRUE3 : FLOAT_FALSE3);
+    this.shaderProgram.setFloat(USE_AMBIENT_MAP_UNIFORM_NAME, this.#useAmbientMap ? FLOAT_TRUE3 : FLOAT_FALSE3);
+    this.shaderProgram.setFloat(USE_SPECULAR_MAP_UNIFORM_NAME, this.#useSpecularMap ? FLOAT_TRUE3 : FLOAT_FALSE3);
+    this.shaderProgram.setFloat(USE_ALPHA_MAP_UNIFORM_NAME, this.#useAlphaMap ? FLOAT_TRUE3 : FLOAT_FALSE3);
+    this.shaderProgram.setFloat(USE_BUMP_MAP_UNIFORM_NAME, this.#useBumpMap ? FLOAT_TRUE3 : FLOAT_FALSE3);
+    this.shaderProgram.setFloat(USE_DISPLACEMENT_MAP_UNIFORM_NAME, this.#useDisplacementMap ? FLOAT_TRUE3 : FLOAT_FALSE3);
+    this.shaderProgram.setFloat(USE_REFLECTION_MAP_UNIFORM_NAME, this.#useReflectionMap ? FLOAT_TRUE3 : FLOAT_FALSE3);
+    this.shaderProgram.setTexture2D(DIFFUSE_MAP_UNIFORM_NAME, this.#diffuseTexture, this.#diffuseTextureUnit);
+    this.shaderProgram.setTexture2D(AMBIENT_MAP_UNIFORM_NAME, this.#ambientTexture, this.#ambientTextureUnit);
+    this.shaderProgram.setTexture2D(SPECULAR_MAP_UNIFORM_NAME, this.#specularTexture, this.#specularTextureUnit);
+    this.shaderProgram.setTexture2D(ALPHA_MAP_UNIFORM_NAME, this.#alphaTexture, this.#alphaTextureUnit);
+    this.shaderProgram.setTexture2D(BUMP_MAP_UNIFORM_NAME, this.#bumpTexture, this.#bumpTextureUnit);
+    this.shaderProgram.setTexture2D(DISPLACEMENT_MAP_UNIFORM_NAME, this.#displacementTexture, this.#displacementTextureUnit);
+    this.shaderProgram.setTexture2D(REFLECTION_MAP_UNIFORM_NAME, this.#reflectionTexture, this.#reflectionTextureUnit);
+  }
+  /**
+   * Sets the ambient color.
+   *
+   * @param {Float32Array | number[]} color - RGB color in [0..1] range.
+   */
+  setAmbientColor(color) {
+    _MtlStandardMaterial.#assertVector3("`MtlStandardMaterial.setAmbientColor`", color);
+    this.#ambientColor.set(color);
+  }
+  /**
+   * Sets the specular color.
+   *
+   * @param {Float32Array | number[]} color - RGB color in [0..1] range.
+   */
+  setSpecularColor(color) {
+    _MtlStandardMaterial.#assertVector3("`MtlStandardMaterial.setSpecularColor`", color);
+    this.#specularColor.set(color);
+  }
+  /**
+   * Sets the emissive color.
+   *
+   * @param {Float32Array | number[]} color - RGB color in [0..1] range.
+   */
+  setEmissiveColor(color) {
+    _MtlStandardMaterial.#assertVector3("`MtlStandardMaterial.setEmissiveColor`", color);
+    this.#emissiveColor.set(color);
+  }
+  /**
+   * Sets the shininess exponent.
+   *
+   * @param {number} value - Shininess exponent.
+   */
+  setShininess(value) {
+    if (typeof value !== TYPEOF_NUMBER || !Number.isFinite(value)) {
+      throw new TypeError(ERROR_SHININESS_TYPE);
+    }
+    this.#shininess = value;
+  }
+  /**
+   * Sets the specular strength multiplier.
+   *
+   * @param {number} value - Specular strength.
+   */
+  setSpecularStrength(value) {
+    if (typeof value !== TYPEOF_NUMBER || !Number.isFinite(value)) {
+      throw new TypeError(ERROR_SPECULAR_STRENGTH_TYPE);
+    }
+    this.#specularStrength = value;
+  }
+  /**
+   * Enables or disables specular term.
+   *
+   * @param {boolean} enabled - Specular usage flag.
+   */
+  setSpecularEnabled(enabled) {
+    if (typeof enabled !== TYPEOF_BOOLEAN) {
+      throw new TypeError(ERROR_SPECULAR_ENABLED_TYPE);
+    }
+    this.#specularEnabled = enabled;
+  }
+  /**
+   * Sets optical density value.
+   *
+   * @param {number} value - Optical density.
+   */
+  setOpticalDensity(value) {
+    if (typeof value !== TYPEOF_NUMBER || !Number.isFinite(value)) {
+      throw new TypeError(ERROR_OPTICAL_DENSITY_TYPE);
+    }
+    this.#opticalDensity = value;
+  }
+  /**
+   * Sets bump multiplier value.
+   *
+   * @param {number} value - Bump multiplier.
+   */
+  setBumpMultiplier(value) {
+    if (typeof value !== TYPEOF_NUMBER || !Number.isFinite(value)) {
+      throw new TypeError(ERROR_BUMP_MULTIPLIER_TYPE);
+    }
+    this.#bumpMultiplier = value;
+  }
+  /**
+   * Sets displacement scale.
+   *
+   * @param {number} value - Displacement scale factor.
+   */
+  setDisplacementScale(value) {
+    if (typeof value !== TYPEOF_NUMBER || !Number.isFinite(value)) {
+      throw new TypeError(ERROR_DISPLACEMENT_SCALE_TYPE);
+    }
+    this.#displacementScale = value;
+  }
+  /**
+   * Sets a diffuse texture and its UV-transform.
+   *
+   * @param {Texture2D} texture                       - Diffuse texture.
+   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+   */
+  setDiffuseMap(texture, options = {}) {
+    this.#setMap(
+      "`MtlStandardMaterial.setDiffuseMap`",
+      texture,
+      options,
+      (map) => {
+        this.#diffuseTexture = map.texture;
+        this.#diffuseTextureUnit = map.textureUnitIndex;
+        this.#useDiffuseMap = true;
+        this.#diffuseUvOffset.set(map.uvOffset);
+        this.#diffuseUvScale.set(map.uvScale);
+      }
+    );
+  }
+  /**
+   * Sets an ambient texture and its UV-transform.
+   *
+   * @param {Texture2D} texture                       - Ambient texture.
+   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+   */
+  setAmbientMap(texture, options = {}) {
+    this.#setMap(
+      "`MtlStandardMaterial.setAmbientMap`",
+      texture,
+      options,
+      (map) => {
+        this.#ambientTexture = map.texture;
+        this.#ambientTextureUnit = map.textureUnitIndex;
+        this.#useAmbientMap = true;
+        this.#ambientUvOffset.set(map.uvOffset);
+        this.#ambientUvScale.set(map.uvScale);
+      }
+    );
+  }
+  /**
+   * Sets a specular texture and its UV-transform.
+   *
+   * @param {Texture2D} texture                       - Specular texture.
+   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+   */
+  setSpecularMap(texture, options = {}) {
+    this.#setMap(
+      "`MtlStandardMaterial.setSpecularMap`",
+      texture,
+      options,
+      (map) => {
+        this.#specularTexture = map.texture;
+        this.#specularTextureUnit = map.textureUnitIndex;
+        this.#useSpecularMap = true;
+        this.#specularUvOffset.set(map.uvOffset);
+        this.#specularUvScale.set(map.uvScale);
+      }
+    );
+  }
+  /**
+   * Sets an alpha texture and its UV-transform.
+   *
+   * @param {Texture2D} texture                       - Alpha texture.
+   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+   */
+  setAlphaMap(texture, options = {}) {
+    this.#setMap(
+      "`MtlStandardMaterial.setAlphaMap`",
+      texture,
+      options,
+      (map) => {
+        this.#alphaTexture = map.texture;
+        this.#alphaTextureUnit = map.textureUnitIndex;
+        this.#useAlphaMap = true;
+        this.#alphaUvOffset.set(map.uvOffset);
+        this.#alphaUvScale.set(map.uvScale);
+      }
+    );
+  }
+  /**
+   * Sets a bump texture and its UV-transform.
+   *
+   * @param {Texture2D} texture                       - Bump texture.
+   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+   */
+  setBumpMap(texture, options = {}) {
+    this.#setMap(
+      "`MtlStandardMaterial.setBumpMap`",
+      texture,
+      options,
+      (map) => {
+        this.#bumpTexture = map.texture;
+        this.#bumpTextureUnit = map.textureUnitIndex;
+        this.#useBumpMap = true;
+        this.#bumpUvOffset.set(map.uvOffset);
+        this.#bumpUvScale.set(map.uvScale);
+      }
+    );
+  }
+  /**
+   * Sets a displacement texture and its UV-transform.
+   *
+   * @param {Texture2D} texture                       - Displacement texture.
+   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+   */
+  setDisplacementMap(texture, options = {}) {
+    this.#setMap(
+      "`MtlStandardMaterial.setDisplacementMap`",
+      texture,
+      options,
+      (map) => {
+        this.#displacementTexture = map.texture;
+        this.#displacementTextureUnit = map.textureUnitIndex;
+        this.#useDisplacementMap = true;
+        this.#displacementUvOffset.set(map.uvOffset);
+        this.#displacementUvScale.set(map.uvScale);
+      }
+    );
+  }
+  /**
+   * Sets a reflection texture and its UV-transform.
+   *
+   * @param {Texture2D} texture                       - Reflection texture.
+   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+   */
+  setReflectionMap(texture, options = {}) {
+    this.#setMap(
+      "`MtlStandardMaterial.setReflectionMap`",
+      texture,
+      options,
+      (map) => {
+        this.#reflectionTexture = map.texture;
+        this.#reflectionTextureUnit = map.textureUnitIndex;
+        this.#useReflectionMap = true;
+        this.#reflectionUvOffset.set(map.uvOffset);
+        this.#reflectionUvScale.set(map.uvScale);
+      }
+    );
+  }
+  /**
+   * Disposes resources, owned by this material.
+   */
+  dispose() {
+    if (this.isDisposed) {
+      return;
+    }
+    if (this.#fallbackTexture) {
+      this.#fallbackTexture.dispose();
+    }
+    super.dispose();
+  }
+  /**
+   * Validates and applies the map options for a texture assignment.
+   *
+   * @param {string} context                        - Error context.
+   * @param {Texture2D} texture                     - Map texture.
+   * @param {MtlStandardMaterialMapOptions} options - Map options.
+   * @param {function(Object): void} apply          - Apply callback.
+   * @returns {void}
+   * @private
+   */
+  #setMap(context, texture, options, apply) {
+    if (!(texture instanceof Texture2D)) {
+      throw new TypeError(context + ERROR_EXPECTS_TEXTURE_SUFFIX);
+    }
+    if (options === null || typeof options !== TYPEOF_OBJECT || Array.isArray(options)) {
+      throw new TypeError(context + ERROR_EXPECTS_OPTIONS_OBJECT_SUFFIX);
+    }
+    const {
+      textureUnitIndex = DEFAULT_DIFFUSE_TEXTURE_UNIT,
+      uvOffset = DEFAULT_UV_OFFSET,
+      uvScale = DEFAULT_UV_SCALE
+    } = options;
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE10) {
+      throw new TypeError(context + ERROR_EXPECTS_TEXTURE_UNIT_INDEX_SUFFIX);
+    }
+    _MtlStandardMaterial.#assertVector2(`${context} options.uvOffset`, uvOffset);
+    _MtlStandardMaterial.#assertVector2(`${context} options.uvScale`, uvScale);
+    apply({
+      texture,
+      textureUnitIndex,
+      uvOffset,
+      uvScale
+    });
+  }
+  /**
+   * Validates the `vector2` arrays.
+   *
+   * @param {string} context                - Error context.
+   * @param {Float32Array | number[]} value - Vector to validate.
+   * @returns {void}
+   * @private
+   */
+  static #assertVector2(context, value) {
+    if (!Array.isArray(value) && !(value instanceof Float32Array)) {
+      throw new TypeError(context + ERROR_EXPECTS_VECTOR2_TYPE_SUFFIX);
+    }
+    if (value.length !== DEFAULT_UV_OFFSET.length) {
+      throw new TypeError(context + ERROR_EXPECTS_VECTOR2_COMPONENTS_SUFFIX);
+    }
+  }
+  /**
+   * Validates the `vector3` arrays.
+   *
+   * @param {string} context                - Error context.
+   * @param {Float32Array | number[]} value - Vector to validate.
+   * @returns {void}
+   * @private
+   */
+  static #assertVector3(context, value) {
+    if (!Array.isArray(value) && !(value instanceof Float32Array)) {
+      throw new TypeError(context + ERROR_EXPECTS_VECTOR2_TYPE_SUFFIX);
+    }
+    if (value.length !== VECTOR3_ELEMENT_COUNT) {
+      throw new TypeError(context + ERROR_EXPECTS_VECTOR3_COMPONENTS_SUFFIX);
+    }
+  }
+};
+
 // core/scene/object3d.js
 var CHILD_NOT_FOUND_INDEX = -1;
 var SINGLE_CHILD_REMOVE_COUNT = 1;
@@ -6907,7 +8018,7 @@ var Object3D = class _Object3D {
     return this.#worldMatrix;
   }
   /**
-   * @param {Object3D} child - Child node to attach to this object (re-parented if it already has a parent).
+   * @param {Object3D} child - Child node to attach to this object (reparented, if it already has a parent).
    */
   add(child) {
     if (!(child instanceof _Object3D)) {
@@ -6939,13 +8050,22 @@ var Object3D = class _Object3D {
     child.#isWorldMatrixDirty = true;
   }
   /**
-   * @param {Float32Array | null} parentWorldMatrix - Parent world matrix, or null when updating a root node.
+   * Updates world matrices.
+   *
+   * @param {Float32Array | null | Object} inputMatrix            - Parent world matrix or options object.
+   * @param {Float32Array | null} [inputMatrix.parentWorldMatrix] - Parent world matrix override (root, when null).
+   * @returns {void}
+   * @throws {TypeError} When inputs are invalid.
    */
-  updateWorldMatrix(parentWorldMatrix) {
-    if (parentWorldMatrix !== null && !(parentWorldMatrix instanceof Float32Array)) {
-      throw new TypeError("Object3D.updateWorldMatrix expects a Float32Array or null.");
+  updateWorldMatrix(inputMatrix) {
+    let resolvedParentWorldMatrix = inputMatrix;
+    if (inputMatrix !== null && typeof inputMatrix === "object" && !(inputMatrix instanceof Float32Array)) {
+      resolvedParentWorldMatrix = "parentWorldMatrix" in inputMatrix ? inputMatrix.parentWorldMatrix : null;
     }
-    this.#updateWorldMatrixRecursive(parentWorldMatrix, false);
+    if (resolvedParentWorldMatrix !== null && !(resolvedParentWorldMatrix instanceof Float32Array)) {
+      throw new TypeError("`Object3D.updateWorldMatrix` expects `Float32Array` or null.");
+    }
+    this.#updateWorldMatrixRecursive(resolvedParentWorldMatrix, false);
   }
   /**
    * @param {function(Object3D): void} callback - Visitor function called for this object and all descendants (depth-first).
@@ -8119,15 +9239,240 @@ var ThirdPersonCamera = class extends Camera {
   }
 };
 
+// core/light/light.js
+var DEFAULT_ENABLED = true;
+var TYPEOF_BOOLEAN2 = "boolean";
+var ERROR_ABSTRACT_CONSTRUCTOR = "`Light` is an abstract class and cannot be instantiated directly.";
+var ERROR_ENABLED_TYPE = "`Light.setEnabled` expects a boolean.";
+var Light = class _Light extends Object3D {
+  /**
+   * Whether this light is enabled.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #enabled = DEFAULT_ENABLED;
+  /**
+   * Creates a new light. This class is abstract and cannot be instantiated directly.
+   *
+   * @throws {Error} When attempting to instantiate the abstract `Light` class.
+   */
+  constructor() {
+    super();
+    if (new.target === _Light) {
+      throw new Error(ERROR_ABSTRACT_CONSTRUCTOR);
+    }
+  }
+  /**
+   * Enables or disables this light.
+   *
+   * @param {boolean} enabled - When true, the light contributes to rendering.
+   * @returns {void}
+   * @throws {TypeError} When the value is not a boolean.
+   */
+  setEnabled(enabled) {
+    if (typeof enabled !== TYPEOF_BOOLEAN2) {
+      throw new TypeError(ERROR_ENABLED_TYPE);
+    }
+    this.#enabled = enabled;
+  }
+  /**
+   * Returns true when the light is enabled.
+   *
+   * @returns {boolean}
+   */
+  isEnabled() {
+    return this.#enabled;
+  }
+};
+
+// core/light/directional-light.js
+var VECTOR3_ELEMENT_COUNT2 = 3;
+var VECTOR_X_INDEX = 0;
+var VECTOR_Y_INDEX = 1;
+var VECTOR_Z_INDEX = 2;
+var DEFAULT_DIRECTION = new Float32Array([0.5, 0.7, 1]);
+var DEFAULT_DIRECTIONAL_STRENGTH2 = 1;
+var MIN_DIRECTIONAL_STRENGTH = 0;
+var MAX_DIRECTIONAL_STRENGTH = 3;
+var MIN_DIRECTION_LENGTH_SQUARED2 = 0;
+var INVERSE_LENGTH_NUMERATOR2 = 1;
+var DEFAULT_ROLL_RADIANS = 0;
+var ASIN_CLAMP_MIN = -1;
+var ASIN_CLAMP_MAX = 1;
+var WORLD_Z_AXIS_X_INDEX = 8;
+var WORLD_Z_AXIS_Y_INDEX = 9;
+var WORLD_Z_AXIS_Z_INDEX = 10;
+var ERROR_DIRECTION_TYPE = "`DirectionalLight.setDirection` expects a number[] or `Float32Array`.";
+var ERROR_DIRECTION_COMPONENTS = "`DirectionalLight.setDirection` expects exactly 3 components.";
+var ERROR_DIRECTION_COMPONENTS_FINITE = "`DirectionalLight.setDirection` expects finite components.";
+var ERROR_DIRECTION_LENGTH = "`DirectionalLight.setDirection` expects a non-zero direction vector.";
+var ERROR_STRENGTH_TYPE = "`DirectionalLight.setStrength` expects a finite number.";
+var DirectionalLight = class _DirectionalLight extends Light {
+  /**
+   * Cached normalized direction buffer.
+   *
+   * @type {Float32Array}
+   * @private
+   */
+  #direction = new Float32Array(VECTOR3_ELEMENT_COUNT2);
+  /**
+   * Directional light strength multiplier.
+   *
+   * @type {number}
+   * @private
+   */
+  #strength = DEFAULT_DIRECTIONAL_STRENGTH2;
+  /**
+   * Creates a new directional light with the default direction.
+   */
+  constructor() {
+    super();
+    this.setDirection(DEFAULT_DIRECTION);
+    this.#strength = DEFAULT_DIRECTIONAL_STRENGTH2;
+  }
+  /**
+   * Sets the light direction by updating the light rotation.
+   *
+   * @param {Float32Array | number[]} direction - Direction vector (world space).
+   * @returns {void}
+   * @throws {TypeError} When the direction is invalid.
+   */
+  setDirection(direction) {
+    _DirectionalLight.#assertVector3(direction);
+    const directionX = direction[VECTOR_X_INDEX];
+    const directionY = direction[VECTOR_Y_INDEX];
+    const directionZ = direction[VECTOR_Z_INDEX];
+    const lengthSquared = directionX * directionX + directionY * directionY + directionZ * directionZ;
+    if (!Number.isFinite(lengthSquared) || lengthSquared <= MIN_DIRECTION_LENGTH_SQUARED2) {
+      throw new TypeError(ERROR_DIRECTION_LENGTH);
+    }
+    const inverseLength = INVERSE_LENGTH_NUMERATOR2 / Math.sqrt(lengthSquared);
+    const normalizedX = directionX * inverseLength;
+    const normalizedY = directionY * inverseLength;
+    const normalizedZ = directionZ * inverseLength;
+    const clampedY = Math.min(ASIN_CLAMP_MAX, Math.max(ASIN_CLAMP_MIN, normalizedY));
+    const rotationX = -Math.asin(clampedY);
+    const rotationY = Math.atan2(normalizedX, normalizedZ);
+    this.rotation.x = rotationX;
+    this.rotation.y = rotationY;
+    this.rotation.z = DEFAULT_ROLL_RADIANS;
+  }
+  /**
+   * Returns the normalized light direction in world space.
+   *
+   * @returns {Float32Array}
+   */
+  getDirection() {
+    const worldMatrix = this.worldMatrix;
+    const axisX = worldMatrix[WORLD_Z_AXIS_X_INDEX];
+    const axisY = worldMatrix[WORLD_Z_AXIS_Y_INDEX];
+    const axisZ = worldMatrix[WORLD_Z_AXIS_Z_INDEX];
+    const lengthSquared = axisX * axisX + axisY * axisY + axisZ * axisZ;
+    if (!Number.isFinite(lengthSquared) || lengthSquared <= MIN_DIRECTION_LENGTH_SQUARED2) {
+      this.#direction.set(DEFAULT_DIRECTION);
+      return this.#direction;
+    }
+    const inverseLength = INVERSE_LENGTH_NUMERATOR2 / Math.sqrt(lengthSquared);
+    this.#direction[VECTOR_X_INDEX] = axisX * inverseLength;
+    this.#direction[VECTOR_Y_INDEX] = axisY * inverseLength;
+    this.#direction[VECTOR_Z_INDEX] = axisZ * inverseLength;
+    return this.#direction;
+  }
+  /**
+   * Sets the directional light strength multiplier.
+   *
+   * @param {number} strength - Directional strength multiplier.
+   * @returns {void}
+   * @throws {TypeError} When the strength is invalid.
+   */
+  setStrength(strength) {
+    if (typeof strength !== "number" || !Number.isFinite(strength)) {
+      throw new TypeError(ERROR_STRENGTH_TYPE);
+    }
+    this.#strength = Math.min(MAX_DIRECTIONAL_STRENGTH, Math.max(MIN_DIRECTIONAL_STRENGTH, strength));
+  }
+  /**
+   * Returns the directional light strength multiplier.
+   *
+   * @returns {number}
+   */
+  getStrength() {
+    return this.#strength;
+  }
+  /**
+   * Validates a vector3-like input.
+   *
+   * @param {Float32Array | number[]} vector - Vector to validate.
+   * @returns {void}
+   * @throws {TypeError} When the vector is invalid.
+   * @private
+   */
+  static #assertVector3(vector) {
+    if (!Array.isArray(vector) && !(vector instanceof Float32Array)) {
+      throw new TypeError(ERROR_DIRECTION_TYPE);
+    }
+    if (vector.length !== VECTOR3_ELEMENT_COUNT2) {
+      throw new TypeError(ERROR_DIRECTION_COMPONENTS);
+    }
+    if (!Number.isFinite(vector[VECTOR_X_INDEX]) || !Number.isFinite(vector[VECTOR_Y_INDEX]) || !Number.isFinite(vector[VECTOR_Z_INDEX])) {
+      throw new TypeError(ERROR_DIRECTION_COMPONENTS_FINITE);
+    }
+  }
+};
+
+// core/light/ambient-light.js
+var DEFAULT_STRENGTH = 0.2;
+var ERROR_STRENGTH_TYPE2 = "`AmbientLight.setStrength` expects a finite number.";
+var AmbientLight = class extends Light {
+  /**
+   * Ambient strength multiplier.
+   *
+   * @type {number}
+   * @private
+   */
+  #strength = DEFAULT_STRENGTH;
+  /**
+   * Creates a new ambient light.
+   */
+  constructor() {
+    super();
+  }
+  /**
+   * Sets the ambient strength multiplier.
+   *
+   * @param {number} strength - Ambient strength.
+   * @returns {void}
+   * @throws {TypeError} When the strength is invalid.
+   */
+  setStrength(strength) {
+    if (typeof strength !== "number" || !Number.isFinite(strength)) {
+      throw new TypeError(ERROR_STRENGTH_TYPE2);
+    }
+    this.#strength = strength;
+  }
+  /**
+   * Returns the ambient strength multiplier.
+   *
+   * @returns {number}
+   */
+  getStrength() {
+    return this.#strength;
+  }
+};
+
 // core/render/renderer.js
 var INDEX_BUFFER_OFFSET_BYTES = 0;
 var MATRIX_4x4_ELEMENT_COUNT10 = 16;
-var VECTOR3_ELEMENT_COUNT2 = 3;
+var VECTOR3_ELEMENT_COUNT3 = 3;
 var OPAQUE_OPACITY = 1;
 var MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT = 2;
 var MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT = 3;
 var MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT = 4;
 var ERROR_UNKNOWN_PRIMITIVE = "Renderer received an unknown geometry primitive.";
+var STACK_EMPTY_LENGTH = 0;
+var LOOP_START_INDEX = 0;
+var LOOP_INCREMENT = 1;
 var Renderer = class {
   /**
    * Wrapper around the underlying WebGL2 rendering context.
@@ -8201,6 +9546,27 @@ var Renderer = class {
    */
   #traverseCallback;
   /**
+   * Reused stack for the light search traversal.
+   *
+   * @type {Object3D[]}
+   * @private
+   */
+  #lightSearchStack;
+  /**
+   * Cached active directional light for the current frame.
+   *
+   * @type {DirectionalLight | null}
+   * @private
+   */
+  #activeDirectionalLight = null;
+  /**
+   * Cached active ambient light for the current frame.
+   *
+   * @type {AmbientLight | null}
+   * @private
+   */
+  #activeAmbientLight = null;
+  /**
    * @param {WebGLContext} webglContext - Wrapper around the underlying WebGL2 rendering context.
    */
   constructor(webglContext) {
@@ -8213,9 +9579,10 @@ var Renderer = class {
     this.#finalMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT10);
     this.#worldMatrixInverse = new Float32Array(MATRIX_4x4_ELEMENT_COUNT10);
     this.#worldInverseTransposeMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT10);
-    this.#cameraPosition = new Float32Array(VECTOR3_ELEMENT_COUNT2);
+    this.#cameraPosition = new Float32Array(VECTOR3_ELEMENT_COUNT3);
     this.#frameViewProjectionMatrix = this.#viewProjectionMatrix;
     this.#frameCameraPosition = this.#cameraPosition;
+    this.#lightSearchStack = [];
     this.#traverseCallback = (x) => this.#renderVisitedObject(x);
   }
   /**
@@ -8250,7 +9617,8 @@ var Renderer = class {
     this.#cameraPosition[1] = cameraPosition.y;
     this.#cameraPosition[2] = cameraPosition.z;
     this.#frameCameraPosition = this.#cameraPosition;
-    scene.updateWorldMatrix(null);
+    scene.updateWorldMatrix({ parentWorldMatrix: null });
+    this.#findActiveLights(scene);
     scene.traverse(this.#traverseCallback);
   }
   /**
@@ -8279,6 +9647,15 @@ var Renderer = class {
       this.#frameViewProjectionMatrix,
       worldMatrix
     );
+    if (material instanceof DirectionalLightMaterial) {
+      if (this.#activeDirectionalLight) {
+        material.setLightDirection(this.#activeDirectionalLight.getDirection());
+        material.setDirectionalStrength(this.#activeDirectionalLight.getStrength());
+      }
+      if (this.#activeAmbientLight) {
+        material.setAmbientStrength(this.#activeAmbientLight.getStrength());
+      }
+    }
     material.use();
     const materialOpacity = material.opacity;
     const isTransparent = materialOpacity < OPAQUE_OPACITY;
@@ -8319,6 +9696,32 @@ var Renderer = class {
       geometry.getIndexComponentType(isWireframeEnabled),
       INDEX_BUFFER_OFFSET_BYTES
     );
+  }
+  /**
+   * Finds the active lights for the current frame.
+   *
+   * @param {Scene} scene - Scene to search.
+   * @returns {void}
+   * @private
+   */
+  #findActiveLights(scene) {
+    this.#activeDirectionalLight = null;
+    this.#activeAmbientLight = null;
+    const stack = this.#lightSearchStack;
+    stack.length = STACK_EMPTY_LENGTH;
+    stack.push(scene);
+    while (stack.length > STACK_EMPTY_LENGTH && (this.#activeDirectionalLight === null || this.#activeAmbientLight === null)) {
+      const node = stack.pop();
+      if (this.#activeDirectionalLight === null && node instanceof DirectionalLight && node.isEnabled()) {
+        this.#activeDirectionalLight = node;
+      } else if (this.#activeAmbientLight === null && node instanceof AmbientLight && node.isEnabled()) {
+        this.#activeAmbientLight = node;
+      }
+      const children = node.children;
+      for (let index = LOOP_START_INDEX; index < children.length; index += LOOP_INCREMENT) {
+        stack.push(children[index]);
+      }
+    }
   }
 };
 function resolvePrimitiveMode(renderingContext, primitive) {
@@ -8927,6 +10330,540 @@ var FpsCounter = class _FpsCounter {
   }
 };
 
+// core/debug/light-gizmo.js
+var DEFAULT_VISIBLE = true;
+var ZERO_VALUE11 = 0;
+var VISIBLE_OPACITY = 1;
+var HIDDEN_OPACITY = 0;
+var MARKER_HALF_SIZE = 0.4;
+var ARROW_LENGTH = 2;
+var ARROW_HEAD_LENGTH = 0.5;
+var ARROW_HEAD_HALF_WIDTH = 0.25;
+var MARKER_COLOR = new Float32Array([0.35, 0.9, 1]);
+var ARROW_COLOR = new Float32Array([1, 0.9, 0.2]);
+var ERROR_WEBGL_CONTEXT_TYPE = "`LightGizmo` expects `WebGL2RenderingContext`.";
+var ERROR_LIGHT_TYPE = "`LightGizmo` expects a `DirectionalLight` instance.";
+var ERROR_VISIBLE_TYPE = "`LightGizmo.setVisible` expects a boolean.";
+var LightGizmo = class extends Object3D {
+  /**
+   * Target directional light.
+   *
+   * @type {DirectionalLight}
+   * @private
+   */
+  #light;
+  /**
+   * Line materials, used by the gizmo.
+   *
+   * @type {SolidColorMaterial[]}
+   * @private
+   */
+  #materials = [];
+  /**
+   * Current visibility state.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #visible = DEFAULT_VISIBLE;
+  /**
+   * Creates a new LightGizmo instance.
+   *
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @param {DirectionalLight} light              - Target directional light.
+   * @throws {TypeError} When the inputs are invalid.
+   */
+  constructor(webglContext, light) {
+    super();
+    if (!(webglContext instanceof WebGL2RenderingContext)) {
+      throw new TypeError(ERROR_WEBGL_CONTEXT_TYPE);
+    }
+    if (!(light instanceof DirectionalLight)) {
+      throw new TypeError(ERROR_LIGHT_TYPE);
+    }
+    this.#light = light;
+    this.#buildMarker(webglContext);
+    this.#buildArrow(webglContext);
+    this.setVisible(DEFAULT_VISIBLE);
+  }
+  /**
+   * Sets gizmo visibility.
+   *
+   * @param {boolean} visible - Whether the gizmo should be visible.
+   * @returns {void}
+   * @throws {TypeError} When the visibility flag is invalid.
+   */
+  setVisible(visible) {
+    if (typeof visible !== "boolean") {
+      throw new TypeError(ERROR_VISIBLE_TYPE);
+    }
+    this.#visible = visible;
+    const opacity = this.#visible ? VISIBLE_OPACITY : HIDDEN_OPACITY;
+    for (const material of this.#materials) {
+      material.setOpacity(opacity);
+    }
+  }
+  /**
+   * Returns the target directional light.
+   *
+   * @returns {DirectionalLight} - The directional light instance, tracked by this gizmo.
+   */
+  get light() {
+    return this.#light;
+  }
+  /**
+   * Builds the position marker lines.
+   *
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @returns {void}
+   * @private
+   */
+  #buildMarker(webglContext) {
+    const markerMaterial = new SolidColorMaterial(webglContext, { color: MARKER_COLOR });
+    this.#materials.push(markerMaterial);
+    const xStart = new Vector3(-MARKER_HALF_SIZE, ZERO_VALUE11, ZERO_VALUE11);
+    const xEnd = new Vector3(MARKER_HALF_SIZE, ZERO_VALUE11, ZERO_VALUE11);
+    this.add(this.#createLine(webglContext, markerMaterial, [xStart, xEnd]));
+    const yStart = new Vector3(ZERO_VALUE11, -MARKER_HALF_SIZE, ZERO_VALUE11);
+    const yEnd = new Vector3(ZERO_VALUE11, MARKER_HALF_SIZE, ZERO_VALUE11);
+    this.add(this.#createLine(webglContext, markerMaterial, [yStart, yEnd]));
+    const zStart = new Vector3(ZERO_VALUE11, ZERO_VALUE11, -MARKER_HALF_SIZE);
+    const zEnd = new Vector3(ZERO_VALUE11, ZERO_VALUE11, MARKER_HALF_SIZE);
+    this.add(this.#createLine(webglContext, markerMaterial, [zStart, zEnd]));
+  }
+  /**
+   * Builds the direction arrow lines.
+   * The arrow points opposite to the shader light direction (where the light shines),
+   * while `DirectionalLight.getDirection()` still returns the `towards light` vector.
+   *
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @returns {void}
+   * @private
+   */
+  #buildArrow(webglContext) {
+    const arrowMaterial = new SolidColorMaterial(webglContext, { color: ARROW_COLOR });
+    this.#materials.push(arrowMaterial);
+    const shaftStart = new Vector3(ZERO_VALUE11, ZERO_VALUE11, ZERO_VALUE11);
+    const shaftEnd = new Vector3(ZERO_VALUE11, ZERO_VALUE11, -ARROW_LENGTH);
+    this.add(this.#createLine(webglContext, arrowMaterial, [shaftStart, shaftEnd]));
+    const headBaseZ = -ARROW_LENGTH + ARROW_HEAD_LENGTH;
+    const headLeft = new Vector3(-ARROW_HEAD_HALF_WIDTH, ZERO_VALUE11, headBaseZ);
+    const headTip = new Vector3(ZERO_VALUE11, ZERO_VALUE11, -ARROW_LENGTH);
+    const headRight = new Vector3(ARROW_HEAD_HALF_WIDTH, ZERO_VALUE11, headBaseZ);
+    this.add(this.#createLine(webglContext, arrowMaterial, [headLeft, headTip, headRight]));
+  }
+  /**
+   * Creates a line mesh from positions and adds it to this gizmo.
+   *
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @param {SolidColorMaterial} material         - Material to use.
+   * @param {Vector3[]} positions                 - Line positions.
+   * @returns {Line}
+   * @private
+   */
+  #createLine(webglContext, material, positions) {
+    const geometry = new PolylineGeometry(webglContext, { positions });
+    return new Line(geometry, material);
+  }
+};
+
+// core/debug/transform-gizmo.js
+var DEFAULT_VISIBLE2 = true;
+var HIDDEN_OPACITY2 = 0;
+var PICK_OPACITY = 0;
+var AXIS_IDLE_OPACITY = 1;
+var AXIS_HOVER_OPACITY = 0.8;
+var AXIS_ACTIVE_OPACITY = 1;
+var AXIS_INACTIVE_OPACITY = 0.35;
+var AXIS_HIDDEN_OPACITY_WHEN_ACTIVE = 0;
+var AXIS_LENGTH = 2.5;
+var AXIS_HEAD_LENGTH = 0.45;
+var AXIS_HEAD_HALF_WIDTH = 0.25;
+var AXIS_PICK_THICKNESS = 0.35;
+var AXIS_PICK_LENGTH = AXIS_LENGTH;
+var AXIS_PICK_CENTER_DIVISOR = 2;
+var ZERO_VALUE12 = 0;
+var AXIS_X = "x";
+var AXIS_Y = "y";
+var AXIS_Z = "z";
+var AXIS_X_COLOR = new Float32Array([1, 0.4, 0.4]);
+var AXIS_Y_COLOR = new Float32Array([0.4, 1, 0.6]);
+var AXIS_Z_COLOR = new Float32Array([0.4, 0.6, 1]);
+var CENTER_SPHERE_RADIUS = 0.15;
+var CENTER_SPHERE_DIAMETER_MULTIPLIER = 2;
+var CENTER_SPHERE_DIAMETER = CENTER_SPHERE_RADIUS * CENTER_SPHERE_DIAMETER_MULTIPLIER;
+var CENTER_SPHERE_WIDTH_SEGMENTS = 12;
+var CENTER_SPHERE_HEIGHT_SEGMENTS = 8;
+var CENTER_SPHERE_COLOR = new Float32Array([1, 1, 1]);
+var CENTER_SPHERE_OPACITY = 0.8;
+var ERROR_WEBGL_CONTEXT_TYPE2 = "`TransformGizmo` expects a `WebGL2RenderingContext`.";
+var ERROR_TARGET_TYPE = "`TransformGizmo` expects an `Object3D` target.";
+var ERROR_VISIBLE_TYPE2 = "`TransformGizmo.setVisible` expects a boolean.";
+var ERROR_AXIS_TYPE = "`TransformGizmo.setActiveAxis` expects (x, y, z) or null.";
+var ERROR_HOVER_AXIS_TYPE = "`TransformGizmo.setHoveredAxis` expects (x, y, z) or null.";
+var ERROR_AXIS_MESH_TYPE = "`TransformGizmo.getAxisForMesh` expects a `Mesh` instance.";
+var ERROR_OPTIONS_TYPE = "`TransformGizmo` expects `options` as a plain object.";
+var AXIS_DIR_X = [1, 0, 0];
+var AXIS_DIR_Y = [0, 1, 0];
+var AXIS_DIR_Z = [0, 0, 1];
+var AXIS_HEAD_ORTHO_X = AXIS_DIR_Y;
+var AXIS_HEAD_ORTHO_Y = AXIS_DIR_X;
+var AXIS_HEAD_ORTHO_Z = AXIS_DIR_X;
+var TransformGizmo = class extends Object3D {
+  /**
+   * Target object, that the gizmo follows.
+   *
+   * @type {Object3D}
+   * @private
+   */
+  #targetObject;
+  /**
+   * Materials used by the axis lines.
+   *
+   * @type {Map<string, SolidColorMaterial>}
+   * @private
+   */
+  #axisMaterials = /* @__PURE__ */ new Map();
+  /**
+   * Pick volume materials (hidden).
+   *
+   * @type {SolidColorMaterial}
+   * @private
+   */
+  #pickMaterial;
+  /**
+   * Center sphere material.
+   *
+   * @type {SolidColorMaterial}
+   * @private
+   */
+  #centerMaterial;
+  /**
+   * Center sphere mesh.
+   *
+   * @type {Mesh}
+   * @private
+   */
+  #centerMesh;
+  /**
+   * Axis pick meshes mapped to axis identifiers.
+   *
+   * @type {Map<Mesh, string>}
+   * @private
+   */
+  #pickMeshAxisMap = /* @__PURE__ */ new Map();
+  /**
+   * Current visibility state.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #visible = DEFAULT_VISIBLE2;
+  /**
+   * Currently active axis (if any).
+   *
+   * @type {string | null}
+   * @private
+   */
+  #activeAxis = null;
+  /**
+   * Currently hovered axis (if any).
+   *
+   * @type {string | null}
+   * @private
+   */
+  #hoveredAxis = null;
+  /**
+   * Creates a new TransformGizmo instance.
+   *
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @param {Object3D} targetObject               - Target object to attach the gizmo to.
+   * @param {Object} [options]                    - Optional settings (reserved for future use).
+   * @throws {TypeError} When inputs are invalid.
+   */
+  constructor(webglContext, targetObject, options = {}) {
+    super();
+    if (!(webglContext instanceof WebGL2RenderingContext)) {
+      throw new TypeError(ERROR_WEBGL_CONTEXT_TYPE2);
+    }
+    if (!(targetObject instanceof Object3D)) {
+      throw new TypeError(ERROR_TARGET_TYPE);
+    }
+    if (options === null || typeof options !== "object" || Array.isArray(options)) {
+      throw new TypeError(ERROR_OPTIONS_TYPE);
+    }
+    this.#pickMaterial = new SolidColorMaterial(webglContext, { color: AXIS_X_COLOR });
+    this.#pickMaterial.setOpacity(PICK_OPACITY);
+    this.#buildAxes(webglContext);
+    this.#buildCenterSphere(webglContext);
+    this.setTarget(targetObject);
+    this.setVisible(DEFAULT_VISIBLE2);
+  }
+  /**
+   * Sets gizmo visibility.
+   *
+   * @param {boolean} visible - Whether the gizmo should be visible.
+   * @returns {void}
+   * @throws {TypeError} When the visibility flag is invalid.
+   */
+  setVisible(visible) {
+    if (typeof visible !== "boolean") {
+      throw new TypeError(ERROR_VISIBLE_TYPE2);
+    }
+    this.#visible = visible;
+    this.#applyAxisVisuals();
+  }
+  /**
+   * Returns current visibility state.
+   *
+   * @returns {boolean} - The current visibility state of the gizmo.
+   */
+  isVisible() {
+    return this.#visible;
+  }
+  /**
+   * Updates the gizmo target and reparents this object.
+   *
+   * @param {Object3D} targetObject - Target object to attach the gizmo to.
+   * @returns {void}
+   * @throws {TypeError} When the target object is invalid.
+   */
+  setTarget(targetObject) {
+    if (!(targetObject instanceof Object3D)) {
+      throw new TypeError(ERROR_TARGET_TYPE);
+    }
+    if (this.parent) {
+      this.parent.remove(this);
+    }
+    this.#targetObject = targetObject;
+    this.#targetObject.add(this);
+  }
+  /**
+   * Returns the currently active axis (if set).
+   *
+   * @returns {string | null} - The currently active axis id (x, y, z) or null, if no axis is active.
+   */
+  getActiveAxis() {
+    return this.#activeAxis;
+  }
+  /**
+   * Sets the active axis identifier.
+   *
+   * @param {string | null} axis - Axis id (x, y, z) or null.
+   * @returns {void}
+   * @throws {TypeError} When the axis value is invalid.
+   */
+  setActiveAxis(axis) {
+    if (axis !== null && axis !== AXIS_X && axis !== AXIS_Y && axis !== AXIS_Z) {
+      throw new TypeError(ERROR_AXIS_TYPE);
+    }
+    if (this.#activeAxis !== null && axis !== null && axis !== this.#activeAxis) {
+      return;
+    }
+    this.#activeAxis = axis;
+    this.#applyAxisVisuals();
+  }
+  /**
+   * Sets the hovered axis identifier.
+   *
+   * @param {string | null} axis - Axis id (x, y, z) or null.
+   * @returns {void}
+   * @throws {TypeError} When the axis value is invalid.
+   */
+  setHoveredAxis(axis) {
+    if (axis !== null && axis !== AXIS_X && axis !== AXIS_Y && axis !== AXIS_Z) {
+      throw new TypeError(ERROR_HOVER_AXIS_TYPE);
+    }
+    if (this.#activeAxis !== null) {
+      return;
+    }
+    this.#hoveredAxis = axis;
+    this.#applyAxisVisuals();
+  }
+  /**
+   * Clears hovered/active state and restores the default visuals.
+   *
+   * @returns {void}
+   */
+  clearState() {
+    this.#hoveredAxis = null;
+    this.#activeAxis = null;
+    this.#applyAxisVisuals();
+  }
+  /**
+   * Returns the axis identifier for a pick mesh.
+   *
+   * @param {Mesh} mesh       - Pick the mesh instance.
+   * @returns {string | null} - The axis id (x, y, z) for the provided pick mesh or null, if the mesh is not mapped to an axis.
+   * @throws {TypeError} When the mesh input is invalid.
+   */
+  getAxisForMesh(mesh) {
+    if (!(mesh instanceof Mesh)) {
+      throw new TypeError(ERROR_AXIS_MESH_TYPE);
+    }
+    return this.#pickMeshAxisMap.get(mesh) ?? null;
+  }
+  /**
+   * Builds the axes lines and arrow heads.
+   *
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @returns {void}
+   * @private
+   */
+  #buildAxes(webglContext) {
+    this.#buildAxisX(webglContext);
+    this.#buildAxisY(webglContext);
+    this.#buildAxisZ(webglContext);
+  }
+  /**
+   * Builds the center sphere marker.
+   *
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @returns {void}
+   * @private
+   */
+  #buildCenterSphere(webglContext) {
+    const geometry = new SphereGeometry(webglContext, {
+      width: CENTER_SPHERE_DIAMETER,
+      height: CENTER_SPHERE_DIAMETER,
+      depth: CENTER_SPHERE_DIAMETER,
+      widthSegments: CENTER_SPHERE_WIDTH_SEGMENTS,
+      heightSegments: CENTER_SPHERE_HEIGHT_SEGMENTS
+    });
+    const material = new SolidColorMaterial(webglContext, { color: CENTER_SPHERE_COLOR });
+    material.setOpacity(CENTER_SPHERE_OPACITY);
+    const mesh = new Mesh(geometry, material);
+    this.#centerMaterial = material;
+    this.#centerMesh = mesh;
+    this.add(mesh);
+  }
+  /**
+   * Builds a single axis line, arrow head and pick volume.
+   *
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @param {string} axis                         - Axis identifier.
+   * @param {Float32Array} color                  - Axis color.
+   * @param {number[]} dir                        - Unit axis direction (X/Y/Z).
+   * @param {number[]} headOrtho                  - Unit orthogonal direction for arrow head width.
+   * @returns {void}
+   * @private
+   */
+  #buildAxis(webglContext, axis, color, dir, headOrtho) {
+    const material = new SolidColorMaterial(webglContext, { color });
+    this.#axisMaterials.set(axis, material);
+    const start = new Vector3(ZERO_VALUE12, ZERO_VALUE12, ZERO_VALUE12);
+    const end = new Vector3(
+      dir[0] * AXIS_LENGTH,
+      dir[1] * AXIS_LENGTH,
+      dir[2] * AXIS_LENGTH
+    );
+    this.add(this.#createLine(webglContext, material, [start, end]));
+    const headBaseLength = AXIS_LENGTH - AXIS_HEAD_LENGTH;
+    const headBase = new Vector3(
+      dir[0] * headBaseLength,
+      dir[1] * headBaseLength,
+      dir[2] * headBaseLength
+    );
+    const headTip = new Vector3(
+      dir[0] * AXIS_LENGTH,
+      dir[1] * AXIS_LENGTH,
+      dir[2] * AXIS_LENGTH
+    );
+    const headLeft = new Vector3(
+      headBase.x + headOrtho[0] * -AXIS_HEAD_HALF_WIDTH,
+      headBase.y + headOrtho[1] * -AXIS_HEAD_HALF_WIDTH,
+      headBase.z + headOrtho[2] * -AXIS_HEAD_HALF_WIDTH
+    );
+    const headRight = new Vector3(
+      headBase.x + headOrtho[0] * AXIS_HEAD_HALF_WIDTH,
+      headBase.y + headOrtho[1] * AXIS_HEAD_HALF_WIDTH,
+      headBase.z + headOrtho[2] * AXIS_HEAD_HALF_WIDTH
+    );
+    this.add(this.#createLine(webglContext, material, [headLeft, headTip, headRight]));
+    this.#addPickMesh(webglContext, axis);
+  }
+  #buildAxisX(webglContext) {
+    this.#buildAxis(webglContext, AXIS_X, AXIS_X_COLOR, AXIS_DIR_X, AXIS_HEAD_ORTHO_X);
+  }
+  #buildAxisY(webglContext) {
+    this.#buildAxis(webglContext, AXIS_Y, AXIS_Y_COLOR, AXIS_DIR_Y, AXIS_HEAD_ORTHO_Y);
+  }
+  #buildAxisZ(webglContext) {
+    this.#buildAxis(webglContext, AXIS_Z, AXIS_Z_COLOR, AXIS_DIR_Z, AXIS_HEAD_ORTHO_Z);
+  }
+  /**
+   * Adds a pick mesh for the given axis.
+   *
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @param {string} axis                         - Axis identifier.
+   * @returns {void}
+   * @private
+   */
+  #addPickMesh(webglContext, axis) {
+    const geometry = new BoxGeometry(webglContext, {
+      width: axis === AXIS_X ? AXIS_PICK_LENGTH : AXIS_PICK_THICKNESS,
+      height: axis === AXIS_Y ? AXIS_PICK_LENGTH : AXIS_PICK_THICKNESS,
+      depth: axis === AXIS_Z ? AXIS_PICK_LENGTH : AXIS_PICK_THICKNESS
+    });
+    const mesh = new Mesh(geometry, this.#pickMaterial, { ownsMaterial: false });
+    switch (axis) {
+      case AXIS_X:
+        mesh.position.x = AXIS_PICK_LENGTH / AXIS_PICK_CENTER_DIVISOR;
+        break;
+      case AXIS_Y:
+        mesh.position.y = AXIS_PICK_LENGTH / AXIS_PICK_CENTER_DIVISOR;
+        break;
+      case AXIS_Z:
+        mesh.position.z = AXIS_PICK_LENGTH / AXIS_PICK_CENTER_DIVISOR;
+        break;
+      default:
+        throw new Error(`Unknown axis: ${axis}`);
+    }
+    this.add(mesh);
+    this.#pickMeshAxisMap.set(mesh, axis);
+  }
+  /**
+   * Creates a line mesh from positions.
+   *
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
+   * @param {SolidColorMaterial} material         - Material to use.
+   * @param {Vector3[]} positions                 - Line positions.
+   * @returns {Line}                              - A new line object, built from the provided positions and material.
+   * @private
+   */
+  #createLine(webglContext, material, positions) {
+    const geometry = new PolylineGeometry(webglContext, { positions });
+    return new Line(geometry, material);
+  }
+  /**
+   * Updates the axis materials based on current hover/active state.
+   *
+   * @returns {void}
+   * @private
+   */
+  #applyAxisVisuals() {
+    const isVisible = this.#visible;
+    const activeAxis = this.#activeAxis;
+    const hoveredAxis = this.#hoveredAxis;
+    for (const [axis, material] of this.#axisMaterials.entries()) {
+      let opacity = HIDDEN_OPACITY2;
+      if (isVisible) {
+        if (activeAxis) {
+          opacity = axis === activeAxis ? AXIS_ACTIVE_OPACITY : AXIS_HIDDEN_OPACITY_WHEN_ACTIVE;
+        } else if (hoveredAxis) {
+          opacity = axis === hoveredAxis ? AXIS_HOVER_OPACITY : AXIS_INACTIVE_OPACITY;
+        } else {
+          opacity = AXIS_IDLE_OPACITY;
+        }
+      }
+      material.setOpacity(opacity);
+    }
+    if (this.#centerMesh && this.#centerMaterial) {
+      this.#centerMaterial.setOpacity(isVisible ? CENTER_SPHERE_OPACITY : HIDDEN_OPACITY2);
+    }
+  }
+};
+
 // core/loaders/obj-mtl/obj-geometry-builder.js
 var POSITION_COMPONENT_COUNT6 = 3;
 var UV_COMPONENT_COUNT2 = 2;
@@ -8935,7 +10872,7 @@ var COLOR_COMPONENT_COUNT5 = 3;
 var DEFAULT_UV = [0, 0];
 var DEFAULT_NORMAL = [0, 0, 1];
 var OBJ_INDEX_NOT_PROVIDED = -1;
-var ZERO_VALUE10 = 0;
+var ZERO_VALUE13 = 0;
 var FIRST_INDEX = 0;
 var SECOND_INDEX = 1;
 var THIRD_INDEX = 2;
@@ -8943,10 +10880,14 @@ var COMPONENT_INDEX_X = 0;
 var COMPONENT_INDEX_Y = 1;
 var COMPONENT_INDEX_Z = 2;
 var VERTEX_KEY_SEPARATOR = "|";
-var LOOP_INCREMENT = 1;
-var ERROR_WEBGL_CONTEXT_TYPE = "`ObjGeometryBuilder` expects a `WebGL2RenderingContext`.";
+var LOOP_INCREMENT2 = 1;
+var LINE_MIN_VERTEX_COUNT = 2;
+var ENTRY_TYPE_MESH = "mesh";
+var ENTRY_TYPE_POINTS = "points";
+var ENTRY_TYPE_LINE = "line";
+var ERROR_WEBGL_CONTEXT_TYPE3 = "`ObjGeometryBuilder` expects a `WebGL2RenderingContext`.";
 var ERROR_PARSED_DATA_TYPE = "`ObjGeometryBuilder.build` expects parsed OBJ data as an object.";
-var TYPEOF_OBJECT = "object";
+var TYPEOF_OBJECT2 = "object";
 var ObjGeometryBuilder = class _ObjGeometryBuilder {
   /**
    * WebGL2 rendering context used to create the geometries.
@@ -8961,7 +10902,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
    */
   constructor(webglContext) {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
-      throw new TypeError(ERROR_WEBGL_CONTEXT_TYPE);
+      throw new TypeError(ERROR_WEBGL_CONTEXT_TYPE3);
     }
     this.#webglContext = webglContext;
   }
@@ -8973,7 +10914,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
    * @throws {TypeError} When `parsedData` is invalid.
    */
   build(parsedData) {
-    if (parsedData === null || typeof parsedData !== TYPEOF_OBJECT || Array.isArray(parsedData)) {
+    if (parsedData === null || typeof parsedData !== TYPEOF_OBJECT2 || Array.isArray(parsedData)) {
       throw new TypeError(ERROR_PARSED_DATA_TYPE);
     }
     const root = new Object3D();
@@ -8986,19 +10927,43 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
         const groupNode = new Object3D();
         objectNode.add(groupNode);
         for (const chunk of groupData.materialChunks) {
-          if (!chunk.triangles.length) {
-            continue;
+          if (chunk.triangles.length) {
+            const geometryData = this.#buildGeometryForChunk(chunk, parsedData);
+            const geometry = new CustomGeometry(this.#webglContext, geometryData);
+            const usesVertexColors = Boolean(geometryData.colors);
+            entries.push({
+              entryType: ENTRY_TYPE_MESH,
+              parent: groupNode,
+              geometry,
+              materialName: chunk.materialName,
+              usesVertexColors
+            });
+            geometries.push(geometry);
           }
-          const geometryData = this.#buildGeometryForChunk(chunk, parsedData);
-          const geometry = new CustomGeometry(this.#webglContext, geometryData);
-          const usesVertexColors = Boolean(geometryData.colors);
-          entries.push({
-            parent: groupNode,
-            geometry,
-            materialName: chunk.materialName,
-            usesVertexColors
-          });
-          geometries.push(geometry);
+          if (chunk.points.length) {
+            const geometry = this.#buildPointsGeometry(chunk, parsedData);
+            entries.push({
+              entryType: ENTRY_TYPE_POINTS,
+              parent: groupNode,
+              geometry,
+              materialName: chunk.materialName,
+              usesVertexColors: false
+            });
+            geometries.push(geometry);
+          }
+          if (chunk.lines.length) {
+            const lineGeometries = this.#buildLineGeometries(chunk, parsedData);
+            for (const geometry of lineGeometries) {
+              entries.push({
+                entryType: ENTRY_TYPE_LINE,
+                parent: groupNode,
+                geometry,
+                materialName: chunk.materialName,
+                usesVertexColors: false
+              });
+              geometries.push(geometry);
+            }
+          }
         }
       }
     }
@@ -9022,7 +10987,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
     const normals = [];
     const colors = parsedData.hasVertexColors ? [] : null;
     const indices = [];
-    if (chunk.smoothingGroup === ZERO_VALUE10) {
+    if (chunk.smoothingGroup === ZERO_VALUE13) {
       this.#appendFlatGeometry(chunk, parsedData, positions, uvs, normals, colors, indices);
     } else {
       this.#appendSmoothGeometry(chunk, parsedData, positions, uvs, normals, colors, indices);
@@ -9034,6 +10999,36 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
       normals: new Float32Array(normals),
       colors: colors ? new Float32Array(colors) : null
     };
+  }
+  /**
+   * Builds points geometry for a chunk.
+   *
+   * @param {ObjMaterialChunk} chunk   - Material chunk.
+   * @param {ObjParsedData} parsedData - Parsed OBJ data.
+   * @returns {PointsGeometry}         - Points geometry.
+   * @private
+   */
+  #buildPointsGeometry(chunk, parsedData) {
+    const positions = _ObjGeometryBuilder.#buildVectorPositions(chunk.points, parsedData.positions);
+    return new PointsGeometry(this.#webglContext, { positions });
+  }
+  /**
+   * Builds line geometries for a chunk.
+   *
+   * @param {ObjMaterialChunk} chunk   - Material chunk.
+   * @param {ObjParsedData} parsedData - Parsed OBJ data.
+   * @returns {PolylineGeometry[]}     - Line geometries.
+   * @private
+   */
+  #buildLineGeometries(chunk, parsedData) {
+    const result = [];
+    for (const lineIndices of chunk.lines) {
+      const positions = _ObjGeometryBuilder.#buildVectorPositions(lineIndices, parsedData.positions);
+      if (positions.length >= LINE_MIN_VERTEX_COUNT) {
+        result.push(new PolylineGeometry(this.#webglContext, { positions }));
+      }
+    }
+    return result;
   }
   /**
    * Appends the flat-shaded geometry data.
@@ -9053,7 +11048,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
     const uvs = parsedData.uvs;
     const normals = parsedData.normals;
     const colors = parsedData.colors;
-    let vertexIndex = ZERO_VALUE10;
+    let vertexIndex = ZERO_VALUE13;
     for (const triangle of chunk.triangles) {
       const faceNormal = this.#computeFaceNormal(triangle, positions);
       for (const vertex of triangle) {
@@ -9075,7 +11070,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
           _ObjGeometryBuilder.#appendColor(colors, positionIndex, colorsOut);
         }
         indicesOut.push(vertexIndex);
-        vertexIndex += LOOP_INCREMENT;
+        vertexIndex += LOOP_INCREMENT2;
       }
     }
   }
@@ -9147,7 +11142,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
           continue;
         }
         const key = _ObjGeometryBuilder.#buildVertexKey(vertex);
-        const current = accumulators.get(key) || [ZERO_VALUE10, ZERO_VALUE10, ZERO_VALUE10];
+        const current = accumulators.get(key) || [ZERO_VALUE13, ZERO_VALUE13, ZERO_VALUE13];
         current[COMPONENT_INDEX_X] += faceNormal[COMPONENT_INDEX_X];
         current[COMPONENT_INDEX_Y] += faceNormal[COMPONENT_INDEX_Y];
         current[COMPONENT_INDEX_Z] += faceNormal[COMPONENT_INDEX_Z];
@@ -9156,7 +11151,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
     }
     for (const [key, normal] of accumulators.entries()) {
       const length = Math.hypot(normal[COMPONENT_INDEX_X], normal[COMPONENT_INDEX_Y], normal[COMPONENT_INDEX_Z]);
-      if (length > ZERO_VALUE10) {
+      if (length > ZERO_VALUE13) {
         normal[COMPONENT_INDEX_X] /= length;
         normal[COMPONENT_INDEX_Y] /= length;
         normal[COMPONENT_INDEX_Z] /= length;
@@ -9196,7 +11191,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
     const ny = abz * acx - abx * acz;
     const nz = abx * acy - aby * acx;
     const length = Math.hypot(nx, ny, nz);
-    if (length > ZERO_VALUE10) {
+    if (length > ZERO_VALUE13) {
       return [nx / length, ny / length, nz / length];
     }
     return DEFAULT_NORMAL;
@@ -9222,13 +11217,13 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
    * Appends a UV to the target buffer.
    *
    * @param {number[]} sourceUvs - Source UVs.
-   * @param {number} index       - UV index.
-   * @param {number[]} target    - Target UV buffer.
-   * @returns {void}             - Appends the referenced UV pair to the target buffer or the default UV, when missing/invalid.
+   * @param {number} index       - UV-index.
+   * @param {number[]} target    - Target UV-buffer.
+   * @returns {void}             - Appends the referenced UV-pair to the target buffer or the default UV, when missing/invalid.
    * @private
    */
   static #appendUv(sourceUvs, index, target) {
-    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE10 && index * UV_COMPONENT_COUNT2 < sourceUvs.length) {
+    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE13 && index * UV_COMPONENT_COUNT2 < sourceUvs.length) {
       const baseIndex = index * UV_COMPONENT_COUNT2;
       target.push(sourceUvs[baseIndex + COMPONENT_INDEX_X], sourceUvs[baseIndex + COMPONENT_INDEX_Y]);
       return;
@@ -9245,7 +11240,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
    * @private
    */
   static #appendNormal(sourceNormals, index, target) {
-    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE10 && index * NORMAL_COMPONENT_COUNT2 < sourceNormals.length) {
+    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE13 && index * NORMAL_COMPONENT_COUNT2 < sourceNormals.length) {
       const baseIndex = index * NORMAL_COMPONENT_COUNT2;
       target.push(
         sourceNormals[baseIndex + COMPONENT_INDEX_X],
@@ -9254,7 +11249,11 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
       );
       return;
     }
-    target.push(DEFAULT_NORMAL[COMPONENT_INDEX_X], DEFAULT_NORMAL[COMPONENT_INDEX_Y], DEFAULT_NORMAL[COMPONENT_INDEX_Z]);
+    target.push(
+      DEFAULT_NORMAL[COMPONENT_INDEX_X],
+      DEFAULT_NORMAL[COMPONENT_INDEX_Y],
+      DEFAULT_NORMAL[COMPONENT_INDEX_Z]
+    );
   }
   /**
    * Appends a color to the target buffer.
@@ -9262,7 +11261,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
    * @param {number[]} sourceColors - Source colors.
    * @param {number} index          - Color index.
    * @param {number[]} target       - Target colors buffer.
-   * @returns {void}                - Appends the referenced RGB triplet to the target buffer.
+   * @returns {void}                - Appends the referenced RGB-triplet to the target buffer.
    * @private
    */
   static #appendColor(sourceColors, index, target) {
@@ -9295,16 +11294,43 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
   static #getPositionComponent(positions, index, component) {
     return positions[index * POSITION_COMPONENT_COUNT6 + component];
   }
+  /**
+   * Builds Vector3 positions from indices.
+   *
+   * @param {number[]} indices   - Position indices.
+   * @param {number[]} positions - Flat positions array.
+   * @returns {Vector3[]}        - Vector3 positions.
+   * @private
+   */
+  static #buildVectorPositions(indices, positions) {
+    const result = [];
+    for (const index of indices) {
+      const baseIndex = index * POSITION_COMPONENT_COUNT6;
+      const x = positions[baseIndex + COMPONENT_INDEX_X];
+      const y = positions[baseIndex + COMPONENT_INDEX_Y];
+      const z = positions[baseIndex + COMPONENT_INDEX_Z];
+      result.push(new Vector3(x, y, z));
+    }
+    return result;
+  }
 };
 
 // core/loaders/obj-mtl/mtl-texture-cache.js
-var ERROR_WEBGL_CONTEXT_TYPE2 = "`TextureCache` expects a `WebGL2RenderingContext`.";
-var ERROR_TEXTURE_URL_TYPE = "`TextureCache.getTexture` expects `url` as a string.";
-var ERROR_OUTPUT_LIST_TYPE = "`TextureCache.getTexture` expects `output` as an array.";
+var ERROR_WEBGL_CONTEXT_TYPE4 = "`MtlTextureCache` expects a `WebGL2RenderingContext`.";
+var ERROR_TEXTURE_URL_TYPE = "`MtlTextureCache.getTexture` expects `url` as a string.";
+var ERROR_OUTPUT_LIST_TYPE = "`MtlTextureCache.getTexture` expects `output` as an array.";
+var ERROR_OPTIONS_TYPE2 = "`MtlTextureCache.getTexture` expects `options` as a plain object.";
+var ERROR_CLAMP_OPTION_TYPE = "`MtlTextureCache.getTexture` expects `options.clamp` as a boolean.";
+var ERROR_WRAP_S_OPTION_TYPE = "`MtlTextureCache.getTexture` expects `options.wrapS` as a number.";
+var ERROR_WRAP_T_OPTION_TYPE = "`MtlTextureCache.getTexture` expects `options.wrapT` as a number.";
+var CACHE_KEY_SEPARATOR = "|";
 var TYPEOF_STRING = "string";
-var MtlTextureCache = class {
+var TYPEOF_OBJECT3 = "object";
+var TYPEOF_BOOLEAN3 = "boolean";
+var TYPEOF_NUMBER2 = "number";
+var MtlTextureCache = class _MtlTextureCache {
   /**
-   * WebGL2 rendering context, used to create textures.
+   * WebGL2 rendering context, used to create the textures.
    *
    * @type {WebGL2RenderingContext}
    * @private
@@ -9323,57 +11349,105 @@ var MtlTextureCache = class {
    */
   constructor(webglContext) {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
-      throw new TypeError(ERROR_WEBGL_CONTEXT_TYPE2);
+      throw new TypeError(ERROR_WEBGL_CONTEXT_TYPE4);
     }
     this.#webglContext = webglContext;
   }
   /**
    * Returns cached or newly loaded texture.
    *
-   * @param {string} url           - Texture URL.
-   * @param {Texture2D[]} output   - Output list of created textures.
-   * @returns {Promise<Texture2D>} - Promise, that resolves with the cached or newly created `Texture2D` instance for the given URL.
+   * @param {string} url                      - Texture URL.
+   * @param {Texture2D[]} output              - Output list of created textures.
+   * @param {Object} [options]                - Texture options.
+   * @param {boolean} [options.clamp = false] - When true, uses `clamp-to-edge` on both S and T-axes.
+   * @param {number} [options.wrapS]          - Optional wrap mode for S-axis.
+   * @param {number} [options.wrapT]          - Optional wrap mode for T-axis.
+   * @returns {Promise<Texture2D>}            - Promise, that resolves with the cached or newly created `Texture2D` instance for the given URL.
    * @throws {TypeError} When url or output are invalid.
    */
-  async getTexture(url, output) {
+  async getTexture(url, output, options = {}) {
     if (typeof url !== TYPEOF_STRING) {
       throw new TypeError(ERROR_TEXTURE_URL_TYPE);
     }
     if (!Array.isArray(output)) {
       throw new TypeError(ERROR_OUTPUT_LIST_TYPE);
     }
-    if (this.#cache.has(url)) {
-      return this.#cache.get(url);
+    if (options === null || typeof options !== TYPEOF_OBJECT3 || Array.isArray(options)) {
+      throw new TypeError(ERROR_OPTIONS_TYPE2);
     }
-    const texture = new Texture2D(this.#webglContext);
+    const { clamp = false, wrapS, wrapT } = options;
+    if (typeof clamp !== TYPEOF_BOOLEAN3) {
+      throw new TypeError(ERROR_CLAMP_OPTION_TYPE);
+    }
+    if (wrapS !== void 0 && typeof wrapS !== TYPEOF_NUMBER2) {
+      throw new TypeError(ERROR_WRAP_S_OPTION_TYPE);
+    }
+    if (wrapT !== void 0 && typeof wrapT !== TYPEOF_NUMBER2) {
+      throw new TypeError(ERROR_WRAP_T_OPTION_TYPE);
+    }
+    const resolvedWrapS = wrapS !== void 0 ? wrapS : clamp ? this.#webglContext.CLAMP_TO_EDGE : this.#webglContext.REPEAT;
+    const resolvedWrapT = wrapT !== void 0 ? wrapT : clamp ? this.#webglContext.CLAMP_TO_EDGE : this.#webglContext.REPEAT;
+    const cacheKey = _MtlTextureCache.#buildCacheKey(url, resolvedWrapS, resolvedWrapT);
+    if (this.#cache.has(cacheKey)) {
+      return this.#cache.get(cacheKey);
+    }
+    const texture = new Texture2D(this.#webglContext, {
+      wrapS: resolvedWrapS,
+      wrapT: resolvedWrapT
+    });
     await texture.loadFromUrl(url);
-    this.#cache.set(url, texture);
+    this.#cache.set(cacheKey, texture);
     output.push(texture);
     return texture;
+  }
+  /**
+   * Builds a cache key for texture lookup.
+   *
+   * @param {string} url   - Texture URL.
+   * @param {number} wrapS - Wrap mode for S-axis.
+   * @param {number} wrapT - Wrap mode for T-axis.
+   * @returns {string}     - Cache key.
+   * @private
+   */
+  static #buildCacheKey(url, wrapS, wrapT) {
+    return String(url) + CACHE_KEY_SEPARATOR + String(wrapS) + CACHE_KEY_SEPARATOR + String(wrapT);
   }
 };
 
 // core/loaders/obj-mtl/obj-material-factory.js
 var DEFAULT_TEXTURE_UNIT_INDEX3 = 0;
 var DEFAULT_OPACITY2 = 1;
+var DEFAULT_AMBIENT_STRENGTH2 = 0.2;
 var COLOR_COMPONENT_COUNT6 = 3;
-var DEFAULT_DIFFUSE_COLOR = new Float32Array([1, 1, 1]);
-var DEFAULT_SHININESS2 = 16;
+var DEFAULT_DIFFUSE_COLOR2 = new Float32Array([1, 1, 1]);
+var DEFAULT_SHININESS3 = 16;
+var DEFAULT_SPECULAR_STRENGTH3 = 1;
+var DEFAULT_OPTICAL_DENSITY2 = 1;
 var MIN_SHININESS = 1;
 var MAX_SHININESS = 128;
-var ZERO_VALUE11 = 0;
+var ZERO_VALUE14 = 0;
+var AMBIENT_COLOR_EPSILON = 1e-4;
 var FIRST_INDEX2 = 0;
 var SECOND_INDEX2 = 1;
 var THIRD_INDEX2 = 2;
-var ERROR_WEBGL_CONTEXT_TYPE3 = "`ObjMaterialFactory` expects a `WebGL2RenderingContext`.";
-var ERROR_OPTIONS_TYPE = "`ObjMaterialFactory` expects options as a plain object.";
+var TEXTURE_UNIT_DIFFUSE = 0;
+var TEXTURE_UNIT_AMBIENT = 1;
+var TEXTURE_UNIT_SPECULAR = 2;
+var TEXTURE_UNIT_ALPHA = 3;
+var TEXTURE_UNIT_BUMP = 4;
+var TEXTURE_UNIT_DISPLACEMENT = 5;
+var TEXTURE_UNIT_REFLECTION = 6;
+var MAX_TEXTURE_UNIT_OFFSET = TEXTURE_UNIT_REFLECTION;
+var ERROR_WEBGL_CONTEXT_TYPE5 = "`ObjMaterialFactory` expects a `WebGL2RenderingContext`.";
+var ERROR_OPTIONS_TYPE3 = "`ObjMaterialFactory` expects options as a plain object.";
 var ERROR_TEXTURE_UNIT_INDEX_TYPE = "`ObjMaterialFactory` expects `textureUnitIndex` as a non-negative integer.";
 var ERROR_DEFAULT_COLOR_TYPE = "`ObjMaterialFactory` expects `defaultColor` as `number[]` or `Float32Array`.";
 var ERROR_DEFAULT_COLOR_LENGTH = "`ObjMaterialFactory` expects `defaultColor` to have 3 components.";
 var ERROR_TEXTURE_CACHE_TYPE = "`ObjMaterialFactory` expects `textureCache` as `MtlTextureCache`.";
 var ERROR_TEXTURES_OUTPUT_TYPE = "`ObjMaterialFactory.createMaterial` expects `textures` as an array.";
-var TYPEOF_OBJECT2 = "object";
-var TYPEOF_NUMBER = "number";
+var ERROR_TEXTURE_UNITS_LIMIT = "`ObjMaterialFactory` cannot allocate texture units for MTL maps. Increase available texture units or reduce the number of maps.";
+var TYPEOF_OBJECT4 = "object";
+var TYPEOF_NUMBER3 = "number";
 var ObjMaterialFactory = class _ObjMaterialFactory {
   /**
    * WebGL2 rendering context used to create the materials.
@@ -9395,7 +11469,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
    * @type {Float32Array}
    * @private
    */
-  #defaultColor = new Float32Array(DEFAULT_DIFFUSE_COLOR);
+  #defaultColor = new Float32Array(DEFAULT_DIFFUSE_COLOR2);
   /**
    * Texture cache, used for loading the textures.
    *
@@ -9410,17 +11484,17 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
    */
   constructor(webglContext, options = {}) {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
-      throw new TypeError(ERROR_WEBGL_CONTEXT_TYPE3);
+      throw new TypeError(ERROR_WEBGL_CONTEXT_TYPE5);
     }
-    if (options === null || typeof options !== TYPEOF_OBJECT2 || Array.isArray(options)) {
-      throw new TypeError(ERROR_OPTIONS_TYPE);
+    if (options === null || typeof options !== TYPEOF_OBJECT4 || Array.isArray(options)) {
+      throw new TypeError(ERROR_OPTIONS_TYPE3);
     }
     const {
       textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX3,
       defaultColor,
       textureCache
     } = options;
-    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE11) {
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE14) {
       throw new TypeError(ERROR_TEXTURE_UNIT_INDEX_TYPE);
     }
     if (defaultColor !== void 0) {
@@ -9442,26 +11516,104 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
   /**
    * Creates a material instance, based on MTL data.
    *
-   * @param {Object | null} definition          - Parsed material definition.
-   * @param {string | null} textureUrl          - Resolved diffuse texture URL.
-   * @param {Array} textures                    - Output list of created textures.
-   * @param {boolean} [useVertexColors = false] - Whether the vertex colors are available.
-   * @returns {Promise<LambertMaterial | PhongMaterial | TexturedMaterial | VertexColorMaterial>} - Promise, that resolves with the created material instance, based on the parsed MTL definition and the available inputs.
+   * @param {Object | null} definition                  - Parsed material definition.
+   * @param {ObjMaterialTextureUrls | null} textureUrls - Resolved texture URLs.
+   * @param {Array} textures                            - Output list of created textures.
+   * @param {boolean} [useVertexColors = false]         - Whether the vertex colors are available.
+   * @returns {Promise<LambertMaterial | PhongMaterial | VertexColorMaterial | MtlStandardMaterial>} - Promise, that resolves with the created material instance, based on the parsed MTL definition and the available inputs.
    * @throws {TypeError} When textures output is invalid.
    */
-  async createMaterial(definition, textureUrl, textures, useVertexColors = false) {
+  async createMaterial(definition, textureUrls, textures, useVertexColors = false) {
     if (!Array.isArray(textures)) {
       throw new TypeError(ERROR_TEXTURES_OUTPUT_TYPE);
     }
     const opacity = definition ? definition.opacity : DEFAULT_OPACITY2;
-    if (definition && definition.diffuseMap && textureUrl) {
-      const texture = await this.#textureCache.getTexture(textureUrl, textures);
-      const material = new TexturedMaterial(this.#webglContext, {
-        texture,
-        ownsTexture: false,
-        textureUnitIndex: this.#textureUnitIndex
+    if (definition && this.#requiresStandardMaterial(definition, textureUrls)) {
+      this.#assertTextureUnitsAvailable(definition, textureUrls);
+      const ambientColor = _ObjMaterialFactory.#resolveAmbientColor(definition);
+      const material = new MtlStandardMaterial(this.#webglContext, {
+        diffuseColor: definition.diffuseColor,
+        ambientColor,
+        specularColor: definition.specularColor,
+        emissiveColor: definition.emissiveColor,
+        ambientStrength: DEFAULT_AMBIENT_STRENGTH2
       });
       material.setOpacity(opacity);
+      material.setShininess(_ObjMaterialFactory.#clampShininess(definition.specularExponent));
+      material.setSpecularStrength(DEFAULT_SPECULAR_STRENGTH3);
+      material.setOpticalDensity(definition.opticalDensity ?? DEFAULT_OPTICAL_DENSITY2);
+      material.setSpecularEnabled(_ObjMaterialFactory.#isSpecularEnabled(definition));
+      if (textureUrls && definition.diffuseMap && textureUrls.diffuse) {
+        const texture = await this.#textureCache.getTexture(textureUrls.diffuse, textures, {
+          clamp: definition.diffuseMap.clamp
+        });
+        material.setDiffuseMap(texture, {
+          textureUnitIndex: this.#textureUnitIndex + TEXTURE_UNIT_DIFFUSE,
+          uvOffset: definition.diffuseMap.offset,
+          uvScale: definition.diffuseMap.scale
+        });
+      }
+      if (textureUrls && definition.ambientMap && textureUrls.ambient) {
+        const texture = await this.#textureCache.getTexture(textureUrls.ambient, textures, {
+          clamp: definition.ambientMap.clamp
+        });
+        material.setAmbientMap(texture, {
+          textureUnitIndex: this.#textureUnitIndex + TEXTURE_UNIT_AMBIENT,
+          uvOffset: definition.ambientMap.offset,
+          uvScale: definition.ambientMap.scale
+        });
+      }
+      if (textureUrls && definition.specularMap && textureUrls.specular) {
+        const texture = await this.#textureCache.getTexture(textureUrls.specular, textures, {
+          clamp: definition.specularMap.clamp
+        });
+        material.setSpecularMap(texture, {
+          textureUnitIndex: this.#textureUnitIndex + TEXTURE_UNIT_SPECULAR,
+          uvOffset: definition.specularMap.offset,
+          uvScale: definition.specularMap.scale
+        });
+      }
+      if (textureUrls && definition.alphaMap && textureUrls.alpha) {
+        const texture = await this.#textureCache.getTexture(textureUrls.alpha, textures, {
+          clamp: definition.alphaMap.clamp
+        });
+        material.setAlphaMap(texture, {
+          textureUnitIndex: this.#textureUnitIndex + TEXTURE_UNIT_ALPHA,
+          uvOffset: definition.alphaMap.offset,
+          uvScale: definition.alphaMap.scale
+        });
+      }
+      if (textureUrls && definition.bumpMap && textureUrls.bump) {
+        const texture = await this.#textureCache.getTexture(textureUrls.bump, textures, {
+          clamp: definition.bumpMap.clamp
+        });
+        material.setBumpMap(texture, {
+          textureUnitIndex: this.#textureUnitIndex + TEXTURE_UNIT_BUMP,
+          uvOffset: definition.bumpMap.offset,
+          uvScale: definition.bumpMap.scale
+        });
+        material.setBumpMultiplier(definition.bumpMap.bumpMultiplier);
+      }
+      if (textureUrls && definition.displacementMap && textureUrls.displacement) {
+        const texture = await this.#textureCache.getTexture(textureUrls.displacement, textures, {
+          clamp: definition.displacementMap.clamp
+        });
+        material.setDisplacementMap(texture, {
+          textureUnitIndex: this.#textureUnitIndex + TEXTURE_UNIT_DISPLACEMENT,
+          uvOffset: definition.displacementMap.offset,
+          uvScale: definition.displacementMap.scale
+        });
+      }
+      if (textureUrls && definition.reflectionMap && textureUrls.reflection) {
+        const texture = await this.#textureCache.getTexture(textureUrls.reflection, textures, {
+          clamp: definition.reflectionMap.clamp
+        });
+        material.setReflectionMap(texture, {
+          textureUnitIndex: this.#textureUnitIndex + TEXTURE_UNIT_REFLECTION,
+          uvOffset: definition.reflectionMap.offset,
+          uvScale: definition.reflectionMap.scale
+        });
+      }
       return material;
     }
     if (useVertexColors && !this.#hasSpecularInfo(definition)) {
@@ -9491,7 +11643,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
     return fallbackMaterial;
   }
   /**
-   * Determines whether the material has specular data.
+   * Determines whether the material has the specular data.
    *
    * @param {Object | null} definition - Parsed material definition.
    * @returns {boolean}                - True, when the definition contains the specular exponent or the non-zero specular color.
@@ -9505,7 +11657,39 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
       return true;
     }
     const specular = definition.specularColor;
-    return Boolean(specular && (specular[FIRST_INDEX2] > ZERO_VALUE11 || specular[SECOND_INDEX2] > ZERO_VALUE11 || specular[THIRD_INDEX2] > ZERO_VALUE11));
+    return Boolean(specular && (specular[FIRST_INDEX2] > ZERO_VALUE14 || specular[SECOND_INDEX2] > ZERO_VALUE14 || specular[THIRD_INDEX2] > ZERO_VALUE14));
+  }
+  /**
+   * Resolves the ambient color, applying fallback to diffuse the color, when needed.
+   *
+   * @param {Object} definition                - Parsed material definition.
+   * @returns {Float32Array | number[] | null} - Resolved ambient color.
+   * @private
+   */
+  static #resolveAmbientColor(definition) {
+    if (!definition) {
+      return null;
+    }
+    if (definition.ambientMap) {
+      return definition.ambientColor;
+    }
+    if (_ObjMaterialFactory.#isColorNearZero(definition.ambientColor)) {
+      return null;
+    }
+    return definition.ambientColor;
+  }
+  /**
+   * Checks whether a color is effectively zero.
+   *
+   * @param {Float32Array | number[] | null} color - Color input.
+   * @returns {boolean}                            - True, when color is missing or near zero.
+   * @private
+   */
+  static #isColorNearZero(color) {
+    if (!color || typeof color.length !== TYPEOF_NUMBER3 || color.length < COLOR_COMPONENT_COUNT6) {
+      return true;
+    }
+    return Math.abs(color[FIRST_INDEX2]) <= AMBIENT_COLOR_EPSILON && Math.abs(color[SECOND_INDEX2]) <= AMBIENT_COLOR_EPSILON && Math.abs(color[THIRD_INDEX2]) <= AMBIENT_COLOR_EPSILON;
   }
   /**
    * Clamps the shininess value into the allowed range.
@@ -9515,10 +11699,127 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
    * @private
    */
   static #clampShininess(value) {
-    if (typeof value !== TYPEOF_NUMBER || !Number.isFinite(value)) {
-      return DEFAULT_SHININESS2;
+    if (typeof value !== TYPEOF_NUMBER3 || !Number.isFinite(value)) {
+      return DEFAULT_SHININESS3;
     }
     return Math.min(Math.max(value, MIN_SHININESS), MAX_SHININESS);
+  }
+  /**
+   * Determines if the material should be rendered with the standard MTL material.
+   *
+   * @param {Object} definition                         - Parsed material definition.
+   * @param {ObjMaterialTextureUrls | null} textureUrls - Resolved texture URLs.
+   * @returns {boolean}                                 - True, when the standard MTL material is required.
+   * @private
+   */
+  #requiresStandardMaterial(definition, textureUrls) {
+    if (!definition) {
+      return false;
+    }
+    const hasMaps = Boolean(definition.diffuseMap || definition.ambientMap || definition.specularMap || definition.alphaMap || definition.bumpMap || definition.displacementMap || definition.reflectionMap);
+    const hasIllumination = definition.illuminationModel !== null;
+    const hasSpecular = this.#hasSpecularInfo(definition);
+    if (hasMaps || hasIllumination || hasSpecular) {
+      return true;
+    }
+    return Boolean(textureUrls && textureUrls.diffuse);
+  }
+  /**
+   * Checks if specular lighting should be enabled.
+   *
+   * @param {Object} definition - Parsed material definition.
+   * @returns {boolean}         - True when specular should be enabled.
+   * @private
+   */
+  static #isSpecularEnabled(definition) {
+    if (!definition || definition.illuminationModel === null) {
+      return true;
+    }
+    return definition.illuminationModel >= SECOND_INDEX2;
+  }
+  /**
+   * Ensures texture units are available for all required maps.
+   *
+   * @param {Object} definition                         - Parsed material definition.
+   * @param {ObjMaterialTextureUrls | null} textureUrls - Resolved texture URLs.
+   * @returns {void}
+   * @throws {Error} When available texture units are insufficient.
+   * @private
+   */
+  #assertTextureUnitsAvailable(definition, textureUrls) {
+    const maxUnits = this.#webglContext.getParameter(this.#webglContext.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
+    if (!Number.isInteger(maxUnits) || maxUnits <= ZERO_VALUE14) {
+      throw new Error(ERROR_TEXTURE_UNITS_LIMIT);
+    }
+    const usesDiffuse = Boolean(textureUrls && definition.diffuseMap && textureUrls.diffuse);
+    const usesAmbient = Boolean(textureUrls && definition.ambientMap && textureUrls.ambient);
+    const usesSpecular = Boolean(textureUrls && definition.specularMap && textureUrls.specular);
+    const usesAlpha = Boolean(textureUrls && definition.alphaMap && textureUrls.alpha);
+    const usesBump = Boolean(textureUrls && definition.bumpMap && textureUrls.bump);
+    const usesDisplacement = Boolean(textureUrls && definition.displacementMap && textureUrls.displacement);
+    const usesReflection = Boolean(textureUrls && definition.reflectionMap && textureUrls.reflection);
+    let maxOffset = ZERO_VALUE14;
+    if (usesDiffuse) {
+      maxOffset = Math.max(maxOffset, TEXTURE_UNIT_DIFFUSE);
+    }
+    if (usesAmbient) {
+      maxOffset = Math.max(maxOffset, TEXTURE_UNIT_AMBIENT);
+    }
+    if (usesSpecular) {
+      maxOffset = Math.max(maxOffset, TEXTURE_UNIT_SPECULAR);
+    }
+    if (usesAlpha) {
+      maxOffset = Math.max(maxOffset, TEXTURE_UNIT_ALPHA);
+    }
+    if (usesBump) {
+      maxOffset = Math.max(maxOffset, TEXTURE_UNIT_BUMP);
+    }
+    if (usesDisplacement) {
+      maxOffset = Math.max(maxOffset, TEXTURE_UNIT_DISPLACEMENT);
+    }
+    if (usesReflection) {
+      maxOffset = Math.max(maxOffset, TEXTURE_UNIT_REFLECTION);
+    }
+    if (maxOffset > MAX_TEXTURE_UNIT_OFFSET) {
+      throw new Error(ERROR_TEXTURE_UNITS_LIMIT);
+    }
+    const highestUnitIndex = this.#textureUnitIndex + maxOffset;
+    if (highestUnitIndex >= maxUnits) {
+      throw new Error(ERROR_TEXTURE_UNITS_LIMIT);
+    }
+  }
+};
+
+// core/loaders/obj-mtl/material-name-normalizer.js
+var CARRIAGE_RETURN_REGEX = /\r+/gu;
+var WHITESPACE_REGEX = /\s+/gu;
+var QUOTE_TOKEN = '"';
+var BACKSLASH_REGEX = /\\/gu;
+var PATH_SEPARATOR = "/";
+var EMPTY_STRING = "";
+var SECOND_INDEX3 = 1;
+var SPACE_SEPARATOR = " ";
+var TYPEOF_STRING2 = "string";
+var ERROR_MATERIAL_NAME_TYPE = "`MaterialNameNormalizer.normalize` expects `name` as a string.";
+var MaterialNameNormalizer = class {
+  /**
+   * Normalizes a material name by: trimming, unquoting, collapsing spaces and fixing separators.
+   *
+   * @param {string} name - Raw material name input.
+   * @returns {string}    - Normalized material name.
+   * @throws {TypeError} When name is not a string.
+   */
+  static normalize(name) {
+    if (typeof name !== TYPEOF_STRING2) {
+      throw new TypeError(ERROR_MATERIAL_NAME_TYPE);
+    }
+    let normalized = name.replace(CARRIAGE_RETURN_REGEX, EMPTY_STRING).trim();
+    if (normalized.startsWith(QUOTE_TOKEN) && normalized.endsWith(QUOTE_TOKEN) && normalized.length > SECOND_INDEX3) {
+      normalized = normalized.slice(SECOND_INDEX3, normalized.length - SECOND_INDEX3);
+    }
+    normalized = normalized.replace(BACKSLASH_REGEX, PATH_SEPARATOR);
+    normalized = normalized.replace(WHITESPACE_REGEX, SPACE_SEPARATOR).trim();
+    return normalized;
   }
 };
 
@@ -9528,6 +11829,8 @@ var OBJ_VERTEX_TOKEN = "v";
 var OBJ_TEXCOORD_TOKEN = "vt";
 var OBJ_NORMAL_TOKEN = "vn";
 var OBJ_FACE_TOKEN = "f";
+var OBJ_POINT_TOKEN = "p";
+var OBJ_LINE_TOKEN = "l";
 var OBJ_MATERIAL_LIB_TOKEN = "mtllib";
 var OBJ_USE_MATERIAL_TOKEN = "usemtl";
 var OBJ_OBJECT_TOKEN = "o";
@@ -9537,19 +11840,24 @@ var OBJ_FACE_ATTRIBUTE_SEPARATOR = "/";
 var DEFAULT_MATERIAL_NAME = "default";
 var DEFAULT_OBJECT_NAME = "default";
 var DEFAULT_GROUP_NAME = "default";
-var SPACE_SEPARATOR = " ";
-var EMPTY_STRING = "";
+var SPACE_SEPARATOR2 = " ";
+var EMPTY_STRING2 = "";
 var LINE_SPLIT_REGEX = /\s+/u;
 var LINE_BREAK_REGEX = /\r?\n/u;
-var QUOTE_TOKEN = '"';
+var QUOTE_TOKEN2 = '"';
 var NOT_FOUND_INDEX = -1;
-var TYPEOF_STRING2 = "string";
+var TYPEOF_STRING3 = "string";
 var FACE_MIN_VERTEX_COUNT = 3;
+var LINE_MIN_VERTEX_COUNT2 = 2;
 var POSITION_COMPONENT_COUNT7 = 3;
 var UV_COMPONENT_COUNT3 = 2;
 var NORMAL_COMPONENT_COUNT3 = 3;
 var COLOR_COMPONENT_COUNT7 = 3;
-var COLOR_START_INDEX = POSITION_COMPONENT_COUNT7 + SECOND_INDEX3;
+var FIRST_INDEX3 = 0;
+var SECOND_INDEX4 = 1;
+var THIRD_INDEX3 = 2;
+var FOURTH_INDEX = 3;
+var COLOR_START_INDEX = POSITION_COMPONENT_COUNT7 + SECOND_INDEX4;
 var DEFAULT_SMOOTHING_GROUP = 0;
 var SMOOTHING_OFF_TOKEN = "off";
 var SMOOTHING_ON_TOKEN = "on";
@@ -9557,10 +11865,6 @@ var OBJ_INDEX_OFFSET = 1;
 var OBJ_INDEX_NOT_PROVIDED2 = -1;
 var OBJ_INDEX_ZERO = 0;
 var DECIMAL_RADIX = 10;
-var FIRST_INDEX3 = 0;
-var SECOND_INDEX3 = 1;
-var THIRD_INDEX3 = 2;
-var FOURTH_INDEX = 3;
 var FAN_FIRST_VERTEX_INDEX = 0;
 var NEXT_FACE_VERTEX_OFFSET = 1;
 var CHUNK_KEY_SEPARATOR = "::";
@@ -9653,7 +11957,7 @@ var ObjParser = class _ObjParser {
    * @throws {TypeError} When `objText` is not a string.
    */
   parse(objText) {
-    if (typeof objText !== TYPEOF_STRING2) {
+    if (typeof objText !== TYPEOF_STRING3) {
       throw new TypeError(ERROR_OBJ_TEXT_TYPE);
     }
     this.#resetState();
@@ -9733,6 +12037,12 @@ var ObjParser = class _ObjParser {
       case OBJ_FACE_TOKEN:
         this.#parseFace(parts);
         break;
+      case OBJ_POINT_TOKEN:
+        this.#parsePoints(parts);
+        break;
+      case OBJ_LINE_TOKEN:
+        this.#parseLineElement(parts);
+        break;
       default:
         break;
     }
@@ -9792,10 +12102,10 @@ var ObjParser = class _ObjParser {
    */
   #parseMaterialLibrary(line) {
     const tokens = _ObjParser.#splitTokens(line);
-    if (tokens.length <= SECOND_INDEX3) {
+    if (tokens.length <= SECOND_INDEX4) {
       return;
     }
-    const libraries = tokens.slice(SECOND_INDEX3);
+    const libraries = tokens.slice(SECOND_INDEX4);
     for (const library of libraries) {
       if (library) {
         this.#materialLibraries.push(library);
@@ -9810,8 +12120,9 @@ var ObjParser = class _ObjParser {
    * @private
    */
   #parseUseMaterial(parts) {
-    const materialName = parts.slice(SECOND_INDEX3).join(SPACE_SEPARATOR) || DEFAULT_MATERIAL_NAME;
-    this.#currentMaterialName = materialName;
+    const rawMaterialName = parts.slice(SECOND_INDEX4).join(SPACE_SEPARATOR2) || DEFAULT_MATERIAL_NAME;
+    const normalizedName = MaterialNameNormalizer.normalize(rawMaterialName);
+    this.#currentMaterialName = normalizedName || DEFAULT_MATERIAL_NAME;
     this.#getOrCreateMaterialChunk(this.#currentGroup, this.#currentMaterialName, this.#currentSmoothingGroup);
   }
   /**
@@ -9822,7 +12133,7 @@ var ObjParser = class _ObjParser {
    * @private
    */
   #parseObject(parts) {
-    const objectName = parts.slice(SECOND_INDEX3).join(SPACE_SEPARATOR) || DEFAULT_OBJECT_NAME;
+    const objectName = parts.slice(SECOND_INDEX4).join(SPACE_SEPARATOR2) || DEFAULT_OBJECT_NAME;
     this.#currentObject = this.#getOrCreateObject(objectName);
     this.#currentGroup = this.#getOrCreateGroup(this.#currentObject, DEFAULT_GROUP_NAME);
     this.#getOrCreateMaterialChunk(this.#currentGroup, this.#currentMaterialName, this.#currentSmoothingGroup);
@@ -9835,7 +12146,7 @@ var ObjParser = class _ObjParser {
    * @private
    */
   #parseGroup(parts) {
-    const groupName = parts.slice(SECOND_INDEX3).join(SPACE_SEPARATOR) || DEFAULT_GROUP_NAME;
+    const groupName = parts.slice(SECOND_INDEX4).join(SPACE_SEPARATOR2) || DEFAULT_GROUP_NAME;
     this.#currentGroup = this.#getOrCreateGroup(this.#currentObject, groupName);
     this.#getOrCreateMaterialChunk(this.#currentGroup, this.#currentMaterialName, this.#currentSmoothingGroup);
   }
@@ -9847,7 +12158,7 @@ var ObjParser = class _ObjParser {
    * @private
    */
   #parseSmoothing(parts) {
-    const smoothingValue = parts[SECOND_INDEX3] || SMOOTHING_OFF_TOKEN;
+    const smoothingValue = parts[SECOND_INDEX4] || SMOOTHING_OFF_TOKEN;
     if (smoothingValue === SMOOTHING_OFF_TOKEN || smoothingValue === String(DEFAULT_SMOOTHING_GROUP)) {
       this.#currentSmoothingGroup = DEFAULT_SMOOTHING_GROUP;
     } else if (smoothingValue === SMOOTHING_ON_TOKEN) {
@@ -9867,18 +12178,71 @@ var ObjParser = class _ObjParser {
    * @private
    */
   #parseFace(parts) {
-    const faceVertices = parts.slice(SECOND_INDEX3);
+    const faceVertices = parts.slice(SECOND_INDEX4);
     if (faceVertices.length < FACE_MIN_VERTEX_COUNT) {
       return;
     }
     const vertices = faceVertices.map((vertex) => this.#resolveFaceVertex(vertex));
-    const chunk = this.#getOrCreateMaterialChunk(this.#currentGroup, this.#currentMaterialName, this.#currentSmoothingGroup);
-    for (let index = SECOND_INDEX3; index < vertices.length - NEXT_FACE_VERTEX_OFFSET; index += NEXT_FACE_VERTEX_OFFSET) {
+    const chunk = this.#getOrCreateMaterialChunk(
+      this.#currentGroup,
+      this.#currentMaterialName,
+      this.#currentSmoothingGroup
+    );
+    for (let index = SECOND_INDEX4; index < vertices.length - NEXT_FACE_VERTEX_OFFSET; index += NEXT_FACE_VERTEX_OFFSET) {
       const firstVertex = vertices[FAN_FIRST_VERTEX_INDEX];
       const secondVertex = vertices[index];
       const thirdVertex = vertices[index + NEXT_FACE_VERTEX_OFFSET];
       chunk.triangles.push([firstVertex, secondVertex, thirdVertex]);
     }
+  }
+  /**
+   * Parses a point line and appends indices to current chunk.
+   *
+   * @param {string[]} parts - Point line parts.
+   * @returns {void}
+   * @private
+   */
+  #parsePoints(parts) {
+    const vertices = parts.slice(SECOND_INDEX4);
+    if (!vertices.length) {
+      return;
+    }
+    const chunk = this.#getOrCreateMaterialChunk(
+      this.#currentGroup,
+      this.#currentMaterialName,
+      this.#currentSmoothingGroup
+    );
+    for (const vertex of vertices) {
+      const positionIndex = this.#resolveVertexPositionIndex(vertex);
+      if (positionIndex !== OBJ_INDEX_NOT_PROVIDED2) {
+        chunk.points.push(positionIndex);
+      }
+    }
+  }
+  /**
+   * Parses a line definition and appends it to current chunk.
+   *
+   * @param {string[]} parts - Line line parts.
+   * @returns {void}
+   * @private
+   */
+  #parseLineElement(parts) {
+    const vertices = parts.slice(SECOND_INDEX4);
+    if (vertices.length < LINE_MIN_VERTEX_COUNT2) {
+      return;
+    }
+    const indices = [];
+    for (const vertex of vertices) {
+      const positionIndex = this.#resolveVertexPositionIndex(vertex);
+      if (positionIndex !== OBJ_INDEX_NOT_PROVIDED2) {
+        indices.push(positionIndex);
+      }
+    }
+    if (indices.length < LINE_MIN_VERTEX_COUNT2) {
+      return;
+    }
+    const chunk = this.#getOrCreateMaterialChunk(this.#currentGroup, this.#currentMaterialName, this.#currentSmoothingGroup);
+    chunk.lines.push(indices);
   }
   /**
    * Resolves a face vertex definition into the indices.
@@ -9891,7 +12255,7 @@ var ObjParser = class _ObjParser {
   #resolveFaceVertex(vertexData) {
     const indices = vertexData.split(OBJ_FACE_ATTRIBUTE_SEPARATOR);
     const positionIndex = _ObjParser.#parseIndex(indices[FIRST_INDEX3], this.#positions.length / POSITION_COMPONENT_COUNT7);
-    const uvIndex = _ObjParser.#parseIndex(indices[SECOND_INDEX3], this.#uvs.length / UV_COMPONENT_COUNT3);
+    const uvIndex = _ObjParser.#parseIndex(indices[SECOND_INDEX4], this.#uvs.length / UV_COMPONENT_COUNT3);
     const normalIndex = _ObjParser.#parseIndex(indices[THIRD_INDEX3], this.#normals.length / NORMAL_COMPONENT_COUNT3);
     if (positionIndex === OBJ_INDEX_NOT_PROVIDED2) {
       throw new Error(ERROR_MISSING_POSITION_INDEX);
@@ -9901,6 +12265,17 @@ var ObjParser = class _ObjParser {
       uvIndex,
       normalIndex
     };
+  }
+  /**
+   * Resolves a vertex token into a position index.
+   *
+   * @param {string} vertexData - Vertex data string.
+   * @returns {number}          - Resolved position index or `-1`.
+   * @private
+   */
+  #resolveVertexPositionIndex(vertexData) {
+    const indices = vertexData.split(OBJ_FACE_ATTRIBUTE_SEPARATOR);
+    return _ObjParser.#parseIndex(indices[FIRST_INDEX3], this.#positions.length / POSITION_COMPONENT_COUNT7);
   }
   /**
    * Creates or returns a parsed object entry.
@@ -9963,7 +12338,9 @@ var ObjParser = class _ObjParser {
     const chunk = {
       materialName: materialKey,
       smoothingGroup,
-      triangles: []
+      triangles: [],
+      points: [],
+      lines: []
     };
     group.materialChunks.push(chunk);
     group.chunkMap.set(key, chunk);
@@ -10019,7 +12396,7 @@ var ObjParser = class _ObjParser {
       return [DEFAULT_SMOOTHING_GROUP, DEFAULT_SMOOTHING_GROUP, DEFAULT_SMOOTHING_GROUP];
     }
     return [
-      Number.parseFloat(parts[SECOND_INDEX3]),
+      Number.parseFloat(parts[SECOND_INDEX4]),
       Number.parseFloat(parts[THIRD_INDEX3]),
       Number.parseFloat(parts[FOURTH_INDEX])
     ];
@@ -10036,7 +12413,7 @@ var ObjParser = class _ObjParser {
       return [DEFAULT_SMOOTHING_GROUP, DEFAULT_SMOOTHING_GROUP];
     }
     return [
-      Number.parseFloat(parts[SECOND_INDEX3]),
+      Number.parseFloat(parts[SECOND_INDEX4]),
       Number.parseFloat(parts[THIRD_INDEX3])
     ];
   }
@@ -10054,7 +12431,7 @@ var ObjParser = class _ObjParser {
     }
     return [
       Number.parseFloat(parts[offset]),
-      Number.parseFloat(parts[offset + SECOND_INDEX3]),
+      Number.parseFloat(parts[offset + SECOND_INDEX4]),
       Number.parseFloat(parts[offset + THIRD_INDEX3])
     ];
   }
@@ -10076,17 +12453,17 @@ var ObjParser = class _ObjParser {
       return [];
     }
     const tokens = [];
-    let currentToken = EMPTY_STRING;
+    let currentToken = EMPTY_STRING2;
     let inQuotes = false;
     for (const char of sanitized) {
-      if (char === QUOTE_TOKEN) {
+      if (char === QUOTE_TOKEN2) {
         inQuotes = !inQuotes;
         continue;
       }
       if (!inQuotes && LINE_SPLIT_REGEX.test(char)) {
         if (currentToken) {
           tokens.push(currentToken);
-          currentToken = EMPTY_STRING;
+          currentToken = EMPTY_STRING2;
         }
         continue;
       }
@@ -10124,6 +12501,7 @@ var MTL_SPECULAR_MAP_TOKEN = "map_Ks";
 var MTL_ALPHA_MAP_TOKEN = "map_d";
 var MTL_BUMP_MAP_TOKEN = "bump";
 var MTL_BUMP_MAP_ALT_TOKEN = "map_Bump";
+var MTL_BUMP_MAP_LOWER_TOKEN = "map_bump";
 var MTL_DISPLACEMENT_MAP_TOKEN = "disp";
 var MTL_REFLECTION_MAP_TOKEN = "refl";
 var MTL_OPACITY_TOKEN = "d";
@@ -10132,39 +12510,60 @@ var MTL_MAP_OPTION_SCALE = "-s";
 var MTL_MAP_OPTION_OFFSET = "-o";
 var MTL_MAP_OPTION_CLAMP = "-clamp";
 var MTL_MAP_OPTION_BUMP_MULTIPLIER = "-bm";
-var MTL_MAP_VECTOR_COMPONENTS = 3;
+var MTL_MAP_OPTION_BLENDU = "-blendu";
+var MTL_MAP_OPTION_BLENDV = "-blendv";
+var MTL_MAP_OPTION_IMFCHAN = "-imfchan";
+var MTL_MAP_OPTION_MM = "-mm";
+var MTL_MAP_OPTION_TEXRES = "-texres";
+var MTL_MAP_OPTION_TYPE = "-type";
+var DEFAULT_MAP_OFFSET = new Float32Array([0, 0]);
+var DEFAULT_MAP_SCALE = new Float32Array([1, 1]);
+var DEFAULT_MAP_CLAMP = false;
+var DEFAULT_BUMP_MULTIPLIER2 = 1;
+var CLAMP_ON_TOKEN = "on";
+var CLAMP_OFF_TOKEN = "off";
+var CLAMP_ON_NUMERIC_TOKEN = "1";
+var CLAMP_OFF_NUMERIC_TOKEN = "0";
+var MTL_MAP_UV_COMPONENTS = 2;
+var MTL_MAP_OPTIONAL_VECTOR_COMPONENTS = 1;
+var MTL_MAP_BLEND_COMPONENTS = 1;
+var MTL_MAP_IMFCHAN_COMPONENTS = 1;
+var MTL_MAP_MM_COMPONENTS = 2;
+var MTL_MAP_TEXRES_COMPONENTS = 1;
+var MTL_MAP_TYPE_COMPONENTS = 1;
 var MTL_MAP_SCALAR_COMPONENTS = 1;
 var COLOR_COMPONENT_COUNT8 = 3;
 var DEFAULT_OPACITY3 = 1;
-var DEFAULT_DIFFUSE_COLOR2 = new Float32Array([1, 1, 1]);
-var DEFAULT_SPECULAR_COLOR2 = new Float32Array([0, 0, 0]);
-var DEFAULT_AMBIENT_COLOR = new Float32Array([0, 0, 0]);
-var DEFAULT_EMISSIVE_COLOR = new Float32Array([0, 0, 0]);
-var ZERO_VALUE12 = 0;
-var EMPTY_STRING2 = "";
-var SPACE_SEPARATOR2 = " ";
+var DEFAULT_DIFFUSE_COLOR3 = new Float32Array([1, 1, 1]);
+var DEFAULT_SPECULAR_COLOR3 = new Float32Array([0, 0, 0]);
+var DEFAULT_AMBIENT_COLOR2 = new Float32Array([0, 0, 0]);
+var DEFAULT_EMISSIVE_COLOR2 = new Float32Array([0, 0, 0]);
+var ZERO_VALUE15 = 0;
+var EMPTY_STRING3 = "";
+var SPACE_SEPARATOR3 = " ";
 var LINE_SPLIT_REGEX2 = /\s+/u;
 var LINE_BREAK_REGEX2 = /\r?\n/u;
+var MAP_FLOAT_TOKEN_REGEX = /^[+-]?(?:\d+\.?\d*|\d*\.?\d+)(?:[eE][+-]?\d+)?$/u;
 var HYPHEN_SEPARATOR = "-";
-var QUOTE_TOKEN2 = '"';
+var QUOTE_TOKEN3 = '"';
 var NOT_FOUND_INDEX2 = -1;
 var FIRST_INDEX4 = 0;
-var SECOND_INDEX4 = 1;
+var SECOND_INDEX5 = 1;
 var THIRD_INDEX4 = 2;
 var FOURTH_INDEX2 = 3;
 var DECIMAL_RADIX2 = 10;
-var TYPEOF_STRING3 = "string";
+var TYPEOF_STRING4 = "string";
 var ERROR_MTL_TEXT_TYPE = "`MtlParser.parse` expects `mtlText` as a string.";
 var MtlParser = class _MtlParser {
   /**
-   * Parses MTL text into material definitions.
+   * Parses the MTL text into the material definitions.
    *
    * @param {string} mtlText                   - MTL file contents.
    * @returns {Map<string, ParsedMtlMaterial>} - Map of parsed materials keyed by the material name.
    * @throws {TypeError} When mtlText is not a string.
    */
   parse(mtlText) {
-    if (typeof mtlText !== TYPEOF_STRING3) {
+    if (typeof mtlText !== TYPEOF_STRING4) {
       throw new TypeError(ERROR_MTL_TEXT_TYPE);
     }
     const materials = /* @__PURE__ */ new Map();
@@ -10179,17 +12578,18 @@ var MtlParser = class _MtlParser {
       const keyword = parts[FIRST_INDEX4];
       switch (keyword) {
         case MTL_NEW_MATERIAL_TOKEN: {
-          const name = parts.slice(SECOND_INDEX4).join(SPACE_SEPARATOR2);
+          const rawName = parts.slice(SECOND_INDEX5).join(SPACE_SEPARATOR3);
+          const name = rawName ? MaterialNameNormalizer.normalize(rawName) : EMPTY_STRING3;
           if (!name) {
             currentMaterial = null;
             break;
           }
           currentMaterial = {
             name,
-            diffuseColor: new Float32Array(DEFAULT_DIFFUSE_COLOR2),
-            ambientColor: new Float32Array(DEFAULT_AMBIENT_COLOR),
-            specularColor: new Float32Array(DEFAULT_SPECULAR_COLOR2),
-            emissiveColor: new Float32Array(DEFAULT_EMISSIVE_COLOR),
+            diffuseColor: new Float32Array(DEFAULT_DIFFUSE_COLOR3),
+            ambientColor: new Float32Array(DEFAULT_AMBIENT_COLOR2),
+            specularColor: new Float32Array(DEFAULT_SPECULAR_COLOR3),
+            emissiveColor: new Float32Array(DEFAULT_EMISSIVE_COLOR2),
             diffuseMap: null,
             ambientMap: null,
             specularMap: null,
@@ -10241,21 +12641,21 @@ var MtlParser = class _MtlParser {
           if (!currentMaterial) {
             break;
           }
-          currentMaterial.specularExponent = _MtlParser.#parseFloatValue(parts[SECOND_INDEX4]);
+          currentMaterial.specularExponent = _MtlParser.#parseFloatValue(parts[SECOND_INDEX5]);
           break;
         }
         case MTL_OPTICAL_DENSITY_TOKEN: {
           if (!currentMaterial) {
             break;
           }
-          currentMaterial.opticalDensity = _MtlParser.#parseFloatValue(parts[SECOND_INDEX4]);
+          currentMaterial.opticalDensity = _MtlParser.#parseFloatValue(parts[SECOND_INDEX5]);
           break;
         }
         case MTL_ILLUMINATION_MODEL_TOKEN: {
           if (!currentMaterial) {
             break;
           }
-          const illumValue = Number.parseInt(parts[SECOND_INDEX4], DECIMAL_RADIX2);
+          const illumValue = Number.parseInt(parts[SECOND_INDEX5], DECIMAL_RADIX2);
           currentMaterial.illuminationModel = Number.isFinite(illumValue) ? illumValue : null;
           break;
         }
@@ -10263,64 +12663,65 @@ var MtlParser = class _MtlParser {
           if (!currentMaterial) {
             break;
           }
-          const mapPath = _MtlParser.#parseMtlMapLine(trimmed);
-          currentMaterial.diffuseMap = mapPath || null;
+          const mapData = _MtlParser.#parseMtlMapLine(trimmed);
+          currentMaterial.diffuseMap = mapData;
           break;
         }
         case MTL_AMBIENT_MAP_TOKEN: {
           if (!currentMaterial) {
             break;
           }
-          const mapPath = _MtlParser.#parseMtlMapLine(trimmed);
-          currentMaterial.ambientMap = mapPath || null;
+          const mapData = _MtlParser.#parseMtlMapLine(trimmed);
+          currentMaterial.ambientMap = mapData;
           break;
         }
         case MTL_SPECULAR_MAP_TOKEN: {
           if (!currentMaterial) {
             break;
           }
-          const mapPath = _MtlParser.#parseMtlMapLine(trimmed);
-          currentMaterial.specularMap = mapPath || null;
+          const mapData = _MtlParser.#parseMtlMapLine(trimmed);
+          currentMaterial.specularMap = mapData;
           break;
         }
         case MTL_ALPHA_MAP_TOKEN: {
           if (!currentMaterial) {
             break;
           }
-          const mapPath = _MtlParser.#parseMtlMapLine(trimmed);
-          currentMaterial.alphaMap = mapPath || null;
+          const mapData = _MtlParser.#parseMtlMapLine(trimmed);
+          currentMaterial.alphaMap = mapData;
           break;
         }
         case MTL_BUMP_MAP_TOKEN:
-        case MTL_BUMP_MAP_ALT_TOKEN: {
+        case MTL_BUMP_MAP_ALT_TOKEN:
+        case MTL_BUMP_MAP_LOWER_TOKEN: {
           if (!currentMaterial) {
             break;
           }
-          const mapPath = _MtlParser.#parseMtlMapLine(trimmed);
-          currentMaterial.bumpMap = mapPath || null;
+          const mapData = _MtlParser.#parseMtlMapLine(trimmed);
+          currentMaterial.bumpMap = mapData;
           break;
         }
         case MTL_DISPLACEMENT_MAP_TOKEN: {
           if (!currentMaterial) {
             break;
           }
-          const mapPath = _MtlParser.#parseMtlMapLine(trimmed);
-          currentMaterial.displacementMap = mapPath || null;
+          const mapData = _MtlParser.#parseMtlMapLine(trimmed);
+          currentMaterial.displacementMap = mapData;
           break;
         }
         case MTL_REFLECTION_MAP_TOKEN: {
           if (!currentMaterial) {
             break;
           }
-          const mapPath = _MtlParser.#parseMtlMapLine(trimmed);
-          currentMaterial.reflectionMap = mapPath || null;
+          const mapData = _MtlParser.#parseMtlMapLine(trimmed);
+          currentMaterial.reflectionMap = mapData;
           break;
         }
         case MTL_OPACITY_TOKEN: {
           if (!currentMaterial) {
             break;
           }
-          const value = _MtlParser.#parseFloatValue(parts[SECOND_INDEX4]);
+          const value = _MtlParser.#parseFloatValue(parts[SECOND_INDEX5]);
           if (value !== null) {
             currentMaterial.opacity = value;
           }
@@ -10330,7 +12731,7 @@ var MtlParser = class _MtlParser {
           if (!currentMaterial) {
             break;
           }
-          const value = _MtlParser.#parseFloatValue(parts[SECOND_INDEX4]);
+          const value = _MtlParser.#parseFloatValue(parts[SECOND_INDEX5]);
           if (value !== null) {
             currentMaterial.opacity = DEFAULT_OPACITY3 - value;
           }
@@ -10352,10 +12753,10 @@ var MtlParser = class _MtlParser {
    */
   static #parseFloatTriplet(parts, expected) {
     if (parts.length <= expected) {
-      return [ZERO_VALUE12, ZERO_VALUE12, ZERO_VALUE12];
+      return [ZERO_VALUE15, ZERO_VALUE15, ZERO_VALUE15];
     }
     return [
-      Number.parseFloat(parts[SECOND_INDEX4]),
+      Number.parseFloat(parts[SECOND_INDEX5]),
       Number.parseFloat(parts[THIRD_INDEX4]),
       Number.parseFloat(parts[FOURTH_INDEX2])
     ];
@@ -10375,15 +12776,15 @@ var MtlParser = class _MtlParser {
     return Number.isFinite(parsed) ? parsed : null;
   }
   /**
-   * Parses a texture map line and extracts a file path.
+   * Parses the texture map line and extracts the file path.
    *
-   * @param {string} line - Full `map_*` line.
-   * @returns {string}    - Extracted texture path from the `map_*` line, returns an empty string when not found.
+   * @param {string} line                  - Full `map_*` line.
+   * @returns {ParsedMtlTextureMap | null} - Parsed texture map data, or null when no path is found.
    * @private
    */
   static #parseMtlMapLine(line) {
-    if (typeof line !== TYPEOF_STRING3) {
-      return EMPTY_STRING2;
+    if (typeof line !== TYPEOF_STRING4) {
+      return null;
     }
     let sanitized = line;
     const commentIndex = sanitized.indexOf(COMMENT_TOKEN2);
@@ -10392,37 +12793,66 @@ var MtlParser = class _MtlParser {
     }
     sanitized = sanitized.trim();
     if (!sanitized) {
-      return EMPTY_STRING2;
+      return null;
     }
     const tokens = _MtlParser.#splitTokens(sanitized);
-    if (tokens.length <= SECOND_INDEX4) {
-      return EMPTY_STRING2;
+    if (tokens.length <= SECOND_INDEX5) {
+      return null;
     }
-    let index = SECOND_INDEX4;
+    const mapData = _MtlParser.#createDefaultTextureMap();
+    let index = SECOND_INDEX5;
     while (index < tokens.length) {
       const token = tokens[index];
       if (token.startsWith(HYPHEN_SEPARATOR)) {
         switch (token) {
           case MTL_MAP_OPTION_SCALE:
+            index = _MtlParser.#consumeMapVectorOption(mapData.scale, tokens, index, DEFAULT_MAP_SCALE);
+            break;
           case MTL_MAP_OPTION_OFFSET:
-            index += MTL_MAP_VECTOR_COMPONENTS + SECOND_INDEX4;
+            index = _MtlParser.#consumeMapVectorOption(mapData.offset, tokens, index, DEFAULT_MAP_OFFSET);
             break;
           case MTL_MAP_OPTION_CLAMP:
+            mapData.clamp = _MtlParser.#parseClampToken(tokens[index + SECOND_INDEX5]);
+            index += MTL_MAP_SCALAR_COMPONENTS + SECOND_INDEX5;
+            break;
           case MTL_MAP_OPTION_BUMP_MULTIPLIER:
-            index += MTL_MAP_SCALAR_COMPONENTS + SECOND_INDEX4;
+            mapData.bumpMultiplier = _MtlParser.#parseFloatValue(tokens[index + SECOND_INDEX5]) ?? DEFAULT_BUMP_MULTIPLIER2;
+            index += MTL_MAP_SCALAR_COMPONENTS + SECOND_INDEX5;
+            break;
+          case MTL_MAP_OPTION_BLENDU:
+          case MTL_MAP_OPTION_BLENDV:
+            index += MTL_MAP_BLEND_COMPONENTS + SECOND_INDEX5;
+            break;
+          case MTL_MAP_OPTION_IMFCHAN:
+            index += MTL_MAP_IMFCHAN_COMPONENTS + SECOND_INDEX5;
+            break;
+          case MTL_MAP_OPTION_MM:
+            index += MTL_MAP_MM_COMPONENTS + SECOND_INDEX5;
+            break;
+          case MTL_MAP_OPTION_TEXRES:
+            index += MTL_MAP_TEXRES_COMPONENTS + SECOND_INDEX5;
+            break;
+          case MTL_MAP_OPTION_TYPE:
+            index += MTL_MAP_TYPE_COMPONENTS + SECOND_INDEX5;
             break;
           default:
-            index += SECOND_INDEX4;
+            index += SECOND_INDEX5;
             break;
         }
         continue;
       }
-      return tokens.slice(index).join(SPACE_SEPARATOR2);
+      const rawPath = tokens.slice(index).join(SPACE_SEPARATOR3);
+      const path = _MtlParser.#normalizeQuotedPath(rawPath);
+      if (!path) {
+        return null;
+      }
+      mapData.path = path;
+      return mapData;
     }
-    return EMPTY_STRING2;
+    return null;
   }
   /**
-   * Splits a line into tokens, while respecting the quotes.
+   * Splits the line into tokens, while respecting the quotes.
    *
    * @param {string} line - Line to split.
    * @returns {string[]}  - Tokenized line parts with quotes preserved as a single token.
@@ -10430,17 +12860,17 @@ var MtlParser = class _MtlParser {
    */
   static #splitTokens(line) {
     const tokens = [];
-    let currentToken = EMPTY_STRING2;
+    let currentToken = EMPTY_STRING3;
     let inQuotes = false;
     for (const char of line) {
-      if (char === QUOTE_TOKEN2) {
+      if (char === QUOTE_TOKEN3) {
         inQuotes = !inQuotes;
         continue;
       }
       if (!inQuotes && LINE_SPLIT_REGEX2.test(char)) {
         if (currentToken) {
           tokens.push(currentToken);
-          currentToken = EMPTY_STRING2;
+          currentToken = EMPTY_STRING3;
         }
         continue;
       }
@@ -10451,27 +12881,149 @@ var MtlParser = class _MtlParser {
     }
     return tokens;
   }
+  /**
+   * Creates a default texture map definition.
+   *
+   * @returns {ParsedMtlTextureMap} - Parsed texture map object with defaults.
+   * @private
+   */
+  static #createDefaultTextureMap() {
+    return {
+      path: EMPTY_STRING3,
+      offset: new Float32Array(DEFAULT_MAP_OFFSET),
+      scale: new Float32Array(DEFAULT_MAP_SCALE),
+      clamp: DEFAULT_MAP_CLAMP,
+      bumpMultiplier: DEFAULT_BUMP_MULTIPLIER2
+    };
+  }
+  /**
+   * Applies the vector map option to the target array.
+   *
+   * @param {Float32Array} target   - Target vector array.
+   * @param {string[]} tokens       - Parsed tokens.
+   * @param {number} startIndex     - Index of the first component.
+   * @param {Float32Array} fallback - Fallback vector.
+   * @returns {void}
+   * @private
+   */
+  static #applyMapVector(target, tokens, startIndex, fallback) {
+    const x = _MtlParser.#parseMapFloatToken(tokens[startIndex], fallback[FIRST_INDEX4]);
+    const y = _MtlParser.#parseMapFloatToken(tokens[startIndex + SECOND_INDEX5], fallback[SECOND_INDEX5]);
+    target[FIRST_INDEX4] = x;
+    target[SECOND_INDEX5] = y;
+  }
+  /**
+   * Consumes map vector options (scale/offset), handling the optional third component.
+   *
+   * @param {Float32Array} target   - Target vector array.
+   * @param {string[]} tokens       - Parsed tokens.
+   * @param {number} optionIndex    - Index of the option token.
+   * @param {Float32Array} fallback - Fallback vector.
+   * @returns {number}              - Next index to continue parsing.
+   * @private
+   */
+  static #consumeMapVectorOption(target, tokens, optionIndex, fallback) {
+    const startIndex = optionIndex + SECOND_INDEX5;
+    _MtlParser.#applyMapVector(target, tokens, startIndex, fallback);
+    let nextIndex = startIndex + MTL_MAP_UV_COMPONENTS;
+    const thirdToken = tokens[nextIndex];
+    if (_MtlParser.#isNumericToken(thirdToken) && tokens.length > nextIndex + SECOND_INDEX5) {
+      nextIndex += MTL_MAP_OPTIONAL_VECTOR_COMPONENTS;
+    }
+    return nextIndex;
+  }
+  /**
+   * Parses a float token for map options.
+   *
+   * @param {string} token    - Token value.
+   * @param {number} fallback - Fallback value.
+   * @returns {number}        - Parsed float value or fallback.
+   * @private
+   */
+  static #parseMapFloatToken(token, fallback) {
+    if (!_MtlParser.#isNumericToken(token)) {
+      return fallback;
+    }
+    const parsed = Number.parseFloat(token);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  /**
+   * Checks if the token is a numeric value.
+   *
+   * @param {string} token - Token value.
+   * @returns {boolean}    - True when token is numeric.
+   * @private
+   */
+  static #isNumericToken(token) {
+    if (typeof token !== TYPEOF_STRING4) {
+      return false;
+    }
+    return MAP_FLOAT_TOKEN_REGEX.test(token);
+  }
+  /**
+   * Parses clamp option token.
+   *
+   * @param {string} token - Clamp option token.
+   * @returns {boolean}    - True when clamp should be enabled.
+   * @private
+   */
+  static #parseClampToken(token) {
+    if (!token) {
+      return DEFAULT_MAP_CLAMP;
+    }
+    const normalized = token.toLowerCase();
+    if (normalized === CLAMP_ON_TOKEN || normalized === CLAMP_ON_NUMERIC_TOKEN) {
+      return true;
+    }
+    if (normalized === CLAMP_OFF_TOKEN || normalized === CLAMP_OFF_NUMERIC_TOKEN) {
+      return false;
+    }
+    return DEFAULT_MAP_CLAMP;
+  }
+  /**
+   * Normalizes a quoted path string.
+   *
+   * @param {string} path - Path token.
+   * @returns {string}    - Normalized path without the wrapping quotes.
+   * @private
+   */
+  static #normalizeQuotedPath(path) {
+    if (typeof path !== TYPEOF_STRING4) {
+      return EMPTY_STRING3;
+    }
+    let normalized = path.trim();
+    if (normalized.startsWith(QUOTE_TOKEN3) && normalized.endsWith(QUOTE_TOKEN3) && normalized.length > SECOND_INDEX5) {
+      normalized = normalized.slice(SECOND_INDEX5, normalized.length - SECOND_INDEX5);
+    }
+    return normalized.trim();
+  }
 };
 
 // core/loaders/obj-mtl/obj-mtl-loader.js
 var DEFAULT_TEXTURE_UNIT_INDEX4 = 0;
-var DEFAULT_DIFFUSE_COLOR3 = new Float32Array([1, 1, 1]);
-var EMPTY_STRING3 = "";
-var DEFAULT_BASE_URL = EMPTY_STRING3;
-var PATH_SEPARATOR = "/";
+var DEFAULT_DIFFUSE_COLOR4 = new Float32Array([1, 1, 1]);
+var DEFAULT_OPACITY4 = 1;
+var EMPTY_STRING4 = "";
+var DEFAULT_BASE_URL = EMPTY_STRING4;
+var PATH_SEPARATOR2 = "/";
+var DOT_SLASH_PREFIX = "./";
 var BACKSLASH_SEPARATOR = "\\";
-var BACKSLASH_REGEX = /\\/gu;
+var BACKSLASH_REGEX2 = /\\/gu;
+var MULTIPLE_SLASHES_REGEX = /\/{2,}/gu;
 var ABSOLUTE_URL_REGEX = /^[a-zA-Z][a-zA-Z\d+.-]*:/u;
-var QUOTE_TOKEN3 = '"';
+var QUOTE_TOKEN4 = '"';
 var NOT_FOUND_INDEX3 = -1;
-var SECOND_INDEX5 = 1;
+var SECOND_INDEX6 = 1;
 var BASE_PATH_SLICE_OFFSET = 1;
-var ZERO_VALUE13 = 0;
+var ZERO_VALUE16 = 0;
 var COLOR_COMPONENT_COUNT9 = 3;
-var TYPEOF_STRING4 = "string";
-var TYPEOF_OBJECT3 = "object";
-var ERROR_WEBGL_CONTEXT_TYPE4 = "`ObjMtlLoader` expects a `WebGL2RenderingContext`.";
-var ERROR_OPTIONS_TYPE2 = "`ObjMtlLoader` expects options as a plain object.";
+var ENTRY_TYPE_MESH2 = "mesh";
+var ENTRY_TYPE_POINTS2 = "points";
+var ENTRY_TYPE_LINE2 = "line";
+var TYPEOF_STRING5 = "string";
+var TYPEOF_OBJECT5 = "object";
+var ERROR_WEBGL_CONTEXT_TYPE6 = "`ObjMtlLoader` expects a `WebGL2RenderingContext`.";
+var ERROR_OPTIONS_TYPE4 = "`ObjMtlLoader` expects options as a plain object.";
 var ERROR_TEXTURE_UNIT_INDEX_TYPE2 = "`ObjMtlLoader` expects `textureUnitIndex` as a non-negative integer.";
 var ERROR_DEFAULT_COLOR_TYPE2 = "`ObjMtlLoader` expects `defaultColor` as `number[]` or `Float32Array`.";
 var ERROR_DEFAULT_COLOR_LENGTH2 = "`ObjMtlLoader` expects `defaultColor` to have 3 components.";
@@ -10485,6 +13037,18 @@ var ERROR_MTL_FILES_TYPE = "`ObjMtlLoader.loadFromFiles` expects `mtlFiles` as `
 var ERROR_ASSET_URL_MAP_TYPE = "`ObjMtlLoader.loadFromFiles` expects `assetUrlMap` as `Map`, when provided.";
 var ERROR_FILES_BASE_URL_TYPE = "`ObjMtlLoader.loadFromFiles` expects `baseUrl` as a string.";
 var ERROR_FILES_TEXTURE_BASE_URL_TYPE = "`ObjMtlLoader.loadFromFiles` expects `textureBaseUrl` as a string, when provided.";
+var WARNING_MTL_MATERIAL_NOT_FOUND_PREFIX = "MTL material not found for usemtl=";
+var WARNING_MTL_AVAILABLE_PREFIX = ", available: ";
+var WARNING_MTL_AVAILABLE_START = "[";
+var WARNING_MTL_AVAILABLE_END = "]";
+var WARNING_MTL_AVAILABLE_SEPARATOR = ", ";
+var WARNING_MTL_MISSING_DIFFUSE_PREFIX = "MTL diffuse map URL missing for path=";
+var WARNING_MTL_MISSING_DIFFUSE_BASE_PREFIX = ", textureBaseUrl=";
+var WARNING_MTL_LOAD_FAILED_PREFIX = "Failed to load MTL: ";
+var WARNING_MTL_LOAD_FAILED_REASON_PREFIX = ", reason: ";
+var WARNING_MTL_LOAD_FAILED_UNKNOWN = "Unknown error";
+var WARNING_MTL_AVAILABLE_LIMIT = 5;
+var WARNING_KEY_SEPARATOR = "::";
 var ERROR_FETCH_FAILED_PREFIX = "Failed to fetch resource: ";
 var ObjMtlLoader = class _ObjMtlLoader {
   /**
@@ -10507,7 +13071,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
    * @type {Float32Array}
    * @private
    */
-  #defaultColor = new Float32Array(DEFAULT_DIFFUSE_COLOR3);
+  #defaultColor = new Float32Array(DEFAULT_DIFFUSE_COLOR4);
   /**
    * OBJ parser instance.
    *
@@ -10550,16 +13114,16 @@ var ObjMtlLoader = class _ObjMtlLoader {
    */
   constructor(webglContext, options = {}) {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
-      throw new TypeError(ERROR_WEBGL_CONTEXT_TYPE4);
+      throw new TypeError(ERROR_WEBGL_CONTEXT_TYPE6);
     }
-    if (options === null || typeof options !== TYPEOF_OBJECT3 || Array.isArray(options)) {
-      throw new TypeError(ERROR_OPTIONS_TYPE2);
+    if (options === null || typeof options !== TYPEOF_OBJECT5 || Array.isArray(options)) {
+      throw new TypeError(ERROR_OPTIONS_TYPE4);
     }
     const {
       textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX4,
       defaultColor
     } = options;
-    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE13) {
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE16) {
       throw new TypeError(ERROR_TEXTURE_UNIT_INDEX_TYPE2);
     }
     if (defaultColor !== void 0) {
@@ -10591,7 +13155,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
    * @throws {TypeError} When options are invalid.
    */
   async loadFromUrls(options = {}) {
-    if (options === null || typeof options !== TYPEOF_OBJECT3 || Array.isArray(options)) {
+    if (options === null || typeof options !== TYPEOF_OBJECT5 || Array.isArray(options)) {
       throw new TypeError(ERROR_LOAD_OPTIONS_TYPE);
     }
     const {
@@ -10600,34 +13164,51 @@ var ObjMtlLoader = class _ObjMtlLoader {
       baseUrl = DEFAULT_BASE_URL,
       textureBaseUrl
     } = options;
-    if (typeof objUrl !== TYPEOF_STRING4) {
+    if (typeof objUrl !== TYPEOF_STRING5) {
       throw new TypeError(ERROR_OBJ_URL_TYPE);
     }
-    if (mtlUrl !== void 0 && typeof mtlUrl !== TYPEOF_STRING4) {
+    if (mtlUrl !== void 0 && typeof mtlUrl !== TYPEOF_STRING5) {
       throw new TypeError(ERROR_MTL_URL_TYPE);
     }
-    if (typeof baseUrl !== TYPEOF_STRING4) {
+    if (typeof baseUrl !== TYPEOF_STRING5) {
       throw new TypeError(ERROR_BASE_URL_TYPE);
     }
-    if (textureBaseUrl !== void 0 && typeof textureBaseUrl !== TYPEOF_STRING4) {
+    if (textureBaseUrl !== void 0 && typeof textureBaseUrl !== TYPEOF_STRING5) {
       throw new TypeError(ERROR_TEXTURE_BASE_URL_TYPE);
     }
     const objText = await _ObjMtlLoader.#fetchText(objUrl);
     const objData = this.#objParser.parse(objText);
     const resolvedBaseUrl = baseUrl || _ObjMtlLoader.#getBasePath(objUrl);
-    const mtlLibraries = mtlUrl ? [mtlUrl] : objData.materialLibraries;
     const mtlData = /* @__PURE__ */ new Map();
-    if (mtlLibraries.length > ZERO_VALUE13) {
-      const mtlBaseUrl = baseUrl || resolvedBaseUrl;
-      for (const library of mtlLibraries) {
-        if (!library) {
-          continue;
-        }
-        const resolvedMtlUrl = mtlUrl ? ABSOLUTE_URL_REGEX.test(library) || library.startsWith(PATH_SEPARATOR) || library.startsWith(mtlBaseUrl) ? library : _ObjMtlLoader.#resolvePath(mtlBaseUrl, library) : _ObjMtlLoader.#resolvePath(resolvedBaseUrl, library);
+    const mtlBaseUrl = baseUrl || resolvedBaseUrl;
+    if (mtlUrl) {
+      const resolvedMtlUrl = _ObjMtlLoader.#resolvePath(mtlBaseUrl, mtlUrl);
+      try {
         const mtlText = await _ObjMtlLoader.#fetchText(resolvedMtlUrl);
         const parsedMtl = this.#mtlParser.parse(mtlText);
         for (const [name, material] of parsedMtl.entries()) {
           mtlData.set(name, material);
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : WARNING_MTL_LOAD_FAILED_UNKNOWN;
+        console.warn(`${WARNING_MTL_LOAD_FAILED_PREFIX}${resolvedMtlUrl}${WARNING_MTL_LOAD_FAILED_REASON_PREFIX}${errorMessage}`);
+      }
+    }
+    if (!mtlUrl && objData.materialLibraries.length > ZERO_VALUE16) {
+      for (const library of objData.materialLibraries) {
+        if (!library) {
+          continue;
+        }
+        const resolvedMtlUrl = _ObjMtlLoader.#resolvePath(resolvedBaseUrl, library);
+        try {
+          const mtlText = await _ObjMtlLoader.#fetchText(resolvedMtlUrl);
+          const parsedMtl = this.#mtlParser.parse(mtlText);
+          for (const [name, material] of parsedMtl.entries()) {
+            mtlData.set(name, material);
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : WARNING_MTL_LOAD_FAILED_UNKNOWN;
+          console.warn(`${WARNING_MTL_LOAD_FAILED_PREFIX}${resolvedMtlUrl}${WARNING_MTL_LOAD_FAILED_REASON_PREFIX}${errorMessage}`);
         }
       }
     }
@@ -10638,11 +13219,11 @@ var ObjMtlLoader = class _ObjMtlLoader {
    * Loads OBJ/MTL assets from the local `File` objects.
    *
    * @param {ObjMtlLoadFromFilesOptions} options - Load options.
-   * @returns {Promise<ObjMtlLoadResult>} - Promise, that resolves with the created scene root and all created assets.
+   * @returns {Promise<ObjMtlLoadResult>}        - Promise, that resolves with the created scene root and all created assets.
    * @throws {TypeError} When options are invalid.
    */
   async loadFromFiles(options = {}) {
-    if (options === null || typeof options !== TYPEOF_OBJECT3 || Array.isArray(options)) {
+    if (options === null || typeof options !== TYPEOF_OBJECT5 || Array.isArray(options)) {
       throw new TypeError(ERROR_LOAD_OPTIONS_TYPE);
     }
     const {
@@ -10661,10 +13242,10 @@ var ObjMtlLoader = class _ObjMtlLoader {
     if (assetUrlMap !== void 0 && !(assetUrlMap instanceof Map)) {
       throw new TypeError(ERROR_ASSET_URL_MAP_TYPE);
     }
-    if (typeof baseUrl !== TYPEOF_STRING4) {
+    if (typeof baseUrl !== TYPEOF_STRING5) {
       throw new TypeError(ERROR_FILES_BASE_URL_TYPE);
     }
-    if (textureBaseUrl !== void 0 && typeof textureBaseUrl !== TYPEOF_STRING4) {
+    if (textureBaseUrl !== void 0 && typeof textureBaseUrl !== TYPEOF_STRING5) {
       throw new TypeError(ERROR_FILES_TEXTURE_BASE_URL_TYPE);
     }
     const objText = await objFile.text();
@@ -10717,19 +13298,71 @@ var ObjMtlLoader = class _ObjMtlLoader {
     const geometries = buildResult.geometries;
     const materials = [];
     const textures = [];
+    const missingMaterialWarnings = /* @__PURE__ */ new Set();
+    const missingDiffuseWarnings = /* @__PURE__ */ new Set();
+    const availableMaterials = Array.from(mtlData.keys());
+    const availablePreview = availableMaterials.slice(ZERO_VALUE16, WARNING_MTL_AVAILABLE_LIMIT);
     for (const entry of buildResult.entries) {
       const materialDefinition = mtlData.get(entry.materialName) || null;
-      const textureUrl = materialDefinition && materialDefinition.diffuseMap ? _ObjMtlLoader.#resolveAssetUrl(textureBaseUrl, materialDefinition.diffuseMap, assetUrlMap) : null;
-      const material = await this.#materialFactory.createMaterial(
-        materialDefinition,
-        textureUrl,
-        textures,
-        entry.usesVertexColors
-      );
-      const mesh = new Mesh(entry.geometry, material);
-      entry.parent.add(mesh);
-      meshes.push(mesh);
-      materials.push(material);
+      const textureUrls = _ObjMtlLoader.#resolveTextureUrls(materialDefinition, textureBaseUrl, assetUrlMap);
+      if (!materialDefinition && !missingMaterialWarnings.has(entry.materialName)) {
+        missingMaterialWarnings.add(entry.materialName);
+        const availableList = availablePreview.join(WARNING_MTL_AVAILABLE_SEPARATOR);
+        console.warn(
+          "%s%s%s%s%s%s",
+          WARNING_MTL_MATERIAL_NOT_FOUND_PREFIX,
+          entry.materialName,
+          WARNING_MTL_AVAILABLE_PREFIX,
+          WARNING_MTL_AVAILABLE_START,
+          availableList,
+          WARNING_MTL_AVAILABLE_END
+        );
+      }
+      if (materialDefinition && materialDefinition.diffuseMap && (!textureUrls || !textureUrls.diffuse)) {
+        const warnKey = materialDefinition.diffuseMap.path + WARNING_KEY_SEPARATOR + textureBaseUrl;
+        if (!missingDiffuseWarnings.has(warnKey)) {
+          missingDiffuseWarnings.add(warnKey);
+          console.warn(
+            "%s%s%s%s",
+            WARNING_MTL_MISSING_DIFFUSE_PREFIX,
+            materialDefinition.diffuseMap.path,
+            WARNING_MTL_MISSING_DIFFUSE_BASE_PREFIX,
+            textureBaseUrl
+          );
+        }
+      }
+      if (entry.entryType === ENTRY_TYPE_MESH2) {
+        const material = await this.#materialFactory.createMaterial(
+          materialDefinition,
+          textureUrls,
+          textures,
+          entry.usesVertexColors
+        );
+        const mesh = new Mesh(entry.geometry, material);
+        entry.parent.add(mesh);
+        meshes.push(mesh);
+        materials.push(material);
+        continue;
+      }
+      if (entry.entryType === ENTRY_TYPE_POINTS2) {
+        const color = materialDefinition ? materialDefinition.diffuseColor : this.#defaultColor;
+        const material = new PointsMaterial(this.#webglContext, { color });
+        material.setOpacity(materialDefinition ? materialDefinition.opacity : DEFAULT_OPACITY4);
+        const points = new Points(entry.geometry, material);
+        entry.parent.add(points);
+        meshes.push(points);
+        materials.push(material);
+        continue;
+      }
+      if (entry.entryType === ENTRY_TYPE_LINE2) {
+        const color = materialDefinition ? materialDefinition.diffuseColor : this.#defaultColor;
+        const material = new SolidColorMaterial(this.#webglContext, { color });
+        material.setOpacity(materialDefinition ? materialDefinition.opacity : DEFAULT_OPACITY4);
+        const line = new Line(entry.geometry, material);
+        entry.parent.add(line);
+        meshes.push(line);
+        materials.push(material);
+      }
     }
     return {
       root,
@@ -10754,12 +13387,20 @@ var ObjMtlLoader = class _ObjMtlLoader {
       if (assetUrlMap.has(normalized)) {
         return assetUrlMap.get(normalized);
       }
+      const basename = _ObjMtlLoader.#getBasename(normalized);
+      if (basename && assetUrlMap.has(basename)) {
+        return assetUrlMap.get(basename);
+      }
     }
     const resolved = _ObjMtlLoader.#resolvePath(baseUrl, path);
     if (assetUrlMap instanceof Map) {
       const normalizedResolved = _ObjMtlLoader.#normalizePath(resolved);
       if (assetUrlMap.has(normalizedResolved)) {
         return assetUrlMap.get(normalizedResolved);
+      }
+      const basenameResolved = _ObjMtlLoader.#getBasename(normalizedResolved);
+      if (basenameResolved && assetUrlMap.has(basenameResolved)) {
+        return assetUrlMap.get(basenameResolved);
       }
     }
     return resolved;
@@ -10772,11 +13413,11 @@ var ObjMtlLoader = class _ObjMtlLoader {
    * @private
    */
   static #getBasePath(url) {
-    const lastSlashIndex = url.lastIndexOf(PATH_SEPARATOR);
+    const lastSlashIndex = url.lastIndexOf(PATH_SEPARATOR2);
     if (lastSlashIndex === NOT_FOUND_INDEX3) {
       return DEFAULT_BASE_URL;
     }
-    return url.slice(ZERO_VALUE13, lastSlashIndex + BASE_PATH_SLICE_OFFSET);
+    return url.slice(ZERO_VALUE16, lastSlashIndex + BASE_PATH_SLICE_OFFSET);
   }
   /**
    * Resolves a relative path against a base URL.
@@ -10792,36 +13433,100 @@ var ObjMtlLoader = class _ObjMtlLoader {
     if (!normalizedPath) {
       return normalizedBase;
     }
-    if (ABSOLUTE_URL_REGEX.test(normalizedPath) || normalizedPath.startsWith(PATH_SEPARATOR)) {
+    if (ABSOLUTE_URL_REGEX.test(normalizedPath) || normalizedPath.startsWith(PATH_SEPARATOR2)) {
       return normalizedPath;
     }
     if (!normalizedBase) {
       return normalizedPath;
     }
-    if (normalizedBase.endsWith(PATH_SEPARATOR) || normalizedPath.startsWith(PATH_SEPARATOR)) {
+    const baseForCompare = _ObjMtlLoader.#stripDotSlashPrefix(normalizedBase);
+    const pathForCompare = _ObjMtlLoader.#stripDotSlashPrefix(normalizedPath);
+    if (baseForCompare && pathForCompare) {
+      const baseWithSeparator = baseForCompare.endsWith(PATH_SEPARATOR2) ? baseForCompare : baseForCompare + PATH_SEPARATOR2;
+      if (pathForCompare === baseForCompare || pathForCompare.startsWith(baseWithSeparator)) {
+        return normalizedPath;
+      }
+    }
+    if (normalizedBase.endsWith(PATH_SEPARATOR2) || normalizedPath.startsWith(PATH_SEPARATOR2)) {
       return normalizedBase + normalizedPath;
     }
-    return normalizedBase + PATH_SEPARATOR + normalizedPath;
+    return normalizedBase + PATH_SEPARATOR2 + normalizedPath;
   }
   /**
-   * Normalizes a path string by trimming and unquoting.
+   * Removes a leading `./` prefix from a normalized path.
+   *
+   * @param {string} path - Normalized path to sanitize.
+   * @returns {string}    - Path without a leading `./` prefix.
+   * @private
+   */
+  static #stripDotSlashPrefix(path) {
+    if (path.startsWith(DOT_SLASH_PREFIX)) {
+      return path.slice(DOT_SLASH_PREFIX.length);
+    }
+    return path;
+  }
+  /**
+   * Normalizes a path string by: trimming, unquoting and deduplicating the relative slashes.
    *
    * @param {string} path - Input path.
    * @returns {string}    - Normalized path string.
    * @private
    */
   static #normalizePath(path) {
-    if (typeof path !== TYPEOF_STRING4) {
-      return EMPTY_STRING3;
+    if (typeof path !== TYPEOF_STRING5) {
+      return EMPTY_STRING4;
     }
     let normalized = path.trim();
-    if (normalized.startsWith(QUOTE_TOKEN3) && normalized.endsWith(QUOTE_TOKEN3) && normalized.length > SECOND_INDEX5) {
-      normalized = normalized.slice(SECOND_INDEX5, normalized.length - SECOND_INDEX5);
+    if (normalized.startsWith(QUOTE_TOKEN4) && normalized.endsWith(QUOTE_TOKEN4) && normalized.length > SECOND_INDEX6) {
+      normalized = normalized.slice(SECOND_INDEX6, normalized.length - SECOND_INDEX6);
     }
     if (normalized.includes(BACKSLASH_SEPARATOR)) {
-      normalized = normalized.replace(BACKSLASH_REGEX, PATH_SEPARATOR);
+      normalized = normalized.replace(BACKSLASH_REGEX2, PATH_SEPARATOR2);
+    }
+    if (!ABSOLUTE_URL_REGEX.test(normalized) && !normalized.startsWith(PATH_SEPARATOR2)) {
+      normalized = normalized.replace(MULTIPLE_SLASHES_REGEX, PATH_SEPARATOR2);
     }
     return normalized.trim();
+  }
+  /**
+   * Resolves texture URLs for all supported maps.
+   *
+   * @param {Object | null} definition          - Parsed material definition.
+   * @param {string} textureBaseUrl             - Base URL for textures.
+   * @param {Map<string, string>} [assetUrlMap] - Asset URL override map.
+   * @returns {Object | null}                   - Map of resolved URLs.
+   * @private
+   */
+  static #resolveTextureUrls(definition, textureBaseUrl, assetUrlMap) {
+    if (!definition) {
+      return null;
+    }
+    return {
+      diffuse: definition.diffuseMap ? _ObjMtlLoader.#resolveAssetUrl(textureBaseUrl, definition.diffuseMap.path, assetUrlMap) : null,
+      ambient: definition.ambientMap ? _ObjMtlLoader.#resolveAssetUrl(textureBaseUrl, definition.ambientMap.path, assetUrlMap) : null,
+      specular: definition.specularMap ? _ObjMtlLoader.#resolveAssetUrl(textureBaseUrl, definition.specularMap.path, assetUrlMap) : null,
+      alpha: definition.alphaMap ? _ObjMtlLoader.#resolveAssetUrl(textureBaseUrl, definition.alphaMap.path, assetUrlMap) : null,
+      bump: definition.bumpMap ? _ObjMtlLoader.#resolveAssetUrl(textureBaseUrl, definition.bumpMap.path, assetUrlMap) : null,
+      displacement: definition.displacementMap ? _ObjMtlLoader.#resolveAssetUrl(textureBaseUrl, definition.displacementMap.path, assetUrlMap) : null,
+      reflection: definition.reflectionMap ? _ObjMtlLoader.#resolveAssetUrl(textureBaseUrl, definition.reflectionMap.path, assetUrlMap) : null
+    };
+  }
+  /**
+   * Returns a basename for the path.
+   *
+   * @param {string} path - Normalized path.
+   * @returns {string}    - Basename, or empty string when not available.
+   * @private
+   */
+  static #getBasename(path) {
+    if (!path) {
+      return EMPTY_STRING4;
+    }
+    const index = path.lastIndexOf(PATH_SEPARATOR2);
+    if (index === NOT_FOUND_INDEX3) {
+      return path;
+    }
+    return path.slice(index + BASE_PATH_SLICE_OFFSET);
   }
   /**
    * Returns a file entry from map using the normalized path or basename.
@@ -10839,7 +13544,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
     if (fileMap.has(normalized)) {
       return fileMap.get(normalized);
     }
-    const basenameIndex = normalized.lastIndexOf(PATH_SEPARATOR);
+    const basenameIndex = normalized.lastIndexOf(PATH_SEPARATOR2);
     const basename = basenameIndex === NOT_FOUND_INDEX3 ? normalized : normalized.slice(basenameIndex + BASE_PATH_SLICE_OFFSET);
     if (fileMap.has(basename)) {
       return fileMap.get(basename);
@@ -10862,11 +13567,13 @@ var DEFAULT_MIN_POLAR_RADIANS = -1.5;
 var DEFAULT_MAX_POLAR_RADIANS = 1.5;
 var DEFAULT_ROTATION_SPEED = 1;
 var DEFAULT_ZOOM_SPEED = 1;
+var DEFAULT_ROTATION_ENABLED = true;
 var ROTATE_BUTTON = 0;
 var ROTATION_RADIANS_PER_PIXEL = 5e-3;
 var WHEEL_DISTANCE_MULTIPLIER = 0.01;
 var WHEEL_LISTENER_OPTIONS = { passive: false };
 var POINTER_ID_RESET_VALUE = -1;
+var ERROR_ROTATION_ENABLED_TYPE = "`OrbitControls.setRotationEnabled` expects a boolean.";
 var OrbitControls = class _OrbitControls {
   /**
    * Controlled camera instance.
@@ -10954,6 +13661,13 @@ var OrbitControls = class _OrbitControls {
    * @private
    */
   #zoomSpeed;
+  /**
+   * Flag controlling whether rotation input is enabled.
+   *
+   * @type {boolean}
+   * @private
+   */
+  #rotationEnabled = DEFAULT_ROTATION_ENABLED;
   /**
    * True when controls need to recompute camera transform.
    *
@@ -11184,6 +13898,31 @@ var OrbitControls = class _OrbitControls {
     this.#markDirty();
   }
   /**
+   * Enables or disables the pointer-driven rotation.
+   *
+   * @param {boolean} enabled - Whether the rotation input is enabled.
+   * @returns {void}
+   * @throws {TypeError} When the enabled flag is invalid.
+   */
+  setRotationEnabled(enabled) {
+    if (typeof enabled !== "boolean") {
+      throw new TypeError(ERROR_ROTATION_ENABLED_TYPE);
+    }
+    this.#rotationEnabled = enabled;
+    if (!enabled && this.#capturedPointerId !== POINTER_ID_RESET_VALUE) {
+      this.#element.releasePointerCapture(this.#capturedPointerId);
+      this.#capturedPointerId = POINTER_ID_RESET_VALUE;
+    }
+  }
+  /**
+   * Returns the current state of the pointer-driven camera rotation input.
+   *
+   * @returns {boolean} - True if the rotation input is enabled, otherwise false.
+   */
+  isRotationEnabled() {
+    return this.#rotationEnabled;
+  }
+  /**
    * Disposes the controller by removing all event listeners.
    */
   dispose() {
@@ -11205,6 +13944,9 @@ var OrbitControls = class _OrbitControls {
    * @private
    */
   #handlePointerDown(event) {
+    if (!this.#rotationEnabled) {
+      return;
+    }
     if (event.button !== ROTATE_BUTTON) {
       return;
     }
@@ -11222,6 +13964,9 @@ var OrbitControls = class _OrbitControls {
    * @private
    */
   #handlePointerMove(event) {
+    if (!this.#rotationEnabled) {
+      return;
+    }
     if (event.pointerId !== this.#capturedPointerId) {
       return;
     }
@@ -11338,7 +14083,7 @@ var INPUT_BACKWARD = -1;
 var INPUT_NONE = 0;
 var SPEED_SCALE_DEFAULT = 1;
 var INPUT_EPSILON = 1e-4;
-var LOOP_START_INDEX = 0;
+var LOOP_START_INDEX2 = 0;
 var LOOP_INDEX_INCREMENT = 1;
 var MINIMUM_NON_NEGATIVE_VALUE = 0;
 var MINIMUM_POSITIVE_VALUE = 0;
@@ -11848,7 +14593,7 @@ var KeyboardControls = class _KeyboardControls {
    */
   #initActionStates() {
     const actionValues = Object.values(ACTIONS);
-    for (let index = LOOP_START_INDEX; index < actionValues.length; index += LOOP_INDEX_INCREMENT) {
+    for (let index = LOOP_START_INDEX2; index < actionValues.length; index += LOOP_INDEX_INCREMENT) {
       this.#actionStates.set(actionValues[index], false);
     }
   }
@@ -12472,8 +15217,8 @@ var MATRIX_INDEX_30 = 12;
 var MATRIX_INDEX_31 = 13;
 var MATRIX_INDEX_32 = 14;
 var MATRIX_INDEX_33 = 15;
-var LOOP_START_INDEX2 = 0;
-var LOOP_INCREMENT2 = 1;
+var LOOP_START_INDEX3 = 0;
+var LOOP_INCREMENT3 = 1;
 var VECTOR_INDEX_X = 0;
 var VECTOR_INDEX_Y = 1;
 var VECTOR_INDEX_Z = 2;
@@ -12497,7 +15242,7 @@ var MOUSE_NDC_Y_KEY = "y";
 var ERROR_SCENE_TYPE = "`Raycaster.raycast` expects scene as a `Scene` instance.";
 var ERROR_CAMERA_TYPE = "`Raycaster.raycast` expects camera as a `Camera` instance.";
 var ERROR_MOUSE_NDC_TYPE = "`Raycaster.raycast` expects `mouseNdc` as an object with numeric x/y.";
-var ERROR_OPTIONS_TYPE3 = "`Raycaster.raycast` expects options as a plain object.";
+var ERROR_OPTIONS_TYPE5 = "`Raycaster.raycast` expects options as a plain object.";
 var ERROR_OPTION_RECURSIVE_TYPE = "`Raycaster.raycast` option recursive must be a boolean.";
 var ERROR_OPTION_FILTER_TYPE = "`Raycaster.raycast` option filter must be a function or null.";
 var ERROR_OPTION_SORT_TYPE = "`Raycaster.raycast` option sort must be a boolean.";
@@ -12526,7 +15271,7 @@ var Raycaster = class _Raycaster {
       throw new TypeError(ERROR_MOUSE_NDC_TYPE);
     }
     if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError(ERROR_OPTIONS_TYPE3);
+      throw new TypeError(ERROR_OPTIONS_TYPE5);
     }
     const recursive = OPTION_RECURSIVE_KEY in options ? options[OPTION_RECURSIVE_KEY] : DEFAULT_RECURSIVE;
     const filter = OPTION_FILTER_KEY in options ? options[OPTION_FILTER_KEY] : DEFAULT_FILTER;
@@ -12540,7 +15285,7 @@ var Raycaster = class _Raycaster {
     if (typeof shouldSort !== "boolean") {
       throw new TypeError(ERROR_OPTION_SORT_TYPE);
     }
-    scene.updateWorldMatrix(null);
+    scene.updateWorldMatrix({ parentWorldMatrix: null });
     const viewMatrix = camera.getViewMatrix();
     const projectionMatrix = camera.getProjectionMatrix();
     const viewProjectionMatrix = Matrix4.multiply(projectionMatrix, viewMatrix);
@@ -12551,7 +15296,7 @@ var Raycaster = class _Raycaster {
       scene.traverse((object) => _Raycaster.#collectIntersection(object, ray, filter, intersections));
     } else {
       const children = scene.children;
-      for (let index = LOOP_START_INDEX2; index < children.length; index += LOOP_INCREMENT2) {
+      for (let index = LOOP_START_INDEX3; index < children.length; index += LOOP_INCREMENT3) {
         _Raycaster.#collectIntersection(children[index], ray, filter, intersections);
       }
     }
@@ -12797,6 +15542,9 @@ var GeraWebGL = Object.freeze({
   Points,
   Line,
   Raycaster,
+  Light,
+  DirectionalLight,
+  AmbientLight,
   // Grouped namespaces:
   Math: Object.freeze({
     Matrix4,
@@ -12833,7 +15581,8 @@ var GeraWebGL = Object.freeze({
     DirectionalLightMaterial,
     LambertMaterial,
     PhongMaterial,
-    PointsMaterial
+    PointsMaterial,
+    MtlStandardMaterial
   }),
   Controls: Object.freeze({
     OrbitControls,
@@ -12845,7 +15594,9 @@ var GeraWebGL = Object.freeze({
     ObjMtlLoader
   }),
   Debug: Object.freeze({
-    FpsCounter
+    FpsCounter,
+    LightGizmo,
+    TransformGizmo
   }),
   // Low-level access (shaders, manual uniforms/attributes):
   LowLevel: Object.freeze({

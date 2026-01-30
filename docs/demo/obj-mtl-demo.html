@@ -53,7 +53,8 @@
         #ui button,
         #ui span,
         #ui input,
-        #ui select {
+        #ui select,
+        #ui label {
             pointer-events : auto;
         }
 
@@ -63,6 +64,12 @@
             align-items : center;
             flex-wrap   : nowrap;
             width       : 100%;
+        }
+
+        .uiCheckbox {
+            display     : inline-flex;
+            gap         : 6px;
+            align-items : center;
         }
 
         .uiRow--hidden {
@@ -101,7 +108,8 @@
         #statusLabel,
         #localStatusLabel,
         #localUploadLabel,
-        #builtinModelLabel {
+        #builtinModelLabel,
+        .uiCheckboxLabel {
             color       : #ffffff;
             font-family : sans-serif;
             font-size   : 14px;
@@ -179,7 +187,8 @@
             #statusLabel,
             #localStatusLabel,
             #localUploadLabel,
-            #builtinModelLabel {
+            #builtinModelLabel,
+            .uiCheckboxLabel {
                 font-size : 12px;
             }
         }
@@ -260,6 +269,91 @@
         <div class="uiRow">
             <button id="wireframeToggleButton">Wireframe: OFF</button>
             <button id="resetViewButton" hidden>Reset view</button>
+        </div>
+
+        <div class="uiRow">
+            <label class="uiCheckbox" for="lightingToggleInput">
+                <input type="checkbox" id="lightingToggleInput" checked />
+                <span class="uiCheckboxLabel">Lighting</span>
+            </label>
+        </div>
+
+        <div class="uiRow">
+            <label class="uiCheckbox" for="directionalLightToggleInput">
+                <input type="checkbox" id="directionalLightToggleInput" checked />
+                <span class="uiCheckboxLabel">Directional light</span>
+            </label>
+            <label class="uiCheckbox" for="ambientLightToggleInput">
+                <input type="checkbox" id="ambientLightToggleInput" checked />
+                <span class="uiCheckboxLabel">Ambient light</span>
+            </label>
+        </div>
+
+        <div class="uiRow">
+            <label class="uiCheckbox" for="directionalStrengthInput">
+                <span class="uiCheckboxLabel" id="directionalStrengthLabel"></span>
+            </label>
+            <input type="range" id="directionalStrengthInput" />
+            <span class="uiCheckboxLabel" id="directionalStrengthValue"></span>
+        </div>
+
+        <div class="uiRow">
+            <label class="uiCheckbox" for="ambientStrengthInput">
+                <span class="uiCheckboxLabel" id="ambientStrengthLabel"></span>
+            </label>
+            <input type="range" id="ambientStrengthInput" />
+            <span class="uiCheckboxLabel" id="ambientStrengthValue"></span>
+        </div>
+
+        <div class="uiRow">
+            <label class="uiCheckbox" for="pauseCameraRotationToggleInput">
+                <input type="checkbox" id="pauseCameraRotationToggleInput" />
+                <span class="uiCheckboxLabel" id="pauseCameraRotationToggleLabel"></span>
+            </label>
+        </div>
+
+        <div class="uiRow">
+            <span id="activeLightsLabel" class="uiCheckboxLabel"></span>
+        </div>
+
+        <div class="uiRow">
+            <span id="lightPositionLabel" class="uiCheckboxLabel"></span>
+        </div>
+
+        <div class="uiRow">
+            <span id="lightPointLabel" class="uiCheckboxLabel"></span>
+        </div>
+
+        <div class="uiRow">
+            <span id="dragAxisLabel" class="uiCheckboxLabel"></span>
+        </div>
+
+        <div class="uiRow">
+            <label class="uiCheckbox" for="lightGizmoToggleInput">
+                <input type="checkbox" id="lightGizmoToggleInput" />
+                <span class="uiCheckboxLabel">Show light gizmo</span>
+            </label>
+        </div>
+
+        <div class="uiRow">
+            <label class="uiCheckbox" for="rotateLightToggleInput">
+                <input type="checkbox" id="rotateLightToggleInput" />
+                <span class="uiCheckboxLabel" id="rotateLightToggleLabel"></span>
+            </label>
+        </div>
+
+        <div class="uiRow">
+            <label class="uiCheckbox" for="dragLightToggleInput">
+                <input type="checkbox" id="dragLightToggleInput" />
+                <span class="uiCheckboxLabel" id="dragLightToggleLabel"></span>
+            </label>
+        </div>
+
+        <div class="uiRow">
+            <label class="uiCheckbox" for="changeLightPointToggleInput">
+                <input type="checkbox" id="changeLightPointToggleInput" />
+                <span class="uiCheckboxLabel" id="changeLightPointToggleLabel"></span>
+            </label>
         </div>
 
         <div class="uiRow">

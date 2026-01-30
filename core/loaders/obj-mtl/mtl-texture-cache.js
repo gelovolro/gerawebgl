@@ -5,36 +5,92 @@ import { Texture2D } from '../../texture/texture2d.js';
  *
  * @type {string}
  */
-const ERROR_WEBGL_CONTEXT_TYPE = '`TextureCache` expects a `WebGL2RenderingContext`.';
+const ERROR_WEBGL_CONTEXT_TYPE = '`MtlTextureCache` expects a `WebGL2RenderingContext`.';
 
 /**
  * Error message for invalid texture URL.
  *
  * @type {string}
  */
-const ERROR_TEXTURE_URL_TYPE = '`TextureCache.getTexture` expects `url` as a string.';
+const ERROR_TEXTURE_URL_TYPE = '`MtlTextureCache.getTexture` expects `url` as a string.';
 
 /**
  * Error message for invalid output list.
  *
  * @type {string}
  */
-const ERROR_OUTPUT_LIST_TYPE = '`TextureCache.getTexture` expects `output` as an array.';
+const ERROR_OUTPUT_LIST_TYPE = '`MtlTextureCache.getTexture` expects `output` as an array.';
 
 /**
- * String literal for typeof checks.
+ * Error message for invalid texture options.
+ *
+ * @type {string}
+ */
+const ERROR_OPTIONS_TYPE = '`MtlTextureCache.getTexture` expects `options` as a plain object.';
+
+/**
+ * Error message for invalid clamp option.
+ *
+ * @type {string}
+ */
+const ERROR_CLAMP_OPTION_TYPE = '`MtlTextureCache.getTexture` expects `options.clamp` as a boolean.';
+
+/**
+ * Error message for invalid wrapS option.
+ *
+ * @type {string}
+ */
+const ERROR_WRAP_S_OPTION_TYPE = '`MtlTextureCache.getTexture` expects `options.wrapS` as a number.';
+
+/**
+ * Error message for invalid wrapT option.
+ *
+ * @type {string}
+ */
+const ERROR_WRAP_T_OPTION_TYPE = '`MtlTextureCache.getTexture` expects `options.wrapT` as a number.';
+
+/**
+ * Separator used to build cache keys.
+ *
+ * @type {string}
+ */
+const CACHE_KEY_SEPARATOR = '|';
+
+/**
+ * String literal for `typeof` checks.
  *
  * @type {string}
  */
 const TYPEOF_STRING = 'string';
 
 /**
- * Caches textures by normalized URL.
+ * String literal for `typeof` object checks.
+ *
+ * @type {string}
+ */
+const TYPEOF_OBJECT = 'object';
+
+/**
+ * String literal for `typeof` boolean checks.
+ *
+ * @type {string}
+ */
+const TYPEOF_BOOLEAN = 'boolean';
+
+/**
+ * String literal for `typeof` number checks.
+ *
+ * @type {string}
+ */
+const TYPEOF_NUMBER = 'number';
+
+/**
+ * Caches the textures by the normalized URL.
  */
 export class MtlTextureCache {
 
     /**
-     * WebGL2 rendering context, used to create textures.
+     * WebGL2 rendering context, used to create the textures.
      *
      * @type {WebGL2RenderingContext}
      * @private
@@ -64,12 +120,16 @@ export class MtlTextureCache {
     /**
      * Returns cached or newly loaded texture.
      *
-     * @param {string} url           - Texture URL.
-     * @param {Texture2D[]} output   - Output list of created textures.
-     * @returns {Promise<Texture2D>} - Promise, that resolves with the cached or newly created `Texture2D` instance for the given URL.
+     * @param {string} url                      - Texture URL.
+     * @param {Texture2D[]} output              - Output list of created textures.
+     * @param {Object} [options]                - Texture options.
+     * @param {boolean} [options.clamp = false] - When true, uses `clamp-to-edge` on both S and T-axes.
+     * @param {number} [options.wrapS]          - Optional wrap mode for S-axis.
+     * @param {number} [options.wrapT]          - Optional wrap mode for T-axis.
+     * @returns {Promise<Texture2D>}            - Promise, that resolves with the cached or newly created `Texture2D` instance for the given URL.
      * @throws {TypeError} When url or output are invalid.
      */
-    async getTexture(url, output) {
+    async getTexture(url, output, options = {}) {
         if (typeof url !== TYPEOF_STRING) {
             throw new TypeError(ERROR_TEXTURE_URL_TYPE);
         }
@@ -78,14 +138,53 @@ export class MtlTextureCache {
             throw new TypeError(ERROR_OUTPUT_LIST_TYPE);
         }
 
-        if (this.#cache.has(url)) {
-            return this.#cache.get(url);
+        if (options === null || typeof options !== TYPEOF_OBJECT || Array.isArray(options)) {
+            throw new TypeError(ERROR_OPTIONS_TYPE);
         }
 
-        const texture = new Texture2D(this.#webglContext);
+        const { clamp = false, wrapS, wrapT } = options;
+
+        if (typeof clamp !== TYPEOF_BOOLEAN) {
+            throw new TypeError(ERROR_CLAMP_OPTION_TYPE);
+        }
+
+        if (wrapS !== undefined && typeof wrapS !== TYPEOF_NUMBER) {
+            throw new TypeError(ERROR_WRAP_S_OPTION_TYPE);
+        }
+
+        if (wrapT !== undefined && typeof wrapT !== TYPEOF_NUMBER) {
+            throw new TypeError(ERROR_WRAP_T_OPTION_TYPE);
+        }
+
+        const resolvedWrapS = wrapS !== undefined ? wrapS : (clamp ? this.#webglContext.CLAMP_TO_EDGE : this.#webglContext.REPEAT);
+        const resolvedWrapT = wrapT !== undefined ? wrapT : (clamp ? this.#webglContext.CLAMP_TO_EDGE : this.#webglContext.REPEAT);
+        const cacheKey      = MtlTextureCache.#buildCacheKey(url, resolvedWrapS, resolvedWrapT);
+
+        if (this.#cache.has(cacheKey)) {
+            return this.#cache.get(cacheKey);
+        }
+
+        const texture = new Texture2D(this.#webglContext, {
+            wrapS : resolvedWrapS,
+            wrapT : resolvedWrapT
+        });
+
         await texture.loadFromUrl(url);
-        this.#cache.set(url, texture);
+        this.#cache.set(cacheKey, texture);
         output.push(texture);
         return texture;
+    }
+
+    /**
+     * Builds a cache key for texture lookup.
+     *
+     * @param {string} url   - Texture URL.
+     * @param {number} wrapS - Wrap mode for S-axis.
+     * @param {number} wrapT - Wrap mode for T-axis.
+     * @returns {string}     - Cache key.
+     * @private
+     */
+    static #buildCacheKey(url, wrapS, wrapT) {
+        return String(url) + CACHE_KEY_SEPARATOR + String(wrapS) + CACHE_KEY_SEPARATOR + String(wrapT);
     }
 }

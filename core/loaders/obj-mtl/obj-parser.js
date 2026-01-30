@@ -1,3 +1,5 @@
+import { MaterialNameNormalizer } from './material-name-normalizer.js';
+
 /**
  * Token, that starts a comment line in OBJ files.
  *
@@ -32,6 +34,20 @@ const OBJ_NORMAL_TOKEN = 'vn';
  * @type {string}
  */
 const OBJ_FACE_TOKEN = 'f';
+
+/**
+ * OBJ token for point definitions.
+ *
+ * @type {string}
+ */
+const OBJ_POINT_TOKEN = 'p';
+
+/**
+ * OBJ token for line definitions.
+ *
+ * @type {string}
+ */
+const OBJ_LINE_TOKEN = 'l';
 
 /**
  * OBJ token for material library reference.
@@ -153,6 +169,13 @@ const TYPEOF_STRING = 'string';
 const FACE_MIN_VERTEX_COUNT = 3;
 
 /**
+ * Line requires at least 2 vertices.
+ *
+ * @type {number}
+ */
+const LINE_MIN_VERTEX_COUNT = 2;
+
+/**
  * Number of components for position vectors.
  *
  * @type {number}
@@ -179,6 +202,34 @@ const NORMAL_COMPONENT_COUNT = 3;
  * @type {number}
  */
 const COLOR_COMPONENT_COUNT = 3;
+
+/**
+ * Index, used to reference the first element in arrays.
+ *
+ * @type {number}
+ */
+const FIRST_INDEX = 0;
+
+/**
+ * Index, used to reference the second element in arrays.
+ *
+ * @type {number}
+ */
+const SECOND_INDEX = 1;
+
+/**
+ * Index, used to reference the third element in arrays.
+ *
+ * @type {number}
+ */
+const THIRD_INDEX = 2;
+
+/**
+ * Index, used to reference the fourth element in arrays.
+ *
+ * @type {number}
+ */
+const FOURTH_INDEX = 3;
 
 /**
  * Start index for vertex color components in `v` lines.
@@ -237,34 +288,6 @@ const OBJ_INDEX_ZERO = 0;
 const DECIMAL_RADIX = 10;
 
 /**
- * Index, used to reference the first element in arrays.
- *
- * @type {number}
- */
-const FIRST_INDEX = 0;
-
-/**
- * Index, used to reference the second element in arrays.
- *
- * @type {number}
- */
-const SECOND_INDEX = 1;
-
-/**
- * Index, used to reference the third element in arrays.
- *
- * @type {number}
- */
-const THIRD_INDEX = 2;
-
-/**
- * Index, used to reference the fourth element in arrays.
- *
- * @type {number}
- */
-const FOURTH_INDEX = 3;
-
-/**
  * Index, of the first face vertex in fan triangulation.
  *
  * @type {number}
@@ -311,8 +334,8 @@ const DEFAULT_VERTEX_COLOR = [1.0, 1.0, 1.0];
  *
  * @typedef {Object} ObjFaceVertex
  * @property {number} positionIndex - Position index (zero-based).
- * @property {number} uvIndex       - UV index (zero-based, or -1).
- * @property {number} normalIndex   - Normal index (zero-based, or -1).
+ * @property {number} uvIndex       - UV index (zero-based or -1).
+ * @property {number} normalIndex   - Normal index (zero-based or -1).
  */
 
 /**
@@ -322,6 +345,8 @@ const DEFAULT_VERTEX_COLOR = [1.0, 1.0, 1.0];
  * @property {string} materialName         - Material name.
  * @property {number} smoothingGroup       - Smoothing group number (0 = off).
  * @property {ObjFaceVertex[][]} triangles - Triangulated faces (each triangle has 3 vertices).
+ * @property {number[]} points             - Point indices in this chunk.
+ * @property {number[][]} lines            - Line index arrays in this chunk.
  */
 
 /**
@@ -553,6 +578,14 @@ export class ObjParser {
                 this.#parseFace(parts);
                 break;
 
+            case OBJ_POINT_TOKEN:
+                this.#parsePoints(parts);
+                break;
+
+            case OBJ_LINE_TOKEN:
+                this.#parseLineElement(parts);
+                break;
+
             default:
                 break;
         }
@@ -641,8 +674,9 @@ export class ObjParser {
      * @private
      */
     #parseUseMaterial(parts) {
-        const materialName        = parts.slice(SECOND_INDEX).join(SPACE_SEPARATOR) || DEFAULT_MATERIAL_NAME;
-        this.#currentMaterialName = materialName;
+        const rawMaterialName     = parts.slice(SECOND_INDEX).join(SPACE_SEPARATOR) || DEFAULT_MATERIAL_NAME;
+        const normalizedName      = MaterialNameNormalizer.normalize(rawMaterialName);
+        this.#currentMaterialName = normalizedName || DEFAULT_MATERIAL_NAME;
         this.#getOrCreateMaterialChunk(this.#currentGroup, this.#currentMaterialName, this.#currentSmoothingGroup);
     }
 
@@ -711,7 +745,11 @@ export class ObjParser {
         }
 
         const vertices = faceVertices.map((vertex) => this.#resolveFaceVertex(vertex));
-        const chunk    = this.#getOrCreateMaterialChunk(this.#currentGroup, this.#currentMaterialName, this.#currentSmoothingGroup);
+        const chunk    = this.#getOrCreateMaterialChunk(
+            this.#currentGroup,
+            this.#currentMaterialName,
+            this.#currentSmoothingGroup
+        );
 
         for (let index = SECOND_INDEX; index < vertices.length - NEXT_FACE_VERTEX_OFFSET; index += NEXT_FACE_VERTEX_OFFSET) {
             const firstVertex  = vertices[FAN_FIRST_VERTEX_INDEX];
@@ -719,6 +757,67 @@ export class ObjParser {
             const thirdVertex  = vertices[index + NEXT_FACE_VERTEX_OFFSET];
             chunk.triangles.push([firstVertex, secondVertex, thirdVertex]);
         }
+    }
+
+    /**
+     * Parses a point line and appends indices to current chunk.
+     *
+     * @param {string[]} parts - Point line parts.
+     * @returns {void}
+     * @private
+     */
+    #parsePoints(parts) {
+        const vertices = parts.slice(SECOND_INDEX);
+
+        if (!vertices.length) {
+            return;
+        }
+
+        const chunk = this.#getOrCreateMaterialChunk(
+            this.#currentGroup,
+            this.#currentMaterialName,
+            this.#currentSmoothingGroup
+        );
+
+        for (const vertex of vertices) {
+            const positionIndex = this.#resolveVertexPositionIndex(vertex);
+
+            if (positionIndex !== OBJ_INDEX_NOT_PROVIDED) {
+                chunk.points.push(positionIndex);
+            }
+        }
+    }
+
+    /**
+     * Parses a line definition and appends it to current chunk.
+     *
+     * @param {string[]} parts - Line line parts.
+     * @returns {void}
+     * @private
+     */
+    #parseLineElement(parts) {
+        const vertices = parts.slice(SECOND_INDEX);
+
+        if (vertices.length < LINE_MIN_VERTEX_COUNT) {
+            return;
+        }
+
+        const indices = [];
+
+        for (const vertex of vertices) {
+            const positionIndex = this.#resolveVertexPositionIndex(vertex);
+
+            if (positionIndex !== OBJ_INDEX_NOT_PROVIDED) {
+                indices.push(positionIndex);
+            }
+        }
+
+        if (indices.length < LINE_MIN_VERTEX_COUNT) {
+            return;
+        }
+
+        const chunk = this.#getOrCreateMaterialChunk(this.#currentGroup, this.#currentMaterialName, this.#currentSmoothingGroup);
+        chunk.lines.push(indices);
     }
 
     /**
@@ -744,6 +843,18 @@ export class ObjParser {
             uvIndex,
             normalIndex
         };
+    }
+
+    /**
+     * Resolves a vertex token into a position index.
+     *
+     * @param {string} vertexData - Vertex data string.
+     * @returns {number}          - Resolved position index or `-1`.
+     * @private
+     */
+    #resolveVertexPositionIndex(vertexData) {
+        const indices = vertexData.split(OBJ_FACE_ATTRIBUTE_SEPARATOR);
+        return ObjParser.#parseIndex(indices[FIRST_INDEX], this.#positions.length / POSITION_COMPONENT_COUNT);
     }
 
     /**
@@ -817,7 +928,9 @@ export class ObjParser {
         const chunk = {
             materialName : materialKey,
             smoothingGroup,
-            triangles    : []
+            triangles    : [],
+            points       : [],
+            lines        : []
         };
 
         group.materialChunks.push(chunk);

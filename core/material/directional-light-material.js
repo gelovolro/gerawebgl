@@ -70,6 +70,20 @@ export const CAMERA_POSITION_UNIFORM_NAME = 'u_cameraPosition';
 export const AMBIENT_STRENGTH_UNIFORM_NAME = 'u_ambientStrength';
 
 /**
+ * Directional strength uniform name.
+ *
+ * @type {string}
+ */
+export const DIRECTIONAL_STRENGTH_UNIFORM_NAME = 'u_directionalStrength';
+
+/**
+ * Lighting enabled uniform name.
+ *
+ * @type {string}
+ */
+export const LIGHTING_ENABLED_UNIFORM_NAME = 'u_lightingEnabled';
+
+/**
  * Opacity uniform name.
  *
  * @type {string}
@@ -105,11 +119,67 @@ export const DEFAULT_LIGHT_DIRECTION = new Float32Array([0.5, 0.7, 1.0]);
 export const DEFAULT_AMBIENT_STRENGTH = 0.2;
 
 /**
- * Minimum allowed squared length for a direction vector. Used to reject a zero-length direction.
+ * Default directional strength.
+ *
+ * @type {number}
+ */
+export const DEFAULT_DIRECTIONAL_STRENGTH = 1.0;
+
+/**
+ * Default lighting enabled flag (float).
+ *
+ * @type {number}
+ */
+export const DEFAULT_LIGHTING_ENABLED = 1.0;
+
+/**
+ * Minimum allowed squared length for a direction vector. Used to reject the zero-length direction.
  *
  * @type {number}
  */
 const MIN_DIRECTION_LENGTH_SQUARED = 0.0;
+
+/**
+ * `Boolean as-float` value for false.
+ *
+ * @type {number}
+ */
+const FLOAT_FALSE = 0.0;
+
+/**
+ * `Boolean-as-float` value for true.
+ *
+ * @type {number}
+ */
+const FLOAT_TRUE = 1.0;
+
+/**
+ * Minimum accepted lighting enabled value.
+ *
+ * @type {number}
+ */
+const MIN_LIGHTING_ENABLED = 0.0;
+
+/**
+ * Maximum accepted lighting enabled value.
+ *
+ * @type {number}
+ */
+const MAX_LIGHTING_ENABLED = 1.0;
+
+/**
+ * Directional strength value used for disabling directional light.
+ *
+ * @type {number}
+ */
+const DIRECTIONAL_STRENGTH_DISABLED = 0.0;
+
+/**
+ * Threshold used to interpret the lighting enabled uniform as a boolean.
+ *
+ * @type {number}
+ */
+const LIGHTING_ENABLED_THRESHOLD = 0.5;
 
 /**
  * Numerator used when computing inverse vector length: `1 / sqrt(lengthSquared)`.
@@ -119,12 +189,42 @@ const MIN_DIRECTION_LENGTH_SQUARED = 0.0;
 const INVERSE_LENGTH_NUMERATOR = 1.0;
 
 /**
+ * Error message for invalid lighting enabled value types.
+ *
+ * @type {string}
+ */
+const ERROR_LIGHTING_ENABLED_TYPE = '`DirectionalLightMaterial.setLightingEnabled` expects a boolean or a finite number.';
+
+/**
+ * Error message for invalid lighting enabled value range.
+ *
+ * @type {string}
+ */
+const ERROR_LIGHTING_ENABLED_RANGE = '`DirectionalLightMaterial.setLightingEnabled` expects a value in [0..1].';
+
+/**
+ * Error message for invalid directional strength values.
+ *
+ * @type {string}
+ */
+const ERROR_DIRECTIONAL_STRENGTH_TYPE = '`DirectionalLightMaterial.setDirectionalStrength` expects a finite number.';
+
+/**
+ * Error message for invalid directional enabled values.
+ *
+ * @type {string}
+ */
+const ERROR_DIRECTIONAL_ENABLED_TYPE = '`DirectionalLightMaterial.setDirectionalEnabled` expects a boolean.';
+
+/**
  * Options common to directional-light materials.
  *
  * @typedef {Object} DirectionalLightMaterialOptions
  * @property {Float32Array | number[]} [color]          - Diffuse RGB color [red, green, blue] in [0..1] range.
  * @property {Float32Array | number[]} [lightDirection] - Directional light direction (world space), normalized internally.
  * @property {number} [ambientStrength]                 - Ambient term multiplier.
+ * @property {number} [directionalStrength]             - Directional light strength multiplier.
+ * @property {boolean | number} [lightingEnabled]       - Lighting enabled flag (boolean or 0..1 float).
  */
 
 /**
@@ -172,9 +272,25 @@ export class DirectionalLightMaterial extends Material {
     #ambientStrength = DEFAULT_AMBIENT_STRENGTH;
 
     /**
+     * Directional strength multiplier.
+     *
+     * @type {number}
+     * @private
+     */
+    #directionalStrength = DEFAULT_DIRECTIONAL_STRENGTH;
+
+    /**
+     * Lighting enabled flag stored as a float.
+     *
+     * @type {number}
+     * @private
+     */
+    #lightingEnabled = DEFAULT_LIGHTING_ENABLED;
+
+    /**
      * Creates a new directional-light material.
      *
-     * @param {WebGL2RenderingContext} webglContext                   - WebGL2 rendering context used to create GPU resources.
+     * @param {WebGL2RenderingContext} webglContext                   - WebGL2 rendering context used to create the GPU resources.
      * @param {ShaderProgram} shaderProgram                           - Compiled shader program instance.
      * @param {DirectionalLightMaterialOptions} [options]             - Common material options.
      * @param {DirectionalLightMaterialBaseOptions} [materialOptions] - Material base options.
@@ -198,13 +314,18 @@ export class DirectionalLightMaterial extends Material {
 
         super(webglContext, shaderProgram, { ownsShaderProgram });
 
-        // Defaults:
         this.#color.set(DEFAULT_COLOR);
         this.setLightDirection(DEFAULT_LIGHT_DIRECTION);
-        this.#ambientStrength = DEFAULT_AMBIENT_STRENGTH;
+        this.#ambientStrength     = DEFAULT_AMBIENT_STRENGTH;
+        this.#directionalStrength = DEFAULT_DIRECTIONAL_STRENGTH;
 
-        // Options:
-        const { color, lightDirection, ambientStrength } = options;
+        const {
+            color,
+            lightDirection,
+            ambientStrength,
+            directionalStrength,
+            lightingEnabled
+        } = options;
 
         if (color !== undefined) {
             this.setColor(color);
@@ -216,6 +337,14 @@ export class DirectionalLightMaterial extends Material {
 
         if (ambientStrength !== undefined) {
             this.setAmbientStrength(ambientStrength);
+        }
+
+        if (directionalStrength !== undefined) {
+            this.setDirectionalStrength(directionalStrength);
+        }
+
+        if (lightingEnabled !== undefined) {
+            this.setLightingEnabled(lightingEnabled);
         }
     }
 
@@ -239,6 +368,8 @@ export class DirectionalLightMaterial extends Material {
         this.shaderProgram.setVector3(COLOR_UNIFORM_NAME, this.#color);
         this.shaderProgram.setVector3(LIGHT_DIRECTION_UNIFORM_NAME, this.#lightDirection);
         this.shaderProgram.setFloat(AMBIENT_STRENGTH_UNIFORM_NAME, this.#ambientStrength);
+        this.shaderProgram.setFloat(DIRECTIONAL_STRENGTH_UNIFORM_NAME, this.#directionalStrength);
+        this.shaderProgram.setFloat(LIGHTING_ENABLED_UNIFORM_NAME, this.#lightingEnabled);
         this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME, this.opacity);
         this.applyAdditionalUniforms(worldMatrix, cameraPosition);
     }
@@ -308,28 +439,100 @@ export class DirectionalLightMaterial extends Material {
     }
 
     /**
-     * Returns the internal diffuse/base color buffer.
+     * Sets directional strength multiplier.
      *
-     * @returns {Float32Array}
+     * @param {number} value - Directional strength multiplier.
+     * @returns {void}
+     * @throws {TypeError} When the value is invalid.
+     */
+    setDirectionalStrength(value) {
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+            throw new TypeError(ERROR_DIRECTIONAL_STRENGTH_TYPE);
+        }
+
+        this.#directionalStrength = value;
+    }
+
+    /**
+     * Enables or disables the directional light contribution.
+     *
+     * @param {boolean} enabled - Whether directional lighting should be enabled.
+     * @returns {void}
+     * @throws {TypeError} When the value is invalid.
+     */
+    setDirectionalEnabled(enabled) {
+        if (typeof enabled !== 'boolean') {
+            throw new TypeError(ERROR_DIRECTIONAL_ENABLED_TYPE);
+        }
+
+        this.#directionalStrength = enabled ? DEFAULT_DIRECTIONAL_STRENGTH : DIRECTIONAL_STRENGTH_DISABLED;
+    }
+
+    /**
+     * Sets lighting enabled state.
+     *
+     * @param {boolean | number} enabled - Boolean or a [0..1] numeric flag.
+     * @returns {void}
+     * @throws {TypeError}  When the value type is invalid.
+     * @throws {RangeError} When the value is outside [0..1].
+     */
+    setLightingEnabled(enabled) {
+        if (typeof enabled === 'boolean') {
+            this.#lightingEnabled = enabled ? FLOAT_TRUE : FLOAT_FALSE;
+            return;
+        }
+
+        if (typeof enabled !== 'number' || !Number.isFinite(enabled)) {
+            throw new TypeError(ERROR_LIGHTING_ENABLED_TYPE);
+        }
+
+        if (enabled < MIN_LIGHTING_ENABLED || enabled > MAX_LIGHTING_ENABLED) {
+            throw new RangeError(ERROR_LIGHTING_ENABLED_RANGE);
+        }
+
+        this.#lightingEnabled = enabled;
+    }
+
+    /**
+     * @returns {boolean} - Returns current lighting enabled state.
+     */
+    isLightingEnabled() {
+        return this.#lightingEnabled > LIGHTING_ENABLED_THRESHOLD;
+    }
+
+    /**
+     * @returns {Float32Array} - Returns the internal diffuse/base color buffer.
      */
     get color() {
         return this.#color;
     }
 
     /**
-     * Returns the internal normalized light direction buffer.
-     *
-     * @returns {Float32Array}
+     * @returns {Float32Array} - Returns the internal normalized light direction buffer.
      */
     get lightDirection() {
         return this.#lightDirection;
     }
 
     /**
-     * @returns {number} Ambient strength multiplier.
+     * @returns {number} - Ambient strength multiplier.
      */
     get ambientStrength() {
         return this.#ambientStrength;
+    }
+
+    /**
+     * @returns {number} - Returns the directional strength multiplier value.
+     */
+    getDirectionalStrength() {
+        return this.#directionalStrength;
+    }
+
+    /**
+     * @returns {number} - Gettet for the directional strength multiplier.
+     */
+    get directionalStrength() {
+        return this.#directionalStrength;
     }
 
     /**
