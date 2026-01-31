@@ -1,6 +1,6 @@
 {
   "name": "gerawebgl",
-  "version": "0.1.0",
+  "version": "0.1.0-dev.20260201013503",
   "description": "Gera WebGL, browser 3D engine using WebGL 2.0",
   "scripts": {
     "ensure:dist": "node -e \"require('fs').mkdirSync('dist',{recursive:true})\"",
@@ -54,5 +54,27 @@
     "http-server": "^14.1.1",
     "jsdoc": "^4.0.5",
     "rimraf": "^6.1.2"
+  },
+  "type": "module",
+  "main": "./dist/gerawebgl.js",
+  "module": "./dist/gerawebgl.js",
+  "exports": {
+    ".": "./dist/gerawebgl.js",
+    "./min": "./dist/gerawebgl.min.js"
+  },
+  "unpkg": "./dist/gerawebgl.min.js",
+  "jsdelivr": "./dist/gerawebgl.min.js",
+  "files": [
+    "dist",
+    "readme.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gelovolro/gerawebgl.git"
+  },
+  "homepage": "https://github.com/gelovolro/gerawebgl",
+  "bugs": {
+    "url": "https://github.com/gelovolro/gerawebgl/issues"
   }
 }
