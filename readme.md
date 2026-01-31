@@ -150,11 +150,7 @@ Face order for the **18-length** buffer is: **Front, Back, Top, Bottom, Right, L
 npm install
 
 # Building project and serving the demo:
-npm run build # or npm run build:all
-npm run demo:serve
-
-# Or using a single command:
-npm run build:all-and-serve-demo
+npm run dev
 ```
 
 ## Working with linting:
@@ -170,7 +166,5 @@ npx eslint core --fix
 ## Docs generation commands:
 
 ```bash
-npm run docs:build
-npm run docs:serve
 npm run docs:build-and-serve
 ```
