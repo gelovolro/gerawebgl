@@ -6,10 +6,10 @@
     "clear:all": "rimraf docs",
     "copy:demo-assets": "copyfiles -u 1 \"assets/**/*\" docs/demo/assets",
     "copy:demo-scripts": "copyfiles -f \"demo/**/*\" docs/demo",
-    "demo:serve": "python -m http.server 9090 -d docs/demo",
+    "demo:serve": "http-server docs/demo -p 9090 -c-1",
     "docs:build": "jsdoc -c jsdoc.json",
-    "docs:serve": "python -m http.server 9091 -d docs",
-    "docs:build-and-serve": "npm run docs:build && python -m http.server 9091 -d docs",
+    "docs:serve": "http-server docs -p 9091 -c-1",
+    "docs:build-and-serve": "npm run docs:build && npm run docs:serve",
     "build:lib:debug": "esbuild core/library.js --bundle --format=esm --sourcemap --outfile=docs/demo/gerawebgl.js",
     "build:lib:release": "esbuild core/library.js --bundle --minify --format=esm --outfile=docs/demo/gerawebgl.min.js",
     "build": "npm run build:lib:debug && npm run build:lib:release && npm run copy:demo-scripts && npm run copy:demo-assets",
@@ -20,7 +20,17 @@
     "create:zip-lite": "npm run clear:zip && zip -r \"gerawebgl-lite-sources-$(date +%d%m%y%H%M%S).zip\" . -x \"*.zip\" \"node_modules/*\" \".git/*\" \"assets/*\" \"docs/*\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["gera", "gerawebgl", "webgl", "webgl2", "3d", "engine", "renderer", "obj", "mtl"],
+  "keywords": [
+    "gera",
+    "gerawebgl",
+    "webgl",
+    "webgl2",
+    "3d",
+    "engine",
+    "renderer",
+    "obj",
+    "mtl"
+  ],
   "author": "gelovolro",
   "license": "SEE LICENSE IN LICENSE",
   "devDependencies": {
@@ -30,6 +40,7 @@
     "eslint": "^9.39.1",
     "eslint-plugin-jsdoc": "^61.5.0",
     "globals": "^16.5.0",
+    "http-server": "^14.1.1",
     "jsdoc": "^4.0.5",
     "rimraf": "^6.1.2"
   }
