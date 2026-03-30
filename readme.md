@@ -168,3 +168,30 @@ npx eslint core --fix
 ```bash
 npm run docs:build-and-serve
 ```
+
+## Dependency graphs check
+
+This project uses `dependency-cruiser` to inspect the dependencies inside the `core/` directory.
+It can also export the dependency graph in `Mermaid`, a text-based diagram format used for documentation and visualization.
+
+Available commands:
+
+```bash
+# Validates the dependency graph for `core/` using the rules from `.dependency-cruiser.cjs`.  
+# At the moment, this is mainly used to detect the circular dependencies.
+npm run arch:check
+```
+
+```bash
+# Prints the raw `Mermaid` dependency graph for `core/` to stdout.  
+# This is useful, if you want to inspect or reuse the generated `Mermaid` source directly.
+npm run arch:deps:raw
+```
+
+```bash
+# Generates the visual architecture artifacts under `docs/architecture/`.  
+# This includes the full dependency graph, focused subsystem graphs, and a folder-level overview.
+npm run arch:deps
+```
+
+Note: SVG generation requires Graphviz, with the `dot` executable available in `PATH`.

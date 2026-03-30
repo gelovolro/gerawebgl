@@ -29,7 +29,10 @@
     "clear:zip": "rimraf *.zip",
     "create:zip-full": "npm run clear:zip && zip -r \"gerawebgl-full-sources-$(date +%d%m%y%H%M%S).zip\" . -x \"*.zip\" \"node_modules/*\" \".git/*\"",
     "create:zip-lite": "npm run clear:zip && zip -r \"gerawebgl-lite-sources-$(date +%d%m%y%H%M%S).zip\" . -x \"*.zip\" \"node_modules/*\" \".git/*\" \"assets/*\" \"docs/*\"",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node -e \"console.error('Error: no tests are specified'); process.exit(1)\"",
+    "arch:deps:raw": "depcruise core --include-only '^core' --output-type mermaid",
+    "arch:deps": "node ./render-dependency-graph.mjs",
+    "arch:check": "depcruise core --include-only '^core'"
   },
   "keywords": [
     "gera",
@@ -47,6 +50,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "copyfiles": "^2.4.1",
+    "dependency-cruiser": "^17.3.8",
     "esbuild": "^0.27.1",
     "eslint": "^9.39.1",
     "eslint-plugin-jsdoc": "^61.5.0",
