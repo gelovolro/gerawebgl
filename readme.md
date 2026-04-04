@@ -2,14 +2,16 @@
 
 I first developed my own WebGL library (based on v1.0) back in 2014. Now I’ve decided to revisit those ideas, explore what WebGL 2.0 offers, and rebuild everything from scratch. The project is named in memory of my cat, who died in 2017.
 
-- **API reference (JSDoc):** https://gelovolro.github.io/gerawebgl/
-- **Materials demo:** https://gelovolro.github.io/gerawebgl/demo/materials.html
-- **Geometries demo:** https://gelovolro.github.io/gerawebgl/demo/geometries.html
-- **OBJ/MTL loader demo:** https://gelovolro.github.io/gerawebgl/demo/obj-mtl-demo.html
-- **Character controls demo (WASD, sprinting, jumping, mouse look, bobbing, 1st/3rd person camera):** https://gelovolro.github.io/gerawebgl/demo/character-controls.html
-- **Heightmap terrain generation demo:** https://gelovolro.github.io/gerawebgl/demo/heightmap-terrain-demo.html
-- **Raycasting demo (picking the cube):** https://gelovolro.github.io/gerawebgl/demo/picking-demo.html
-- **Points render & 3D object path movement demo:** https://gelovolro.github.io/gerawebgl/demo/points-and-path-demo.html
+- **Site root:** https://gelovolro.github.io/gerawebgl/
+- **API reference (JSDoc):** https://gelovolro.github.io/gerawebgl/api/
+- **HLD diagrams:** https://gelovolro.github.io/gerawebgl/hld-diagrams/
+- **Materials demo:** https://gelovolro.github.io/gerawebgl/demos/materials.html
+- **Geometries demo:** https://gelovolro.github.io/gerawebgl/demos/geometries.html
+- **OBJ/MTL loader demo:** https://gelovolro.github.io/gerawebgl/demos/obj-mtl-demo.html
+- **Character controls demo (WASD, sprinting, jumping, mouse look, bobbing, 1st/3rd person camera):** https://gelovolro.github.io/gerawebgl/demos/character-controls.html
+- **Heightmap terrain generation demo:** https://gelovolro.github.io/gerawebgl/demos/heightmap-terrain-demo.html
+- **Raycasting demo (picking the cube):** https://gelovolro.github.io/gerawebgl/demos/picking-demo.html
+- **Points render & 3D object path movement demo:** https://gelovolro.github.io/gerawebgl/demos/points-and-path-demo.html
 
 ## Quick start
 
@@ -149,7 +151,7 @@ Face order for the **18-length** buffer is: **Front, Back, Top, Bottom, Right, L
 # Restore the dependencies:
 npm install
 
-# Building project and serving the demo:
+# Build the project and serve the GitHub Pages content locally (demos + docs):
 npm run dev
 ```
 
@@ -179,19 +181,19 @@ Available commands:
 ```bash
 # Validates the dependency graph for `core/` using the rules from `.dependency-cruiser.cjs`.  
 # At the moment, this is mainly used to detect the circular dependencies.
-npm run arch:check
+npm run deps:check
 ```
 
 ```bash
 # Prints the raw `Mermaid` dependency graph for `core/` to stdout.  
 # This is useful, if you want to inspect or reuse the generated `Mermaid` source directly.
-npm run arch:deps:raw
+npm run deps:showgraph:raw
 ```
 
 ```bash
-# Generates the visual architecture artifacts under `docs/architecture/`.  
+# Generates the dependency HLD-diagrams under `docs/hld-component-diagrams/`.  
 # This includes the full dependency graph, focused subsystem graphs, and a folder-level overview.
-npm run arch:deps
+npm run deps:generate:diagrams
 ```
 
 Note: SVG generation requires Graphviz, with the `dot` executable available in `PATH`.

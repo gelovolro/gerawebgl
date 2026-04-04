@@ -1,0 +1,17 @@
+name: Install the deps and build
+description: Install Graphviz, install the NPM dependencies and run build
+
+runs:
+  using: composite
+  steps:
+    - name: Install Graphviz
+      shell: bash
+      run: sudo apt-get update && sudo apt-get install -y graphviz
+
+    - name: Install the dependencies
+      shell: bash
+      run: npm ci
+
+    - name: Build stage
+      shell: bash
+      run: npm run build

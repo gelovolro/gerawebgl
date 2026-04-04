@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 
-const OUTPUT_DIR            = "docs/hld_component_diagrams";
+const OUTPUT_DIR            = "docs/hld-component-diagrams";
 const CORE_ROOT             = "core";
 const ENCODING_UTF8         = "utf8";
 const DOT_INDENT            = "    ";
@@ -19,7 +19,7 @@ const EDGE_FONT_SIZE        = 9;
 const NODE_SHAPE            = "box";
 const NODE_STYLE            = "rounded";
 const GRAPH_DIRECTION       = "LR";
-const NPM_COMMAND           = "npm run arch:deps";
+const NPM_COMMAND           = "npm run deps:generate:diagrams";
 const FIRST_ITEM_INDEX      = 0;
 const MIN_NESTED_PATH_PARTS = 2;
 const REMOVE_FILE_OPTIONS   = Object.freeze({ force: true });
