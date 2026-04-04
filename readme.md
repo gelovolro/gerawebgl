@@ -2,9 +2,8 @@
 
 I first developed my own WebGL library (based on v1.0) back in 2014. Now I’ve decided to revisit those ideas, explore what WebGL 2.0 offers, and rebuild everything from scratch. The project is named in memory of my cat, who died in 2017.
 
-- **Site root:** https://gelovolro.github.io/gerawebgl/
+- **GitHub pages site root:** https://gelovolro.github.io/gerawebgl/
 - **API reference (JSDoc):** https://gelovolro.github.io/gerawebgl/api/
-- **HLD diagrams:** https://gelovolro.github.io/gerawebgl/hld-diagrams/
 - **Materials demo:** https://gelovolro.github.io/gerawebgl/demos/materials.html
 - **Geometries demo:** https://gelovolro.github.io/gerawebgl/demos/geometries.html
 - **OBJ/MTL loader demo:** https://gelovolro.github.io/gerawebgl/demos/obj-mtl-demo.html
@@ -151,7 +150,7 @@ Face order for the **18-length** buffer is: **Front, Back, Top, Bottom, Right, L
 # Restore the dependencies:
 npm install
 
-# Build the project and serve the GitHub Pages content locally (demos + docs):
+# Build the project and serve the GitHub pages content locally (demos + docs):
 npm run dev
 ```
 
@@ -168,6 +167,16 @@ npx eslint core --fix
 ## Docs generation commands:
 
 ```bash
+# Generate JSDoc only, without the dependency diagrams:
+npm run docs:build:jsdoc-only
+
+# Generate the local docs bundle, 'JSDoc + HLD dependency diagrams':
+npm run docs:build-locally
+
+# Serve the generated docs locally on port '9091':
+npm run docs:serve
+
+# Generate the full local docs bundle and start the local server:
 npm run docs:build-and-serve
 ```
 
