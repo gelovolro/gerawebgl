@@ -206,3 +206,9 @@ npm run deps:generate:diagrams
 ```
 
 Note: SVG generation requires Graphviz, with the `dot` executable available in `PATH`.
+
+## Testing
+
+```bash
+npm test
+```

@@ -1,4 +1,4 @@
-name: CI (develop build)
+name: CI (develop branch) on PR
 
 on:
   pull_request:
@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  baserun:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -19,5 +19,5 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Restore the dependencies and build
-        uses: ./.github/actions/install-build
+      - name: Restore the dependencies, build and run the tests
+        uses: ./.github/actions/base-preparation

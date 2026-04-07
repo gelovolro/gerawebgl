@@ -1,5 +1,5 @@
-name: Install the deps and build
-description: Install Graphviz, install the NPM dependencies and run build
+name: Install the deps, build and run the tests
+description: Install Graphviz, install the NPM dependencies, run build and run tests
 
 runs:
   using: composite

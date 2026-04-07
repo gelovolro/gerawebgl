@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  baserun:
     runs-on: ubuntu-24.04
 
     steps:
@@ -31,17 +31,17 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Restore the dependencies and build
-        uses: ./.github/actions/install-build
+      - name: Restore the dependencies, build and run the tests
+        uses: ./.github/actions/base-preparation
 
-      - name: Upload Pages artifact
+      - name: Upload the GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist-github-pages
 
   deploy:
     runs-on: ubuntu-24.04
-    needs: build
+    needs: baserun
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
