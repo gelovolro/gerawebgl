@@ -15,3 +15,7 @@ runs:
     - name: Build stage
       shell: bash
       run: npm run build
+
+    - name: Test stage
+      shell: bash
+      run: npm test

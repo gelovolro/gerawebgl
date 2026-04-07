@@ -39,10 +39,14 @@
     "clear:zip": "rimraf *.zip",
     "create:zip-full": "npm run clear:zip && zip -r \"gerawebgl-full-sources-$(date +%d%m%y%H%M%S).zip\" . -x \"*.zip\" \"node_modules/*\" \".git/*\"",
     "create:zip-lite": "npm run clear:zip && zip -r \"gerawebgl-lite-sources-$(date +%d%m%y%H%M%S).zip\" . -x \"*.zip\" \"node_modules/*\" \".git/*\" \"demo-assets/*\" \"dist-github-pages/*\" \"docs/*\"",
-    "test": "node -e \"console.error('Error: no tests are specified'); process.exit(1)\"",
     "deps:check": "depcruise core --include-only '^core'",
     "deps:showgraph:raw": "depcruise core --include-only '^core' --output-type mermaid",
-    "deps:generate:diagrams": "node ./render-dependency-graph.mjs"
+    "deps:generate:diagrams": "node ./render-dependency-graph.mjs",
+    "test:unit": "node --test tests/unit/vector3.test.mjs tests/unit/matrix4.test.mjs",
+    "test:smoke:oneshot": "node --test tests/smoke/scripts-one-shot.test.mjs",
+    "test:smoke:serve": "node --test tests/smoke/scripts-serve.test.mjs",
+    "test:smoke": "npm run test:smoke:oneshot && npm run test:smoke:serve",
+    "test": "npm run test:unit && npm run test:smoke"
   },
   "keywords": [
     "gera",
