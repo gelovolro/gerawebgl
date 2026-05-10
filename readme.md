@@ -209,6 +209,20 @@ Note: SVG generation requires Graphviz, with the `dot` executable available in `
 
 ## Testing
 
+Run the full test suite:
+
 ```bash
 npm test
+```
+
+Run the unit tests only:
+
+```bash
+npm run test:unit
+```
+
+Run the unit tests and print the coverage stats:
+
+```bash
+npm run test:unit:coverage
 ```

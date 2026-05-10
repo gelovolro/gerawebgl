@@ -7,101 +7,17 @@ import { Mesh }                from '../scene/mesh.js';
 import { BoxGeometry }         from '../geometry/box-geometry.js';
 import { Material }            from '../material/material.js';
 import { VertexColorMaterial } from '../material/vertex-color-material.js';
-
-/**
- * Default camera vertical field of view, in radians.
- * Used when `EngineOptions.fieldOfViewRadians` is not provided.
- *
- * @type {number}
- */
-const DEFAULT_FIELD_OF_VIEW_RADIANS = Math.PI / 4;
-
-/**
- * Default near clipping plane distance.
- * Used when `EngineOptions.near` is not provided.
- *
- * @type {number}
- */
-const DEFAULT_NEAR = 0.1;
-
-/**
- * Default far clipping plane distance.
- * Used when `EngineOptions.far` is not provided.
- *
- * @type {number}
- */
-const DEFAULT_FAR = 100.0;
-
-/**
- * Default initial camera position on the Z axis.
- * Used when `EngineOptions.initialCameraZ` is not provided.
- *
- * @type {number}
- */
-const DEFAULT_INITIAL_CAMERA_Z = 5.0;
-
-/**
- * Converts milliseconds to seconds. Used to compute time values.
- *
- * @type {number}
- */
-const MILLISECONDS_TO_SECONDS = 0.001;
-
-/**
- * Default box size used by `Engine.createBoxMesh()`.
- * Used when `createBoxMesh options.size` is not provided.
- *
- * @type {number}
- */
-const DEFAULT_BOX_SIZE = 1.0;
-
-/**
- * Minimal allowed box size for `Engine.createBoxMesh()`.
- *
- * @type {number}
- */
-const MIN_BOX_SIZE = 0;
-
-/**
- * `requestAnimationFrame` id reset value.
- * Zero means - no frame scheduled.
- *
- * @type {number}
- */
-const ENGINE_ANIMATION_FRAME_ID_RESET_VALUE = 0;
-
-/**
- * Engine time fields reset/uninitialized value (seconds).
- * Used as a sentinel to detect the first frame.
- *
- * @type {number}
- */
-const ENGINE_TIME_SECONDS_RESET_VALUE = 0;
-
-/**
- * Initial camera aspect ratio used during `Engine` construction.
- * Real aspect ratio is updated on first render based on canvas size.
- *
- * @type {number}
- */
-const INITIAL_CAMERA_ASPECT_RATIO = 1.0;
-
-/**
- * Exclusive lower bound for numeric parameters.
- *
- * @type {number}
- */
-const MIN_EXCLUSIVE_NUMBER = 0;
+import * as EngineConstants    from '../constants/engine.js';
 
 /**
  * Options used by `createEngine` and `Engine`.
  *
  * @typedef {Object} EngineOptions
- * @property {number}  [fieldOfViewRadians=Math.PI / 4] - Vertical field of view in radians.
- * @property {number}  [near = 0.1]                     - Near clipping plane.
- * @property {number}  [far  = 100.0]                   - Far clipping plane.
- * @property {number}  [initialCameraZ = 5.0]           - Initial camera position on the Z axis.
- * @property {boolean} [fitToWindow    = false]         - When true, the engine will render using `window.innerWidth/innerHeight` as the canvas size source.
+ * @property {number}  [fieldOfViewRadians = Math.PI / 4] - Vertical field of view in radians.
+ * @property {number}  [near = 0.1]                       - Near clipping plane.
+ * @property {number}  [far  = 100.0]                     - Far clipping plane.
+ * @property {number}  [initialCameraZ = 5.0]             - Initial camera position on the Z axis.
+ * @property {boolean} [fitToWindow    = false]           - When true, the engine will render using `window.innerWidth/innerHeight` as the canvas size source.
  */
 
 /**
@@ -124,7 +40,10 @@ const MIN_EXCLUSIVE_NUMBER = 0;
  */
 
 /**
- * High-level convenience wrapper, that bundles the most common building blocks.
+ * High-level wrapper that creates and connects common rendering building blocks.
+ *
+ * Engine owns the WebGL context wrapper, renderer, scene and default camera.
+ * It also provides a small render loop based on `requestAnimationFrame`.
  */
 export class Engine {
 
@@ -178,13 +97,13 @@ export class Engine {
     #isRunning = false;
 
     /**
-     * Stores the active requestAnimationFrame id.
+     * Stores the active `requestAnimationFrame` id.
      * A reset value (usually `0`) indicates, that no frame is currently scheduled.
      *
      * @type {number}
      * @private
      */
-    #requestAnimationFrameId = ENGINE_ANIMATION_FRAME_ID_RESET_VALUE;
+    #requestAnimationFrameId = EngineConstants.ENGINE_STATE_RESET.ANIMATION_FRAME_ID;
 
     /**
      * Timestamp (in seconds) of the previous frame.
@@ -193,7 +112,7 @@ export class Engine {
      * @type {number}
      * @private
      */
-    #lastTimeSeconds = ENGINE_TIME_SECONDS_RESET_VALUE;
+    #lastTimeSeconds = EngineConstants.ENGINE_STATE_RESET.TIME_SECONDS;
 
     /**
      * Start timestamp (in seconds) of the engine loop.
@@ -202,7 +121,7 @@ export class Engine {
      * @type {number}
      * @private
      */
-    #startTimeSeconds = ENGINE_TIME_SECONDS_RESET_VALUE;
+    #startTimeSeconds = EngineConstants.ENGINE_STATE_RESET.TIME_SECONDS;
 
     /**
      * Optional per-frame callback invoked by `Engine.start(callback)`.
@@ -219,7 +138,7 @@ export class Engine {
      * @type {{ fitToWindow: boolean }}
      * @private
      */
-    #resizeOptions = { fitToWindow: false };
+    #resizeOptions = { fitToWindow: EngineConstants.ENGINE_CANVAS_DEFAULTS.FIT_TO_WINDOW };
 
     /**
      * @param {HTMLCanvasElement} canvas - Canvas used for rendering.
@@ -235,21 +154,21 @@ export class Engine {
         }
 
         const {
-            fieldOfViewRadians = DEFAULT_FIELD_OF_VIEW_RADIANS,
-            near               = DEFAULT_NEAR,
-            far                = DEFAULT_FAR,
-            initialCameraZ     = DEFAULT_INITIAL_CAMERA_Z,
-            fitToWindow        = false
+            fieldOfViewRadians = EngineConstants.ENGINE_CAMERA_DEFAULTS.FIELD_OF_VIEW_RADIANS,
+            near               = EngineConstants.ENGINE_CAMERA_DEFAULTS.NEAR_CLIPPING_PLANE,
+            far                = EngineConstants.ENGINE_CAMERA_DEFAULTS.FAR_CLIPPING_PLANE,
+            initialCameraZ     = EngineConstants.ENGINE_CAMERA_DEFAULTS.INITIAL_CAMERA_Z,
+            fitToWindow        = EngineConstants.ENGINE_CANVAS_DEFAULTS.FIT_TO_WINDOW
         } = options;
 
-        if (typeof fieldOfViewRadians !== 'number' || fieldOfViewRadians <= MIN_EXCLUSIVE_NUMBER) {
+        if (typeof fieldOfViewRadians !== 'number' || fieldOfViewRadians <= EngineConstants.ENGINE_VALIDATION_LIMITS.MIN_NUMBER_EXCLUSIVE) {
             throw new RangeError('Engine option `fieldOfViewRadians` must be a positive number.');
         }
 
         if (typeof near   !== 'number'
             || typeof far !== 'number'
-            || near <= MIN_EXCLUSIVE_NUMBER
-            || far  <= MIN_EXCLUSIVE_NUMBER
+            || near <= EngineConstants.ENGINE_VALIDATION_LIMITS.MIN_NUMBER_EXCLUSIVE
+            || far  <= EngineConstants.ENGINE_VALIDATION_LIMITS.MIN_NUMBER_EXCLUSIVE
             || near >= far) {
             throw new RangeError('Engine options `near` and `far` must be positive numbers and near < far.');
         }
@@ -266,7 +185,7 @@ export class Engine {
         this.#contextWrapper    = new WebGLContext(canvas);
         this.#renderer          = new Renderer(this.#contextWrapper);
         this.#scene             = new Scene();
-        this.#camera            = new PerspectiveCamera(fieldOfViewRadians, INITIAL_CAMERA_ASPECT_RATIO, near, far); // default camera type
+        this.#camera            = new PerspectiveCamera(fieldOfViewRadians, EngineConstants.ENGINE_CAMERA_DEFAULTS.INITIAL_CAMERA_ASPECT_RATIO, near, far); // default camera type
         this.#camera.position.z = initialCameraZ;
     }
 
@@ -310,9 +229,9 @@ export class Engine {
             throw new TypeError('`Engine.createBoxMesh` expects an options object (plain object).');
         }
 
-        const { size = DEFAULT_BOX_SIZE, material } = options;
+        const { size = EngineConstants.ENGINE_HELPER_DEFAULTS.BOX_SIZE, material } = options;
 
-        if (typeof size !== 'number' || size <= MIN_BOX_SIZE) {
+        if (typeof size !== 'number' || size <= EngineConstants.ENGINE_VALIDATION_LIMITS.MIN_BOX_SIZE_EXCLUSIVE) {
             throw new RangeError('`Engine.createBoxMesh` option `size` must be a positive number.');
         }
 
@@ -351,8 +270,8 @@ export class Engine {
 
         this.#isRunning               = true;
         this.#frameCallback           = frameCallback || null;
-        this.#lastTimeSeconds         = ENGINE_TIME_SECONDS_RESET_VALUE;
-        this.#startTimeSeconds        = ENGINE_TIME_SECONDS_RESET_VALUE;
+        this.#lastTimeSeconds         = EngineConstants.ENGINE_STATE_RESET.TIME_SECONDS;
+        this.#startTimeSeconds        = EngineConstants.ENGINE_STATE_RESET.TIME_SECONDS;
         this.#requestAnimationFrameId = window.requestAnimationFrame((timeMs) => this.#renderFrame(timeMs));
     }
 
@@ -365,7 +284,7 @@ export class Engine {
         }
 
         window.cancelAnimationFrame(this.#requestAnimationFrameId);
-        this.#requestAnimationFrameId = ENGINE_ANIMATION_FRAME_ID_RESET_VALUE;
+        this.#requestAnimationFrameId = EngineConstants.ENGINE_STATE_RESET.ANIMATION_FRAME_ID;
         this.#isRunning               = false;
         this.#frameCallback           = null;
     }
@@ -388,9 +307,9 @@ export class Engine {
      * @private
      */
     #renderFrame(timeMs) {
-        const timeSeconds = timeMs * MILLISECONDS_TO_SECONDS;
+        const timeSeconds = timeMs * EngineConstants.ENGINE_TIME.MILLISECONDS_TO_SECONDS;
 
-        if (this.#startTimeSeconds === ENGINE_TIME_SECONDS_RESET_VALUE) {
+        if (this.#startTimeSeconds === EngineConstants.ENGINE_STATE_RESET.TIME_SECONDS) {
             this.#startTimeSeconds = timeSeconds;
             this.#lastTimeSeconds  = timeSeconds;
         }

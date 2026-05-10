@@ -1,7 +1,7 @@
 import test               from 'node:test';
 import assert             from 'node:assert/strict';
-import { Matrix4 }        from '../../core/math/matrix4.js';
-import { TestAssertions } from '../helpers/test-assertions.mjs';
+import { Matrix4 }        from '../../../core/math/matrix4.js';
+import { TestAssertions } from '../../helpers/test-assertions.mjs';
 
 class Matrix4TestFixtures {
     static createExpectedIdentity() {

@@ -1,19 +1,17 @@
 import test        from 'node:test';
 import assert      from 'node:assert/strict';
-import { Vector3 } from '../../core/math/vector3.js';
+import { Vector3 } from '../../../core/math/vector3.js';
 
 class Vector3TestFixtures {
     static createChangeCounter() {
         return {
             value: 0,
-            onChange() {
-                this.value += 1;
-            }
+            onChange() { this.value += 1; }
         };
     }
 }
 
-test('Vector3.createZero should create a zero vector', () => {
+test("'Vector3.createZero' should create a zero vector", () => {
     // Arrange
     const expectedComponents = { x: 0, y: 0, z: 0 };
 
@@ -26,7 +24,7 @@ test('Vector3.createZero should create a zero vector', () => {
     assert.equal(actualVector.z, expectedComponents.z);
 });
 
-test('Vector3.createUnitScale should create a unit-scale vector', () => {
+test("'Vector3.createUnitScale' should create a unit-scale vector", () => {
     // Arrange
     const expectedComponents = { x: 1, y: 1, z: 1 };
 
@@ -39,7 +37,7 @@ test('Vector3.createUnitScale should create a unit-scale vector', () => {
     assert.equal(actualVector.z, expectedComponents.z);
 });
 
-test('Vector3.set should update all components and emit exactly one change', () => {
+test("'Vector3.set' should update all components and emit exactly one change", () => {
     // Arrange
     const changeCounter = Vector3TestFixtures.createChangeCounter();
     const actualVector  = new Vector3(0, 0, 0, changeCounter.onChange.bind(changeCounter));
@@ -55,7 +53,7 @@ test('Vector3.set should update all components and emit exactly one change', () 
     assert.equal(changeCounter.value, 1);
 });
 
-test('Vector3 property setters should not emit a change, when the value stays the same', () => {
+test("'Vector3' property setters should not emit a change, when the value stays the same", () => {
     // Arrange
     const changeCounter = Vector3TestFixtures.createChangeCounter();
     const actualVector  = new Vector3(1, 2, 3, changeCounter.onChange.bind(changeCounter));
@@ -70,7 +68,7 @@ test('Vector3 property setters should not emit a change, when the value stays th
     assert.equal(changeCounter.value, 0);
 });
 
-test('Vector3.copyFrom should copy all components from another vector', () => {
+test("'Vector3.copyFrom' should copy all components from another vector", () => {
     // Arrange
     const sourceVector = new Vector3(4, 5, 6);
     const actualVector = new Vector3();
@@ -85,7 +83,7 @@ test('Vector3.copyFrom should copy all components from another vector', () => {
     assert.equal(actualVector.z, 6);
 });
 
-test('Vector3.setOnChange should replace the callback and allow null', () => {
+test("'Vector3.setOnChange' should replace the callback and allow null", () => {
     // Arrange
     const firstCounter  = Vector3TestFixtures.createChangeCounter();
     const secondCounter = Vector3TestFixtures.createChangeCounter();
@@ -103,7 +101,7 @@ test('Vector3.setOnChange should replace the callback and allow null', () => {
     assert.equal(secondCounter.value, 1);
 });
 
-test('Vector3 constructor should reject a non-function onChange callback', () => {
+test("'Vector3' constructor should reject a non-function onChange callback", () => {
     // Arrange
     const invalidCallback = 'not-a-function';
 
@@ -114,7 +112,7 @@ test('Vector3 constructor should reject a non-function onChange callback', () =>
     assert.throws(actualCall, /function or null/);
 });
 
-test('Vector3.set should reject NaN components', () => {
+test("'Vector3.set' should reject NaN components", () => {
     // Arrange
     const actualVector = new Vector3();
 

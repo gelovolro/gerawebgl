@@ -23,7 +23,7 @@
     "copy:full-docs-to-github-pages": "npm run copy:docs-jsdoc-to-github-pages && npm run copy:docs-hld-diagrams-to-github-pages",
     "copy:all": "npm run copy:demo:all && npm run copy:dist-to-github-pages && npm run copy:full-docs-to-github-pages && npm run copy:github-pages-index-template",
     "github-pages:serve-locally": "http-server dist-github-pages -p 9090 -c-1",
-    "docs:build:jsdoc-only": "jsdoc -c jsdoc.json",
+    "docs:build:jsdoc-only": "jsdoc -c jsdoc.json -R readme.md",
     "docs:build-locally": "npm run ensure:docs-jsdoc-dir && npm run ensure:docs-hld-diagrams-dir && npm run deps:check && npm run deps:generate:diagrams && npm run docs:build:jsdoc-only",
     "docs:serve": "http-server docs -p 9091 -c-1",
     "docs:build-and-serve": "npm run docs:build-locally && npm run docs:serve",
@@ -42,11 +42,12 @@
     "deps:check": "depcruise core --include-only '^core'",
     "deps:showgraph:raw": "depcruise core --include-only '^core' --output-type mermaid",
     "deps:generate:diagrams": "node ./render-dependency-graph.mjs",
-    "test:unit": "node --test tests/unit/vector3.test.mjs tests/unit/matrix4.test.mjs",
+    "test:unit": "node --test tests/unit/**/*.tests.mjs",
+    "test:unit:coverage": "node --test --experimental-test-coverage --test-coverage-include=core/**/*.js --test-coverage-exclude=tests/**/*.mjs tests/unit/**/*.tests.mjs",
     "test:smoke:oneshot": "node --test tests/smoke/scripts-one-shot.test.mjs",
     "test:smoke:serve": "node --test tests/smoke/scripts-serve.test.mjs",
     "test:smoke": "npm run test:smoke:oneshot && npm run test:smoke:serve",
-    "test": "npm run test:unit && npm run test:smoke"
+    "test": "npm run test:unit && npm run test:smoke && npm run test:unit:coverage"
   },
   "keywords": [
     "gera",
