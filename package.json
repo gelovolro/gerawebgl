@@ -47,7 +47,7 @@
     "test:smoke:oneshot": "node --test tests/smoke/scripts-one-shot.test.mjs",
     "test:smoke:serve": "node --test tests/smoke/scripts-serve.test.mjs",
     "test:smoke": "npm run test:smoke:oneshot && npm run test:smoke:serve",
-    "test": "npm run test:unit && npm run test:smoke && npm run test:unit:coverage"
+    "test": "npm run test:unit:coverage && npm run test:smoke"
   },
   "keywords": [
     "gera",
