@@ -43,6 +43,11 @@ export function withFakeBrowserWebGLEnvironment(callback) {
     const animationFrames                = new Map();
     const requestedFrames                = [];
     const canceledFrames                 = [];
+    const drawCalls                      = [];
+    const enabledCapabilities            = [];
+    const disabledCapabilities           = [];
+    const blendFuncCalls                 = [];
+    const depthMaskCalls                 = [];
     let nextAnimationFrameId             = INITIAL_ANIMATION_FRAME_ID;
 
     class FakeWebGL2RenderingContext {
@@ -73,14 +78,14 @@ export function withFakeBrowserWebGLEnvironment(callback) {
         SRC_ALPHA            = FAKE_WEBGL_CONSTANTS.SRC_ALPHA;
         ONE_MINUS_SRC_ALPHA  = FAKE_WEBGL_CONSTANTS.ONE_MINUS_SRC_ALPHA;
 
-        enable() {}
-        disable() {}
+        enable(capability) { enabledCapabilities.push(capability); }
+        disable(capability) { disabledCapabilities.push(capability); }
         depthFunc() {}
         clearColor() {}
         clear() {}
         viewport() {}
-        blendFunc() {}
-        depthMask() {}
+        blendFunc(sourceFactor, destinationFactor) { blendFuncCalls.push({ sourceFactor, destinationFactor }); }
+        depthMask(flag) { depthMaskCalls.push(flag); }
         bindBuffer() {}
         bufferData() {}
         bindVertexArray() {}
@@ -101,7 +106,7 @@ export function withFakeBrowserWebGLEnvironment(callback) {
         uniform3fv() {}
         uniform4fv() {}
         uniformMatrix4fv() {}
-        drawElements() {}
+        drawElements(mode, count, type, offset) { drawCalls.push({ mode, count, type, offset }); }
         createBuffer() { return {}; }
         createVertexArray() { return {}; }
         createShader(type) { return { type }; }
@@ -157,6 +162,11 @@ export function withFakeBrowserWebGLEnvironment(callback) {
         window                 : fakeWindow,
         requestedFrames,
         canceledFrames,
+        drawCalls,
+        enabledCapabilities,
+        disabledCapabilities,
+        blendFuncCalls,
+        depthMaskCalls,
 
         createCanvas() { return new FakeHTMLCanvasElement(); },
 

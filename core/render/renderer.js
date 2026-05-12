@@ -7,6 +7,8 @@ import { WebGLContext }             from '../webgl-context.js';
 import { DirectionalLightMaterial } from '../material/directional-light-material.js';
 import { DirectionalLight }         from '../light/directional-light.js';
 import { AmbientLight }             from '../light/ambient-light.js';
+import * as MathConstants           from '../constants/math.js';
+import * as RendererConstants       from '../constants/renderer.js';
 import {
     PRIMITIVE_TRIANGLES,
     PRIMITIVE_LINES,
@@ -16,87 +18,6 @@ import {
 } from '../geometry/geometry.js';
 
 /**
- * Byte offset passed to `webglRenderingContext.drawElements()` call.
- * Indices always start at the beginning of the currently bound index buffer.
- *
- * @type {number}
- */
-const INDEX_BUFFER_OFFSET_BYTES = 0;
-
-/**
- * Element count for a 4x4 matrix stored in a flat array.
- * Used for allocating reusable `Float32Array(16)` buffers.
- *
- * @type {number}
- */
-const MATRIX_4x4_ELEMENT_COUNT = 16;
-
-/**
- * Element count for a 3D vector stored in a flat array (x, y, z).
- * Used for allocating reusable `Float32Array(3)` buffers (e.g. camera position).
- *
- * @type {number}
- */
-const VECTOR3_ELEMENT_COUNT = 3;
-
-/**
- * Opacity value, that is considered fully opaque.
- *
- * @type {number}
- */
-const OPAQUE_OPACITY = 1.0;
-
-/**
- * `Material.apply()` parameter count, when it expects: finalMatrix, worldMatrix.
- *
- * @type {number}
- */
-const MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT = 2;
-
-/**
- * `Material.apply()` parameter count, when it expects: finalMatrix, worldMatrix, worldInverseTransposeMatrix.
- *
- * @type {number}
- */
-const MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT = 3;
-
-/**
- * `Material.apply()` parameter count when it expects:
- * finalMatrix, worldMatrix, worldInverseTransposeMatrix, cameraPosition.
- *
- * @type {number}
- */
-const MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT = 4;
-
-/**
- * Error message used, when geometry primitive is unknown.
- *
- * @type {string}
- */
-const ERROR_UNKNOWN_PRIMITIVE = 'Renderer received an unknown geometry primitive.';
-
-/**
- * Stack empty length, used for traversal loops.
- *
- * @type {number}
- */
-const STACK_EMPTY_LENGTH = 0;
-
-/**
- * Start index for the loop iterations.
- *
- * @type {number}
- */
-const LOOP_START_INDEX = 0;
-
-/**
- * Loop increment step.
- *
- * @type {number}
- */
-const LOOP_INCREMENT = 1;
-
-/**
  * Canvas resize options for `WebGLContext.resizeToDisplaySize()`.
  *
  * @typedef {Object} ResizeToDisplaySizeOptions
@@ -104,8 +25,8 @@ const LOOP_INCREMENT = 1;
  */
 
 /**
- * High-level renderer, that draws a scene from the perspective of a camera.
- * Keeps per-frame allocations minimal (reuse the matrices, reuse the traversal callback).
+ * High-level renderer that draws a scene from the perspective of a camera.
+ * Keeps per-frame allocations minimal by reusing matrices and the traversal callback.
  */
 export class Renderer {
 
@@ -223,12 +144,12 @@ export class Renderer {
         }
 
         this.#contextWrapper              = webglContext;
-        this.#webglRenderingContext       = webglContext.context;
-        this.#viewProjectionMatrix        = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
-        this.#finalMatrix                 = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
-        this.#worldMatrixInverse          = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
-        this.#worldInverseTransposeMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
-        this.#cameraPosition              = new Float32Array(VECTOR3_ELEMENT_COUNT);
+        this.#webglRenderingContext       = this.#contextWrapper.context;
+        this.#viewProjectionMatrix        = new Float32Array(MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
+        this.#finalMatrix                 = new Float32Array(MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
+        this.#worldMatrixInverse          = new Float32Array(MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
+        this.#worldInverseTransposeMatrix = new Float32Array(MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
+        this.#cameraPosition              = new Float32Array(MathConstants.MATH_LAYOUT.VECTOR3_ELEMENT_COUNT);
         this.#frameViewProjectionMatrix   = this.#viewProjectionMatrix;
         this.#frameCameraPosition         = this.#cameraPosition;
         this.#lightSearchStack            = [];
@@ -284,7 +205,9 @@ export class Renderer {
     /**
      * Renders a single visited scene node during traversal.
      *
-     * @param {Object3D} visitedObject - Visited scene node (only `Mesh` instances are rendered, they're childs from `Object3D`).
+     * Only `Mesh` instances are rendered. Other `Object3D` nodes are skipped.
+     *
+     * @param {Object3D} visitedObject - Visited scene node.
      * @private
      */
     #renderVisitedObject(visitedObject) {
@@ -325,7 +248,7 @@ export class Renderer {
 
         material.use();
         const materialOpacity = material.opacity;
-        const isTransparent   = materialOpacity < OPAQUE_OPACITY;
+        const isTransparent   = materialOpacity < RendererConstants.RENDERER_OPACITY.OPAQUE_THRESHOLD;
 
         if (isTransparent) {
             renderingContext.enable(renderingContext.BLEND);
@@ -337,9 +260,9 @@ export class Renderer {
         }
 
         const applyParameterCount = material.apply.length;
-        const wantsWorldMatrix    = applyParameterCount >= MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT;
-        const wantsNormalMatrix   = applyParameterCount >= MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT;
-        const wantsCameraPosition = applyParameterCount >= MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT;
+        const wantsWorldMatrix    = applyParameterCount >= RendererConstants.RENDERER_MATERIAL_APPLY_PARAM_COUNTS.WORLD_MATRIX;
+        const wantsNormalMatrix   = applyParameterCount >= RendererConstants.RENDERER_MATERIAL_APPLY_PARAM_COUNTS.WORLD_INVERSE_TRANSPOSE;
+        const wantsCameraPosition = applyParameterCount >= RendererConstants.RENDERER_MATERIAL_APPLY_PARAM_COUNTS.CAMERA_POSITION;
 
         if (!wantsWorldMatrix) {
             material.apply(this.#finalMatrix);
@@ -368,7 +291,7 @@ export class Renderer {
             mode,
             indexCount,
             geometry.getIndexComponentType(isWireframeEnabled),
-            INDEX_BUFFER_OFFSET_BYTES
+            RendererConstants.RENDERER_DRAW.INDEX_BUFFER_OFFSET_BYTES
         );
     }
 
@@ -384,10 +307,13 @@ export class Renderer {
         this.#activeAmbientLight     = null;
 
         const stack  = this.#lightSearchStack;
-        stack.length = STACK_EMPTY_LENGTH;
+        stack.length = RendererConstants.RENDERER_TRAVERSAL.STACK_EMPTY_LENGTH;
         stack.push(scene);
 
-        while (stack.length > STACK_EMPTY_LENGTH && (this.#activeDirectionalLight === null || this.#activeAmbientLight === null)) {
+        while (
+            stack.length > RendererConstants.RENDERER_TRAVERSAL.STACK_EMPTY_LENGTH
+            && (this.#activeDirectionalLight === null || this.#activeAmbientLight === null)
+        ) {
             const node = stack.pop();
 
             if (this.#activeDirectionalLight === null
@@ -402,7 +328,11 @@ export class Renderer {
 
             const children = node.children;
 
-            for (let index = LOOP_START_INDEX; index < children.length; index += LOOP_INCREMENT) {
+            for (
+                let index = RendererConstants.RENDERER_TRAVERSAL.CHILD_LOOP_START_INDEX;
+                index < children.length;
+                index += RendererConstants.RENDERER_TRAVERSAL.CHILD_LOOP_INCREMENT
+            ) {
                 stack.push(children[index]);
             }
         }
@@ -429,6 +359,6 @@ function resolvePrimitiveMode(renderingContext, primitive) {
         case PRIMITIVE_POINTS:
             return renderingContext.POINTS;
         default:
-            throw new Error(ERROR_UNKNOWN_PRIMITIVE);
+            throw new Error(RendererConstants.RENDERER_ERRORS.UNKNOWN_PRIMITIVE);
     }
 }
