@@ -83,6 +83,18 @@ test("'Vector3.copyFrom' should copy all components from another vector", () => 
     assert.equal(actualVector.z, 6);
 });
 
+test("'Vector3.copyFrom' should reject a source that is not a 'Vector3'", () => {
+    // Arrange
+    const actualVector  = new Vector3();
+    const invalidSource = {};
+
+    // Act
+    const actualCall = () => actualVector.copyFrom(invalidSource);
+
+    // Assert
+    assert.throws(actualCall, /Vector3 instance/);
+});
+
 test("'Vector3.setOnChange' should replace the callback and allow null", () => {
     // Arrange
     const firstCounter  = Vector3TestFixtures.createChangeCounter();
@@ -99,6 +111,18 @@ test("'Vector3.setOnChange' should replace the callback and allow null", () => {
     // Assert
     assert.equal(firstCounter.value, 0);
     assert.equal(secondCounter.value, 1);
+});
+
+test("'Vector3.setOnChange' should reject a non-function callback", () => {
+    // Arrange
+    const actualVector    = new Vector3();
+    const invalidCallback = 'not-a-function';
+
+    // Act
+    const actualCall = () => actualVector.setOnChange(invalidCallback);
+
+    // Assert
+    assert.throws(actualCall, /function or null/);
 });
 
 test("'Vector3' constructor should reject a non-function onChange callback", () => {
