@@ -1,57 +1,46 @@
-import { ShaderProgram } from '../shader/shader-program.js';
-import {
-    DirectionalLightMaterial,
-    POSITION_ATTRIBUTE_LOCATION,
-    NORMAL_ATTRIBUTE_LOCATION,
-    FINAL_MATRIX_UNIFORM_NAME,
-    WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME,
-    COLOR_UNIFORM_NAME,
-    LIGHT_DIRECTION_UNIFORM_NAME,
-    AMBIENT_STRENGTH_UNIFORM_NAME,
-    DIRECTIONAL_STRENGTH_UNIFORM_NAME,
-    LIGHTING_ENABLED_UNIFORM_NAME,
-    OPACITY_UNIFORM_NAME
-} from './directional-light-material.js';
+import * as MaterialConstants       from '../constants/directional-light-material.js';
+import { ShaderProgram }            from '../shader/shader-program.js';
+import { DirectionalLightMaterial } from './directional-light-material.js';
 
 /**
  * GLSL vertex shader source code.
  *
  * Requires:
- * - position attribute at location 0
- * - normal attribute at location 3
+ * - position attribute at 'location 0'
+ * - normal attribute at 'location 3'
  *
  * @type {string}
  */
 const VERTEX_SHADER_SOURCE = `#version 300 es
 precision mediump float;
-layout(location = ${POSITION_ATTRIBUTE_LOCATION}) in vec3 a_position;
-layout(location = ${NORMAL_ATTRIBUTE_LOCATION}) in vec3 a_normal;
-uniform mat4 ${FINAL_MATRIX_UNIFORM_NAME};
-uniform mat4 ${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME};
+layout(location = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.POSITION_LOCATION}) in vec3 a_position;
+layout(location = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.NORMAL_LOCATION}) in vec3 a_normal;
+uniform mat4 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX};
+uniform mat4 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX};
 out vec3 v_normal;
 
 void main() {
-    gl_Position = ${FINAL_MATRIX_UNIFORM_NAME} * vec4(a_position, 1.0);
-    v_normal    = (${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME} * vec4(a_normal, 0.0)).xyz;
+    gl_Position = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX} * vec4(a_position, 1.0);
+    v_normal    = (${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX} * vec4(a_normal, 0.0)).xyz;
 }
 `;
 
 /**
  * GLSL fragment shader source code.
  *
- * Implements Lambert diffuse lighting: `ambient + diffuse`.
+ * Implements Lambert diffuse lighting: 'ambient + diffuse'.
  *
  * @type {string}
  */
 const FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision mediump float;
 in vec3 v_normal;
-uniform vec3  ${COLOR_UNIFORM_NAME};
-uniform vec3  ${LIGHT_DIRECTION_UNIFORM_NAME};
-uniform float ${AMBIENT_STRENGTH_UNIFORM_NAME};
-uniform float ${DIRECTIONAL_STRENGTH_UNIFORM_NAME};
-uniform float ${LIGHTING_ENABLED_UNIFORM_NAME};
-uniform float ${OPACITY_UNIFORM_NAME};
+uniform vec3  ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR};
+uniform vec3  ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION};
+uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH};
+uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH};
+uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED};
+uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY};
 out vec4 outColor;
 
 void main() {
@@ -61,11 +50,11 @@ void main() {
         surface_normal = -surface_normal;
     }
 
-    vec3 light_direction    = normalize(${LIGHT_DIRECTION_UNIFORM_NAME});
-    float diffuse_intensity = max(dot(surface_normal, light_direction), 0.0) * ${DIRECTIONAL_STRENGTH_UNIFORM_NAME};
-    float lit_intensity     = clamp(${AMBIENT_STRENGTH_UNIFORM_NAME} + diffuse_intensity, 0.0, 1.0);
-    float light_intensity   = mix(1.0, lit_intensity, ${LIGHTING_ENABLED_UNIFORM_NAME});
-    outColor                = vec4(${COLOR_UNIFORM_NAME} * light_intensity, ${OPACITY_UNIFORM_NAME});
+    vec3 light_direction    = normalize(${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION});
+    float diffuse_intensity = max(dot(surface_normal, light_direction), 0.0) * ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH};
+    float lit_intensity     = clamp(${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH} + diffuse_intensity, 0.0, 1.0);
+    float light_intensity   = mix(1.0, lit_intensity, ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED});
+    outColor                = vec4(${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR} * light_intensity, ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY});
 }
 `;
 
@@ -81,7 +70,7 @@ void main() {
 /**
  * Simple Lambert (diffuse) material with one directional light.
  *
- * This material expects geometry to provide normals at attribute location 3.
+ * This material expects geometry to provide normals at attribute 'location 3'.
  */
 export class LambertMaterial extends DirectionalLightMaterial {
 

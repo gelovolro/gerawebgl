@@ -1,14 +1,15 @@
-import { Matrix4 }                  from '../math/matrix4.js';
-import { Object3D }                 from '../scene/object3d.js';
-import { Mesh }                     from '../scene/mesh.js';
-import { Scene }                    from '../scene/scene.js';
-import { Camera }                   from '../scene/camera.js';
-import { WebGLContext }             from '../webgl-context.js';
-import { DirectionalLightMaterial } from '../material/directional-light-material.js';
-import { DirectionalLight }         from '../light/directional-light.js';
-import { AmbientLight }             from '../light/ambient-light.js';
-import * as MathConstants           from '../constants/math.js';
-import * as RendererConstants       from '../constants/renderer.js';
+import * as MathConstants             from '../constants/math.js';
+import * as RendererConstants         from '../constants/renderer.js';
+import * as RendererExceptionMessages from '../exception-messages/renderer.js';
+import { Matrix4 }                    from '../math/matrix4.js';
+import { Object3D }                   from '../scene/object3d.js';
+import { Mesh }                       from '../scene/mesh.js';
+import { Scene }                      from '../scene/scene.js';
+import { Camera }                     from '../scene/camera.js';
+import { WebGLContext }               from '../webgl-context.js';
+import { DirectionalLightMaterial }   from '../material/directional-light-material.js';
+import { DirectionalLight }           from '../light/directional-light.js';
+import { AmbientLight }               from '../light/ambient-light.js';
 import {
     PRIMITIVE_TRIANGLES,
     PRIMITIVE_LINES,
@@ -359,6 +360,6 @@ function resolvePrimitiveMode(renderingContext, primitive) {
         case PRIMITIVE_POINTS:
             return renderingContext.POINTS;
         default:
-            throw new Error(RendererConstants.RENDERER_ERRORS.UNKNOWN_PRIMITIVE);
+            throw new Error(RendererExceptionMessages.RENDERER_EXCEPTION_MESSAGES.UNKNOWN_PRIMITIVE);
     }
 }

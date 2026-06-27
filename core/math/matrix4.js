@@ -438,7 +438,8 @@ export class Matrix4 {
         }
 
         for (const matrix of matrices) {
-            if (!(matrix instanceof Float32Array) || matrix.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
+            if (!(matrix instanceof Float32Array)
+                || matrix.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
                 throw new TypeError('`Matrix4.multiplyMany` expects the 4x4 `Float32Array` matrices.');
             }
         }

@@ -1,20 +1,6 @@
-import { ShaderProgram } from '../shader/shader-program.js';
-import {
-    DirectionalLightMaterial,
-    POSITION_ATTRIBUTE_LOCATION,
-    NORMAL_ATTRIBUTE_LOCATION,
-    FINAL_MATRIX_UNIFORM_NAME,
-    WORLD_MATRIX_UNIFORM_NAME,
-    WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME,
-    COLOR_UNIFORM_NAME,
-    LIGHT_DIRECTION_UNIFORM_NAME,
-    CAMERA_POSITION_UNIFORM_NAME,
-    AMBIENT_STRENGTH_UNIFORM_NAME,
-    DIRECTIONAL_STRENGTH_UNIFORM_NAME,
-    LIGHTING_ENABLED_UNIFORM_NAME,
-    OPACITY_UNIFORM_NAME,
-    VECTOR3_ELEMENT_COUNT
-} from './directional-light-material.js';
+import * as MaterialConstants       from '../constants/directional-light-material.js';
+import { ShaderProgram }            from '../shader/shader-program.js';
+import { DirectionalLightMaterial } from './directional-light-material.js';
 
 /**
  * Specular color uniform name.
@@ -69,18 +55,18 @@ const DEFAULT_SHININESS = 16.0;
  */
 const VERTEX_SHADER_SOURCE = `#version 300 es
 precision mediump float;
-layout(location = ${POSITION_ATTRIBUTE_LOCATION}) in vec3 a_position;
-layout(location = ${NORMAL_ATTRIBUTE_LOCATION}) in vec3 a_normal;
-uniform mat4 ${FINAL_MATRIX_UNIFORM_NAME};
-uniform mat4 ${WORLD_MATRIX_UNIFORM_NAME};
-uniform mat4 ${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME};
+layout(location = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.POSITION_LOCATION}) in vec3 a_position;
+layout(location = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.NORMAL_LOCATION}) in vec3 a_normal;
+uniform mat4 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX};
+uniform mat4 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX};
+uniform mat4 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX};
 out vec3 v_worldPosition;
 out vec3 v_normal;
 
 void main() {
-    gl_Position     = ${FINAL_MATRIX_UNIFORM_NAME} * vec4(a_position, 1.0);
-    v_worldPosition = (${WORLD_MATRIX_UNIFORM_NAME} * vec4(a_position, 1.0)).xyz;
-    v_normal        = (${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME} * vec4(a_normal, 0.0)).xyz;
+    gl_Position     = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX} * vec4(a_position, 1.0);
+    v_worldPosition = (${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX} * vec4(a_position, 1.0)).xyz;
+    v_normal        = (${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX} * vec4(a_normal, 0.0)).xyz;
 }
 `;
 
@@ -95,16 +81,16 @@ const FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision mediump float;
 in vec3 v_worldPosition;
 in vec3 v_normal;
-uniform vec3  ${COLOR_UNIFORM_NAME};
+uniform vec3  ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR};
 uniform vec3  ${SPECULAR_COLOR_UNIFORM_NAME};
-uniform vec3  ${LIGHT_DIRECTION_UNIFORM_NAME};
-uniform vec3  ${CAMERA_POSITION_UNIFORM_NAME};
-uniform float ${AMBIENT_STRENGTH_UNIFORM_NAME};
-uniform float ${DIRECTIONAL_STRENGTH_UNIFORM_NAME};
-uniform float ${LIGHTING_ENABLED_UNIFORM_NAME};
+uniform vec3  ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION};
+uniform vec3  ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION};
+uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH};
+uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH};
+uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED};
 uniform float ${SPECULAR_STRENGTH_UNIFORM_NAME};
 uniform float ${SHININESS_UNIFORM_NAME};
-uniform float ${OPACITY_UNIFORM_NAME};
+uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY};
 out vec4 outColor;
 
 void main() {
@@ -114,26 +100,26 @@ void main() {
         surface_normal = -surface_normal;
     }
 
-    vec3 light_direction     = normalize(${LIGHT_DIRECTION_UNIFORM_NAME});
-    vec3 view_direction      = normalize(${CAMERA_POSITION_UNIFORM_NAME} - v_worldPosition);
-    float lighting_enabled   = ${LIGHTING_ENABLED_UNIFORM_NAME};
-    float diffuse_intensity  = max(dot(surface_normal, light_direction), 0.0) * ${DIRECTIONAL_STRENGTH_UNIFORM_NAME};
+    vec3 light_direction     = normalize(${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION});
+    vec3 view_direction      = normalize(${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION} - v_worldPosition);
+    float lighting_enabled   = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED};
+    float diffuse_intensity  = max(dot(surface_normal, light_direction), 0.0) * ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH};
     float specular_intensity = 0.0;
 
     if (diffuse_intensity > 0.0) {
         vec3 reflection_direction = reflect(-light_direction, surface_normal);
-        float specular_base = max(dot(view_direction, reflection_direction), 0.0);
-        specular_intensity  = pow(specular_base, ${SHININESS_UNIFORM_NAME});
+        float specular_base       = max(dot(view_direction, reflection_direction), 0.0);
+        specular_intensity        = pow(specular_base, ${SHININESS_UNIFORM_NAME});
     }
 
-    vec3 ambient  = ${COLOR_UNIFORM_NAME} * ${AMBIENT_STRENGTH_UNIFORM_NAME};
-    vec3 diffuse  = ${COLOR_UNIFORM_NAME} * (diffuse_intensity * lighting_enabled);
+    vec3 ambient  = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR} * ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH};
+    vec3 diffuse  = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR} * (diffuse_intensity * lighting_enabled);
     vec3 specular = ${SPECULAR_COLOR_UNIFORM_NAME}
         * (specular_intensity * ${SPECULAR_STRENGTH_UNIFORM_NAME}
-        * ${DIRECTIONAL_STRENGTH_UNIFORM_NAME} * lighting_enabled);
+        * ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH} * lighting_enabled);
 
     vec3 rgb = ambient + diffuse + specular;
-    outColor = vec4(rgb, ${OPACITY_UNIFORM_NAME});
+    outColor = vec4(rgb, ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY});
 }
 `;
 
@@ -162,7 +148,7 @@ export class PhongMaterial extends DirectionalLightMaterial {
      * @type {Float32Array}
      * @private
      */
-    #specularColor = new Float32Array(VECTOR3_ELEMENT_COUNT);
+    #specularColor = new Float32Array(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_VECTOR3_ELEMENT_COUNT);
 
     /**
      * Specular strength multiplier.
@@ -220,8 +206,8 @@ export class PhongMaterial extends DirectionalLightMaterial {
      * @protected
      */
     applyAdditionalUniforms(worldMatrix, cameraPosition) {
-        this.shaderProgram.setMatrix4(WORLD_MATRIX_UNIFORM_NAME    , worldMatrix);
-        this.shaderProgram.setVector3(CAMERA_POSITION_UNIFORM_NAME , cameraPosition);
+        this.shaderProgram.setMatrix4(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX    , worldMatrix);
+        this.shaderProgram.setVector3(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION , cameraPosition);
         this.shaderProgram.setVector3(SPECULAR_COLOR_UNIFORM_NAME  , this.#specularColor);
         this.shaderProgram.setFloat(SPECULAR_STRENGTH_UNIFORM_NAME , this.#specularStrength);
         this.shaderProgram.setFloat(SHININESS_UNIFORM_NAME         , this.#shininess);

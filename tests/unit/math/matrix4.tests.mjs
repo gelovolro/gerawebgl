@@ -231,8 +231,8 @@ test("'Matrix4.createRotationZ' should create a rotation matrix around Z axis", 
     const expectedMatrix = new Float32Array([
          0, 1, 0, 0,
         -1, 0, 0, 0,
-         0, 0, 1, 0,
-         0, 0, 0, 1
+        0, 0, 1, 0,
+        0, 0, 0, 1
     ]);
 
     // Act

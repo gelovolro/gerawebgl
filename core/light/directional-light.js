@@ -1,152 +1,8 @@
-import { Light } from './light.js';
-
-/**
- * Number of components in a direction vector.
- *
- * @type {number}
- */
-const VECTOR3_ELEMENT_COUNT = 3;
-
-/**
- * Index of the X component in a vector.
- *
- * @type {number}
- */
-const VECTOR_X_INDEX = 0;
-
-/**
- * Index of the Y component in a vector.
- *
- * @type {number}
- */
-const VECTOR_Y_INDEX = 1;
-
-/**
- * Index of the Z component in a vector.
- *
- * @type {number}
- */
-const VECTOR_Z_INDEX = 2;
-
-/**
- * Default light direction (world space).
- * Matches the engine's historical default.
- *
- * @type {Float32Array}
- */
-const DEFAULT_DIRECTION = new Float32Array([0.5, 0.7, 1.0]);
-
-/**
- * Default directional light strength.
- *
- * @type {number}
- */
-const DEFAULT_DIRECTIONAL_STRENGTH = 1.0;
-
-/**
- * Minimum directional light strength.
- *
- * @type {number}
- */
-const MIN_DIRECTIONAL_STRENGTH = 0.0;
-
-/**
- * Maximum directional light strength.
- *
- * @type {number}
- */
-const MAX_DIRECTIONAL_STRENGTH = 3.0;
-
-/**
- * Minimum allowed squared length for a direction vector.
- *
- * @type {number}
- */
-const MIN_DIRECTION_LENGTH_SQUARED = 0.0;
-
-/**
- * Numerator used for inverse length computations.
- *
- * @type {number}
- */
-const INVERSE_LENGTH_NUMERATOR = 1.0;
-
-/**
- * Default roll angle (rotation around the Z axis).
- *
- * @type {number}
- */
-const DEFAULT_ROLL_RADIANS = 0.0;
-
-/**
- * Minimum clamp value for asin.
- *
- * @type {number}
- */
-const ASIN_CLAMP_MIN = -1.0;
-
-/**
- * Maximum clamp value for asin.
- *
- * @type {number}
- */
-const ASIN_CLAMP_MAX = 1.0;
-
-/**
- * World matrix index for Z axis X component.
- *
- * @type {number}
- */
-const WORLD_Z_AXIS_X_INDEX = 8;
-
-/**
- * World matrix index for Z axis Y component.
- *
- * @type {number}
- */
-const WORLD_Z_AXIS_Y_INDEX = 9;
-
-/**
- * World matrix index for Z axis Z component.
- *
- * @type {number}
- */
-const WORLD_Z_AXIS_Z_INDEX = 10;
-
-/**
- * Error message for invalid direction type.
- *
- * @type {string}
- */
-const ERROR_DIRECTION_TYPE = '`DirectionalLight.setDirection` expects a number[] or `Float32Array`.';
-
-/**
- * Error message for invalid direction component count.
- *
- * @type {string}
- */
-const ERROR_DIRECTION_COMPONENTS = '`DirectionalLight.setDirection` expects exactly 3 components.';
-
-/**
- * Error message for invalid direction component values.
- *
- * @type {string}
- */
-const ERROR_DIRECTION_COMPONENTS_FINITE = '`DirectionalLight.setDirection` expects finite components.';
-
-/**
- * Error message for invalid direction length.
- *
- * @type {string}
- */
-const ERROR_DIRECTION_LENGTH = '`DirectionalLight.setDirection` expects a non-zero direction vector.';
-
-/**
- * Error message for invalid strength values.
- *
- * @type {string}
- */
-const ERROR_STRENGTH_TYPE = '`DirectionalLight.setStrength` expects a finite number.';
+import { ECMASCRIPT_TYPEOF_RESULTS } from '../constants/ecmascript-types.js';
+import * as MathConstants            from '../constants/math.js';
+import * as LightConstants           from '../constants/light.js';
+import * as LightExceptionMessages   from '../exception-messages/light.js';
+import { Light }                     from './light.js';
 
 /**
  * Directional light source.
@@ -159,7 +15,7 @@ export class DirectionalLight extends Light {
      * @type {Float32Array}
      * @private
      */
-    #direction = new Float32Array(VECTOR3_ELEMENT_COUNT);
+    #direction = new Float32Array(MathConstants.MATH_LAYOUT.VECTOR3_ELEMENT_COUNT);
 
     /**
      * Directional light strength multiplier.
@@ -167,15 +23,15 @@ export class DirectionalLight extends Light {
      * @type {number}
      * @private
      */
-    #strength = DEFAULT_DIRECTIONAL_STRENGTH;
+    #strength = LightConstants.LIGHT_DIRECTIONAL.DEFAULT_DIRECTIONAL_STRENGTH;
 
     /**
      * Creates a new directional light with the default direction.
      */
     constructor() {
         super();
-        this.setDirection(DEFAULT_DIRECTION);
-        this.#strength = DEFAULT_DIRECTIONAL_STRENGTH;
+        this.setDirection(LightConstants.LIGHT_DIRECTIONAL_DEFAULT_DIRECTION);
+        this.#strength = LightConstants.LIGHT_DIRECTIONAL.DEFAULT_DIRECTIONAL_STRENGTH;
     }
 
     /**
@@ -189,30 +45,30 @@ export class DirectionalLight extends Light {
         DirectionalLight.#assertVector3(direction);
 
         // Read the direction components and compute the squared length (avoids the premature `sqrt`):
-        const directionX    = direction[VECTOR_X_INDEX];
-        const directionY    = direction[VECTOR_Y_INDEX];
-        const directionZ    = direction[VECTOR_Z_INDEX];
+        const directionX    = direction[MathConstants.MATH_VECTOR3_INDEXES.X];
+        const directionY    = direction[MathConstants.MATH_VECTOR3_INDEXES.Y];
+        const directionZ    = direction[MathConstants.MATH_VECTOR3_INDEXES.Z];
         const lengthSquared = (directionX * directionX) + (directionY * directionY) + (directionZ * directionZ);
 
         // Reject the zero-length and non-finite vectors (can't be normalized safely):
-        if (!Number.isFinite(lengthSquared) || lengthSquared <= MIN_DIRECTION_LENGTH_SQUARED) {
-            throw new TypeError(ERROR_DIRECTION_LENGTH);
+        if (!Number.isFinite(lengthSquared) || lengthSquared <= LightConstants.LIGHT_DIRECTIONAL.MIN_DIRECTION_LENGTH_SQUARED) {
+            throw new TypeError(LightExceptionMessages.LIGHT_EXCEPTION_MESSAGES.DIRECTION_LENGTH);
         }
 
         // Normalize the direction to unit the length for stable trigonometry:
-        const inverseLength = INVERSE_LENGTH_NUMERATOR / Math.sqrt(lengthSquared);
+        const inverseLength = LightConstants.LIGHT_DIRECTIONAL.INVERSE_LENGTH_NUMERATOR / Math.sqrt(lengthSquared);
         const normalizedX   = directionX * inverseLength;
         const normalizedY   = directionY * inverseLength;
         const normalizedZ   = directionZ * inverseLength;
 
         // Convert the normalized direction to Euler angles (pitch/yaw), with `asin` clamping for numeric safety:
-        const clampedY  = Math.min(ASIN_CLAMP_MAX, Math.max(ASIN_CLAMP_MIN, normalizedY));
+        const clampedY  = Math.min(LightConstants.LIGHT_DIRECTIONAL.ASIN_CLAMP_MAX, Math.max(LightConstants.LIGHT_DIRECTIONAL.ASIN_CLAMP_MIN, normalizedY));
         const rotationX = -Math.asin(clampedY);
         const rotationY = Math.atan2(normalizedX, normalizedZ);
 
         this.rotation.x = rotationX;
         this.rotation.y = rotationY;
-        this.rotation.z = DEFAULT_ROLL_RADIANS;
+        this.rotation.z = LightConstants.LIGHT_DIRECTIONAL.DEFAULT_ROLL_RADIANS;
     }
 
     /**
@@ -222,20 +78,20 @@ export class DirectionalLight extends Light {
      */
     getDirection() {
         const worldMatrix   = this.worldMatrix;
-        const axisX         = worldMatrix[WORLD_Z_AXIS_X_INDEX];
-        const axisY         = worldMatrix[WORLD_Z_AXIS_Y_INDEX];
-        const axisZ         = worldMatrix[WORLD_Z_AXIS_Z_INDEX];
+        const axisX         = worldMatrix[MathConstants.MATH_MATRIX4_INDEXES.WORLD_Z_AXIS_X];
+        const axisY         = worldMatrix[MathConstants.MATH_MATRIX4_INDEXES.WORLD_Z_AXIS_Y];
+        const axisZ         = worldMatrix[MathConstants.MATH_MATRIX4_INDEXES.WORLD_Z_AXIS_Z];
         const lengthSquared = (axisX * axisX) + (axisY * axisY) + (axisZ * axisZ);
 
-        if (!Number.isFinite(lengthSquared) || lengthSquared <= MIN_DIRECTION_LENGTH_SQUARED) {
-            this.#direction.set(DEFAULT_DIRECTION);
+        if (!Number.isFinite(lengthSquared) || lengthSquared <= LightConstants.LIGHT_DIRECTIONAL.MIN_DIRECTION_LENGTH_SQUARED) {
+            this.#direction.set(LightConstants.LIGHT_DIRECTIONAL_DEFAULT_NORMALIZED_DIRECTION);
             return this.#direction;
         }
 
-        const inverseLength = INVERSE_LENGTH_NUMERATOR / Math.sqrt(lengthSquared);
-        this.#direction[VECTOR_X_INDEX] = axisX * inverseLength;
-        this.#direction[VECTOR_Y_INDEX] = axisY * inverseLength;
-        this.#direction[VECTOR_Z_INDEX] = axisZ * inverseLength;
+        const inverseLength = LightConstants.LIGHT_DIRECTIONAL.INVERSE_LENGTH_NUMERATOR / Math.sqrt(lengthSquared);
+        this.#direction[MathConstants.MATH_VECTOR3_INDEXES.X] = axisX * inverseLength;
+        this.#direction[MathConstants.MATH_VECTOR3_INDEXES.Y] = axisY * inverseLength;
+        this.#direction[MathConstants.MATH_VECTOR3_INDEXES.Z] = axisZ * inverseLength;
         return this.#direction;
     }
 
@@ -247,11 +103,11 @@ export class DirectionalLight extends Light {
      * @throws {TypeError} When the strength is invalid.
      */
     setStrength(strength) {
-        if (typeof strength !== 'number' || !Number.isFinite(strength)) {
-            throw new TypeError(ERROR_STRENGTH_TYPE);
+        if (typeof strength !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(strength)) {
+            throw new TypeError(LightExceptionMessages.LIGHT_EXCEPTION_MESSAGES.DIRECTIONAL_STRENGTH_TYPE);
         }
 
-        this.#strength = Math.min(MAX_DIRECTIONAL_STRENGTH, Math.max(MIN_DIRECTIONAL_STRENGTH, strength));
+        this.#strength = Math.min(LightConstants.LIGHT_DIRECTIONAL.MAX_DIRECTIONAL_STRENGTH, Math.max(LightConstants.LIGHT_DIRECTIONAL.MIN_DIRECTIONAL_STRENGTH, strength));
     }
 
     /**
@@ -273,17 +129,17 @@ export class DirectionalLight extends Light {
      */
     static #assertVector3(vector) {
         if (!Array.isArray(vector) && !(vector instanceof Float32Array)) {
-            throw new TypeError(ERROR_DIRECTION_TYPE);
+            throw new TypeError(LightExceptionMessages.LIGHT_EXCEPTION_MESSAGES.DIRECTION_TYPE);
         }
 
-        if (vector.length !== VECTOR3_ELEMENT_COUNT) {
-            throw new TypeError(ERROR_DIRECTION_COMPONENTS);
+        if (vector.length !== MathConstants.MATH_LAYOUT.VECTOR3_ELEMENT_COUNT) {
+            throw new TypeError(LightExceptionMessages.LIGHT_EXCEPTION_MESSAGES.DIRECTION_COMPONENTS);
         }
 
-        if (!Number.isFinite(vector[VECTOR_X_INDEX])
-            || !Number.isFinite(vector[VECTOR_Y_INDEX])
-            || !Number.isFinite(vector[VECTOR_Z_INDEX])) {
-            throw new TypeError(ERROR_DIRECTION_COMPONENTS_FINITE);
+        if (!Number.isFinite(vector[MathConstants.MATH_VECTOR3_INDEXES.X])
+            || !Number.isFinite(vector[MathConstants.MATH_VECTOR3_INDEXES.Y])
+            || !Number.isFinite(vector[MathConstants.MATH_VECTOR3_INDEXES.Z])) {
+            throw new TypeError(LightExceptionMessages.LIGHT_EXCEPTION_MESSAGES.DIRECTION_COMPONENTS_FINITE);
         }
     }
 }

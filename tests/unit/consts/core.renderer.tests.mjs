@@ -8,8 +8,7 @@ test("'Renderer' constants objects should be frozen", () => {
         RendererConstants.RENDERER_DRAW,
         RendererConstants.RENDERER_OPACITY,
         RendererConstants.RENDERER_MATERIAL_APPLY_PARAM_COUNTS,
-        RendererConstants.RENDERER_TRAVERSAL,
-        RendererConstants.RENDERER_ERRORS
+        RendererConstants.RENDERER_TRAVERSAL
     ];
 
     // Act & Assert
@@ -50,12 +49,4 @@ test("'Renderer' traversal constants should keep existing values", () => {
     assert.equal(actualConstants.STACK_EMPTY_LENGTH, 0);
     assert.equal(actualConstants.CHILD_LOOP_START_INDEX, 0);
     assert.equal(actualConstants.CHILD_LOOP_INCREMENT, 1);
-});
-
-test("'Renderer' error constants should keep existing values", () => {
-    // Arrange
-    const actualConstants = RendererConstants.RENDERER_ERRORS;
-
-    // Act & Assert
-    assert.equal(actualConstants.UNKNOWN_PRIMITIVE, 'Renderer received an unknown geometry primitive.');
 });

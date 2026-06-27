@@ -1,4 +1,5 @@
-import { MaterialNameNormalizer } from './material-name-normalizer.js';
+import { ECMASCRIPT_TYPEOF_RESULTS } from '../../constants/ecmascript-types.js';
+import { MaterialNameNormalizer }    from './material-name-normalizer.js';
 
 /**
  * Token, that starts a comment line in OBJ files.
@@ -153,13 +154,6 @@ const QUOTE_TOKEN = '"';
  * @type {number}
  */
 const NOT_FOUND_INDEX = -1;
-
-/**
- * String literal for the typeof checks.
- *
- * @type {string}
- */
-const TYPEOF_STRING = 'string';
 
 /**
  * Face requires at least the `3 vertices`.
@@ -481,7 +475,7 @@ export class ObjParser {
      * @throws {TypeError} When `objText` is not a string.
      */
     parse(objText) {
-        if (typeof objText !== TYPEOF_STRING) {
+        if (typeof objText !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
             throw new TypeError(ERROR_OBJ_TEXT_TYPE);
         }
 

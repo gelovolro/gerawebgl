@@ -1,8 +1,9 @@
-import { CustomGeometry }   from '../../geometry/custom-geometry.js';
-import { PointsGeometry }   from '../../geometry/points-geometry.js';
-import { PolylineGeometry } from '../../geometry/polyline-geometry.js';
-import { Object3D }         from '../../scene/object3d.js';
-import { Vector3 }          from '../../math/vector3.js';
+import { ECMASCRIPT_TYPEOF_RESULTS } from '../../constants/ecmascript-types.js';
+import { CustomGeometry }            from '../../geometry/custom-geometry.js';
+import { PointsGeometry }            from '../../geometry/points-geometry.js';
+import { PolylineGeometry }          from '../../geometry/polyline-geometry.js';
+import { Object3D }                  from '../../scene/object3d.js';
+import { Vector3 }                   from '../../math/vector3.js';
 
 /**
  * Number of components for position vectors.
@@ -159,13 +160,6 @@ const ERROR_WEBGL_CONTEXT_TYPE = '`ObjGeometryBuilder` expects a `WebGL2Renderin
 const ERROR_PARSED_DATA_TYPE = '`ObjGeometryBuilder.build` expects parsed OBJ data as an object.';
 
 /**
- * String literal for typeof checks (object).
- *
- * @type {string}
- */
-const TYPEOF_OBJECT = 'object';
-
-/**
  * Type definition for parsed OBJ face vertex.
  *
  * @typedef {Object} ObjFaceVertex
@@ -266,7 +260,7 @@ export class ObjGeometryBuilder {
      * @throws {TypeError} When `parsedData` is invalid.
      */
     build(parsedData) {
-        if (parsedData === null || typeof parsedData !== TYPEOF_OBJECT || Array.isArray(parsedData)) {
+        if (parsedData === null || typeof parsedData !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(parsedData)) {
             throw new TypeError(ERROR_PARSED_DATA_TYPE);
         }
 

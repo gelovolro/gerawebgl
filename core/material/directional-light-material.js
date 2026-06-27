@@ -1,220 +1,13 @@
-import { Material }      from './material.js';
-import { ShaderProgram } from '../shader/shader-program.js';
+import { ECMASCRIPT_TYPEOF_RESULTS }
+    from '../constants/ecmascript-types.js';
 
-/**
- * Attribute location used by `vec3` position.
- * Must match geometry's `POSITION_ATTRIBUTE_LOCATION`.
- *
- * @type {number}
- */
-export const POSITION_ATTRIBUTE_LOCATION = 0;
+import { DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES }
+    from '../exception-messages/directional-light-material.js';
 
-/**
- * Attribute location used by `vec3` normal.
- * Must match geometry's `NORMAL_ATTRIBUTE_LOCATION`.
- *
- * @type {number}
- */
-export const NORMAL_ATTRIBUTE_LOCATION = 3;
-
-/**
- * Name of the final transformation matrix uniform: `view projection * world`.
- *
- * @type {string}
- */
-export const FINAL_MATRIX_UNIFORM_NAME = 'u_matrix';
-
-/**
- * Name of the world inverse transpose matrix uniform: `(world ^ -1) ^ T`.
- * Used to correctly transform normals into world space under non-uniform scale.
- *
- * @type {string}
- */
-export const WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME = 'u_worldInverseTranspose';
-
-/**
- * Name of the world matrix uniform.
- * Used by materials, that require world-space position reconstruction in shaders.
- *
- * @type {string}
- */
-export const WORLD_MATRIX_UNIFORM_NAME = 'u_worldMatrix';
-
-/**
- * Diffuse/base color uniform name.
- *
- * @type {string}
- */
-export const COLOR_UNIFORM_NAME = 'u_color';
-
-/**
- * Directional light direction uniform name (world space).
- * Vector points from surface to the light (towards the light).
- *
- * @type {string}
- */
-export const LIGHT_DIRECTION_UNIFORM_NAME = 'u_lightDirection';
-
-/**
- * Camera position uniform name (world space).
- *
- * @type {string}
- */
-export const CAMERA_POSITION_UNIFORM_NAME = 'u_cameraPosition';
-
-/**
- * Ambient strength uniform name.
- *
- * @type {string}
- */
-export const AMBIENT_STRENGTH_UNIFORM_NAME = 'u_ambientStrength';
-
-/**
- * Directional strength uniform name.
- *
- * @type {string}
- */
-export const DIRECTIONAL_STRENGTH_UNIFORM_NAME = 'u_directionalStrength';
-
-/**
- * Lighting enabled uniform name.
- *
- * @type {string}
- */
-export const LIGHTING_ENABLED_UNIFORM_NAME = 'u_lightingEnabled';
-
-/**
- * Opacity uniform name.
- *
- * @type {string}
- */
-export const OPACITY_UNIFORM_NAME = 'u_opacity';
-
-/**
- * Vector3 length (component count).
- *
- * @type {number}
- */
-export const VECTOR3_ELEMENT_COUNT = 3;
-
-/**
- * Default diffuse/base color (RGB).
- *
- * @type {Float32Array}
- */
-export const DEFAULT_COLOR = new Float32Array([0.85, 0.85, 0.85]);
-
-/**
- * Default directional light direction in world space (points from surface to light).
- *
- * @type {Float32Array}
- */
-export const DEFAULT_LIGHT_DIRECTION = new Float32Array([0.5, 0.7, 1.0]);
-
-/**
- * Default ambient term strength.
- *
- * @type {number}
- */
-export const DEFAULT_AMBIENT_STRENGTH = 0.2;
-
-/**
- * Default directional strength.
- *
- * @type {number}
- */
-export const DEFAULT_DIRECTIONAL_STRENGTH = 1.0;
-
-/**
- * Default lighting enabled flag (float).
- *
- * @type {number}
- */
-export const DEFAULT_LIGHTING_ENABLED = 1.0;
-
-/**
- * Minimum allowed squared length for a direction vector. Used to reject the zero-length direction.
- *
- * @type {number}
- */
-const MIN_DIRECTION_LENGTH_SQUARED = 0.0;
-
-/**
- * `Boolean as-float` value for false.
- *
- * @type {number}
- */
-const FLOAT_FALSE = 0.0;
-
-/**
- * `Boolean-as-float` value for true.
- *
- * @type {number}
- */
-const FLOAT_TRUE = 1.0;
-
-/**
- * Minimum accepted lighting enabled value.
- *
- * @type {number}
- */
-const MIN_LIGHTING_ENABLED = 0.0;
-
-/**
- * Maximum accepted lighting enabled value.
- *
- * @type {number}
- */
-const MAX_LIGHTING_ENABLED = 1.0;
-
-/**
- * Directional strength value used for disabling directional light.
- *
- * @type {number}
- */
-const DIRECTIONAL_STRENGTH_DISABLED = 0.0;
-
-/**
- * Threshold used to interpret the lighting enabled uniform as a boolean.
- *
- * @type {number}
- */
-const LIGHTING_ENABLED_THRESHOLD = 0.5;
-
-/**
- * Numerator used when computing inverse vector length: `1 / sqrt(lengthSquared)`.
- *
- * @type {number}
- */
-const INVERSE_LENGTH_NUMERATOR = 1.0;
-
-/**
- * Error message for invalid lighting enabled value types.
- *
- * @type {string}
- */
-const ERROR_LIGHTING_ENABLED_TYPE = '`DirectionalLightMaterial.setLightingEnabled` expects a boolean or a finite number.';
-
-/**
- * Error message for invalid lighting enabled value range.
- *
- * @type {string}
- */
-const ERROR_LIGHTING_ENABLED_RANGE = '`DirectionalLightMaterial.setLightingEnabled` expects a value in [0..1].';
-
-/**
- * Error message for invalid directional strength values.
- *
- * @type {string}
- */
-const ERROR_DIRECTIONAL_STRENGTH_TYPE = '`DirectionalLightMaterial.setDirectionalStrength` expects a finite number.';
-
-/**
- * Error message for invalid directional enabled values.
- *
- * @type {string}
- */
-const ERROR_DIRECTIONAL_ENABLED_TYPE = '`DirectionalLightMaterial.setDirectionalEnabled` expects a boolean.';
+import * as LightConstants    from '../constants/light.js';
+import * as MaterialConstants from '../constants/directional-light-material.js';
+import { Material }           from './material.js';
+import { ShaderProgram }      from '../shader/shader-program.js';
 
 /**
  * Options common to directional-light materials.
@@ -253,7 +46,7 @@ export class DirectionalLightMaterial extends Material {
      * @type {Float32Array}
      * @private
      */
-    #color = new Float32Array(VECTOR3_ELEMENT_COUNT);
+    #color = new Float32Array(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_VECTOR3_ELEMENT_COUNT);
 
     /**
      * Directional light direction (world space, normalized).
@@ -261,7 +54,7 @@ export class DirectionalLightMaterial extends Material {
      * @type {Float32Array}
      * @private
      */
-    #lightDirection = new Float32Array(VECTOR3_ELEMENT_COUNT);
+    #lightDirection = new Float32Array(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_VECTOR3_ELEMENT_COUNT);
 
     /**
      * Ambient term multiplier.
@@ -269,7 +62,7 @@ export class DirectionalLightMaterial extends Material {
      * @type {number}
      * @private
      */
-    #ambientStrength = DEFAULT_AMBIENT_STRENGTH;
+    #ambientStrength = LightConstants.LIGHT_AMBIENT.DEFAULT_STRENGTH;
 
     /**
      * Directional strength multiplier.
@@ -277,7 +70,7 @@ export class DirectionalLightMaterial extends Material {
      * @type {number}
      * @private
      */
-    #directionalStrength = DEFAULT_DIRECTIONAL_STRENGTH;
+    #directionalStrength = LightConstants.LIGHT_DIRECTIONAL.DEFAULT_DIRECTIONAL_STRENGTH;
 
     /**
      * Lighting enabled flag stored as a float.
@@ -285,7 +78,7 @@ export class DirectionalLightMaterial extends Material {
      * @type {number}
      * @private
      */
-    #lightingEnabled = DEFAULT_LIGHTING_ENABLED;
+    #lightingEnabled = MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_LIGHTING.DEFAULT_LIGHTING_ENABLED;
 
     /**
      * Creates a new directional-light material.
@@ -297,27 +90,27 @@ export class DirectionalLightMaterial extends Material {
      */
     constructor(webglContext, shaderProgram, options = {}, materialOptions = {}) {
         if (!(webglContext instanceof WebGL2RenderingContext)) {
-            throw new TypeError('`DirectionalLightMaterial` expects a WebGL2RenderingContext.');
+            throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.WEBGL_CONTEXT_TYPE);
         }
 
         if (!(shaderProgram instanceof ShaderProgram)) {
-            throw new TypeError('`DirectionalLightMaterial` expects a ShaderProgram instance.');
+            throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.SHADER_PROGRAM_TYPE);
         }
 
         DirectionalLightMaterial.#assertPlainObject('`DirectionalLightMaterial`', options);
         DirectionalLightMaterial.#assertPlainObject('`DirectionalLightMaterial`', materialOptions);
         const { ownsShaderProgram = true } = materialOptions;
 
-        if (typeof ownsShaderProgram !== 'boolean') {
-            throw new TypeError('`DirectionalLightMaterial` option "ownsShaderProgram" must be a boolean.');
+        if (typeof ownsShaderProgram !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+            throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.OWNS_SHADER_PROGRAM_TYPE);
         }
 
         super(webglContext, shaderProgram, { ownsShaderProgram });
 
-        this.#color.set(DEFAULT_COLOR);
-        this.setLightDirection(DEFAULT_LIGHT_DIRECTION);
-        this.#ambientStrength     = DEFAULT_AMBIENT_STRENGTH;
-        this.#directionalStrength = DEFAULT_DIRECTIONAL_STRENGTH;
+        this.#color.set(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_DEFAULT_COLOR);
+        this.setLightDirection(LightConstants.LIGHT_DIRECTIONAL_DEFAULT_DIRECTION);
+        this.#ambientStrength     = LightConstants.LIGHT_AMBIENT.DEFAULT_STRENGTH;
+        this.#directionalStrength = LightConstants.LIGHT_DIRECTIONAL.DEFAULT_DIRECTIONAL_STRENGTH;
 
         const {
             color,
@@ -363,14 +156,14 @@ export class DirectionalLightMaterial extends Material {
      * @param {Float32Array} cameraPosition              - Camera position, world space.
      */
     apply(finalMatrix, worldMatrix, worldInverseTransposeMatrix, cameraPosition) {
-        this.shaderProgram.setMatrix4(FINAL_MATRIX_UNIFORM_NAME, finalMatrix);
-        this.shaderProgram.setMatrix4(WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME, worldInverseTransposeMatrix);
-        this.shaderProgram.setVector3(COLOR_UNIFORM_NAME, this.#color);
-        this.shaderProgram.setVector3(LIGHT_DIRECTION_UNIFORM_NAME, this.#lightDirection);
-        this.shaderProgram.setFloat(AMBIENT_STRENGTH_UNIFORM_NAME, this.#ambientStrength);
-        this.shaderProgram.setFloat(DIRECTIONAL_STRENGTH_UNIFORM_NAME, this.#directionalStrength);
-        this.shaderProgram.setFloat(LIGHTING_ENABLED_UNIFORM_NAME, this.#lightingEnabled);
-        this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME, this.opacity);
+        this.shaderProgram.setMatrix4(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX, finalMatrix);
+        this.shaderProgram.setMatrix4(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX, worldInverseTransposeMatrix);
+        this.shaderProgram.setVector3(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR, this.#color);
+        this.shaderProgram.setVector3(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION, this.#lightDirection);
+        this.shaderProgram.setFloat(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH, this.#ambientStrength);
+        this.shaderProgram.setFloat(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH, this.#directionalStrength);
+        this.shaderProgram.setFloat(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED, this.#lightingEnabled);
+        this.shaderProgram.setFloat(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY, this.opacity);
         this.applyAdditionalUniforms(worldMatrix, cameraPosition);
     }
 
@@ -415,11 +208,11 @@ export class DirectionalLightMaterial extends Material {
             directionY * directionY +
             directionZ * directionZ;
 
-        if (!Number.isFinite(directionLengthSquared) || directionLengthSquared <= MIN_DIRECTION_LENGTH_SQUARED) {
-            throw new TypeError('`DirectionalLightMaterial.setLightDirection` expects a non-zero finite vector.');
+        if (!Number.isFinite(directionLengthSquared) || directionLengthSquared <= LightConstants.LIGHT_DIRECTIONAL.MIN_DIRECTION_LENGTH_SQUARED) {
+            throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.LIGHT_DIRECTION_LENGTH);
         }
 
-        const inverseDirectionLength = INVERSE_LENGTH_NUMERATOR / Math.sqrt(directionLengthSquared);
+        const inverseDirectionLength = LightConstants.LIGHT_DIRECTIONAL.INVERSE_LENGTH_NUMERATOR / Math.sqrt(directionLengthSquared);
         this.#lightDirection[0] = directionX * inverseDirectionLength;
         this.#lightDirection[1] = directionY * inverseDirectionLength;
         this.#lightDirection[2] = directionZ * inverseDirectionLength;
@@ -431,8 +224,8 @@ export class DirectionalLightMaterial extends Material {
      * @param {number} value - Ambient multiplier.
      */
     setAmbientStrength(value) {
-        if (typeof value !== 'number' || !Number.isFinite(value)) {
-            throw new TypeError('`DirectionalLightMaterial.setAmbientStrength` expects a finite number.');
+        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+            throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.AMBIENT_STRENGTH_TYPE);
         }
 
         this.#ambientStrength = value;
@@ -446,8 +239,8 @@ export class DirectionalLightMaterial extends Material {
      * @throws {TypeError} When the value is invalid.
      */
     setDirectionalStrength(value) {
-        if (typeof value !== 'number' || !Number.isFinite(value)) {
-            throw new TypeError(ERROR_DIRECTIONAL_STRENGTH_TYPE);
+        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+            throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.DIRECTIONAL_STRENGTH_TYPE);
         }
 
         this.#directionalStrength = value;
@@ -461,11 +254,11 @@ export class DirectionalLightMaterial extends Material {
      * @throws {TypeError} When the value is invalid.
      */
     setDirectionalEnabled(enabled) {
-        if (typeof enabled !== 'boolean') {
-            throw new TypeError(ERROR_DIRECTIONAL_ENABLED_TYPE);
+        if (typeof enabled !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+            throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.DIRECTIONAL_ENABLED_TYPE);
         }
 
-        this.#directionalStrength = enabled ? DEFAULT_DIRECTIONAL_STRENGTH : DIRECTIONAL_STRENGTH_DISABLED;
+        this.#directionalStrength = enabled ? LightConstants.LIGHT_DIRECTIONAL.DEFAULT_DIRECTIONAL_STRENGTH : LightConstants.LIGHT_DIRECTIONAL.MIN_DIRECTIONAL_STRENGTH;
     }
 
     /**
@@ -477,17 +270,17 @@ export class DirectionalLightMaterial extends Material {
      * @throws {RangeError} When the value is outside [0..1].
      */
     setLightingEnabled(enabled) {
-        if (typeof enabled === 'boolean') {
-            this.#lightingEnabled = enabled ? FLOAT_TRUE : FLOAT_FALSE;
+        if (typeof enabled === ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+            this.#lightingEnabled = enabled ? MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_LIGHTING.FLOAT_TRUE : MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_LIGHTING.FLOAT_FALSE;
             return;
         }
 
-        if (typeof enabled !== 'number' || !Number.isFinite(enabled)) {
-            throw new TypeError(ERROR_LIGHTING_ENABLED_TYPE);
+        if (typeof enabled !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(enabled)) {
+            throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.LIGHTING_ENABLED_TYPE);
         }
 
-        if (enabled < MIN_LIGHTING_ENABLED || enabled > MAX_LIGHTING_ENABLED) {
-            throw new RangeError(ERROR_LIGHTING_ENABLED_RANGE);
+        if (enabled < MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_LIGHTING.MIN_LIGHTING_ENABLED || enabled > MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_LIGHTING.MAX_LIGHTING_ENABLED) {
+            throw new RangeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.LIGHTING_ENABLED_RANGE);
         }
 
         this.#lightingEnabled = enabled;
@@ -497,7 +290,7 @@ export class DirectionalLightMaterial extends Material {
      * @returns {boolean} - Returns current lighting enabled state.
      */
     isLightingEnabled() {
-        return this.#lightingEnabled > LIGHTING_ENABLED_THRESHOLD;
+        return this.#lightingEnabled > MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_LIGHTING.LIGHTING_ENABLED_THRESHOLD;
     }
 
     /**
@@ -529,10 +322,22 @@ export class DirectionalLightMaterial extends Material {
     }
 
     /**
-     * @returns {number} - Gettet for the directional strength multiplier.
+     * @returns {number} - Getter for the directional strength multiplier.
      */
     get directionalStrength() {
         return this.#directionalStrength;
+    }
+
+    /**
+     * Formats a directional-light material exception message template.
+     *
+     * @param {string} messageTemplate - Message template with a `{methodName}` token.
+     * @param {string} methodName      - Method name to inject.
+     * @returns {string}               - Formatted exception message.
+     * @private
+     */
+    static #formatExceptionMessage(messageTemplate, methodName) {
+        return messageTemplate.replace('{methodName}', methodName);
     }
 
     /**
@@ -543,15 +348,24 @@ export class DirectionalLightMaterial extends Material {
      */
     static assertVector3(methodName, vector3) {
         if (!Array.isArray(vector3) && !(vector3 instanceof Float32Array)) {
-            throw new TypeError(`${methodName} expects a number[] or Float32Array.`);
+            throw new TypeError(DirectionalLightMaterial.#formatExceptionMessage(
+                DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.VECTOR3_TYPE,
+                methodName
+            ));
         }
 
-        if (vector3.length !== VECTOR3_ELEMENT_COUNT) {
-            throw new TypeError(`${methodName} expects exactly 3 components [x, y, z].`);
+        if (vector3.length !== MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_VECTOR3_ELEMENT_COUNT) {
+            throw new TypeError(DirectionalLightMaterial.#formatExceptionMessage(
+                DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.VECTOR3_COMPONENTS,
+                methodName
+            ));
         }
 
         if (!Number.isFinite(vector3[0]) || !Number.isFinite(vector3[1]) || !Number.isFinite(vector3[2])) {
-            throw new TypeError(`${methodName} expects all components to be finite numbers.`);
+            throw new TypeError(DirectionalLightMaterial.#formatExceptionMessage(
+                DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.VECTOR3_COMPONENTS_FINITE,
+                methodName
+            ));
         }
     }
 
@@ -563,8 +377,11 @@ export class DirectionalLightMaterial extends Material {
      * @private
      */
     static #assertPlainObject(methodName, object) {
-        if (object === null || typeof object !== 'object' || Array.isArray(object)) {
-            throw new TypeError(`${methodName} expects an options object (plain object).`);
+        if (object === null || typeof object !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(object)) {
+            throw new TypeError(DirectionalLightMaterial.#formatExceptionMessage(
+                DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.OPTIONS_OBJECT,
+                methodName
+            ));
         }
     }
 }

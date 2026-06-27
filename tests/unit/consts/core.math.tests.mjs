@@ -7,6 +7,8 @@ test("'Common math' constants objects should be frozen", () => {
     const actualConstants = [
         MathConstants.MATH_LAYOUT,
         MathConstants.MATH_VECTOR3_COMPONENTS,
+        MathConstants.MATH_VECTOR3_INDEXES,
+        MathConstants.MATH_MATRIX4_INDEXES,
         MathConstants.MATH_PERSPECTIVE,
         MathConstants.MATH_MATRIX_INVERSION
     ];
@@ -34,6 +36,26 @@ test("'Common math' should keep 'Vector3' component constants values", () => {
     // Act & Assert
     assert.equal(actualConstants.ZERO, 0);
     assert.equal(actualConstants.UNIT, 1);
+});
+
+test("'Common math' should keep 'Vector3' index constants values", () => {
+    // Arrange
+    const actualConstants = MathConstants.MATH_VECTOR3_INDEXES;
+
+    // Act & Assert
+    assert.equal(actualConstants.X, 0);
+    assert.equal(actualConstants.Y, 1);
+    assert.equal(actualConstants.Z, 2);
+});
+
+test("'Common math' should keep 'Matrix4' index constants values", () => {
+    // Arrange
+    const actualConstants = MathConstants.MATH_MATRIX4_INDEXES;
+
+    // Act & Assert
+    assert.equal(actualConstants.WORLD_Z_AXIS_X, 8);
+    assert.equal(actualConstants.WORLD_Z_AXIS_Y, 9);
+    assert.equal(actualConstants.WORLD_Z_AXIS_Z, 10);
 });
 
 test("'Matrix4' perspective constants should keep existing values", () => {

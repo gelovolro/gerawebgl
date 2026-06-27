@@ -1,3 +1,5 @@
+import { ECMASCRIPT_TYPEOF_RESULTS } from '../../constants/ecmascript-types.js';
+
 /**
  * Carriage return regex for sanitizing the material names.
  *
@@ -55,13 +57,6 @@ const SECOND_INDEX = 1;
 const SPACE_SEPARATOR = ' ';
 
 /**
- * String literal for the `typeof` checks.
- *
- * @type {string}
- */
-const TYPEOF_STRING = 'string';
-
-/**
  * Error message for invalid material name input.
  *
  * @type {string}
@@ -81,7 +76,7 @@ export class MaterialNameNormalizer {
      * @throws {TypeError} When name is not a string.
      */
     static normalize(name) {
-        if (typeof name !== TYPEOF_STRING) {
+        if (typeof name !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
             throw new TypeError(ERROR_MATERIAL_NAME_TYPE);
         }
 
