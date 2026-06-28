@@ -1,12 +1,6 @@
-import { Object3D }   from './object3d.js';
-import { CameraMath } from '../math/camera-math.js';
-
-/**
- * Element count for a 4x4 matrix stored in a flat array.
- *
- * @type {number}
- */
-const MATRIX_4x4_ELEMENT_COUNT = 16;
+import * as MathConstants from '../constants/math.js';
+import { CameraMath }     from '../math/camera-math.js';
+import { Object3D }       from './object3d.js';
 
 /**
  * Base camera class. Responsibilities:
@@ -97,7 +91,7 @@ export class Camera extends Object3D {
 
     constructor() {
         super();
-        this.#viewMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
+        this.#viewMatrix = new Float32Array(MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
     }
 
     /**
