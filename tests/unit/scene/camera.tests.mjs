@@ -41,6 +41,22 @@ class CameraTestFixtures {
             0,   0,    0,     1
         ]);
     }
+
+    static createExpectedCombinedViewMatrix() {
+        const zero                  = 0;
+        const unit                  = 1;
+        const inverseScaleX         = 0.5;
+        const negativeInverseScaleY = -0.25;
+        const translatedX           = -10;
+        const translatedY           = 2.5;
+
+        return new Float32Array([
+            zero,          negativeInverseScaleY, zero, zero,
+            inverseScaleX, zero,                  zero, zero,
+            zero,          zero,                  unit, zero,
+            translatedX,   translatedY,           zero, unit
+        ]);
+    }
 }
 
 test("'Camera.getProjectionMatrix' should throw for base camera class", () => {
@@ -158,4 +174,50 @@ test("'Camera.getViewMatrix' should update matrix after scale changes", () => {
 
     // Assert
     TestAssertions.assertFloat32ArrayApproximatelyEquals(actualViewMatrix, expectedMatrix);
+});
+
+test("'Camera.getViewMatrix' should combine translation, rotation and non-uniform scale", () => {
+    // Arrange
+    const actualCamera   = new Camera();
+    const expectedMatrix = CameraTestFixtures.createExpectedCombinedViewMatrix();
+    const positionX      = 10;
+    const positionY      = 20;
+    const positionZ      = 0;
+    const scaleX         = 2;
+    const scaleY         = 4;
+    const scaleZ         = 1;
+
+    // Act
+    actualCamera.getViewMatrix();
+    actualCamera.position.set(positionX, positionY, positionZ);
+    actualCamera.rotation.z = CameraTestFixtures.VIEW_MATRIX_ROTATION_Z_RADIANS;
+    actualCamera.scale.set(scaleX, scaleY, scaleZ);
+
+    const actualViewMatrix = actualCamera.getViewMatrix();
+
+    // Assert
+    TestAssertions.assertFloat32ArrayApproximatelyEquals(actualViewMatrix, expectedMatrix);
+});
+
+test("'Camera.getViewMatrix' should reject zero scale", () => {
+    // Arrange
+    const actualScaleXCamera = new Camera();
+    const actualScaleYCamera = new Camera();
+    const actualScaleZCamera = new Camera();
+    const zeroScale          = 0;
+    const unitScale          = 1;
+    const expectedErrorMatch = /zero scale/;
+
+    // Act
+    actualScaleXCamera.scale.set(zeroScale, unitScale, unitScale);
+    actualScaleYCamera.scale.set(unitScale, zeroScale, unitScale);
+    actualScaleZCamera.scale.set(unitScale, unitScale, zeroScale);
+
+    const actualScaleXCall = () => actualScaleXCamera.getViewMatrix();
+    const actualScaleYCall = () => actualScaleYCamera.getViewMatrix();
+    const actualScaleZCall = () => actualScaleZCamera.getViewMatrix();
+
+    // Assert
+    const isExpectedError = (error) => error instanceof RangeError && expectedErrorMatch.test(error.message);
+    [actualScaleXCall, actualScaleYCall, actualScaleZCall].forEach((actualCall) => assert.throws(actualCall, isExpectedError));
 });

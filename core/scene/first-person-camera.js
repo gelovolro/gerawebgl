@@ -1,5 +1,6 @@
-import { Camera }     from './camera.js';
-import { CameraMath } from '../math/camera-math.js';
+import * as MathConstants from '../constants/math.js';
+import { Camera }         from './camera.js';
+import { Matrix4 }        from '../math/matrix4.js';
 
 /**
  * Default camera field of view divisor used for computing FOV in radians.
@@ -35,27 +36,6 @@ const DEFAULT_NEAR = 0.1;
  * @type {number}
  */
 const DEFAULT_FAR = 200.0;
-
-/**
- * Minimum allowed aspect ratio.
- *
- * @type {number}
- */
-const MINIMUM_ASPECT_RATIO = 0.0;
-
-/**
- * Minimum allowed near clipping plane distance.
- *
- * @type {number}
- */
-const MINIMUM_NEAR_CLIP_DISTANCE = 0.0;
-
-/**
- * Element count for a 4x4 matrix stored in a flat array.
- *
- * @type {number}
- */
-const MATRIX_4x4_ELEMENT_COUNT = 16;
 
 /**
  * First-person camera mode - normal (no bobbing).
@@ -195,11 +175,11 @@ export class FirstPersonCamera extends Camera {
             throw new TypeError('`FirstPersonCamera` expects `far` as a number.');
         }
 
-        if (aspectRatio <= MINIMUM_ASPECT_RATIO) {
+        if (aspectRatio <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
             throw new RangeError('`FirstPersonCamera` expects `aspectRatio` to be a positive number.');
         }
 
-        if (near <= MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
+        if (near <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
             throw new RangeError('`FirstPersonCamera` expects `0 < near < far`.');
         }
 
@@ -211,7 +191,7 @@ export class FirstPersonCamera extends Camera {
         this.#aspectRatio        = aspectRatio;
         this.#near               = near;
         this.#far                = far;
-        this.#projectionMatrix   = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
+        this.#projectionMatrix   = new Float32Array(MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
         this.#mode               = mode;
     }
 
@@ -251,7 +231,7 @@ export class FirstPersonCamera extends Camera {
      */
     getProjectionMatrix() {
         if (this.#isProjectionMatrixDirty) {
-            CameraMath.writePerspectiveMatrixTo(
+            Matrix4.writePerspectiveTo(
                 this.#projectionMatrix,
                 this.#fieldOfViewRadians,
                 this.#aspectRatio,
@@ -275,7 +255,7 @@ export class FirstPersonCamera extends Camera {
             throw new TypeError('`FirstPersonCamera.setAspectRatio` expects `aspectRatio` as a number.');
         }
 
-        if (aspectRatio <= MINIMUM_ASPECT_RATIO) {
+        if (aspectRatio <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
             throw new RangeError('`FirstPersonCamera.setAspectRatio` expects a positive number.');
         }
 

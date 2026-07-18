@@ -106,7 +106,7 @@ export class Matrix4 {
         if (typeof scaleX    !== 'number'
             || typeof scaleY !== 'number'
             || typeof scaleZ !== 'number') {
-            throw new TypeError('Matrix4.createScale expects numeric arguments.');
+            throw new TypeError('`Matrix4.createScale` expects numeric arguments.');
         }
 
         const out = Matrix4.#createEmpty();
@@ -178,37 +178,134 @@ export class Matrix4 {
             || typeof aspectRatio     !== 'number'
             || typeof near            !== 'number'
             || typeof far             !== 'number') {
-            throw new TypeError('Matrix4.createPerspective expects numeric arguments.');
+            throw new TypeError('`Matrix4.createPerspective` expects numeric arguments.');
         }
 
-        if (near <= 0 || far <= near) {
-            throw new RangeError('Matrix4.createPerspective expects 0 < near < far.');
+        if (aspectRatio <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
+            throw new RangeError('`Matrix4.createPerspective` expects a positive aspect ratio.');
         }
 
-        const out                    = Matrix4.#createEmpty();
-        const inverseDepthRange      = MathConstants.MATH_PERSPECTIVE.DEPTH_RANGE_NUMERATOR / (near - far);
-        const halfFieldOfViewRadians = fieldOfViewRadians / MathConstants.MATH_PERSPECTIVE.HALF_FIELD_OF_VIEW_DIVISOR;
-        const projectionScale        = MathConstants.MATH_PERSPECTIVE.PROJECTION_SCALE_NUMERATOR / Math.tan(halfFieldOfViewRadians);
+        if (near <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
+            throw new RangeError('`Matrix4.createPerspective` expects `0 < near < far`.');
+        }
 
-        out[0]  = projectionScale / aspectRatio;
-        out[1]  = 0;
-        out[2]  = 0;
-        out[3]  = 0;
+        return Matrix4.#writePerspectiveIntoUnchecked(
+            Matrix4.#createEmpty(),
+            fieldOfViewRadians,
+            aspectRatio,
+            near,
+            far
+        );
+    }
 
-        out[4]  = 0;
-        out[5]  = projectionScale;
-        out[6]  = 0;
-        out[7]  = 0;
+    /**
+     * Writes a perspective projection matrix to the provided output buffer.
+     *
+     * The output buffer is updated in place and returned without allocating a new matrix.
+     *
+     * @param {Float32Array} out                - Output 4x4 matrix buffer.
+     * @param {number}       fieldOfViewRadians - Vertical field of view in radians.
+     * @param {number}       aspectRatio        - Viewport width-to-height ratio.
+     * @param {number}       near               - Near clipping distance.
+     * @param {number}       far                - Far clipping distance.
+     * @returns {Float32Array}                  - The provided output buffer.
+     * @throws {TypeError}                      - If the output buffer or arguments are invalid.
+     * @throws {RangeError}                     - If the aspect ratio or clipping distances are invalid.
+     */
+    static writePerspectiveTo(out, fieldOfViewRadians, aspectRatio, near, far) {
+        if (!(out instanceof Float32Array) || out.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
+            throw new TypeError('`Matrix4.writePerspectiveTo` expects out to be `Float32Array(16)`.');
+        }
 
-        out[8]  = 0;
-        out[9]  = 0;
-        out[10] = (far + near) * inverseDepthRange;
-        out[11] = MathConstants.MATH_PERSPECTIVE.W_COMPONENT_SCALE;
+        if (typeof fieldOfViewRadians !== 'number'
+            || typeof aspectRatio     !== 'number'
+            || typeof near            !== 'number'
+            || typeof far             !== 'number') {
+            throw new TypeError('`Matrix4.writePerspectiveTo` expects numeric arguments.');
+        }
 
-        out[12] = 0;
-        out[13] = 0;
-        out[14] = (MathConstants.MATH_PERSPECTIVE.Z_RANGE_MULTIPLIER * far * near) * inverseDepthRange;
-        out[15] = 0;
+        if (aspectRatio <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
+            throw new RangeError('`Matrix4.writePerspectiveTo` expects a positive aspect ratio.');
+        }
+
+        if (near <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
+            throw new RangeError('`Matrix4.writePerspectiveTo` expects `0 < near < far`.');
+        }
+
+        return Matrix4.#writePerspectiveIntoUnchecked(
+            out,
+            fieldOfViewRadians,
+            aspectRatio,
+            near,
+            far
+        );
+    }
+
+    /**
+     * Writes an orthographic projection matrix to the provided output buffer.
+     *
+     * The output buffer is updated in place and returned without allocating a new matrix.
+     *
+     * @param {Float32Array} out    - Output 4x4 matrix buffer.
+     * @param {number}       left   - Left clipping plane.
+     * @param {number}       right  - Right clipping plane.
+     * @param {number}       bottom - Bottom clipping plane.
+     * @param {number}       top    - Top clipping plane.
+     * @param {number}       near   - Near clipping distance.
+     * @param {number}       far    - Far clipping distance.
+     * @returns {Float32Array}      - The provided output buffer.
+     * @throws {TypeError}          - If the output buffer or arguments are invalid.
+     * @throws {RangeError}         - If the projection bounds or clipping distances are invalid.
+     */
+    static writeOrthographicTo(out, left, right, bottom, top, near, far) {
+        if (!(out instanceof Float32Array) || out.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
+            throw new TypeError('`Matrix4.writeOrthographicTo` expects out to be `Float32Array(16)`.');
+        }
+
+        if (typeof left      !== 'number'
+            || typeof right  !== 'number'
+            || typeof bottom !== 'number'
+            || typeof top    !== 'number'
+            || typeof near   !== 'number'
+            || typeof far    !== 'number') {
+            throw new TypeError('`Matrix4.writeOrthographicTo` expects numeric arguments.');
+        }
+
+        if (left === right) {
+            throw new RangeError('`Matrix4.writeOrthographicTo` expects `left !== right`.');
+        }
+
+        if (bottom === top) {
+            throw new RangeError('`Matrix4.writeOrthographicTo` expects `bottom !== top`.');
+        }
+
+        if (far <= near) {
+            throw new RangeError('`Matrix4.writeOrthographicTo` expects `near < far`.');
+        }
+
+        const inverseWidth  = MathConstants.MATH_MATRIX_VALUES.UNIT / (right - left);
+        const inverseHeight = MathConstants.MATH_MATRIX_VALUES.UNIT / (top - bottom);
+        const inverseDepth  = MathConstants.MATH_MATRIX_VALUES.UNIT / (near - far);
+
+        out[0]  = MathConstants.MATH_ORTHOGRAPHIC.SCALE_NUMERATOR * inverseWidth;
+        out[1]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[2]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[3]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+
+        out[4]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[5]  = MathConstants.MATH_ORTHOGRAPHIC.SCALE_NUMERATOR * inverseHeight;
+        out[6]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[7]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+
+        out[8]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[9]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[10] = MathConstants.MATH_ORTHOGRAPHIC.SCALE_NUMERATOR * inverseDepth;
+        out[11] = MathConstants.MATH_MATRIX_VALUES.ZERO;
+
+        out[12] = -(right + left) * inverseWidth;
+        out[13] = -(top + bottom) * inverseHeight;
+        out[14] = (far + near) * inverseDepth;
+        out[15] = MathConstants.MATH_MATRIX_VALUES.UNIT;
 
         return out;
     }
@@ -230,7 +327,7 @@ export class Matrix4 {
         if (typeof translateX    !== 'number'
             || typeof translateY !== 'number'
             || typeof translateZ !== 'number') {
-            throw new TypeError('Matrix4.createTranslation expects numeric arguments.');
+            throw new TypeError('`Matrix4.createTranslation` expects numeric arguments.');
         }
 
         const out = Matrix4.createIdentity();
@@ -253,7 +350,7 @@ export class Matrix4 {
      */
     static createRotationX(angleRadians) {
         if (typeof angleRadians !== 'number') {
-            throw new TypeError('Matrix4.createRotationX expects a numeric argument.');
+            throw new TypeError('`Matrix4.createRotationX` expects a numeric argument.');
         }
 
         const cosAngle = Math.cos(angleRadians);
@@ -296,7 +393,7 @@ export class Matrix4 {
      */
     static createRotationY(angleRadians) {
         if (typeof angleRadians !== 'number') {
-            throw new TypeError('Matrix4.createRotationY expects a numeric argument.');
+            throw new TypeError('`Matrix4.createRotationY` expects a numeric argument.');
         }
 
         const cosAngle = Math.cos(angleRadians);
@@ -339,7 +436,7 @@ export class Matrix4 {
      */
     static createRotationZ(angleRadians) {
         if (typeof angleRadians !== 'number') {
-            throw new TypeError('Matrix4.createRotationZ expects a numeric argument.');
+            throw new TypeError('`Matrix4.createRotationZ` expects a numeric argument.');
         }
 
         const cosAngle = Math.cos(angleRadians);
@@ -383,11 +480,10 @@ export class Matrix4 {
             || leftMatrix.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT
             || !(rightMatrix instanceof Float32Array)
             || rightMatrix.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
-            throw new TypeError('Matrix4.multiply expects two 4x4 Float32Array matrices.');
+            throw new TypeError('`Matrix4.multiply` expects two 4x4 `Float32Array` matrices.');
         }
 
-        const out = Matrix4.#createEmpty();
-        return Matrix4.#multiplyIntoUnchecked(out, leftMatrix, rightMatrix);
+        return Matrix4.#multiplyIntoUnchecked(Matrix4.#createEmpty(), leftMatrix, rightMatrix);
     }
 
     /**
@@ -410,11 +506,11 @@ export class Matrix4 {
             || leftMatrix.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT
             || !(rightMatrix instanceof Float32Array)
             || rightMatrix.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
-            throw new TypeError('Matrix4.multiplyTo expects three 4x4 Float32Array matrices.');
+            throw new TypeError('`Matrix4.multiplyTo` expects three 4x4 `Float32Array` matrices.');
         }
 
         if (out === leftMatrix || out === rightMatrix) {
-            throw new Error('Matrix4.multiplyTo does not support in-place multiplication. Use a separate output matrix.');
+            throw new Error('`Matrix4.multiplyTo` does not support in-place multiplication. Use a separate output matrix.');
         }
 
         return Matrix4.#multiplyIntoUnchecked(out, leftMatrix, rightMatrix);
@@ -464,8 +560,7 @@ export class Matrix4 {
             throw new TypeError('`Matrix4.transpose` expects a 4x4 `Float32Array` matrix.');
         }
 
-        const out = Matrix4.#createEmpty();
-        return Matrix4.#transposeIntoUnchecked(out, matrix);
+        return Matrix4.#transposeIntoUnchecked(Matrix4.#createEmpty(), matrix);
     }
 
     /**
@@ -505,8 +600,7 @@ export class Matrix4 {
             throw new TypeError('`Matrix4.invert` expects a 4x4 `Float32Array` matrix.');
         }
 
-        const out = Matrix4.#createEmpty();
-        return Matrix4.#invertIntoUnchecked(out, matrix);
+        return Matrix4.#invertIntoUnchecked(Matrix4.#createEmpty(), matrix);
     }
 
     /**
@@ -558,6 +652,55 @@ export class Matrix4 {
                 + leftMatrix[3 * MathConstants.MATH_LAYOUT.MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 3];
             }
         }
+
+        return out;
+    }
+
+    /**
+     * Writes a perspective projection matrix to the provided output buffer.
+     *
+     * Assumes public method validation already checked the output buffer and projection parameters.
+     *
+     * @param {Float32Array} out                - Output 4x4 matrix.
+     * @param {number}       fieldOfViewRadians - Vertical field of view in radians.
+     * @param {number}       aspectRatio        - Viewport width-to-height ratio.
+     * @param {number}       near               - Near clipping distance.
+     * @param {number}       far                - Far clipping distance.
+     * @returns {Float32Array}                  - The output matrix (out).
+     * @private
+     */
+    static #writePerspectiveIntoUnchecked(out, fieldOfViewRadians, aspectRatio, near, far) {
+        const inverseDepthRange =
+            MathConstants.MATH_PERSPECTIVE.DEPTH_RANGE_NUMERATOR
+            / (near - far);
+
+        const halfFieldOfViewRadians =
+            fieldOfViewRadians
+            / MathConstants.MATH_PERSPECTIVE.HALF_FIELD_OF_VIEW_DIVISOR;
+
+        const projectionScale =
+            MathConstants.MATH_PERSPECTIVE.PROJECTION_SCALE_NUMERATOR
+            / Math.tan(halfFieldOfViewRadians);
+
+        out[0]  = projectionScale / aspectRatio;
+        out[1]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[2]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[3]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+
+        out[4]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[5]  = projectionScale;
+        out[6]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[7]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+
+        out[8]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[9]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[10] = (far + near) * inverseDepthRange;
+        out[11] = MathConstants.MATH_PERSPECTIVE.W_COMPONENT_SCALE;
+
+        out[12] = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[13] = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[14] = (MathConstants.MATH_PERSPECTIVE.Z_RANGE_MULTIPLIER * far * near) * inverseDepthRange;
+        out[15] = MathConstants.MATH_MATRIX_VALUES.ZERO;
 
         return out;
     }
