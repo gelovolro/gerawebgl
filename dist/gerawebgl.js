@@ -144,21 +144,63 @@ var WebGLContext = class _WebGLContext {
   }
 };
 
+// core/constants/math.js
+var MATH_LAYOUT = Object.freeze({
+  MATRIX_4X4_ELEMENT_COUNT: 16,
+  MATRIX_COLUMN_COUNT: 4,
+  MATRIX_ROW_COUNT: 4,
+  MATRIX_STRIDE: 4,
+  VECTOR3_ELEMENT_COUNT: 3
+});
+var MATH_COMMON_VALUES = Object.freeze({
+  ZERO: 0,
+  UNIT: 1
+});
+var MATH_VECTOR3_COMPONENTS = Object.freeze({
+  ZERO: MATH_COMMON_VALUES.ZERO,
+  UNIT: MATH_COMMON_VALUES.UNIT
+});
+var MATH_VECTOR3_INDEXES = Object.freeze({
+  X: 0,
+  Y: 1,
+  Z: 2
+});
+var MATH_MATRIX4_INDEXES = Object.freeze({
+  WORLD_Z_AXIS_X: 8,
+  WORLD_Z_AXIS_Y: 9,
+  WORLD_Z_AXIS_Z: 10
+});
+var MATH_MATRIX_VALUES = Object.freeze({
+  ZERO: MATH_COMMON_VALUES.ZERO,
+  UNIT: MATH_COMMON_VALUES.UNIT
+});
+var MATH_PERSPECTIVE = Object.freeze({
+  HALF_FIELD_OF_VIEW_DIVISOR: 2,
+  PROJECTION_SCALE_NUMERATOR: 1,
+  DEPTH_RANGE_NUMERATOR: 1,
+  Z_RANGE_MULTIPLIER: 2,
+  W_COMPONENT_SCALE: -1
+});
+var MATH_ORTHOGRAPHIC = Object.freeze({ SCALE_NUMERATOR: 2 });
+var MATH_CAMERA_LIMITS = Object.freeze({
+  MINIMUM_ASPECT_RATIO: 0,
+  MINIMUM_NEAR_CLIP_DISTANCE: 0
+});
+var MATH_VIEW_MATRIX = Object.freeze({ SCALE_INVERSE_NUMERATOR: 1 });
+var MATH_MATRIX_INVERSION = Object.freeze({
+  MIN_INVERTIBLE_DETERMINANT_ABS: 1e-12,
+  INVERSE_DETERMINANT_NUMERATOR: 1
+});
+
 // core/math/matrix4.js
-var HALF_FIELD_OF_VIEW_DIVISOR = 2;
-var PROJECTION_SCALE_NUMERATOR = 1;
-var DEPTH_RANGE_NUMERATOR = 1;
-var PERSPECTIVE_Z_RANGE_MULTIPLIER = 2;
-var PERSPECTIVE_W_COMPONENT_SCALE = -1;
-var MATRIX_4x4_ELEMENT_COUNT = 16;
-var MATRIX_COLUMN_COUNT = 4;
-var MATRIX_ROW_COUNT = 4;
-var MATRIX_STRIDE = 4;
-var MIN_INVERTIBLE_DETERMINANT_ABS = 1e-12;
-var INVERSE_DETERMINANT_NUMERATOR = 1;
 var Matrix4 = class _Matrix4 {
   /**
-   * Creates a new 4x4 identity matrix.
+   * Creates a new 4x4 identity matrix:
+   *
+   * column 0: [ 1, 0, 0, 0 ]
+   * column 1: [ 0, 1, 0, 0 ]
+   * column 2: [ 0, 0, 1, 0 ]
+   * column 3: [ 0, 0, 0, 1 ]
    *
    * @returns {Float32Array} - A new identity matrix.
    */
@@ -171,7 +213,12 @@ var Matrix4 = class _Matrix4 {
     return out;
   }
   /**
-   * Creates a scale matrix.
+   * Creates a scale matrix:
+   *
+   * column 0: [ scaleX, 0,      0,      0 ]
+   * column 1: [ 0,      scaleY, 0,      0 ]
+   * column 2: [ 0,      0,      scaleZ, 0 ]
+   * column 3: [ 0,      0,      0,      1 ]
    *
    * @param {number} scaleX  - Scale along X.
    * @param {number} scaleY  - Scale along Y.
@@ -180,7 +227,7 @@ var Matrix4 = class _Matrix4 {
    */
   static createScale(scaleX, scaleY, scaleZ) {
     if (typeof scaleX !== "number" || typeof scaleY !== "number" || typeof scaleZ !== "number") {
-      throw new TypeError("Matrix4.createScale expects numeric arguments.");
+      throw new TypeError("`Matrix4.createScale` expects numeric arguments.");
     }
     const out = _Matrix4.#createEmpty();
     out[0] = scaleX;
@@ -190,44 +237,174 @@ var Matrix4 = class _Matrix4 {
     return out;
   }
   /**
-   * Creates a perspective projection matrix.
+   * Creates a perspective projection matrix:
+   *
+   * column 0: [ projectionScale / aspectRatio, 0,               0,           0 ]
+   * column 1: [ 0,                             projectionScale, 0,           0 ]
+   * column 2: [ 0,                             0,               depthScale, -1 ]
+   * column 3: [ 0,                             0,               depthOffset, 0 ]
+   *
+   * Perspective projection:
+   * - makes farther objects appear smaller and closer objects appear larger
+   * - unlike the orthographic projection, object size depends on distance from the camera
+   *
+   * How the matrix is applied to a 3D point?
+   * - the matrix stores projection coefficients, not a projected point
+   * - a view-space 3D point [x, y, z] is used as a homogeneous input [x, y, z, 1]
+   * - homogeneous input means a 3D point, stored with a helper 'w-component', not a point in 4D space
+   * - 'w = 1' means a position, 'w = 0' means a direction, so the translation/depth offset wouldn't apply
+   *
+   * Multiplying this homogeneous form of the 3D point by the matrix produces the clip-space coordinates:
+   *
+   * clip x: [ x * projectionScale / aspectRatio ]
+   * clip y: [ y * projectionScale               ]
+   * clip z: [ z * depthScale + 1 * depthOffset  ]
+   * clip w: [ z * (-1) + 1 * 0 = -z             ]
+   *
+   * About spaces:
+   * - world-space describes where an object is in the scene
+   * - view-space describes the same object relative to the camera, before the projection
+   * - the perspective projection matrix converts the 'view-space' coordinates into the 'clip-space' coordinates
+   * - clip-space stores 4 components: [clip x, clip y, clip z, clip w]
+   * - clip-space is where projected coordinates are checked against the visible camera volume
+   * - after clipping, the perspective divide ('/ clip w') converts clip-space coordinates into NDC coordinates
+   *
+   * Notes about the projection scale:
+   * - the scale uses the half-angle between the camera center line and the vertical view boundary (that's why tangent is used)
+   * - tangent describes how wide the vertical view opens from this half-angle
+   * - the inverse is used, because tangent gives the view opening, while the matrix needs a scale, that brings this opening back to the unit boundary
+   * - the final scale value is the inverse of that opening value (tangent of half of the vertical FOV)
+   *
+   * Depth mapping:
+   * - depth scale controls how the view-space z value is scaled for clip-space z
+   * - depth offset shifts the scaled z value so 'near' and 'far' can be mapped to the clip-space depth limits
+   *
+   * Formulas:
+   * - aspect ratio                = viewport width / viewport height
+   * - vertical projection scale   = inverse of tangent(half vertical field of view)
+   * - horizontal projection scale = vertical projection scale / aspect ratio
+   * - depth scale                 = (far + near) / (near - far)
+   * - depth offset                = 2 * far * near / (near - far)
    *
    * @param {number} fieldOfViewRadians - Vertical field of view in radians.
    * @param {number} aspectRatio        - Viewport aspect ratio (width / height).
-   * @param {number} near               - Near clipping plane, must be > 0.
-   * @param {number} far                - Far clipping plane, must be > near.
+   * @param {number} near               - Near clipping plane, must be '> 0'.
+   * @param {number} far                - Far clipping plane, must be '> near'.
    * @returns {Float32Array}            - A new perspective projection matrix.
    */
   static createPerspective(fieldOfViewRadians, aspectRatio, near, far) {
     if (typeof fieldOfViewRadians !== "number" || typeof aspectRatio !== "number" || typeof near !== "number" || typeof far !== "number") {
-      throw new TypeError("Matrix4.createPerspective expects numeric arguments.");
+      throw new TypeError("`Matrix4.createPerspective` expects numeric arguments.");
     }
-    if (near <= 0 || far <= near) {
-      throw new RangeError("Matrix4.createPerspective expects 0 < near < far.");
+    if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
+      throw new RangeError("`Matrix4.createPerspective` expects a positive aspect ratio.");
     }
-    const out = _Matrix4.#createEmpty();
-    const projectionScale = PROJECTION_SCALE_NUMERATOR / Math.tan(fieldOfViewRadians / HALF_FIELD_OF_VIEW_DIVISOR);
-    const inverseDepthRange = DEPTH_RANGE_NUMERATOR / (near - far);
-    out[0] = projectionScale / aspectRatio;
-    out[1] = 0;
-    out[2] = 0;
-    out[3] = 0;
-    out[4] = 0;
-    out[5] = projectionScale;
-    out[6] = 0;
-    out[7] = 0;
-    out[8] = 0;
-    out[9] = 0;
-    out[10] = (far + near) * inverseDepthRange;
-    out[11] = PERSPECTIVE_W_COMPONENT_SCALE;
-    out[12] = 0;
-    out[13] = 0;
-    out[14] = PERSPECTIVE_Z_RANGE_MULTIPLIER * far * near * inverseDepthRange;
-    out[15] = 0;
+    if (near <= MATH_CAMERA_LIMITS.MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
+      throw new RangeError("`Matrix4.createPerspective` expects `0 < near < far`.");
+    }
+    return _Matrix4.#writePerspectiveIntoUnchecked(
+      _Matrix4.#createEmpty(),
+      fieldOfViewRadians,
+      aspectRatio,
+      near,
+      far
+    );
+  }
+  /**
+   * Writes a perspective projection matrix to the provided output buffer.
+   *
+   * The output buffer is updated in place and returned without allocating a new matrix.
+   *
+   * @param {Float32Array} out                - Output 4x4 matrix buffer.
+   * @param {number}       fieldOfViewRadians - Vertical field of view in radians.
+   * @param {number}       aspectRatio        - Viewport width-to-height ratio.
+   * @param {number}       near               - Near clipping distance.
+   * @param {number}       far                - Far clipping distance.
+   * @returns {Float32Array}                  - The provided output buffer.
+   * @throws {TypeError}                      - If the output buffer or arguments are invalid.
+   * @throws {RangeError}                     - If the aspect ratio or clipping distances are invalid.
+   */
+  static writePerspectiveTo(out, fieldOfViewRadians, aspectRatio, near, far) {
+    if (!(out instanceof Float32Array) || out.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
+      throw new TypeError("`Matrix4.writePerspectiveTo` expects out to be `Float32Array(16)`.");
+    }
+    if (typeof fieldOfViewRadians !== "number" || typeof aspectRatio !== "number" || typeof near !== "number" || typeof far !== "number") {
+      throw new TypeError("`Matrix4.writePerspectiveTo` expects numeric arguments.");
+    }
+    if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
+      throw new RangeError("`Matrix4.writePerspectiveTo` expects a positive aspect ratio.");
+    }
+    if (near <= MATH_CAMERA_LIMITS.MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
+      throw new RangeError("`Matrix4.writePerspectiveTo` expects `0 < near < far`.");
+    }
+    return _Matrix4.#writePerspectiveIntoUnchecked(
+      out,
+      fieldOfViewRadians,
+      aspectRatio,
+      near,
+      far
+    );
+  }
+  /**
+   * Writes an orthographic projection matrix to the provided output buffer.
+   *
+   * The output buffer is updated in place and returned without allocating a new matrix.
+   *
+   * @param {Float32Array} out    - Output 4x4 matrix buffer.
+   * @param {number}       left   - Left clipping plane.
+   * @param {number}       right  - Right clipping plane.
+   * @param {number}       bottom - Bottom clipping plane.
+   * @param {number}       top    - Top clipping plane.
+   * @param {number}       near   - Near clipping distance.
+   * @param {number}       far    - Far clipping distance.
+   * @returns {Float32Array}      - The provided output buffer.
+   * @throws {TypeError}          - If the output buffer or arguments are invalid.
+   * @throws {RangeError}         - If the projection bounds or clipping distances are invalid.
+   */
+  static writeOrthographicTo(out, left, right, bottom, top, near, far) {
+    if (!(out instanceof Float32Array) || out.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
+      throw new TypeError("`Matrix4.writeOrthographicTo` expects out to be `Float32Array(16)`.");
+    }
+    if (typeof left !== "number" || typeof right !== "number" || typeof bottom !== "number" || typeof top !== "number" || typeof near !== "number" || typeof far !== "number") {
+      throw new TypeError("`Matrix4.writeOrthographicTo` expects numeric arguments.");
+    }
+    if (left === right) {
+      throw new RangeError("`Matrix4.writeOrthographicTo` expects `left !== right`.");
+    }
+    if (bottom === top) {
+      throw new RangeError("`Matrix4.writeOrthographicTo` expects `bottom !== top`.");
+    }
+    if (far <= near) {
+      throw new RangeError("`Matrix4.writeOrthographicTo` expects `near < far`.");
+    }
+    const inverseWidth = MATH_MATRIX_VALUES.UNIT / (right - left);
+    const inverseHeight = MATH_MATRIX_VALUES.UNIT / (top - bottom);
+    const inverseDepth = MATH_MATRIX_VALUES.UNIT / (near - far);
+    out[0] = MATH_ORTHOGRAPHIC.SCALE_NUMERATOR * inverseWidth;
+    out[1] = MATH_MATRIX_VALUES.ZERO;
+    out[2] = MATH_MATRIX_VALUES.ZERO;
+    out[3] = MATH_MATRIX_VALUES.ZERO;
+    out[4] = MATH_MATRIX_VALUES.ZERO;
+    out[5] = MATH_ORTHOGRAPHIC.SCALE_NUMERATOR * inverseHeight;
+    out[6] = MATH_MATRIX_VALUES.ZERO;
+    out[7] = MATH_MATRIX_VALUES.ZERO;
+    out[8] = MATH_MATRIX_VALUES.ZERO;
+    out[9] = MATH_MATRIX_VALUES.ZERO;
+    out[10] = MATH_ORTHOGRAPHIC.SCALE_NUMERATOR * inverseDepth;
+    out[11] = MATH_MATRIX_VALUES.ZERO;
+    out[12] = -(right + left) * inverseWidth;
+    out[13] = -(top + bottom) * inverseHeight;
+    out[14] = (far + near) * inverseDepth;
+    out[15] = MATH_MATRIX_VALUES.UNIT;
     return out;
   }
   /**
-   * Creates a translation matrix.
+   * Creates a translation matrix:
+   *
+   * [ 1 0 0 translateX ]
+   * [ 0 1 0 translateY ]
+   * [ 0 0 1 translateZ ]
+   * [ 0 0 0 1          ]
    *
    * @param {number} translateX - Translation along X axis.
    * @param {number} translateY - Translation along Y axis.
@@ -236,7 +413,7 @@ var Matrix4 = class _Matrix4 {
    */
   static createTranslation(translateX, translateY, translateZ) {
     if (typeof translateX !== "number" || typeof translateY !== "number" || typeof translateZ !== "number") {
-      throw new TypeError("Matrix4.createTranslation expects numeric arguments.");
+      throw new TypeError("`Matrix4.createTranslation` expects numeric arguments.");
     }
     const out = _Matrix4.createIdentity();
     out[12] = translateX;
@@ -245,14 +422,19 @@ var Matrix4 = class _Matrix4 {
     return out;
   }
   /**
-   * Creates a rotation matrix around the X axis.
+   * Creates a rotation matrix around the X axis:
+   *
+   * [ 1 0         0        0 ]
+   * [ 0 cosAngle -sinAngle 0 ]
+   * [ 0 sinAngle  cosAngle 0 ]
+   * [ 0 0         0        1 ]
    *
    * @param {number} angleRadians - Angle in radians.
    * @returns {Float32Array}      - A new rotation matrix.
    */
   static createRotationX(angleRadians) {
     if (typeof angleRadians !== "number") {
-      throw new TypeError("Matrix4.createRotationX expects a numeric argument.");
+      throw new TypeError("`Matrix4.createRotationX` expects a numeric argument.");
     }
     const cosAngle = Math.cos(angleRadians);
     const sinAngle = Math.sin(angleRadians);
@@ -276,14 +458,19 @@ var Matrix4 = class _Matrix4 {
     return out;
   }
   /**
-   * Creates a rotation matrix around the Y axis.
+   * Creates a rotation matrix around the Y axis:
+   *
+   * [  cosAngle 0 sinAngle 0 ]
+   * [  0        1 0        0 ]
+   * [ -sinAngle 0 cosAngle 0 ]
+   * [  0        0 0        1 ]
    *
    * @param {number} angleRadians - Angle in radians.
    * @returns {Float32Array}      - A new rotation matrix.
    */
   static createRotationY(angleRadians) {
     if (typeof angleRadians !== "number") {
-      throw new TypeError("Matrix4.createRotationY expects a numeric argument.");
+      throw new TypeError("`Matrix4.createRotationY` expects a numeric argument.");
     }
     const cosAngle = Math.cos(angleRadians);
     const sinAngle = Math.sin(angleRadians);
@@ -307,14 +494,19 @@ var Matrix4 = class _Matrix4 {
     return out;
   }
   /**
-   * Creates a rotation matrix around the Z axis.
+   * Creates a rotation matrix around the Z axis:
+   *
+   * [ cosAngle -sinAngle 0 0 ]
+   * [ sinAngle  cosAngle 0 0 ]
+   * [ 0         0        1 0 ]
+   * [ 0         0        0 1 ]
    *
    * @param {number} angleRadians - Angle in radians.
    * @returns {Float32Array}      - A new rotation matrix.
    */
   static createRotationZ(angleRadians) {
     if (typeof angleRadians !== "number") {
-      throw new TypeError("Matrix4.createRotationZ expects a numeric argument.");
+      throw new TypeError("`Matrix4.createRotationZ` expects a numeric argument.");
     }
     const cosAngle = Math.cos(angleRadians);
     const sinAngle = Math.sin(angleRadians);
@@ -338,24 +530,27 @@ var Matrix4 = class _Matrix4 {
     return out;
   }
   /**
-   * Multiplies two 4x4 matrices: result = leftMatrix * rightMatrix.
+   * Multiplies two 4x4 matrices: 'result = leftMatrix * rightMatrix'.
+   *
+   * Order matters. With column-vector style, right matrix is applied first.
    *
    * @param {Float32Array} leftMatrix  - Left-hand matrix (4x4).
    * @param {Float32Array} rightMatrix - Right-hand matrix (4x4).
    * @returns {Float32Array}           - A new matrix containing the product.
    */
   static multiply(leftMatrix, rightMatrix) {
-    if (!(leftMatrix instanceof Float32Array) || leftMatrix.length !== MATRIX_4x4_ELEMENT_COUNT || !(rightMatrix instanceof Float32Array) || rightMatrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
-      throw new TypeError("Matrix4.multiply expects two 4x4 Float32Array matrices.");
+    if (!(leftMatrix instanceof Float32Array) || leftMatrix.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT || !(rightMatrix instanceof Float32Array) || rightMatrix.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
+      throw new TypeError("`Matrix4.multiply` expects two 4x4 `Float32Array` matrices.");
     }
-    const out = _Matrix4.#createEmpty();
-    return _Matrix4.#multiplyIntoUnchecked(out, leftMatrix, rightMatrix);
+    return _Matrix4.#multiplyIntoUnchecked(_Matrix4.#createEmpty(), leftMatrix, rightMatrix);
   }
   /**
    * Multiplies two 4x4 matrices into an existing output matrix:
-   * out = leftMatrix * rightMatrix.
+   * 'out = leftMatrix * rightMatrix'.
    *
-   * Notes: out must not be the same object as leftMatrix or rightMatrix.
+   * Notes:
+   * - order matters, with column-vector style the right matrix is applied first
+   * - out must not be the same object as 'leftMatrix' or 'rightMatrix'
    *
    * @param {Float32Array} out         - Output 4x4 matrix.
    * @param {Float32Array} leftMatrix  - Left-hand matrix (4x4).
@@ -363,19 +558,22 @@ var Matrix4 = class _Matrix4 {
    * @returns {Float32Array}           - The output matrix (out).
    */
   static multiplyTo(out, leftMatrix, rightMatrix) {
-    if (!(out instanceof Float32Array) || out.length !== MATRIX_4x4_ELEMENT_COUNT || !(leftMatrix instanceof Float32Array) || leftMatrix.length !== MATRIX_4x4_ELEMENT_COUNT || !(rightMatrix instanceof Float32Array) || rightMatrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
-      throw new TypeError("Matrix4.multiplyTo expects three 4x4 Float32Array matrices.");
+    if (!(out instanceof Float32Array) || out.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT || !(leftMatrix instanceof Float32Array) || leftMatrix.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT || !(rightMatrix instanceof Float32Array) || rightMatrix.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
+      throw new TypeError("`Matrix4.multiplyTo` expects three 4x4 `Float32Array` matrices.");
     }
     if (out === leftMatrix || out === rightMatrix) {
-      throw new Error("Matrix4.multiplyTo does not support in-place multiplication. Use a separate output matrix.");
+      throw new Error("`Matrix4.multiplyTo` does not support in-place multiplication. Use a separate output matrix.");
     }
     return _Matrix4.#multiplyIntoUnchecked(out, leftMatrix, rightMatrix);
   }
   /**
    * Multiplies several matrices in sequence:
-   * result = m0 * m1 * m2 * ... * mn
+   * 'result = m0 * m1 * m2 * ... * mn'
    *
-   * Notes: If no matrices are provided, returns a new identity matrix. If exactly one matrix is provided, returns the same matrix instance (no copy).
+   * Notes:
+   * - order matters, with column-vector style, the last matrix is applied first
+   * - if no matrices are provided, returns a new identity matrix
+   * - if exactly one matrix is provided, returns the same matrix instance (no copy)
    *
    * @param {...Float32Array} matrices - Matrices to multiply, in order.
    * @returns {Float32Array}           - The resulting matrix.
@@ -384,6 +582,11 @@ var Matrix4 = class _Matrix4 {
     if (matrices.length === 0) {
       return _Matrix4.createIdentity();
     }
+    for (const matrix of matrices) {
+      if (!(matrix instanceof Float32Array) || matrix.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
+        throw new TypeError("`Matrix4.multiplyMany` expects the 4x4 `Float32Array` matrices.");
+      }
+    }
     let result = matrices[0];
     for (let index = 1; index < matrices.length; index += 1) {
       result = _Matrix4.multiply(result, matrices[index]);
@@ -391,29 +594,28 @@ var Matrix4 = class _Matrix4 {
     return result;
   }
   /**
-   * Transposes a 4x4 matrix.
+   * Transposes a 4x4 matrix by swapping its rows and columns.
    *
    * @param {Float32Array} matrix - Input 4x4 matrix.
    * @returns {Float32Array}      - A new transposed matrix.
    */
   static transpose(matrix) {
-    if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+    if (!(matrix instanceof Float32Array) || matrix.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
       throw new TypeError("`Matrix4.transpose` expects a 4x4 `Float32Array` matrix.");
     }
-    const out = _Matrix4.#createEmpty();
-    return _Matrix4.#transposeIntoUnchecked(out, matrix);
+    return _Matrix4.#transposeIntoUnchecked(_Matrix4.#createEmpty(), matrix);
   }
   /**
-   * Transposes a 4x4 matrix into an existing output matrix.
+   * Transposes a 4x4 matrix into an existing output matrix by swapping rows and columns.
    *
-   * Notes: out must not be the same object as matrix.
+   * Note: out must not be the same object as matrix.
    *
    * @param {Float32Array} out    - Output 4x4 matrix.
    * @param {Float32Array} matrix - Input 4x4 matrix.
    * @returns {Float32Array}      - The output matrix (out).
    */
   static transposeTo(out, matrix) {
-    if (!(out instanceof Float32Array) || out.length !== MATRIX_4x4_ELEMENT_COUNT || !(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+    if (!(out instanceof Float32Array) || out.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT || !(matrix instanceof Float32Array) || matrix.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
       throw new TypeError("`Matrix4.transposeTo` expects two 4x4 `Float32Array` matrices.");
     }
     if (out === matrix) {
@@ -422,27 +624,30 @@ var Matrix4 = class _Matrix4 {
     return _Matrix4.#transposeIntoUnchecked(out, matrix);
   }
   /**
-   * Inverts a 4x4 matrix.
+   * Inverts a 4x4 matrix using its adjugate and determinant.
+   *
+   * A near-zero determinant means the matrix is singular or unsafe to invert.
    *
    * @param {Float32Array} matrix - Input 4x4 matrix.
    * @returns {Float32Array}      - A new inverted matrix.
    */
   static invert(matrix) {
-    if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+    if (!(matrix instanceof Float32Array) || matrix.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
       throw new TypeError("`Matrix4.invert` expects a 4x4 `Float32Array` matrix.");
     }
-    const out = _Matrix4.#createEmpty();
-    return _Matrix4.#invertIntoUnchecked(out, matrix);
+    return _Matrix4.#invertIntoUnchecked(_Matrix4.#createEmpty(), matrix);
   }
   /**
-   * Inverts a 4x4 matrix into an existing output matrix.
+   * Inverts a 4x4 matrix into an existing output matrix using its adjugate and determinant.
+   *
+   * A near-zero determinant means the matrix is singular or unsafe to invert.
    *
    * @param {Float32Array} out    - Output 4x4 matrix.
    * @param {Float32Array} matrix - Input 4x4 matrix.
    * @returns {Float32Array}      - The output matrix (out).
    */
   static invertTo(out, matrix) {
-    if (!(out instanceof Float32Array) || out.length !== MATRIX_4x4_ELEMENT_COUNT || !(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+    if (!(out instanceof Float32Array) || out.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT || !(matrix instanceof Float32Array) || matrix.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
       throw new TypeError("`Matrix4.invertTo` expects two 4x4 `Float32Array` matrices.");
     }
     if (out === matrix) {
@@ -451,7 +656,9 @@ var Matrix4 = class _Matrix4 {
     return _Matrix4.#invertIntoUnchecked(out, matrix);
   }
   /**
-   * Multiplies two 4x4 matrices into out without validation.
+   * Multiplies two validated 4x4 matrices into out.
+   *
+   * Assumes public validation already checked matrix types, sizes, and output aliasing.
    *
    * @param {Float32Array} out         - Output 4x4 matrix that will receive the result.
    * @param {Float32Array} leftMatrix  - Left-hand 4x4 matrix.
@@ -460,17 +667,54 @@ var Matrix4 = class _Matrix4 {
    * @private
    */
   static #multiplyIntoUnchecked(out, leftMatrix, rightMatrix) {
-    for (let columnIndex = 0; columnIndex < MATRIX_COLUMN_COUNT; columnIndex += 1) {
-      const rightColumnOffset = columnIndex * MATRIX_STRIDE;
-      for (let rowIndex = 0; rowIndex < MATRIX_ROW_COUNT; rowIndex += 1) {
+    for (let columnIndex = 0; columnIndex < MATH_LAYOUT.MATRIX_COLUMN_COUNT; columnIndex += 1) {
+      const rightColumnOffset = columnIndex * MATH_LAYOUT.MATRIX_STRIDE;
+      for (let rowIndex = 0; rowIndex < MATH_LAYOUT.MATRIX_ROW_COUNT; rowIndex += 1) {
         const resultIndex = rightColumnOffset + rowIndex;
-        out[resultIndex] = leftMatrix[0 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 0] + leftMatrix[1 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 1] + leftMatrix[2 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 2] + leftMatrix[3 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 3];
+        out[resultIndex] = leftMatrix[0 * MATH_LAYOUT.MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 0] + leftMatrix[1 * MATH_LAYOUT.MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 1] + leftMatrix[2 * MATH_LAYOUT.MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 2] + leftMatrix[3 * MATH_LAYOUT.MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 3];
       }
     }
     return out;
   }
   /**
-   * Transposes a 4x4 matrix into out without validation.
+   * Writes a perspective projection matrix to the provided output buffer.
+   *
+   * Assumes public method validation already checked the output buffer and projection parameters.
+   *
+   * @param {Float32Array} out                - Output 4x4 matrix.
+   * @param {number}       fieldOfViewRadians - Vertical field of view in radians.
+   * @param {number}       aspectRatio        - Viewport width-to-height ratio.
+   * @param {number}       near               - Near clipping distance.
+   * @param {number}       far                - Far clipping distance.
+   * @returns {Float32Array}                  - The output matrix (out).
+   * @private
+   */
+  static #writePerspectiveIntoUnchecked(out, fieldOfViewRadians, aspectRatio, near, far) {
+    const inverseDepthRange = MATH_PERSPECTIVE.DEPTH_RANGE_NUMERATOR / (near - far);
+    const halfFieldOfViewRadians = fieldOfViewRadians / MATH_PERSPECTIVE.HALF_FIELD_OF_VIEW_DIVISOR;
+    const projectionScale = MATH_PERSPECTIVE.PROJECTION_SCALE_NUMERATOR / Math.tan(halfFieldOfViewRadians);
+    out[0] = projectionScale / aspectRatio;
+    out[1] = MATH_MATRIX_VALUES.ZERO;
+    out[2] = MATH_MATRIX_VALUES.ZERO;
+    out[3] = MATH_MATRIX_VALUES.ZERO;
+    out[4] = MATH_MATRIX_VALUES.ZERO;
+    out[5] = projectionScale;
+    out[6] = MATH_MATRIX_VALUES.ZERO;
+    out[7] = MATH_MATRIX_VALUES.ZERO;
+    out[8] = MATH_MATRIX_VALUES.ZERO;
+    out[9] = MATH_MATRIX_VALUES.ZERO;
+    out[10] = (far + near) * inverseDepthRange;
+    out[11] = MATH_PERSPECTIVE.W_COMPONENT_SCALE;
+    out[12] = MATH_MATRIX_VALUES.ZERO;
+    out[13] = MATH_MATRIX_VALUES.ZERO;
+    out[14] = MATH_PERSPECTIVE.Z_RANGE_MULTIPLIER * far * near * inverseDepthRange;
+    out[15] = MATH_MATRIX_VALUES.ZERO;
+    return out;
+  }
+  /**
+   * Transposes a validated 4x4 matrix into out.
+   *
+   * Assumes public validation already checked matrix types, sizes, and output aliasing.
    *
    * @param {Float32Array} out    - Output 4x4 matrix, that will receive the result.
    * @param {Float32Array} matrix - Input 4x4 matrix.
@@ -497,7 +741,10 @@ var Matrix4 = class _Matrix4 {
     return out;
   }
   /**
-   * Inverts a 4x4 matrix into out without validation. Throws when the matrix is not invertible.
+   * Inverts a validated 4x4 matrix into out.
+   *
+   * Uses the adjugate and determinant, throws when the determinant is too close to zero.
+   * Assumes public validation already checked matrix types, sizes, and output aliasing.
    *
    * @param {Float32Array} out    - Output 4x4 matrix, that will receive the result.
    * @param {Float32Array} matrix - Input 4x4 matrix.
@@ -534,10 +781,10 @@ var Matrix4 = class _Matrix4 {
     const b10 = a21 * a33 - a23 * a31;
     const b11 = a22 * a33 - a23 * a32;
     const determinant = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
-    if (Math.abs(determinant) < MIN_INVERTIBLE_DETERMINANT_ABS) {
-      throw new Error("`Matrix4.invertTo`: matrix is not invertible.");
+    if (Math.abs(determinant) < MATH_MATRIX_INVERSION.MIN_INVERTIBLE_DETERMINANT_ABS) {
+      throw new Error("`Matrix4.#invertIntoUnchecked` matrix is not invertible.");
     }
-    const inverseDeterminant = INVERSE_DETERMINANT_NUMERATOR / determinant;
+    const inverseDeterminant = MATH_MATRIX_INVERSION.INVERSE_DETERMINANT_NUMERATOR / determinant;
     out[0] = (a11 * b11 - a12 * b10 + a13 * b09) * inverseDeterminant;
     out[1] = (a02 * b10 - a01 * b11 - a03 * b09) * inverseDeterminant;
     out[2] = (a31 * b05 - a32 * b04 + a33 * b03) * inverseDeterminant;
@@ -563,13 +810,11 @@ var Matrix4 = class _Matrix4 {
    * @private
    */
   static #createEmpty() {
-    return new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
+    return new Float32Array(MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
   }
 };
 
 // core/math/vector3.js
-var ZERO_COMPONENT = 0;
-var UNIT_COMPONENT = 1;
 var Vector3 = class _Vector3 {
   /** @type {number} */
   #x;
@@ -583,43 +828,45 @@ var Vector3 = class _Vector3 {
    * @param {number} [x = 0] - X component.
    * @param {number} [y = 0] - Y component.
    * @param {number} [z = 0] - Z component.
-   * @param {Function | null} [onChange = null] - Called when any component changes.
+   * @param {Function | null} [onChange = null] - Called, when any component changes.
    */
-  constructor(x = ZERO_COMPONENT, y = ZERO_COMPONENT, z = ZERO_COMPONENT, onChange = null) {
+  constructor(x = MATH_VECTOR3_COMPONENTS.ZERO, y = MATH_VECTOR3_COMPONENTS.ZERO, z = MATH_VECTOR3_COMPONENTS.ZERO, onChange = null) {
     if (onChange !== null && typeof onChange !== "function") {
       throw new TypeError("Vector3 constructor expects `onChange` as a function or null.");
     }
-    this.#x = ZERO_COMPONENT;
-    this.#y = ZERO_COMPONENT;
-    this.#z = ZERO_COMPONENT;
+    this.#x = MATH_VECTOR3_COMPONENTS.ZERO;
+    this.#y = MATH_VECTOR3_COMPONENTS.ZERO;
+    this.#z = MATH_VECTOR3_COMPONENTS.ZERO;
     this.#onChange = onChange;
     this.set(x, y, z);
   }
   /**
    * Creates a new (0, 0, 0) vector.
    *
-   * @param {Function | null} [onChange=null] - Optional callback invoked when the vector changes, or null to disable change notifications.
-   * @returns {Vector3}                       - A new Vector3 instance with all components set to zero (0, 0, 0).
+   * @param {Function | null} [onChange = null] - Optional callback invoked, when the vector changes.
+   * @returns {Vector3}                         - New vector with all components set to zero.
    */
   static createZero(onChange = null) {
     return new _Vector3(
-      ZERO_COMPONENT,
-      ZERO_COMPONENT,
-      ZERO_COMPONENT,
+      MATH_VECTOR3_COMPONENTS.ZERO,
+      MATH_VECTOR3_COMPONENTS.ZERO,
+      MATH_VECTOR3_COMPONENTS.ZERO,
       onChange
     );
   }
   /**
-   * Creates a new (1, 1, 1) vector (unit scale vector).
+   * Creates a new (1, 1, 1) vector.
    *
-   * @param {Function | null} [onChange=null] - Optional callback invoked when the vector changes, or null to disable change notifications.
-   * @returns {Vector3}                       - A new Vector3 instance with all components set to one (1, 1, 1).
+   * This value is commonly used as a unit scale vector.
+   *
+   * @param {Function | null} [onChange = null] - Optional callback invoked, when the vector changes.
+   * @returns {Vector3}                         - New vector with all components set to one.
    */
   static createUnitScale(onChange = null) {
     return new _Vector3(
-      UNIT_COMPONENT,
-      UNIT_COMPONENT,
-      UNIT_COMPONENT,
+      MATH_VECTOR3_COMPONENTS.UNIT,
+      MATH_VECTOR3_COMPONENTS.UNIT,
+      MATH_VECTOR3_COMPONENTS.UNIT,
       onChange
     );
   }
@@ -709,9 +956,9 @@ var Vector3 = class _Vector3 {
     return this.set(other.x, other.y, other.z);
   }
   /**
-   * Sets/updates the onChange callback.
+   * Sets or clears the 'onChange' callback.
    *
-   * @param {Function | null} onChange - Callback invoked when any component changes, or null to disable change notifications.
+   * @param {Function | null} onChange - Callback invoked, when any component changes or null to disable the change notifications.
    * @returns {Vector3}                - This vector instance (for chaining).
    */
   setOnChange(onChange) {
@@ -722,6 +969,8 @@ var Vector3 = class _Vector3 {
     return this;
   }
   /**
+   * Emits the change notification, when a callback is registered.
+   *
    * @private
    */
   #emitChange() {
@@ -737,194 +986,6 @@ var Vector3 = class _Vector3 {
   static #assertNumber(value, name) {
     if (typeof value !== "number" || Number.isNaN(value)) {
       throw new TypeError(`Vector3 component "${name}" must be a valid number.`);
-    }
-  }
-};
-
-// core/math/camera-math.js
-var HALF_FIELD_OF_VIEW_DIVISOR2 = 2;
-var PROJECTION_SCALE_NUMERATOR2 = 1;
-var DEPTH_RANGE_NUMERATOR2 = 1;
-var PERSPECTIVE_Z_RANGE_MULTIPLIER2 = 2;
-var PERSPECTIVE_W_COMPONENT_SCALE2 = -1;
-var ORTHOGRAPHIC_SCALE_NUMERATOR = 2;
-var MATRIX_4x4_ELEMENT_COUNT2 = 16;
-var MINIMUM_ASPECT_RATIO = 0;
-var MINIMUM_NEAR_CLIP_DISTANCE = 0;
-var SCALE_INVERSE_NUMERATOR = 1;
-var CameraMath = class _CameraMath {
-  /**
-   * Writes a perspective projection matrix into an existing output matrix.
-   *
-   * @param {Float32Array} out          - Output 4x4 matrix (length 16), that will receive the projection matrix.
-   * @param {number} fieldOfViewRadians - Vertical field of view in radians.
-   * @param {number} aspectRatio        - Viewport aspect ratio (width / height).
-   * @param {number} near               - Near clipping plane distance (must be > 0).
-   * @param {number} far                - Far clipping plane distance (must be > near).
-   * @returns {Float32Array}            - The output matrix (out).
-   */
-  static writePerspectiveMatrixTo(out, fieldOfViewRadians, aspectRatio, near, far) {
-    _CameraMath.#assertMatrix4(out);
-    if (typeof fieldOfViewRadians !== "number" || typeof aspectRatio !== "number" || typeof near !== "number" || typeof far !== "number") {
-      throw new TypeError("CameraMath.writePerspectiveMatrixTo expects numeric arguments.");
-    }
-    if (aspectRatio <= MINIMUM_ASPECT_RATIO) {
-      throw new RangeError("CameraMath.writePerspectiveMatrixTo expects a positive aspect ratio.");
-    }
-    if (near <= MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
-      throw new RangeError("CameraMath.writePerspectiveMatrixTo expects 0 < near < far.");
-    }
-    const projectionScale = PROJECTION_SCALE_NUMERATOR2 / Math.tan(fieldOfViewRadians / HALF_FIELD_OF_VIEW_DIVISOR2);
-    const inverseDepthRange = DEPTH_RANGE_NUMERATOR2 / (near - far);
-    out[0] = projectionScale / aspectRatio;
-    out[1] = 0;
-    out[2] = 0;
-    out[3] = 0;
-    out[4] = 0;
-    out[5] = projectionScale;
-    out[6] = 0;
-    out[7] = 0;
-    out[8] = 0;
-    out[9] = 0;
-    out[10] = (far + near) * inverseDepthRange;
-    out[11] = PERSPECTIVE_W_COMPONENT_SCALE2;
-    out[12] = 0;
-    out[13] = 0;
-    out[14] = PERSPECTIVE_Z_RANGE_MULTIPLIER2 * far * near * inverseDepthRange;
-    out[15] = 0;
-    return out;
-  }
-  /**
-   * Writes an orthographic projection matrix into an existing output matrix.
-   *
-   * This uses the same clip-space depth convention as `writePerspectiveMatrixTo`.
-   *
-   * @param {Float32Array} out - Output 4x4 matrix (length 16), that will receive the projection matrix.
-   * @param {number} left      - Left plane.
-   * @param {number} right     - Right plane.
-   * @param {number} bottom    - Bottom plane.
-   * @param {number} top       - Top plane.
-   * @param {number} near      - Near clipping plane distance.
-   * @param {number} far       - Far clipping plane distance.
-   * @returns {Float32Array}   - The output matrix.
-   */
-  static writeOrthographicMatrixTo(out, left, right, bottom, top, near, far) {
-    _CameraMath.#assertMatrix4(out);
-    if (typeof left !== "number" || typeof right !== "number" || typeof bottom !== "number" || typeof top !== "number" || typeof near !== "number" || typeof far !== "number") {
-      throw new TypeError("`CameraMath.writeOrthographicMatrixTo` expects numeric arguments.");
-    }
-    if (left === right) {
-      throw new RangeError("`CameraMath.writeOrthographicMatrixTo` expects `left !== right`.");
-    }
-    if (bottom === top) {
-      throw new RangeError("`CameraMath.writeOrthographicMatrixTo` expects `bottom !== top`.");
-    }
-    if (far <= near) {
-      throw new RangeError("`CameraMath.writeOrthographicMatrixTo` expects `near < far`.");
-    }
-    const inverseWidth = DEPTH_RANGE_NUMERATOR2 / (right - left);
-    const inverseHeight = DEPTH_RANGE_NUMERATOR2 / (top - bottom);
-    const inverseDepth = DEPTH_RANGE_NUMERATOR2 / (near - far);
-    out[0] = ORTHOGRAPHIC_SCALE_NUMERATOR * inverseWidth;
-    out[1] = 0;
-    out[2] = 0;
-    out[3] = 0;
-    out[4] = 0;
-    out[5] = ORTHOGRAPHIC_SCALE_NUMERATOR * inverseHeight;
-    out[6] = 0;
-    out[7] = 0;
-    out[8] = 0;
-    out[9] = 0;
-    out[10] = ORTHOGRAPHIC_SCALE_NUMERATOR * inverseDepth;
-    out[11] = 0;
-    out[12] = -(right + left) * inverseWidth;
-    out[13] = -(top + bottom) * inverseHeight;
-    out[14] = (far + near) * inverseDepth;
-    out[15] = 1;
-    return out;
-  }
-  /**
-   * Writes a view matrix (inverse of camera, TRS) into an existing output matrix.
-   *
-   * Assumes camera local transform order matches Object3D:
-   * local = T * (Rz * Ry * Rx) * S
-   * view  = inv(S) * inv(R) * inv(T)
-   *
-   * @param {Float32Array} out - Output 4x4 matrix (length 16), that will receive the view matrix.
-   * @param {Vector3} position - Camera position.
-   * @param {Vector3} rotation - Camera rotation in radians.
-   * @param {Vector3} scale    - Camera scale (must be non-zero on all axes).
-   * @returns {Float32Array}   - The output matrix (out).
-   */
-  static writeViewMatrixTo(out, position, rotation, scale) {
-    _CameraMath.#assertMatrix4(out);
-    if (!(position instanceof Vector3) || !(rotation instanceof Vector3) || !(scale instanceof Vector3)) {
-      throw new TypeError("CameraMath.writeViewMatrixTo expects Vector3 arguments (position, rotation, scale).");
-    }
-    if (scale.x === 0 || scale.y === 0 || scale.z === 0) {
-      throw new RangeError("CameraMath.writeViewMatrixTo cannot invert a zero scale.");
-    }
-    const positionX = position.x;
-    const positionY = position.y;
-    const positionZ = position.z;
-    const rotationX = rotation.x;
-    const rotationY = rotation.y;
-    const rotationZ = rotation.z;
-    const inverseScaleX = SCALE_INVERSE_NUMERATOR / scale.x;
-    const inverseScaleY = SCALE_INVERSE_NUMERATOR / scale.y;
-    const inverseScaleZ = SCALE_INVERSE_NUMERATOR / scale.z;
-    const cosX = Math.cos(rotationX);
-    const sinX = Math.sin(rotationX);
-    const cosY = Math.cos(rotationY);
-    const sinY = Math.sin(rotationY);
-    const cosZ = Math.cos(rotationZ);
-    const sinZ = Math.sin(rotationZ);
-    const rot00 = cosZ * cosY;
-    const rot01 = cosZ * sinY * sinX - sinZ * cosX;
-    const rot02 = cosZ * sinY * cosX + sinZ * sinX;
-    const rot10 = sinZ * cosY;
-    const rot11 = sinZ * sinY * sinX + cosZ * cosX;
-    const rot12 = sinZ * sinY * cosX - cosZ * sinX;
-    const rot20 = -sinY;
-    const rot21 = cosY * sinX;
-    const rot22 = cosY * cosX;
-    const a00 = rot00 * inverseScaleX;
-    const a01 = rot10 * inverseScaleX;
-    const a02 = rot20 * inverseScaleX;
-    const a10 = rot01 * inverseScaleY;
-    const a11 = rot11 * inverseScaleY;
-    const a12 = rot21 * inverseScaleY;
-    const a20 = rot02 * inverseScaleZ;
-    const a21 = rot12 * inverseScaleZ;
-    const a22 = rot22 * inverseScaleZ;
-    const translateX = -(a00 * positionX + a01 * positionY + a02 * positionZ);
-    const translateY = -(a10 * positionX + a11 * positionY + a12 * positionZ);
-    const translateZ = -(a20 * positionX + a21 * positionY + a22 * positionZ);
-    out[0] = a00;
-    out[1] = a10;
-    out[2] = a20;
-    out[3] = 0;
-    out[4] = a01;
-    out[5] = a11;
-    out[6] = a21;
-    out[7] = 0;
-    out[8] = a02;
-    out[9] = a12;
-    out[10] = a22;
-    out[11] = 0;
-    out[12] = translateX;
-    out[13] = translateY;
-    out[14] = translateZ;
-    out[15] = 1;
-    return out;
-  }
-  /**
-   * @param {Float32Array} out - Output matrix to validate.
-   * @private
-   */
-  static #assertMatrix4(out) {
-    if (!(out instanceof Float32Array) || out.length !== MATRIX_4x4_ELEMENT_COUNT2) {
-      throw new TypeError("Expected out to be a Float32Array(16).");
     }
   }
 };
@@ -5415,7 +5476,7 @@ var Texture2D = class {
 };
 
 // core/shader/shader-program.js
-var MATRIX_4x4_ELEMENT_COUNT3 = 16;
+var MATRIX_4x4_ELEMENT_COUNT = 16;
 var VECTOR_2_ELEMENT_COUNT = 2;
 var VECTOR_3_ELEMENT_COUNT = 3;
 var VECTOR_4_ELEMENT_COUNT = 4;
@@ -5662,7 +5723,7 @@ var ShaderProgram = class {
     if (typeof name !== "string") {
       throw new TypeError("`ShaderProgram.setMatrix4` expects uniform name as a string.");
     }
-    if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT3) {
+    if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
       throw new TypeError("`ShaderProgram.setMatrix4` expects a 4x4 Float32Array.");
     }
     const location = this.#getUniformLocation(name);
@@ -6247,37 +6308,89 @@ var NormalMaterial = class extends Material {
   }
 };
 
+// core/constants/ecmascript-types.js
+var ECMASCRIPT_TYPEOF_RESULTS = Object.freeze({
+  UNDEFINED: "undefined",
+  OBJECT: "object",
+  BOOLEAN: "boolean",
+  NUMBER: "number",
+  BIGINT: "bigint",
+  STRING: "string",
+  SYMBOL: "symbol",
+  FUNCTION: "function"
+});
+
+// core/exception-messages/directional-light-material.js
+var DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES = Object.freeze({
+  WEBGL_CONTEXT_TYPE: "`DirectionalLightMaterial` expects a WebGL2RenderingContext.",
+  SHADER_PROGRAM_TYPE: "`DirectionalLightMaterial` expects a ShaderProgram instance.",
+  OWNS_SHADER_PROGRAM_TYPE: '`DirectionalLightMaterial` option "ownsShaderProgram" must be a boolean.',
+  LIGHT_DIRECTION_LENGTH: "`DirectionalLightMaterial.setLightDirection` expects a non-zero finite vector.",
+  AMBIENT_STRENGTH_TYPE: "`DirectionalLightMaterial.setAmbientStrength` expects a finite number.",
+  DIRECTIONAL_STRENGTH_TYPE: "`DirectionalLightMaterial.setDirectionalStrength` expects a finite number.",
+  DIRECTIONAL_ENABLED_TYPE: "`DirectionalLightMaterial.setDirectionalEnabled` expects a boolean.",
+  LIGHTING_ENABLED_TYPE: "`DirectionalLightMaterial.setLightingEnabled` expects a boolean or a finite number.",
+  LIGHTING_ENABLED_RANGE: "`DirectionalLightMaterial.setLightingEnabled` expects a value in [0..1].",
+  VECTOR3_TYPE: "{methodName} expects a number[] or Float32Array.",
+  VECTOR3_COMPONENTS: "{methodName} expects exactly 3 components [x, y, z].",
+  VECTOR3_COMPONENTS_FINITE: "{methodName} expects all components to be finite numbers.",
+  OPTIONS_OBJECT: "{methodName} expects an options object (plain object)."
+});
+
+// core/constants/light.js
+var LIGHT_DEFAULTS = Object.freeze({ ENABLED: true });
+var LIGHT_AMBIENT = Object.freeze({ DEFAULT_STRENGTH: 0.2 });
+var LIGHT_DIRECTIONAL = Object.freeze({
+  DEFAULT_DIRECTIONAL_STRENGTH: 1,
+  MIN_DIRECTIONAL_STRENGTH: 0,
+  MAX_DIRECTIONAL_STRENGTH: 3,
+  MIN_DIRECTION_LENGTH_SQUARED: 0,
+  INVERSE_LENGTH_NUMERATOR: 1,
+  DEFAULT_ROLL_RADIANS: 0,
+  ASIN_CLAMP_MIN: -1,
+  ASIN_CLAMP_MAX: 1
+});
+var LIGHT_DIRECTIONAL_DEFAULT_DIRECTION = Object.freeze([0.5, 0.7, 1]);
+var DEFAULT_DIRECTION_LENGTH = Math.hypot(
+  LIGHT_DIRECTIONAL_DEFAULT_DIRECTION[MATH_VECTOR3_INDEXES.X],
+  LIGHT_DIRECTIONAL_DEFAULT_DIRECTION[MATH_VECTOR3_INDEXES.Y],
+  LIGHT_DIRECTIONAL_DEFAULT_DIRECTION[MATH_VECTOR3_INDEXES.Z]
+);
+var LIGHT_DIRECTIONAL_DEFAULT_NORMALIZED_DIRECTION = Object.freeze([
+  LIGHT_DIRECTIONAL_DEFAULT_DIRECTION[MATH_VECTOR3_INDEXES.X] / DEFAULT_DIRECTION_LENGTH,
+  LIGHT_DIRECTIONAL_DEFAULT_DIRECTION[MATH_VECTOR3_INDEXES.Y] / DEFAULT_DIRECTION_LENGTH,
+  LIGHT_DIRECTIONAL_DEFAULT_DIRECTION[MATH_VECTOR3_INDEXES.Z] / DEFAULT_DIRECTION_LENGTH
+]);
+
+// core/constants/directional-light-material.js
+var DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES = Object.freeze({
+  POSITION_LOCATION: 0,
+  NORMAL_LOCATION: 3
+});
+var DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS = Object.freeze({
+  FINAL_MATRIX: "u_matrix",
+  WORLD_INVERSE_TRANSPOSE_MATRIX: "u_worldInverseTranspose",
+  WORLD_MATRIX: "u_worldMatrix",
+  COLOR: "u_color",
+  LIGHT_DIRECTION: "u_lightDirection",
+  CAMERA_POSITION: "u_cameraPosition",
+  AMBIENT_STRENGTH: "u_ambientStrength",
+  DIRECTIONAL_STRENGTH: "u_directionalStrength",
+  LIGHTING_ENABLED: "u_lightingEnabled",
+  OPACITY: "u_opacity"
+});
+var DIRECTIONAL_LIGHT_MATERIAL_DEFAULT_COLOR = Object.freeze([0.85, 0.85, 0.85]);
+var DIRECTIONAL_LIGHT_MATERIAL_LIGHTING = Object.freeze({
+  DEFAULT_LIGHTING_ENABLED: 1,
+  FLOAT_FALSE: 0,
+  FLOAT_TRUE: 1,
+  MIN_LIGHTING_ENABLED: 0,
+  MAX_LIGHTING_ENABLED: 1,
+  LIGHTING_ENABLED_THRESHOLD: 0.5
+});
+var DIRECTIONAL_LIGHT_MATERIAL_VECTOR3_ELEMENT_COUNT = 3;
+
 // core/material/directional-light-material.js
-var POSITION_ATTRIBUTE_LOCATION6 = 0;
-var NORMAL_ATTRIBUTE_LOCATION3 = 3;
-var FINAL_MATRIX_UNIFORM_NAME = "u_matrix";
-var WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME = "u_worldInverseTranspose";
-var WORLD_MATRIX_UNIFORM_NAME = "u_worldMatrix";
-var COLOR_UNIFORM_NAME2 = "u_color";
-var LIGHT_DIRECTION_UNIFORM_NAME = "u_lightDirection";
-var CAMERA_POSITION_UNIFORM_NAME = "u_cameraPosition";
-var AMBIENT_STRENGTH_UNIFORM_NAME = "u_ambientStrength";
-var DIRECTIONAL_STRENGTH_UNIFORM_NAME = "u_directionalStrength";
-var LIGHTING_ENABLED_UNIFORM_NAME = "u_lightingEnabled";
-var OPACITY_UNIFORM_NAME5 = "u_opacity";
-var VECTOR3_ELEMENT_COUNT = 3;
-var DEFAULT_COLOR2 = new Float32Array([0.85, 0.85, 0.85]);
-var DEFAULT_LIGHT_DIRECTION = new Float32Array([0.5, 0.7, 1]);
-var DEFAULT_AMBIENT_STRENGTH = 0.2;
-var DEFAULT_DIRECTIONAL_STRENGTH = 1;
-var DEFAULT_LIGHTING_ENABLED = 1;
-var MIN_DIRECTION_LENGTH_SQUARED = 0;
-var FLOAT_FALSE = 0;
-var FLOAT_TRUE = 1;
-var MIN_LIGHTING_ENABLED = 0;
-var MAX_LIGHTING_ENABLED = 1;
-var DIRECTIONAL_STRENGTH_DISABLED = 0;
-var LIGHTING_ENABLED_THRESHOLD = 0.5;
-var INVERSE_LENGTH_NUMERATOR = 1;
-var ERROR_LIGHTING_ENABLED_TYPE = "`DirectionalLightMaterial.setLightingEnabled` expects a boolean or a finite number.";
-var ERROR_LIGHTING_ENABLED_RANGE = "`DirectionalLightMaterial.setLightingEnabled` expects a value in [0..1].";
-var ERROR_DIRECTIONAL_STRENGTH_TYPE = "`DirectionalLightMaterial.setDirectionalStrength` expects a finite number.";
-var ERROR_DIRECTIONAL_ENABLED_TYPE = "`DirectionalLightMaterial.setDirectionalEnabled` expects a boolean.";
 var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material {
   /**
    * Diffuse/base color (RGB).
@@ -6285,35 +6398,35 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
    * @type {Float32Array}
    * @private
    */
-  #color = new Float32Array(VECTOR3_ELEMENT_COUNT);
+  #color = new Float32Array(DIRECTIONAL_LIGHT_MATERIAL_VECTOR3_ELEMENT_COUNT);
   /**
    * Directional light direction (world space, normalized).
    *
    * @type {Float32Array}
    * @private
    */
-  #lightDirection = new Float32Array(VECTOR3_ELEMENT_COUNT);
+  #lightDirection = new Float32Array(DIRECTIONAL_LIGHT_MATERIAL_VECTOR3_ELEMENT_COUNT);
   /**
    * Ambient term multiplier.
    *
    * @type {number}
    * @private
    */
-  #ambientStrength = DEFAULT_AMBIENT_STRENGTH;
+  #ambientStrength = LIGHT_AMBIENT.DEFAULT_STRENGTH;
   /**
    * Directional strength multiplier.
    *
    * @type {number}
    * @private
    */
-  #directionalStrength = DEFAULT_DIRECTIONAL_STRENGTH;
+  #directionalStrength = LIGHT_DIRECTIONAL.DEFAULT_DIRECTIONAL_STRENGTH;
   /**
    * Lighting enabled flag stored as a float.
    *
    * @type {number}
    * @private
    */
-  #lightingEnabled = DEFAULT_LIGHTING_ENABLED;
+  #lightingEnabled = DIRECTIONAL_LIGHT_MATERIAL_LIGHTING.DEFAULT_LIGHTING_ENABLED;
   /**
    * Creates a new directional-light material.
    *
@@ -6324,22 +6437,22 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
    */
   constructor(webglContext, shaderProgram, options = {}, materialOptions = {}) {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
-      throw new TypeError("`DirectionalLightMaterial` expects a WebGL2RenderingContext.");
+      throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.WEBGL_CONTEXT_TYPE);
     }
     if (!(shaderProgram instanceof ShaderProgram)) {
-      throw new TypeError("`DirectionalLightMaterial` expects a ShaderProgram instance.");
+      throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.SHADER_PROGRAM_TYPE);
     }
     _DirectionalLightMaterial.#assertPlainObject("`DirectionalLightMaterial`", options);
     _DirectionalLightMaterial.#assertPlainObject("`DirectionalLightMaterial`", materialOptions);
     const { ownsShaderProgram = true } = materialOptions;
-    if (typeof ownsShaderProgram !== "boolean") {
-      throw new TypeError('`DirectionalLightMaterial` option "ownsShaderProgram" must be a boolean.');
+    if (typeof ownsShaderProgram !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+      throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.OWNS_SHADER_PROGRAM_TYPE);
     }
     super(webglContext, shaderProgram, { ownsShaderProgram });
-    this.#color.set(DEFAULT_COLOR2);
-    this.setLightDirection(DEFAULT_LIGHT_DIRECTION);
-    this.#ambientStrength = DEFAULT_AMBIENT_STRENGTH;
-    this.#directionalStrength = DEFAULT_DIRECTIONAL_STRENGTH;
+    this.#color.set(DIRECTIONAL_LIGHT_MATERIAL_DEFAULT_COLOR);
+    this.setLightDirection(LIGHT_DIRECTIONAL_DEFAULT_DIRECTION);
+    this.#ambientStrength = LIGHT_AMBIENT.DEFAULT_STRENGTH;
+    this.#directionalStrength = LIGHT_DIRECTIONAL.DEFAULT_DIRECTIONAL_STRENGTH;
     const {
       color,
       lightDirection,
@@ -6378,14 +6491,14 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
    * @param {Float32Array} cameraPosition              - Camera position, world space.
    */
   apply(finalMatrix, worldMatrix, worldInverseTransposeMatrix, cameraPosition) {
-    this.shaderProgram.setMatrix4(FINAL_MATRIX_UNIFORM_NAME, finalMatrix);
-    this.shaderProgram.setMatrix4(WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME, worldInverseTransposeMatrix);
-    this.shaderProgram.setVector3(COLOR_UNIFORM_NAME2, this.#color);
-    this.shaderProgram.setVector3(LIGHT_DIRECTION_UNIFORM_NAME, this.#lightDirection);
-    this.shaderProgram.setFloat(AMBIENT_STRENGTH_UNIFORM_NAME, this.#ambientStrength);
-    this.shaderProgram.setFloat(DIRECTIONAL_STRENGTH_UNIFORM_NAME, this.#directionalStrength);
-    this.shaderProgram.setFloat(LIGHTING_ENABLED_UNIFORM_NAME, this.#lightingEnabled);
-    this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME5, this.opacity);
+    this.shaderProgram.setMatrix4(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX, finalMatrix);
+    this.shaderProgram.setMatrix4(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX, worldInverseTransposeMatrix);
+    this.shaderProgram.setVector3(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR, this.#color);
+    this.shaderProgram.setVector3(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION, this.#lightDirection);
+    this.shaderProgram.setFloat(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH, this.#ambientStrength);
+    this.shaderProgram.setFloat(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH, this.#directionalStrength);
+    this.shaderProgram.setFloat(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED, this.#lightingEnabled);
+    this.shaderProgram.setFloat(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY, this.opacity);
     this.applyAdditionalUniforms(worldMatrix, cameraPosition);
   }
   /**
@@ -6422,10 +6535,10 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
     const directionY = direction[1];
     const directionZ = direction[2];
     const directionLengthSquared = directionX * directionX + directionY * directionY + directionZ * directionZ;
-    if (!Number.isFinite(directionLengthSquared) || directionLengthSquared <= MIN_DIRECTION_LENGTH_SQUARED) {
-      throw new TypeError("`DirectionalLightMaterial.setLightDirection` expects a non-zero finite vector.");
+    if (!Number.isFinite(directionLengthSquared) || directionLengthSquared <= LIGHT_DIRECTIONAL.MIN_DIRECTION_LENGTH_SQUARED) {
+      throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.LIGHT_DIRECTION_LENGTH);
     }
-    const inverseDirectionLength = INVERSE_LENGTH_NUMERATOR / Math.sqrt(directionLengthSquared);
+    const inverseDirectionLength = LIGHT_DIRECTIONAL.INVERSE_LENGTH_NUMERATOR / Math.sqrt(directionLengthSquared);
     this.#lightDirection[0] = directionX * inverseDirectionLength;
     this.#lightDirection[1] = directionY * inverseDirectionLength;
     this.#lightDirection[2] = directionZ * inverseDirectionLength;
@@ -6436,8 +6549,8 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
    * @param {number} value - Ambient multiplier.
    */
   setAmbientStrength(value) {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      throw new TypeError("`DirectionalLightMaterial.setAmbientStrength` expects a finite number.");
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+      throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.AMBIENT_STRENGTH_TYPE);
     }
     this.#ambientStrength = value;
   }
@@ -6449,8 +6562,8 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
    * @throws {TypeError} When the value is invalid.
    */
   setDirectionalStrength(value) {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      throw new TypeError(ERROR_DIRECTIONAL_STRENGTH_TYPE);
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+      throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.DIRECTIONAL_STRENGTH_TYPE);
     }
     this.#directionalStrength = value;
   }
@@ -6462,10 +6575,10 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
    * @throws {TypeError} When the value is invalid.
    */
   setDirectionalEnabled(enabled) {
-    if (typeof enabled !== "boolean") {
-      throw new TypeError(ERROR_DIRECTIONAL_ENABLED_TYPE);
+    if (typeof enabled !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+      throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.DIRECTIONAL_ENABLED_TYPE);
     }
-    this.#directionalStrength = enabled ? DEFAULT_DIRECTIONAL_STRENGTH : DIRECTIONAL_STRENGTH_DISABLED;
+    this.#directionalStrength = enabled ? LIGHT_DIRECTIONAL.DEFAULT_DIRECTIONAL_STRENGTH : LIGHT_DIRECTIONAL.MIN_DIRECTIONAL_STRENGTH;
   }
   /**
    * Sets lighting enabled state.
@@ -6476,15 +6589,15 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
    * @throws {RangeError} When the value is outside [0..1].
    */
   setLightingEnabled(enabled) {
-    if (typeof enabled === "boolean") {
-      this.#lightingEnabled = enabled ? FLOAT_TRUE : FLOAT_FALSE;
+    if (typeof enabled === ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+      this.#lightingEnabled = enabled ? DIRECTIONAL_LIGHT_MATERIAL_LIGHTING.FLOAT_TRUE : DIRECTIONAL_LIGHT_MATERIAL_LIGHTING.FLOAT_FALSE;
       return;
     }
-    if (typeof enabled !== "number" || !Number.isFinite(enabled)) {
-      throw new TypeError(ERROR_LIGHTING_ENABLED_TYPE);
+    if (typeof enabled !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(enabled)) {
+      throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.LIGHTING_ENABLED_TYPE);
     }
-    if (enabled < MIN_LIGHTING_ENABLED || enabled > MAX_LIGHTING_ENABLED) {
-      throw new RangeError(ERROR_LIGHTING_ENABLED_RANGE);
+    if (enabled < DIRECTIONAL_LIGHT_MATERIAL_LIGHTING.MIN_LIGHTING_ENABLED || enabled > DIRECTIONAL_LIGHT_MATERIAL_LIGHTING.MAX_LIGHTING_ENABLED) {
+      throw new RangeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.LIGHTING_ENABLED_RANGE);
     }
     this.#lightingEnabled = enabled;
   }
@@ -6492,7 +6605,7 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
    * @returns {boolean} - Returns current lighting enabled state.
    */
   isLightingEnabled() {
-    return this.#lightingEnabled > LIGHTING_ENABLED_THRESHOLD;
+    return this.#lightingEnabled > DIRECTIONAL_LIGHT_MATERIAL_LIGHTING.LIGHTING_ENABLED_THRESHOLD;
   }
   /**
    * @returns {Float32Array} - Returns the internal diffuse/base color buffer.
@@ -6519,10 +6632,21 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
     return this.#directionalStrength;
   }
   /**
-   * @returns {number} - Gettet for the directional strength multiplier.
+   * @returns {number} - Getter for the directional strength multiplier.
    */
   get directionalStrength() {
     return this.#directionalStrength;
+  }
+  /**
+   * Formats a directional-light material exception message template.
+   *
+   * @param {string} messageTemplate - Message template with a `{methodName}` token.
+   * @param {string} methodName      - Method name to inject.
+   * @returns {string}               - Formatted exception message.
+   * @private
+   */
+  static #formatExceptionMessage(messageTemplate, methodName) {
+    return messageTemplate.replace("{methodName}", methodName);
   }
   /**
    * Validates a vector3-like input.
@@ -6532,13 +6656,22 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
    */
   static assertVector3(methodName, vector3) {
     if (!Array.isArray(vector3) && !(vector3 instanceof Float32Array)) {
-      throw new TypeError(`${methodName} expects a number[] or Float32Array.`);
+      throw new TypeError(_DirectionalLightMaterial.#formatExceptionMessage(
+        DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.VECTOR3_TYPE,
+        methodName
+      ));
     }
-    if (vector3.length !== VECTOR3_ELEMENT_COUNT) {
-      throw new TypeError(`${methodName} expects exactly 3 components [x, y, z].`);
+    if (vector3.length !== DIRECTIONAL_LIGHT_MATERIAL_VECTOR3_ELEMENT_COUNT) {
+      throw new TypeError(_DirectionalLightMaterial.#formatExceptionMessage(
+        DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.VECTOR3_COMPONENTS,
+        methodName
+      ));
     }
     if (!Number.isFinite(vector3[0]) || !Number.isFinite(vector3[1]) || !Number.isFinite(vector3[2])) {
-      throw new TypeError(`${methodName} expects all components to be finite numbers.`);
+      throw new TypeError(_DirectionalLightMaterial.#formatExceptionMessage(
+        DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.VECTOR3_COMPONENTS_FINITE,
+        methodName
+      ));
     }
   }
   /**
@@ -6549,8 +6682,11 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
    * @private
    */
   static #assertPlainObject(methodName, object) {
-    if (object === null || typeof object !== "object" || Array.isArray(object)) {
-      throw new TypeError(`${methodName} expects an options object (plain object).`);
+    if (object === null || typeof object !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(object)) {
+      throw new TypeError(_DirectionalLightMaterial.#formatExceptionMessage(
+        DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.OPTIONS_OBJECT,
+        methodName
+      ));
     }
   }
 };
@@ -6558,26 +6694,26 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
 // core/material/lambert-material.js
 var VERTEX_SHADER_SOURCE5 = `#version 300 es
 precision mediump float;
-layout(location = ${POSITION_ATTRIBUTE_LOCATION6}) in vec3 a_position;
-layout(location = ${NORMAL_ATTRIBUTE_LOCATION3}) in vec3 a_normal;
-uniform mat4 ${FINAL_MATRIX_UNIFORM_NAME};
-uniform mat4 ${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME};
+layout(location = ${DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.POSITION_LOCATION}) in vec3 a_position;
+layout(location = ${DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.NORMAL_LOCATION}) in vec3 a_normal;
+uniform mat4 ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX};
+uniform mat4 ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX};
 out vec3 v_normal;
 
 void main() {
-    gl_Position = ${FINAL_MATRIX_UNIFORM_NAME} * vec4(a_position, 1.0);
-    v_normal    = (${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME} * vec4(a_normal, 0.0)).xyz;
+    gl_Position = ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX} * vec4(a_position, 1.0);
+    v_normal    = (${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX} * vec4(a_normal, 0.0)).xyz;
 }
 `;
 var FRAGMENT_SHADER_SOURCE5 = `#version 300 es
 precision mediump float;
 in vec3 v_normal;
-uniform vec3  ${COLOR_UNIFORM_NAME2};
-uniform vec3  ${LIGHT_DIRECTION_UNIFORM_NAME};
-uniform float ${AMBIENT_STRENGTH_UNIFORM_NAME};
-uniform float ${DIRECTIONAL_STRENGTH_UNIFORM_NAME};
-uniform float ${LIGHTING_ENABLED_UNIFORM_NAME};
-uniform float ${OPACITY_UNIFORM_NAME5};
+uniform vec3  ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR};
+uniform vec3  ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION};
+uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH};
+uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH};
+uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED};
+uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY};
 out vec4 outColor;
 
 void main() {
@@ -6587,11 +6723,11 @@ void main() {
         surface_normal = -surface_normal;
     }
 
-    vec3 light_direction    = normalize(${LIGHT_DIRECTION_UNIFORM_NAME});
-    float diffuse_intensity = max(dot(surface_normal, light_direction), 0.0) * ${DIRECTIONAL_STRENGTH_UNIFORM_NAME};
-    float lit_intensity     = clamp(${AMBIENT_STRENGTH_UNIFORM_NAME} + diffuse_intensity, 0.0, 1.0);
-    float light_intensity   = mix(1.0, lit_intensity, ${LIGHTING_ENABLED_UNIFORM_NAME});
-    outColor                = vec4(${COLOR_UNIFORM_NAME2} * light_intensity, ${OPACITY_UNIFORM_NAME5});
+    vec3 light_direction    = normalize(${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION});
+    float diffuse_intensity = max(dot(surface_normal, light_direction), 0.0) * ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH};
+    float lit_intensity     = clamp(${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH} + diffuse_intensity, 0.0, 1.0);
+    float light_intensity   = mix(1.0, lit_intensity, ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED});
+    outColor                = vec4(${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR} * light_intensity, ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY});
 }
 `;
 var LambertMaterial = class extends DirectionalLightMaterial {
@@ -6619,34 +6755,34 @@ var DEFAULT_SPECULAR_STRENGTH = 1;
 var DEFAULT_SHININESS = 16;
 var VERTEX_SHADER_SOURCE6 = `#version 300 es
 precision mediump float;
-layout(location = ${POSITION_ATTRIBUTE_LOCATION6}) in vec3 a_position;
-layout(location = ${NORMAL_ATTRIBUTE_LOCATION3}) in vec3 a_normal;
-uniform mat4 ${FINAL_MATRIX_UNIFORM_NAME};
-uniform mat4 ${WORLD_MATRIX_UNIFORM_NAME};
-uniform mat4 ${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME};
+layout(location = ${DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.POSITION_LOCATION}) in vec3 a_position;
+layout(location = ${DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.NORMAL_LOCATION}) in vec3 a_normal;
+uniform mat4 ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX};
+uniform mat4 ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX};
+uniform mat4 ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX};
 out vec3 v_worldPosition;
 out vec3 v_normal;
 
 void main() {
-    gl_Position     = ${FINAL_MATRIX_UNIFORM_NAME} * vec4(a_position, 1.0);
-    v_worldPosition = (${WORLD_MATRIX_UNIFORM_NAME} * vec4(a_position, 1.0)).xyz;
-    v_normal        = (${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME} * vec4(a_normal, 0.0)).xyz;
+    gl_Position     = ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX} * vec4(a_position, 1.0);
+    v_worldPosition = (${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX} * vec4(a_position, 1.0)).xyz;
+    v_normal        = (${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX} * vec4(a_normal, 0.0)).xyz;
 }
 `;
 var FRAGMENT_SHADER_SOURCE6 = `#version 300 es
 precision mediump float;
 in vec3 v_worldPosition;
 in vec3 v_normal;
-uniform vec3  ${COLOR_UNIFORM_NAME2};
+uniform vec3  ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR};
 uniform vec3  ${SPECULAR_COLOR_UNIFORM_NAME};
-uniform vec3  ${LIGHT_DIRECTION_UNIFORM_NAME};
-uniform vec3  ${CAMERA_POSITION_UNIFORM_NAME};
-uniform float ${AMBIENT_STRENGTH_UNIFORM_NAME};
-uniform float ${DIRECTIONAL_STRENGTH_UNIFORM_NAME};
-uniform float ${LIGHTING_ENABLED_UNIFORM_NAME};
+uniform vec3  ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION};
+uniform vec3  ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION};
+uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH};
+uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH};
+uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED};
 uniform float ${SPECULAR_STRENGTH_UNIFORM_NAME};
 uniform float ${SHININESS_UNIFORM_NAME};
-uniform float ${OPACITY_UNIFORM_NAME5};
+uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY};
 out vec4 outColor;
 
 void main() {
@@ -6656,26 +6792,26 @@ void main() {
         surface_normal = -surface_normal;
     }
 
-    vec3 light_direction     = normalize(${LIGHT_DIRECTION_UNIFORM_NAME});
-    vec3 view_direction      = normalize(${CAMERA_POSITION_UNIFORM_NAME} - v_worldPosition);
-    float lighting_enabled   = ${LIGHTING_ENABLED_UNIFORM_NAME};
-    float diffuse_intensity  = max(dot(surface_normal, light_direction), 0.0) * ${DIRECTIONAL_STRENGTH_UNIFORM_NAME};
+    vec3 light_direction     = normalize(${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION});
+    vec3 view_direction      = normalize(${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION} - v_worldPosition);
+    float lighting_enabled   = ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED};
+    float diffuse_intensity  = max(dot(surface_normal, light_direction), 0.0) * ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH};
     float specular_intensity = 0.0;
 
     if (diffuse_intensity > 0.0) {
         vec3 reflection_direction = reflect(-light_direction, surface_normal);
-        float specular_base = max(dot(view_direction, reflection_direction), 0.0);
-        specular_intensity  = pow(specular_base, ${SHININESS_UNIFORM_NAME});
+        float specular_base       = max(dot(view_direction, reflection_direction), 0.0);
+        specular_intensity        = pow(specular_base, ${SHININESS_UNIFORM_NAME});
     }
 
-    vec3 ambient  = ${COLOR_UNIFORM_NAME2} * ${AMBIENT_STRENGTH_UNIFORM_NAME};
-    vec3 diffuse  = ${COLOR_UNIFORM_NAME2} * (diffuse_intensity * lighting_enabled);
+    vec3 ambient  = ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR} * ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH};
+    vec3 diffuse  = ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR} * (diffuse_intensity * lighting_enabled);
     vec3 specular = ${SPECULAR_COLOR_UNIFORM_NAME}
         * (specular_intensity * ${SPECULAR_STRENGTH_UNIFORM_NAME}
-        * ${DIRECTIONAL_STRENGTH_UNIFORM_NAME} * lighting_enabled);
+        * ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH} * lighting_enabled);
 
     vec3 rgb = ambient + diffuse + specular;
-    outColor = vec4(rgb, ${OPACITY_UNIFORM_NAME5});
+    outColor = vec4(rgb, ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY});
 }
 `;
 var PhongMaterial = class extends DirectionalLightMaterial {
@@ -6685,7 +6821,7 @@ var PhongMaterial = class extends DirectionalLightMaterial {
    * @type {Float32Array}
    * @private
    */
-  #specularColor = new Float32Array(VECTOR3_ELEMENT_COUNT);
+  #specularColor = new Float32Array(DIRECTIONAL_LIGHT_MATERIAL_VECTOR3_ELEMENT_COUNT);
   /**
    * Specular strength multiplier.
    *
@@ -6734,8 +6870,8 @@ var PhongMaterial = class extends DirectionalLightMaterial {
    * @protected
    */
   applyAdditionalUniforms(worldMatrix, cameraPosition) {
-    this.shaderProgram.setMatrix4(WORLD_MATRIX_UNIFORM_NAME, worldMatrix);
-    this.shaderProgram.setVector3(CAMERA_POSITION_UNIFORM_NAME, cameraPosition);
+    this.shaderProgram.setMatrix4(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX, worldMatrix);
+    this.shaderProgram.setVector3(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION, cameraPosition);
     this.shaderProgram.setVector3(SPECULAR_COLOR_UNIFORM_NAME, this.#specularColor);
     this.shaderProgram.setFloat(SPECULAR_STRENGTH_UNIFORM_NAME, this.#specularStrength);
     this.shaderProgram.setFloat(SHININESS_UNIFORM_NAME, this.#shininess);
@@ -6796,32 +6932,32 @@ var PhongMaterial = class extends DirectionalLightMaterial {
 };
 
 // core/material/points-material.js
-var POSITION_ATTRIBUTE_LOCATION7 = 0;
+var POSITION_ATTRIBUTE_LOCATION6 = 0;
 var COLOR_ATTRIBUTE_LOCATION3 = 1;
 var MATRIX_UNIFORM_NAME5 = "u_matrix";
-var COLOR_UNIFORM_NAME3 = "u_color";
+var COLOR_UNIFORM_NAME2 = "u_color";
 var POINT_SIZE_UNIFORM_NAME = "u_pointSize";
-var OPACITY_UNIFORM_NAME6 = "u_opacity";
+var OPACITY_UNIFORM_NAME5 = "u_opacity";
 var USE_VERTEX_COLOR_UNIFORM_NAME = "u_useVertexColor";
 var COLOR_COMPONENT_COUNT4 = 3;
 var COLOR_COMPONENT_RED_INDEX = 0;
 var COLOR_COMPONENT_GREEN_INDEX = 1;
 var COLOR_COMPONENT_BLUE_INDEX = 2;
-var DEFAULT_COLOR3 = new Float32Array([1, 1, 1]);
+var DEFAULT_COLOR2 = new Float32Array([1, 1, 1]);
 var DEFAULT_POINT_SIZE = 6;
 var MIN_POINT_SIZE = 0;
 var DEFAULT_USE_VERTEX_COLORS = false;
-var FLOAT_FALSE2 = 0;
-var FLOAT_TRUE2 = 1;
+var FLOAT_FALSE = 0;
+var FLOAT_TRUE = 1;
 var POINT_COORD_CENTER = 0.5;
 var POINT_COORD_RADIUS = 0.5;
 var POSITION_W_COMPONENT = 1;
 var VERTEX_SHADER_SOURCE7 = `#version 300 es
 precision mediump float;
-layout(location = ${POSITION_ATTRIBUTE_LOCATION7}) in vec3 a_position;
+layout(location = ${POSITION_ATTRIBUTE_LOCATION6}) in vec3 a_position;
 layout(location = ${COLOR_ATTRIBUTE_LOCATION3}) in vec3 a_color;
 uniform mat4 ${MATRIX_UNIFORM_NAME5};
-uniform vec3 ${COLOR_UNIFORM_NAME3};
+uniform vec3 ${COLOR_UNIFORM_NAME2};
 uniform float ${POINT_SIZE_UNIFORM_NAME};
 uniform float ${USE_VERTEX_COLOR_UNIFORM_NAME};
 out vec3 v_color;
@@ -6829,13 +6965,13 @@ out vec3 v_color;
 void main() {
     gl_Position  = ${MATRIX_UNIFORM_NAME5} * vec4(a_position, ${POSITION_W_COMPONENT});
     gl_PointSize = ${POINT_SIZE_UNIFORM_NAME};
-    v_color      = mix(${COLOR_UNIFORM_NAME3}, a_color, ${USE_VERTEX_COLOR_UNIFORM_NAME});
+    v_color      = mix(${COLOR_UNIFORM_NAME2}, a_color, ${USE_VERTEX_COLOR_UNIFORM_NAME});
 }
 `;
 var FRAGMENT_SHADER_SOURCE7 = `#version 300 es
 precision mediump float;
 in vec3 v_color;
-uniform float ${OPACITY_UNIFORM_NAME6};
+uniform float ${OPACITY_UNIFORM_NAME5};
 out vec4 outColor;
 
 void main() {
@@ -6846,7 +6982,7 @@ void main() {
         discard;
     }
 
-    outColor = vec4(v_color, ${OPACITY_UNIFORM_NAME6});
+    outColor = vec4(v_color, ${OPACITY_UNIFORM_NAME5});
 }
 `;
 var PointsMaterial = class extends Material {
@@ -6856,7 +6992,7 @@ var PointsMaterial = class extends Material {
    * @type {Float32Array}
    * @private
    */
-  #color = new Float32Array(DEFAULT_COLOR3);
+  #color = new Float32Array(DEFAULT_COLOR2);
   /**
    * Point size in pixels.
    *
@@ -6901,10 +7037,10 @@ var PointsMaterial = class extends Material {
    */
   apply(matrix4) {
     this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME5, matrix4);
-    this.shaderProgram.setVector3(COLOR_UNIFORM_NAME3, this.#color);
+    this.shaderProgram.setVector3(COLOR_UNIFORM_NAME2, this.#color);
     this.shaderProgram.setFloat(POINT_SIZE_UNIFORM_NAME, this.#pointSize);
-    this.shaderProgram.setFloat(USE_VERTEX_COLOR_UNIFORM_NAME, this.#useVertexColors ? FLOAT_TRUE2 : FLOAT_FALSE2);
-    this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME6, this.opacity);
+    this.shaderProgram.setFloat(USE_VERTEX_COLOR_UNIFORM_NAME, this.#useVertexColors ? FLOAT_TRUE : FLOAT_FALSE);
+    this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME5, this.opacity);
   }
   /**
    * Sets the RGB color.
@@ -6973,9 +7109,6 @@ var PointsMaterial = class extends Material {
 
 // core/material/mtl-standard-material.js
 var UV_ATTRIBUTE_LOCATION3 = 2;
-var TYPEOF_OBJECT = "object";
-var TYPEOF_BOOLEAN = "boolean";
-var TYPEOF_NUMBER = "number";
 var DIFFUSE_MAP_UNIFORM_NAME = "u_diffuseMap";
 var AMBIENT_MAP_UNIFORM_NAME = "u_ambientMap";
 var SPECULAR_MAP_UNIFORM_NAME = "u_specularMap";
@@ -7013,7 +7146,7 @@ var USE_ALPHA_MAP_UNIFORM_NAME = "u_useAlphaMap";
 var USE_BUMP_MAP_UNIFORM_NAME = "u_useBumpMap";
 var USE_DISPLACEMENT_MAP_UNIFORM_NAME = "u_useDisplacementMap";
 var USE_REFLECTION_MAP_UNIFORM_NAME = "u_useReflectionMap";
-var LIGHTING_ENABLED_THRESHOLD2 = 0.5;
+var LIGHTING_ENABLED_THRESHOLD = 0.5;
 var DEFAULT_DIFFUSE_COLOR = new Float32Array([1, 1, 1]);
 var DEFAULT_AMBIENT_COLOR = new Float32Array([1, 1, 1]);
 var DEFAULT_SPECULAR_COLOR2 = new Float32Array([1, 1, 1]);
@@ -7025,8 +7158,8 @@ var DEFAULT_BUMP_MULTIPLIER = 1;
 var DEFAULT_DISPLACEMENT_SCALE = 0.1;
 var DEFAULT_UV_OFFSET = new Float32Array([0, 0]);
 var DEFAULT_UV_SCALE = new Float32Array([1, 1]);
-var FLOAT_FALSE3 = 0;
-var FLOAT_TRUE3 = 1;
+var FLOAT_FALSE2 = 0;
+var FLOAT_TRUE2 = 1;
 var DEFAULT_DIFFUSE_TEXTURE_UNIT = 0;
 var DEFAULT_AMBIENT_TEXTURE_UNIT = 1;
 var DEFAULT_SPECULAR_TEXTURE_UNIT = 2;
@@ -7050,12 +7183,12 @@ var ERROR_EXPECTS_VECTOR2_COMPONENTS_SUFFIX = " expects exactly 2 components.";
 var ERROR_EXPECTS_VECTOR3_COMPONENTS_SUFFIX = " expects exactly 3 components.";
 var VERTEX_SHADER_SOURCE8 = `#version 300 es
 precision mediump float;
-layout(location = ${POSITION_ATTRIBUTE_LOCATION6}) in vec3 a_position;
-layout(location = ${NORMAL_ATTRIBUTE_LOCATION3}) in vec3 a_normal;
+layout(location = ${DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.POSITION_LOCATION}) in vec3 a_position;
+layout(location = ${DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.NORMAL_LOCATION}) in vec3 a_normal;
 layout(location = ${UV_ATTRIBUTE_LOCATION3}) in vec2 a_uv;
-uniform mat4 ${FINAL_MATRIX_UNIFORM_NAME};
-uniform mat4 ${WORLD_MATRIX_UNIFORM_NAME};
-uniform mat4 ${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME};
+uniform mat4 ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX};
+uniform mat4 ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX};
+uniform mat4 ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX};
 uniform sampler2D ${DISPLACEMENT_MAP_UNIFORM_NAME};
 uniform float ${USE_DISPLACEMENT_MAP_UNIFORM_NAME};
 uniform float ${DISPLACEMENT_SCALE_UNIFORM_NAME};
@@ -7074,9 +7207,9 @@ void main() {
     }
 
     vec3 displaced_position = a_position + (a_normal * displacement);
-    gl_Position = ${FINAL_MATRIX_UNIFORM_NAME} * vec4(displaced_position, 1.0);
-    v_worldPosition = (${WORLD_MATRIX_UNIFORM_NAME} * vec4(displaced_position, 1.0)).xyz;
-    v_normal = (${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME} * vec4(a_normal, 0.0)).xyz;
+    gl_Position     = ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX} * vec4(displaced_position, 1.0);
+    v_worldPosition = (${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX} * vec4(displaced_position, 1.0)).xyz;
+    v_normal        = (${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX} * vec4(a_normal, 0.0)).xyz;
     v_uv = a_uv;
 }
 `;
@@ -7085,19 +7218,19 @@ precision mediump float;
 in vec3 v_worldPosition;
 in vec3 v_normal;
 in vec2 v_uv;
-uniform vec3 ${COLOR_UNIFORM_NAME2};
+uniform vec3 ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR};
 uniform vec3 ${AMBIENT_COLOR_UNIFORM_NAME};
 uniform vec3 ${SPECULAR_COLOR_UNIFORM_NAME2};
 uniform vec3 ${EMISSIVE_COLOR_UNIFORM_NAME};
-uniform vec3 ${LIGHT_DIRECTION_UNIFORM_NAME};
-uniform vec3 ${CAMERA_POSITION_UNIFORM_NAME};
-uniform float ${AMBIENT_STRENGTH_UNIFORM_NAME};
-uniform float ${DIRECTIONAL_STRENGTH_UNIFORM_NAME};
-uniform float ${LIGHTING_ENABLED_UNIFORM_NAME};
+uniform vec3 ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION};
+uniform vec3 ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION};
+uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH};
+uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH};
+uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED};
 uniform float ${SPECULAR_STRENGTH_UNIFORM_NAME2};
 uniform float ${SHININESS_UNIFORM_NAME2};
 uniform float ${SPECULAR_ENABLED_UNIFORM_NAME};
-uniform float ${OPACITY_UNIFORM_NAME5};
+uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY};
 uniform float ${OPTICAL_DENSITY_UNIFORM_NAME};
 uniform float ${BUMP_MULTIPLIER_UNIFORM_NAME};
 uniform sampler2D ${DIFFUSE_MAP_UNIFORM_NAME};
@@ -7132,54 +7265,64 @@ vec2 apply_uv(vec2 base_uv, vec2 offset, vec2 scale) {
 
 vec3 compute_bump_normal(vec3 normal, vec2 uv) {
     vec3 tangent_normal = texture(${BUMP_MAP_UNIFORM_NAME}, uv).xyz * 2.0 - 1.0;
-    tangent_normal.xy *= ${BUMP_MULTIPLIER_UNIFORM_NAME};
-    tangent_normal = normalize(tangent_normal);
+    tangent_normal.xy  *= ${BUMP_MULTIPLIER_UNIFORM_NAME};
+    tangent_normal      = normalize(tangent_normal);
 
-    vec3 dp1 = dFdx(v_worldPosition);
-    vec3 dp2 = dFdy(v_worldPosition);
-    vec2 duv1 = dFdx(uv);
-    vec2 duv2 = dFdy(uv);
-    vec3 tangent = normalize(dp1 * duv2.y - dp2 * duv1.y);
+    vec3 dp1       = dFdx(v_worldPosition);
+    vec3 dp2       = dFdy(v_worldPosition);
+    vec2 duv1      = dFdx(uv);
+    vec2 duv2      = dFdy(uv);
+    vec3 tangent   = normalize(dp1 * duv2.y - dp2 * duv1.y);
     vec3 bitangent = normalize(-dp1 * duv2.x + dp2 * duv1.x);
+
     mat3 tbn = mat3(tangent, bitangent, normal);
     return normalize(tbn * tangent_normal);
 }
 
 vec2 compute_reflection_uv(vec3 normal, vec3 view_dir) {
     vec3 reflect_dir = reflect(-view_dir, normal);
-    float m = 2.0 * sqrt(reflect_dir.x * reflect_dir.x
+    float uv_scale   = 2.0 * sqrt(
+          reflect_dir.x * reflect_dir.x
         + reflect_dir.y * reflect_dir.y
-        + (reflect_dir.z + 1.0) * (reflect_dir.z + 1.0));
-    return (reflect_dir.xy / m) + vec2(0.5, 0.5);
+        + (reflect_dir.z + 1.0) * (reflect_dir.z + 1.0)
+    );
+
+    return (reflect_dir.xy / uv_scale) + vec2(0.5, 0.5);
 }
 
 void main() {
-    vec3 diffuse_color = ${COLOR_UNIFORM_NAME2};
+    vec3 diffuse_color     = ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR};
     vec3 diffuse_map_color = vec3(1.0);
+
     if (${USE_DIFFUSE_MAP_UNIFORM_NAME} > 0.5) {
         vec2 diff_uv = apply_uv(v_uv, ${DIFFUSE_UV_OFFSET_UNIFORM_NAME}, ${DIFFUSE_UV_SCALE_UNIFORM_NAME});
         diffuse_map_color = texture(${DIFFUSE_MAP_UNIFORM_NAME}, diff_uv).rgb;
         diffuse_color *= diffuse_map_color;
     }
 
-    float alpha = ${OPACITY_UNIFORM_NAME5};
+    float alpha = ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY};
+
     if (${USE_ALPHA_MAP_UNIFORM_NAME} > 0.5) {
         vec2 alpha_uv = apply_uv(v_uv, ${ALPHA_UV_OFFSET_UNIFORM_NAME}, ${ALPHA_UV_SCALE_UNIFORM_NAME});
         alpha *= texture(${ALPHA_MAP_UNIFORM_NAME}, alpha_uv).r;
     }
 
-    if (${LIGHTING_ENABLED_UNIFORM_NAME} <= ${LIGHTING_ENABLED_THRESHOLD2}) {
+    if (${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED} <= ${LIGHTING_ENABLED_THRESHOLD}) {
         vec3 unlit_color = diffuse_color;
+
         if (${USE_DIFFUSE_MAP_UNIFORM_NAME} > 0.5) {
             unlit_color = diffuse_map_color;
         }
+
         vec3 rgb = unlit_color + ${EMISSIVE_COLOR_UNIFORM_NAME};
         outColor = vec4(rgb, alpha);
         return;
     }
 
-    vec3 normal = normalize(v_normal);
-    vec3 view_dir = normalize(${CAMERA_POSITION_UNIFORM_NAME} - v_worldPosition);
+    vec3 normal         = normalize(v_normal);
+    vec3 view_dir       = normalize(${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION} - v_worldPosition);
+    vec3 ambient_tint   = ${AMBIENT_COLOR_UNIFORM_NAME};
+    vec3 specular_color = ${SPECULAR_COLOR_UNIFORM_NAME2};
 
     if (${USE_BUMP_MAP_UNIFORM_NAME} > 0.5) {
         vec2 bump_uv = apply_uv(v_uv, ${BUMP_UV_OFFSET_UNIFORM_NAME}, ${BUMP_UV_SCALE_UNIFORM_NAME});
@@ -7190,24 +7333,23 @@ void main() {
         normal = -normal;
     }
 
-    vec3 ambient_tint = ${AMBIENT_COLOR_UNIFORM_NAME};
     if (${USE_AMBIENT_MAP_UNIFORM_NAME} > 0.5) {
-        vec2 amb_uv = apply_uv(v_uv, ${AMBIENT_UV_OFFSET_UNIFORM_NAME}, ${AMBIENT_UV_SCALE_UNIFORM_NAME});
+        vec2 amb_uv   = apply_uv(v_uv, ${AMBIENT_UV_OFFSET_UNIFORM_NAME}, ${AMBIENT_UV_SCALE_UNIFORM_NAME});
         ambient_tint *= texture(${AMBIENT_MAP_UNIFORM_NAME}, amb_uv).rgb;
     }
 
-    vec3 specular_color = ${SPECULAR_COLOR_UNIFORM_NAME2};
     if (${USE_SPECULAR_MAP_UNIFORM_NAME} > 0.5) {
-        vec2 spec_uv = apply_uv(v_uv, ${SPECULAR_UV_OFFSET_UNIFORM_NAME}, ${SPECULAR_UV_SCALE_UNIFORM_NAME});
+        vec2 spec_uv    = apply_uv(v_uv, ${SPECULAR_UV_OFFSET_UNIFORM_NAME}, ${SPECULAR_UV_SCALE_UNIFORM_NAME});
         specular_color *= texture(${SPECULAR_MAP_UNIFORM_NAME}, spec_uv).rgb;
     }
 
-    vec3 light_direction = normalize(${LIGHT_DIRECTION_UNIFORM_NAME});
-    float diffuse_intensity = max(dot(normal, light_direction), 0.0);
-    vec3 ambient = diffuse_color * ambient_tint * ${AMBIENT_STRENGTH_UNIFORM_NAME};
-    vec3 diffuse = diffuse_color * (diffuse_intensity * ${DIRECTIONAL_STRENGTH_UNIFORM_NAME});
-
     float specular_intensity = 0.0;
+    vec3 light_direction     = normalize(${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION});
+    float diffuse_intensity  = max(dot(normal, light_direction), 0.0);
+
+    vec3 ambient = diffuse_color * ambient_tint * ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH};
+    vec3 diffuse = diffuse_color * (diffuse_intensity * ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH});
+
     if (${SPECULAR_ENABLED_UNIFORM_NAME} > 0.5 && diffuse_intensity > 0.0) {
         vec3 reflection_direction = reflect(-light_direction, normal);
         float specular_base = max(dot(view_dir, reflection_direction), 0.0);
@@ -7215,16 +7357,17 @@ void main() {
     }
 
     vec3 specular = specular_color * (specular_intensity * ${SPECULAR_STRENGTH_UNIFORM_NAME2}
-        * ${DIRECTIONAL_STRENGTH_UNIFORM_NAME});
+        * ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH});
+
     vec3 emissive = ${EMISSIVE_COLOR_UNIFORM_NAME};
-    vec3 rgb = ambient + diffuse + specular + emissive;
+    vec3 rgb      = ambient + diffuse + specular + emissive;
 
     if (${USE_REFLECTION_MAP_UNIFORM_NAME} > 0.5) {
-        vec2 refl_uv = compute_reflection_uv(normal, view_dir);
+        vec2 refl_uv        = compute_reflection_uv(normal, view_dir);
         vec2 refl_uv_scaled = apply_uv(refl_uv, ${REFLECTION_UV_OFFSET_UNIFORM_NAME}, ${REFLECTION_UV_SCALE_UNIFORM_NAME});
-        vec3 refl_color = texture(${REFLECTION_MAP_UNIFORM_NAME}, refl_uv_scaled).rgb;
+        vec3 refl_color     = texture(${REFLECTION_MAP_UNIFORM_NAME}, refl_uv_scaled).rgb;
         float refl_strength = clamp(${OPTICAL_DENSITY_UNIFORM_NAME} - 1.0, 0.0, 1.0);
-        rgb = mix(rgb, refl_color, refl_strength);
+        rgb                 = mix(rgb, refl_color, refl_strength);
     }
 
     outColor = vec4(rgb, alpha);
@@ -7553,7 +7696,7 @@ var MtlStandardMaterial = class _MtlStandardMaterial extends DirectionalLightMat
    * @param {MtlStandardMaterialOptions} [options] - Material options.
    */
   constructor(webglContext, options = {}) {
-    if (options === null || typeof options !== TYPEOF_OBJECT || Array.isArray(options)) {
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
       throw new TypeError(ERROR_OPTIONS_OBJECT);
     }
     const {
@@ -7606,14 +7749,14 @@ var MtlStandardMaterial = class _MtlStandardMaterial extends DirectionalLightMat
    * @protected
    */
   applyAdditionalUniforms(worldMatrix, cameraPosition) {
-    this.shaderProgram.setMatrix4(WORLD_MATRIX_UNIFORM_NAME, worldMatrix);
-    this.shaderProgram.setVector3(CAMERA_POSITION_UNIFORM_NAME, cameraPosition);
+    this.shaderProgram.setMatrix4(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX, worldMatrix);
+    this.shaderProgram.setVector3(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION, cameraPosition);
     this.shaderProgram.setVector3(AMBIENT_COLOR_UNIFORM_NAME, this.#ambientColor);
     this.shaderProgram.setVector3(SPECULAR_COLOR_UNIFORM_NAME2, this.#specularColor);
     this.shaderProgram.setVector3(EMISSIVE_COLOR_UNIFORM_NAME, this.#emissiveColor);
     this.shaderProgram.setFloat(SPECULAR_STRENGTH_UNIFORM_NAME2, this.#specularStrength);
     this.shaderProgram.setFloat(SHININESS_UNIFORM_NAME2, this.#shininess);
-    this.shaderProgram.setFloat(SPECULAR_ENABLED_UNIFORM_NAME, this.#specularEnabled ? FLOAT_TRUE3 : FLOAT_FALSE3);
+    this.shaderProgram.setFloat(SPECULAR_ENABLED_UNIFORM_NAME, this.#specularEnabled ? FLOAT_TRUE2 : FLOAT_FALSE2);
     this.shaderProgram.setFloat(OPTICAL_DENSITY_UNIFORM_NAME, this.#opticalDensity);
     this.shaderProgram.setFloat(BUMP_MULTIPLIER_UNIFORM_NAME, this.#bumpMultiplier);
     this.shaderProgram.setFloat(DISPLACEMENT_SCALE_UNIFORM_NAME, this.#displacementScale);
@@ -7631,13 +7774,13 @@ var MtlStandardMaterial = class _MtlStandardMaterial extends DirectionalLightMat
     this.shaderProgram.setVector2(DISPLACEMENT_UV_SCALE_UNIFORM_NAME, this.#displacementUvScale);
     this.shaderProgram.setVector2(REFLECTION_UV_OFFSET_UNIFORM_NAME, this.#reflectionUvOffset);
     this.shaderProgram.setVector2(REFLECTION_UV_SCALE_UNIFORM_NAME, this.#reflectionUvScale);
-    this.shaderProgram.setFloat(USE_DIFFUSE_MAP_UNIFORM_NAME, this.#useDiffuseMap ? FLOAT_TRUE3 : FLOAT_FALSE3);
-    this.shaderProgram.setFloat(USE_AMBIENT_MAP_UNIFORM_NAME, this.#useAmbientMap ? FLOAT_TRUE3 : FLOAT_FALSE3);
-    this.shaderProgram.setFloat(USE_SPECULAR_MAP_UNIFORM_NAME, this.#useSpecularMap ? FLOAT_TRUE3 : FLOAT_FALSE3);
-    this.shaderProgram.setFloat(USE_ALPHA_MAP_UNIFORM_NAME, this.#useAlphaMap ? FLOAT_TRUE3 : FLOAT_FALSE3);
-    this.shaderProgram.setFloat(USE_BUMP_MAP_UNIFORM_NAME, this.#useBumpMap ? FLOAT_TRUE3 : FLOAT_FALSE3);
-    this.shaderProgram.setFloat(USE_DISPLACEMENT_MAP_UNIFORM_NAME, this.#useDisplacementMap ? FLOAT_TRUE3 : FLOAT_FALSE3);
-    this.shaderProgram.setFloat(USE_REFLECTION_MAP_UNIFORM_NAME, this.#useReflectionMap ? FLOAT_TRUE3 : FLOAT_FALSE3);
+    this.shaderProgram.setFloat(USE_DIFFUSE_MAP_UNIFORM_NAME, this.#useDiffuseMap ? FLOAT_TRUE2 : FLOAT_FALSE2);
+    this.shaderProgram.setFloat(USE_AMBIENT_MAP_UNIFORM_NAME, this.#useAmbientMap ? FLOAT_TRUE2 : FLOAT_FALSE2);
+    this.shaderProgram.setFloat(USE_SPECULAR_MAP_UNIFORM_NAME, this.#useSpecularMap ? FLOAT_TRUE2 : FLOAT_FALSE2);
+    this.shaderProgram.setFloat(USE_ALPHA_MAP_UNIFORM_NAME, this.#useAlphaMap ? FLOAT_TRUE2 : FLOAT_FALSE2);
+    this.shaderProgram.setFloat(USE_BUMP_MAP_UNIFORM_NAME, this.#useBumpMap ? FLOAT_TRUE2 : FLOAT_FALSE2);
+    this.shaderProgram.setFloat(USE_DISPLACEMENT_MAP_UNIFORM_NAME, this.#useDisplacementMap ? FLOAT_TRUE2 : FLOAT_FALSE2);
+    this.shaderProgram.setFloat(USE_REFLECTION_MAP_UNIFORM_NAME, this.#useReflectionMap ? FLOAT_TRUE2 : FLOAT_FALSE2);
     this.shaderProgram.setTexture2D(DIFFUSE_MAP_UNIFORM_NAME, this.#diffuseTexture, this.#diffuseTextureUnit);
     this.shaderProgram.setTexture2D(AMBIENT_MAP_UNIFORM_NAME, this.#ambientTexture, this.#ambientTextureUnit);
     this.shaderProgram.setTexture2D(SPECULAR_MAP_UNIFORM_NAME, this.#specularTexture, this.#specularTextureUnit);
@@ -7679,7 +7822,7 @@ var MtlStandardMaterial = class _MtlStandardMaterial extends DirectionalLightMat
    * @param {number} value - Shininess exponent.
    */
   setShininess(value) {
-    if (typeof value !== TYPEOF_NUMBER || !Number.isFinite(value)) {
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
       throw new TypeError(ERROR_SHININESS_TYPE);
     }
     this.#shininess = value;
@@ -7690,7 +7833,7 @@ var MtlStandardMaterial = class _MtlStandardMaterial extends DirectionalLightMat
    * @param {number} value - Specular strength.
    */
   setSpecularStrength(value) {
-    if (typeof value !== TYPEOF_NUMBER || !Number.isFinite(value)) {
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
       throw new TypeError(ERROR_SPECULAR_STRENGTH_TYPE);
     }
     this.#specularStrength = value;
@@ -7701,7 +7844,7 @@ var MtlStandardMaterial = class _MtlStandardMaterial extends DirectionalLightMat
    * @param {boolean} enabled - Specular usage flag.
    */
   setSpecularEnabled(enabled) {
-    if (typeof enabled !== TYPEOF_BOOLEAN) {
+    if (typeof enabled !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
       throw new TypeError(ERROR_SPECULAR_ENABLED_TYPE);
     }
     this.#specularEnabled = enabled;
@@ -7712,7 +7855,7 @@ var MtlStandardMaterial = class _MtlStandardMaterial extends DirectionalLightMat
    * @param {number} value - Optical density.
    */
   setOpticalDensity(value) {
-    if (typeof value !== TYPEOF_NUMBER || !Number.isFinite(value)) {
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
       throw new TypeError(ERROR_OPTICAL_DENSITY_TYPE);
     }
     this.#opticalDensity = value;
@@ -7723,7 +7866,7 @@ var MtlStandardMaterial = class _MtlStandardMaterial extends DirectionalLightMat
    * @param {number} value - Bump multiplier.
    */
   setBumpMultiplier(value) {
-    if (typeof value !== TYPEOF_NUMBER || !Number.isFinite(value)) {
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
       throw new TypeError(ERROR_BUMP_MULTIPLIER_TYPE);
     }
     this.#bumpMultiplier = value;
@@ -7734,7 +7877,7 @@ var MtlStandardMaterial = class _MtlStandardMaterial extends DirectionalLightMat
    * @param {number} value - Displacement scale factor.
    */
   setDisplacementScale(value) {
-    if (typeof value !== TYPEOF_NUMBER || !Number.isFinite(value)) {
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
       throw new TypeError(ERROR_DISPLACEMENT_SCALE_TYPE);
     }
     this.#displacementScale = value;
@@ -7905,7 +8048,7 @@ var MtlStandardMaterial = class _MtlStandardMaterial extends DirectionalLightMat
     if (!(texture instanceof Texture2D)) {
       throw new TypeError(context + ERROR_EXPECTS_TEXTURE_SUFFIX);
     }
-    if (options === null || typeof options !== TYPEOF_OBJECT || Array.isArray(options)) {
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
       throw new TypeError(context + ERROR_EXPECTS_OPTIONS_OBJECT_SUFFIX);
     }
     const {
@@ -7953,7 +8096,7 @@ var MtlStandardMaterial = class _MtlStandardMaterial extends DirectionalLightMat
     if (!Array.isArray(value) && !(value instanceof Float32Array)) {
       throw new TypeError(context + ERROR_EXPECTS_VECTOR2_TYPE_SUFFIX);
     }
-    if (value.length !== VECTOR3_ELEMENT_COUNT) {
+    if (value.length !== DIRECTIONAL_LIGHT_MATERIAL_VECTOR3_ELEMENT_COUNT) {
       throw new TypeError(context + ERROR_EXPECTS_VECTOR3_COMPONENTS_SUFFIX);
     }
   }
@@ -7962,7 +8105,7 @@ var MtlStandardMaterial = class _MtlStandardMaterial extends DirectionalLightMat
 // core/scene/object3d.js
 var CHILD_NOT_FOUND_INDEX = -1;
 var SINGLE_CHILD_REMOVE_COUNT = 1;
-var MATRIX_4x4_ELEMENT_COUNT4 = 16;
+var MATRIX_4x4_ELEMENT_COUNT2 = 16;
 var Object3D = class _Object3D {
   /** @type {Vector3} */
   #position;
@@ -7985,8 +8128,8 @@ var Object3D = class _Object3D {
   constructor() {
     this.#parent = null;
     this.#children = [];
-    this.#localMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT4);
-    this.#worldMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT4);
+    this.#localMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT2);
+    this.#worldMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT2);
     _Object3D.#setIdentityMatrix(this.#localMatrix);
     _Object3D.#setIdentityMatrix(this.#worldMatrix);
     this.#position = Vector3.createZero(() => this.#markTransformDirty());
@@ -8161,7 +8304,7 @@ var Object3D = class _Object3D {
    * @private
    */
   static #setIdentityMatrix(out) {
-    for (let index = 0; index < MATRIX_4x4_ELEMENT_COUNT4; index += 1) {
+    for (let index = 0; index < MATRIX_4x4_ELEMENT_COUNT2; index += 1) {
       out[index] = 0;
     }
     out[0] = 1;
@@ -8335,7 +8478,6 @@ var Scene = class extends Object3D {
 };
 
 // core/scene/camera.js
-var MATRIX_4x4_ELEMENT_COUNT5 = 16;
 var Camera = class extends Object3D {
   /**
    * Cached view matrix buffer. Reused between frames to avoid allocations.
@@ -8409,7 +8551,7 @@ var Camera = class extends Object3D {
   #cachedScaleZ = Number.NaN;
   constructor() {
     super();
-    this.#viewMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT5);
+    this.#viewMatrix = new Float32Array(MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
   }
   /**
    * Returns the view matrix (inverse of camera local TRS transform).
@@ -8454,9 +8596,102 @@ var Camera = class extends Object3D {
     const scale = this.scale;
     const isViewDirty = this.#isTransformChanged(position, rotation, scale);
     if (isViewDirty === true) {
-      CameraMath.writeViewMatrixTo(this.#viewMatrix, position, rotation, scale);
+      this.#writeViewMatrixTo(this.#viewMatrix, position, rotation, scale);
       this.#cacheTransform(position, rotation, scale);
     }
+  }
+  /**
+   * Writes a view matrix into an existing output matrix.
+   *
+   * A view matrix is the inverse of the camera transform.
+   * It moves the world-space coordinates into the camera-relative view-space.
+   *
+   * 'Object3D' builds local transforms in this order:
+   *
+   * local = T * (Rz * Ry * Rx) * S
+   *
+   * Therefore the inverse view transform is applied in reverse order:
+   *
+   * view = inv(S) * inv(R) * inv(T)
+   *
+   * The inverse of the rotation block is its transpose, because the rotation
+   * matrix is orthonormal. The inverse scale is applied to the rows of that
+   * transposed rotation block, forming matrix:
+   *
+   * A = inv(S) * R^T
+   *
+   * Camera translation is then inverted as '-A * position', because the world must be
+   * shifted by the opposite camera position after the inverse rotation/scale basis is known.
+   *
+   * Scale components must be non-zero. A zero scale would have no reciprocal,
+   * so the camera transform could not be inverted into a valid view matrix.
+   *
+   * The method writes the matrix into 'out' and returns that same 'out' buffer.
+   *
+   * @private
+   * @param {Float32Array} out      - Output 4x4 matrix (length 16), that will receive the view matrix.
+   * @param {Vector3}      position - Camera position.
+   * @param {Vector3}      rotation - Camera rotation in radians.
+   * @param {Vector3}      scale    - Camera scale (must be non-zero on all axes).
+   * @returns {Float32Array}        - The output matrix (out).
+   */
+  #writeViewMatrixTo(out, position, rotation, scale) {
+    if (scale.x === MATH_MATRIX_VALUES.ZERO || scale.y === MATH_MATRIX_VALUES.ZERO || scale.z === MATH_MATRIX_VALUES.ZERO) {
+      throw new RangeError("Private method `Camera.#writeViewMatrixTo` cannot invert a zero scale.");
+    }
+    const positionX = position.x;
+    const positionY = position.y;
+    const positionZ = position.z;
+    const rotationX = rotation.x;
+    const rotationY = rotation.y;
+    const rotationZ = rotation.z;
+    const inverseScaleX = MATH_VIEW_MATRIX.SCALE_INVERSE_NUMERATOR / scale.x;
+    const inverseScaleY = MATH_VIEW_MATRIX.SCALE_INVERSE_NUMERATOR / scale.y;
+    const inverseScaleZ = MATH_VIEW_MATRIX.SCALE_INVERSE_NUMERATOR / scale.z;
+    const cosX = Math.cos(rotationX);
+    const sinX = Math.sin(rotationX);
+    const cosY = Math.cos(rotationY);
+    const sinY = Math.sin(rotationY);
+    const cosZ = Math.cos(rotationZ);
+    const sinZ = Math.sin(rotationZ);
+    const rot00 = cosZ * cosY;
+    const rot01 = cosZ * sinY * sinX - sinZ * cosX;
+    const rot02 = cosZ * sinY * cosX + sinZ * sinX;
+    const rot10 = sinZ * cosY;
+    const rot11 = sinZ * sinY * sinX + cosZ * cosX;
+    const rot12 = sinZ * sinY * cosX - cosZ * sinX;
+    const rot20 = -sinY;
+    const rot21 = cosY * sinX;
+    const rot22 = cosY * cosX;
+    const a00 = rot00 * inverseScaleX;
+    const a01 = rot10 * inverseScaleX;
+    const a02 = rot20 * inverseScaleX;
+    const a10 = rot01 * inverseScaleY;
+    const a11 = rot11 * inverseScaleY;
+    const a12 = rot21 * inverseScaleY;
+    const a20 = rot02 * inverseScaleZ;
+    const a21 = rot12 * inverseScaleZ;
+    const a22 = rot22 * inverseScaleZ;
+    const translateX = -(a00 * positionX + a01 * positionY + a02 * positionZ);
+    const translateY = -(a10 * positionX + a11 * positionY + a12 * positionZ);
+    const translateZ = -(a20 * positionX + a21 * positionY + a22 * positionZ);
+    out[0] = a00;
+    out[1] = a10;
+    out[2] = a20;
+    out[3] = MATH_MATRIX_VALUES.ZERO;
+    out[4] = a01;
+    out[5] = a11;
+    out[6] = a21;
+    out[7] = MATH_MATRIX_VALUES.ZERO;
+    out[8] = a02;
+    out[9] = a12;
+    out[10] = a22;
+    out[11] = MATH_MATRIX_VALUES.ZERO;
+    out[12] = translateX;
+    out[13] = translateY;
+    out[14] = translateZ;
+    out[15] = MATH_MATRIX_VALUES.UNIT;
+    return out;
   }
   /**
    * Checks whether the local transform has changed, since the last cached snapshot.
@@ -8527,9 +8762,6 @@ var Camera = class extends Object3D {
 };
 
 // core/scene/perspective-camera.js
-var MINIMUM_NEAR_CLIP_DISTANCE2 = 0;
-var MINIMUM_ASPECT_RATIO2 = 0;
-var MATRIX_4x4_ELEMENT_COUNT6 = 16;
 var PerspectiveCamera = class extends Camera {
   /**
    * Vertical field of view in radians.
@@ -8594,17 +8826,17 @@ var PerspectiveCamera = class extends Camera {
     if (typeof far !== "number") {
       throw new TypeError("`PerspectiveCamera` expects `far` as a number.");
     }
-    if (aspectRatio <= MINIMUM_ASPECT_RATIO2) {
+    if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
       throw new RangeError("`PerspectiveCamera` expects a positive `aspect ratio`.");
     }
-    if (near <= MINIMUM_NEAR_CLIP_DISTANCE2 || far <= near) {
+    if (near <= MATH_CAMERA_LIMITS.MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
       throw new RangeError("`PerspectiveCamera` expects `0 < near < far`.");
     }
     this.#fieldOfViewRadians = fieldOfViewRadians;
     this.#aspectRatio = aspectRatio;
     this.#near = near;
     this.#far = far;
-    this.#projectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT6);
+    this.#projectionMatrix = new Float32Array(MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
   }
   /**
    * Updates the aspect ratio and marks projection cache as dirty.
@@ -8615,7 +8847,7 @@ var PerspectiveCamera = class extends Camera {
     if (typeof aspectRatio !== "number") {
       throw new TypeError("`PerspectiveCamera.setAspectRatio` expects `aspectRatio` as a number.");
     }
-    if (aspectRatio <= MINIMUM_ASPECT_RATIO2) {
+    if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
       throw new RangeError("`PerspectiveCamera.setAspectRatio` expects a positive number.");
     }
     if (aspectRatio === this.#aspectRatio) {
@@ -8631,7 +8863,7 @@ var PerspectiveCamera = class extends Camera {
    */
   getProjectionMatrix() {
     if (this.#isProjectionMatrixDirty === true) {
-      CameraMath.writePerspectiveMatrixTo(
+      Matrix4.writePerspectiveTo(
         this.#projectionMatrix,
         this.#fieldOfViewRadians,
         this.#aspectRatio,
@@ -8645,8 +8877,6 @@ var PerspectiveCamera = class extends Camera {
 };
 
 // core/scene/orthographic-camera.js
-var MATRIX_4x4_ELEMENT_COUNT7 = 16;
-var MINIMUM_ASPECT_RATIO3 = 0;
 var MINIMUM_VIEW_SIZE = 0;
 var HALF_MULTIPLIER = 0.5;
 var OrthographicCamera = class extends Camera {
@@ -8734,7 +8964,7 @@ var OrthographicCamera = class extends Camera {
    */
   constructor(leftOrOptions, right, bottom, top, near, far) {
     super();
-    this.#projectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT7);
+    this.#projectionMatrix = new Float32Array(MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
     if (leftOrOptions !== null && typeof leftOrOptions === "object") {
       if (Array.isArray(leftOrOptions) === true) {
         throw new TypeError("`OrthographicCamera` expects options as a plain object, not an array.");
@@ -8760,7 +8990,7 @@ var OrthographicCamera = class extends Camera {
     if (typeof aspectRatio !== "number") {
       throw new TypeError("`OrthographicCamera.setAspectRatio` expects `aspectRatio` as a number.");
     }
-    if (aspectRatio <= MINIMUM_ASPECT_RATIO3) {
+    if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
       throw new RangeError("`OrthographicCamera.setAspectRatio` expects `aspectRatio` to be a positive number.");
     }
     if (this.#viewSize === null) {
@@ -8781,7 +9011,7 @@ var OrthographicCamera = class extends Camera {
    */
   getProjectionMatrix() {
     if (this.#isProjectionMatrixDirty === true) {
-      CameraMath.writeOrthographicMatrixTo(
+      Matrix4.writeOrthographicTo(
         this.#projectionMatrix,
         this.#left,
         this.#right,
@@ -8863,7 +9093,7 @@ var OrthographicCamera = class extends Camera {
     if (viewSize <= MINIMUM_VIEW_SIZE) {
       throw new RangeError("`OrthographicCamera` expects `viewSize` to be a positive number.");
     }
-    if (aspectRatio <= MINIMUM_ASPECT_RATIO3) {
+    if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
       throw new RangeError("`OrthographicCamera` expects `aspectRatio` to be a positive number.");
     }
     if (far <= near) {
@@ -8900,9 +9130,6 @@ var DEFAULT_FIELD_OF_VIEW_RADIANS = Math.PI / DEFAULT_FIELD_OF_VIEW_DIVISOR;
 var DEFAULT_ASPECT_RATIO = 1;
 var DEFAULT_NEAR = 0.1;
 var DEFAULT_FAR = 200;
-var MINIMUM_ASPECT_RATIO4 = 0;
-var MINIMUM_NEAR_CLIP_DISTANCE3 = 0;
-var MATRIX_4x4_ELEMENT_COUNT8 = 16;
 var FIRST_PERSON_CAMERA_MODE_NORMAL = "NORMAL";
 var FIRST_PERSON_CAMERA_MODE_BOBBING = "BOBBING";
 var FIRST_PERSON_CAMERA_MODES = Object.freeze({
@@ -8988,10 +9215,10 @@ var FirstPersonCamera = class extends Camera {
     if (typeof far !== "number") {
       throw new TypeError("`FirstPersonCamera` expects `far` as a number.");
     }
-    if (aspectRatio <= MINIMUM_ASPECT_RATIO4) {
+    if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
       throw new RangeError("`FirstPersonCamera` expects `aspectRatio` to be a positive number.");
     }
-    if (near <= MINIMUM_NEAR_CLIP_DISTANCE3 || far <= near) {
+    if (near <= MATH_CAMERA_LIMITS.MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
       throw new RangeError("`FirstPersonCamera` expects `0 < near < far`.");
     }
     if (!FIRST_PERSON_CAMERA_MODE_SET.has(mode)) {
@@ -9001,7 +9228,7 @@ var FirstPersonCamera = class extends Camera {
     this.#aspectRatio = aspectRatio;
     this.#near = near;
     this.#far = far;
-    this.#projectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT8);
+    this.#projectionMatrix = new Float32Array(MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
     this.#mode = mode;
   }
   /**
@@ -9036,7 +9263,7 @@ var FirstPersonCamera = class extends Camera {
    */
   getProjectionMatrix() {
     if (this.#isProjectionMatrixDirty) {
-      CameraMath.writePerspectiveMatrixTo(
+      Matrix4.writePerspectiveTo(
         this.#projectionMatrix,
         this.#fieldOfViewRadians,
         this.#aspectRatio,
@@ -9056,7 +9283,7 @@ var FirstPersonCamera = class extends Camera {
     if (typeof aspectRatio !== "number") {
       throw new TypeError("`FirstPersonCamera.setAspectRatio` expects `aspectRatio` as a number.");
     }
-    if (aspectRatio <= MINIMUM_ASPECT_RATIO4) {
+    if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
       throw new RangeError("`FirstPersonCamera.setAspectRatio` expects a positive number.");
     }
     this.#aspectRatio = aspectRatio;
@@ -9070,9 +9297,6 @@ var DEFAULT_FIELD_OF_VIEW_RADIANS2 = Math.PI / DEFAULT_FIELD_OF_VIEW_DIVISOR2;
 var DEFAULT_ASPECT_RATIO2 = 1;
 var DEFAULT_NEAR2 = 0.1;
 var DEFAULT_FAR2 = 200;
-var MINIMUM_ASPECT_RATIO5 = 0;
-var MINIMUM_NEAR_CLIP_DISTANCE4 = 0;
-var MATRIX_4x4_ELEMENT_COUNT9 = 16;
 var THIRD_PERSON_CAMERA_MODE_NORMAL = "NORMAL";
 var THIRD_PERSON_CAMERA_MODE_BOBBING = "BOBBING";
 var THIRD_PERSON_CAMERA_MODES = Object.freeze({
@@ -9158,10 +9382,10 @@ var ThirdPersonCamera = class extends Camera {
     if (typeof far !== "number") {
       throw new TypeError("`ThirdPersonCamera` expects `far` as a number.");
     }
-    if (aspectRatio <= MINIMUM_ASPECT_RATIO5) {
+    if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
       throw new RangeError("`ThirdPersonCamera` expects `aspectRatio` to be a positive number.");
     }
-    if (near <= MINIMUM_NEAR_CLIP_DISTANCE4 || far <= near) {
+    if (near <= MATH_CAMERA_LIMITS.MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
       throw new RangeError("`ThirdPersonCamera` expects `0 < near < far`.");
     }
     if (!THIRD_PERSON_CAMERA_MODE_SET.has(mode)) {
@@ -9171,7 +9395,7 @@ var ThirdPersonCamera = class extends Camera {
     this.#aspectRatio = aspectRatio;
     this.#near = near;
     this.#far = far;
-    this.#projectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT9);
+    this.#projectionMatrix = new Float32Array(MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
     this.#mode = mode;
   }
   /**
@@ -9210,7 +9434,7 @@ var ThirdPersonCamera = class extends Camera {
     if (typeof aspectRatio !== "number") {
       throw new TypeError("`ThirdPersonCamera.setAspectRatio` expects `aspectRatio` as a number.");
     }
-    if (aspectRatio <= MINIMUM_ASPECT_RATIO5) {
+    if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
       throw new RangeError("`ThirdPersonCamera.setAspectRatio` expects a positive number.");
     }
     if (aspectRatio === this.#aspectRatio) {
@@ -9226,7 +9450,7 @@ var ThirdPersonCamera = class extends Camera {
    */
   getProjectionMatrix() {
     if (this.#isProjectionMatrixDirty === true) {
-      CameraMath.writePerspectiveMatrixTo(
+      Matrix4.writePerspectiveTo(
         this.#projectionMatrix,
         this.#fieldOfViewRadians,
         this.#aspectRatio,
@@ -9239,11 +9463,38 @@ var ThirdPersonCamera = class extends Camera {
   }
 };
 
+// core/constants/renderer.js
+var RENDERER_DRAW = Object.freeze({ INDEX_BUFFER_OFFSET_BYTES: 0 });
+var RENDERER_OPACITY = Object.freeze({ OPAQUE_THRESHOLD: 1 });
+var RENDERER_MATERIAL_APPLY_PARAM_COUNTS = Object.freeze({
+  WORLD_MATRIX: 2,
+  WORLD_INVERSE_TRANSPOSE: 3,
+  CAMERA_POSITION: 4
+});
+var RENDERER_TRAVERSAL = Object.freeze({
+  STACK_EMPTY_LENGTH: 0,
+  CHILD_LOOP_START_INDEX: 0,
+  CHILD_LOOP_INCREMENT: 1
+});
+
+// core/exception-messages/renderer.js
+var RENDERER_EXCEPTION_MESSAGES = Object.freeze({
+  UNKNOWN_PRIMITIVE: "Renderer received an unknown geometry primitive."
+});
+
+// core/exception-messages/light.js
+var LIGHT_EXCEPTION_MESSAGES = Object.freeze({
+  ABSTRACT_CONSTRUCTOR: "`Light` is an abstract class and cannot be instantiated directly.",
+  ENABLED_TYPE: "`Light.setEnabled` expects a boolean.",
+  AMBIENT_STRENGTH_TYPE: "`AmbientLight.setStrength` expects a finite number.",
+  DIRECTION_TYPE: "`DirectionalLight.setDirection` expects a number[] or `Float32Array`.",
+  DIRECTION_COMPONENTS: "`DirectionalLight.setDirection` expects exactly 3 components.",
+  DIRECTION_COMPONENTS_FINITE: "`DirectionalLight.setDirection` expects finite components.",
+  DIRECTION_LENGTH: "`DirectionalLight.setDirection` expects a non-zero direction vector.",
+  DIRECTIONAL_STRENGTH_TYPE: "`DirectionalLight.setStrength` expects a finite number."
+});
+
 // core/light/light.js
-var DEFAULT_ENABLED = true;
-var TYPEOF_BOOLEAN2 = "boolean";
-var ERROR_ABSTRACT_CONSTRUCTOR = "`Light` is an abstract class and cannot be instantiated directly.";
-var ERROR_ENABLED_TYPE = "`Light.setEnabled` expects a boolean.";
 var Light = class _Light extends Object3D {
   /**
    * Whether this light is enabled.
@@ -9251,7 +9502,7 @@ var Light = class _Light extends Object3D {
    * @type {boolean}
    * @private
    */
-  #enabled = DEFAULT_ENABLED;
+  #enabled = LIGHT_DEFAULTS.ENABLED;
   /**
    * Creates a new light. This class is abstract and cannot be instantiated directly.
    *
@@ -9260,7 +9511,7 @@ var Light = class _Light extends Object3D {
   constructor() {
     super();
     if (new.target === _Light) {
-      throw new Error(ERROR_ABSTRACT_CONSTRUCTOR);
+      throw new Error(LIGHT_EXCEPTION_MESSAGES.ABSTRACT_CONSTRUCTOR);
     }
   }
   /**
@@ -9271,8 +9522,8 @@ var Light = class _Light extends Object3D {
    * @throws {TypeError} When the value is not a boolean.
    */
   setEnabled(enabled) {
-    if (typeof enabled !== TYPEOF_BOOLEAN2) {
-      throw new TypeError(ERROR_ENABLED_TYPE);
+    if (typeof enabled !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+      throw new TypeError(LIGHT_EXCEPTION_MESSAGES.ENABLED_TYPE);
     }
     this.#enabled = enabled;
   }
@@ -9287,27 +9538,6 @@ var Light = class _Light extends Object3D {
 };
 
 // core/light/directional-light.js
-var VECTOR3_ELEMENT_COUNT2 = 3;
-var VECTOR_X_INDEX = 0;
-var VECTOR_Y_INDEX = 1;
-var VECTOR_Z_INDEX = 2;
-var DEFAULT_DIRECTION = new Float32Array([0.5, 0.7, 1]);
-var DEFAULT_DIRECTIONAL_STRENGTH2 = 1;
-var MIN_DIRECTIONAL_STRENGTH = 0;
-var MAX_DIRECTIONAL_STRENGTH = 3;
-var MIN_DIRECTION_LENGTH_SQUARED2 = 0;
-var INVERSE_LENGTH_NUMERATOR2 = 1;
-var DEFAULT_ROLL_RADIANS = 0;
-var ASIN_CLAMP_MIN = -1;
-var ASIN_CLAMP_MAX = 1;
-var WORLD_Z_AXIS_X_INDEX = 8;
-var WORLD_Z_AXIS_Y_INDEX = 9;
-var WORLD_Z_AXIS_Z_INDEX = 10;
-var ERROR_DIRECTION_TYPE = "`DirectionalLight.setDirection` expects a number[] or `Float32Array`.";
-var ERROR_DIRECTION_COMPONENTS = "`DirectionalLight.setDirection` expects exactly 3 components.";
-var ERROR_DIRECTION_COMPONENTS_FINITE = "`DirectionalLight.setDirection` expects finite components.";
-var ERROR_DIRECTION_LENGTH = "`DirectionalLight.setDirection` expects a non-zero direction vector.";
-var ERROR_STRENGTH_TYPE = "`DirectionalLight.setStrength` expects a finite number.";
 var DirectionalLight = class _DirectionalLight extends Light {
   /**
    * Cached normalized direction buffer.
@@ -9315,21 +9545,21 @@ var DirectionalLight = class _DirectionalLight extends Light {
    * @type {Float32Array}
    * @private
    */
-  #direction = new Float32Array(VECTOR3_ELEMENT_COUNT2);
+  #direction = new Float32Array(MATH_LAYOUT.VECTOR3_ELEMENT_COUNT);
   /**
    * Directional light strength multiplier.
    *
    * @type {number}
    * @private
    */
-  #strength = DEFAULT_DIRECTIONAL_STRENGTH2;
+  #strength = LIGHT_DIRECTIONAL.DEFAULT_DIRECTIONAL_STRENGTH;
   /**
    * Creates a new directional light with the default direction.
    */
   constructor() {
     super();
-    this.setDirection(DEFAULT_DIRECTION);
-    this.#strength = DEFAULT_DIRECTIONAL_STRENGTH2;
+    this.setDirection(LIGHT_DIRECTIONAL_DEFAULT_DIRECTION);
+    this.#strength = LIGHT_DIRECTIONAL.DEFAULT_DIRECTIONAL_STRENGTH;
   }
   /**
    * Sets the light direction by updating the light rotation.
@@ -9340,23 +9570,23 @@ var DirectionalLight = class _DirectionalLight extends Light {
    */
   setDirection(direction) {
     _DirectionalLight.#assertVector3(direction);
-    const directionX = direction[VECTOR_X_INDEX];
-    const directionY = direction[VECTOR_Y_INDEX];
-    const directionZ = direction[VECTOR_Z_INDEX];
+    const directionX = direction[MATH_VECTOR3_INDEXES.X];
+    const directionY = direction[MATH_VECTOR3_INDEXES.Y];
+    const directionZ = direction[MATH_VECTOR3_INDEXES.Z];
     const lengthSquared = directionX * directionX + directionY * directionY + directionZ * directionZ;
-    if (!Number.isFinite(lengthSquared) || lengthSquared <= MIN_DIRECTION_LENGTH_SQUARED2) {
-      throw new TypeError(ERROR_DIRECTION_LENGTH);
+    if (!Number.isFinite(lengthSquared) || lengthSquared <= LIGHT_DIRECTIONAL.MIN_DIRECTION_LENGTH_SQUARED) {
+      throw new TypeError(LIGHT_EXCEPTION_MESSAGES.DIRECTION_LENGTH);
     }
-    const inverseLength = INVERSE_LENGTH_NUMERATOR2 / Math.sqrt(lengthSquared);
+    const inverseLength = LIGHT_DIRECTIONAL.INVERSE_LENGTH_NUMERATOR / Math.sqrt(lengthSquared);
     const normalizedX = directionX * inverseLength;
     const normalizedY = directionY * inverseLength;
     const normalizedZ = directionZ * inverseLength;
-    const clampedY = Math.min(ASIN_CLAMP_MAX, Math.max(ASIN_CLAMP_MIN, normalizedY));
+    const clampedY = Math.min(LIGHT_DIRECTIONAL.ASIN_CLAMP_MAX, Math.max(LIGHT_DIRECTIONAL.ASIN_CLAMP_MIN, normalizedY));
     const rotationX = -Math.asin(clampedY);
     const rotationY = Math.atan2(normalizedX, normalizedZ);
     this.rotation.x = rotationX;
     this.rotation.y = rotationY;
-    this.rotation.z = DEFAULT_ROLL_RADIANS;
+    this.rotation.z = LIGHT_DIRECTIONAL.DEFAULT_ROLL_RADIANS;
   }
   /**
    * Returns the normalized light direction in world space.
@@ -9365,18 +9595,18 @@ var DirectionalLight = class _DirectionalLight extends Light {
    */
   getDirection() {
     const worldMatrix = this.worldMatrix;
-    const axisX = worldMatrix[WORLD_Z_AXIS_X_INDEX];
-    const axisY = worldMatrix[WORLD_Z_AXIS_Y_INDEX];
-    const axisZ = worldMatrix[WORLD_Z_AXIS_Z_INDEX];
+    const axisX = worldMatrix[MATH_MATRIX4_INDEXES.WORLD_Z_AXIS_X];
+    const axisY = worldMatrix[MATH_MATRIX4_INDEXES.WORLD_Z_AXIS_Y];
+    const axisZ = worldMatrix[MATH_MATRIX4_INDEXES.WORLD_Z_AXIS_Z];
     const lengthSquared = axisX * axisX + axisY * axisY + axisZ * axisZ;
-    if (!Number.isFinite(lengthSquared) || lengthSquared <= MIN_DIRECTION_LENGTH_SQUARED2) {
-      this.#direction.set(DEFAULT_DIRECTION);
+    if (!Number.isFinite(lengthSquared) || lengthSquared <= LIGHT_DIRECTIONAL.MIN_DIRECTION_LENGTH_SQUARED) {
+      this.#direction.set(LIGHT_DIRECTIONAL_DEFAULT_NORMALIZED_DIRECTION);
       return this.#direction;
     }
-    const inverseLength = INVERSE_LENGTH_NUMERATOR2 / Math.sqrt(lengthSquared);
-    this.#direction[VECTOR_X_INDEX] = axisX * inverseLength;
-    this.#direction[VECTOR_Y_INDEX] = axisY * inverseLength;
-    this.#direction[VECTOR_Z_INDEX] = axisZ * inverseLength;
+    const inverseLength = LIGHT_DIRECTIONAL.INVERSE_LENGTH_NUMERATOR / Math.sqrt(lengthSquared);
+    this.#direction[MATH_VECTOR3_INDEXES.X] = axisX * inverseLength;
+    this.#direction[MATH_VECTOR3_INDEXES.Y] = axisY * inverseLength;
+    this.#direction[MATH_VECTOR3_INDEXES.Z] = axisZ * inverseLength;
     return this.#direction;
   }
   /**
@@ -9387,10 +9617,10 @@ var DirectionalLight = class _DirectionalLight extends Light {
    * @throws {TypeError} When the strength is invalid.
    */
   setStrength(strength) {
-    if (typeof strength !== "number" || !Number.isFinite(strength)) {
-      throw new TypeError(ERROR_STRENGTH_TYPE);
+    if (typeof strength !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(strength)) {
+      throw new TypeError(LIGHT_EXCEPTION_MESSAGES.DIRECTIONAL_STRENGTH_TYPE);
     }
-    this.#strength = Math.min(MAX_DIRECTIONAL_STRENGTH, Math.max(MIN_DIRECTIONAL_STRENGTH, strength));
+    this.#strength = Math.min(LIGHT_DIRECTIONAL.MAX_DIRECTIONAL_STRENGTH, Math.max(LIGHT_DIRECTIONAL.MIN_DIRECTIONAL_STRENGTH, strength));
   }
   /**
    * Returns the directional light strength multiplier.
@@ -9410,20 +9640,18 @@ var DirectionalLight = class _DirectionalLight extends Light {
    */
   static #assertVector3(vector) {
     if (!Array.isArray(vector) && !(vector instanceof Float32Array)) {
-      throw new TypeError(ERROR_DIRECTION_TYPE);
+      throw new TypeError(LIGHT_EXCEPTION_MESSAGES.DIRECTION_TYPE);
     }
-    if (vector.length !== VECTOR3_ELEMENT_COUNT2) {
-      throw new TypeError(ERROR_DIRECTION_COMPONENTS);
+    if (vector.length !== MATH_LAYOUT.VECTOR3_ELEMENT_COUNT) {
+      throw new TypeError(LIGHT_EXCEPTION_MESSAGES.DIRECTION_COMPONENTS);
     }
-    if (!Number.isFinite(vector[VECTOR_X_INDEX]) || !Number.isFinite(vector[VECTOR_Y_INDEX]) || !Number.isFinite(vector[VECTOR_Z_INDEX])) {
-      throw new TypeError(ERROR_DIRECTION_COMPONENTS_FINITE);
+    if (!Number.isFinite(vector[MATH_VECTOR3_INDEXES.X]) || !Number.isFinite(vector[MATH_VECTOR3_INDEXES.Y]) || !Number.isFinite(vector[MATH_VECTOR3_INDEXES.Z])) {
+      throw new TypeError(LIGHT_EXCEPTION_MESSAGES.DIRECTION_COMPONENTS_FINITE);
     }
   }
 };
 
 // core/light/ambient-light.js
-var DEFAULT_STRENGTH = 0.2;
-var ERROR_STRENGTH_TYPE2 = "`AmbientLight.setStrength` expects a finite number.";
 var AmbientLight = class extends Light {
   /**
    * Ambient strength multiplier.
@@ -9431,7 +9659,7 @@ var AmbientLight = class extends Light {
    * @type {number}
    * @private
    */
-  #strength = DEFAULT_STRENGTH;
+  #strength = LIGHT_AMBIENT.DEFAULT_STRENGTH;
   /**
    * Creates a new ambient light.
    */
@@ -9446,8 +9674,8 @@ var AmbientLight = class extends Light {
    * @throws {TypeError} When the strength is invalid.
    */
   setStrength(strength) {
-    if (typeof strength !== "number" || !Number.isFinite(strength)) {
-      throw new TypeError(ERROR_STRENGTH_TYPE2);
+    if (typeof strength !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(strength)) {
+      throw new TypeError(LIGHT_EXCEPTION_MESSAGES.AMBIENT_STRENGTH_TYPE);
     }
     this.#strength = strength;
   }
@@ -9462,17 +9690,6 @@ var AmbientLight = class extends Light {
 };
 
 // core/render/renderer.js
-var INDEX_BUFFER_OFFSET_BYTES = 0;
-var MATRIX_4x4_ELEMENT_COUNT10 = 16;
-var VECTOR3_ELEMENT_COUNT3 = 3;
-var OPAQUE_OPACITY = 1;
-var MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT = 2;
-var MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT = 3;
-var MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT = 4;
-var ERROR_UNKNOWN_PRIMITIVE = "Renderer received an unknown geometry primitive.";
-var STACK_EMPTY_LENGTH = 0;
-var LOOP_START_INDEX = 0;
-var LOOP_INCREMENT = 1;
 var Renderer = class {
   /**
    * Wrapper around the underlying WebGL2 rendering context.
@@ -9574,12 +9791,12 @@ var Renderer = class {
       throw new TypeError("Renderer expects a WebGLContext instance.");
     }
     this.#contextWrapper = webglContext;
-    this.#webglRenderingContext = webglContext.context;
-    this.#viewProjectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT10);
-    this.#finalMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT10);
-    this.#worldMatrixInverse = new Float32Array(MATRIX_4x4_ELEMENT_COUNT10);
-    this.#worldInverseTransposeMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT10);
-    this.#cameraPosition = new Float32Array(VECTOR3_ELEMENT_COUNT3);
+    this.#webglRenderingContext = this.#contextWrapper.context;
+    this.#viewProjectionMatrix = new Float32Array(MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
+    this.#finalMatrix = new Float32Array(MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
+    this.#worldMatrixInverse = new Float32Array(MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
+    this.#worldInverseTransposeMatrix = new Float32Array(MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
+    this.#cameraPosition = new Float32Array(MATH_LAYOUT.VECTOR3_ELEMENT_COUNT);
     this.#frameViewProjectionMatrix = this.#viewProjectionMatrix;
     this.#frameCameraPosition = this.#cameraPosition;
     this.#lightSearchStack = [];
@@ -9624,7 +9841,9 @@ var Renderer = class {
   /**
    * Renders a single visited scene node during traversal.
    *
-   * @param {Object3D} visitedObject - Visited scene node (only `Mesh` instances are rendered, they're childs from `Object3D`).
+   * Only `Mesh` instances are rendered. Other `Object3D` nodes are skipped.
+   *
+   * @param {Object3D} visitedObject - Visited scene node.
    * @private
    */
   #renderVisitedObject(visitedObject) {
@@ -9658,7 +9877,7 @@ var Renderer = class {
     }
     material.use();
     const materialOpacity = material.opacity;
-    const isTransparent = materialOpacity < OPAQUE_OPACITY;
+    const isTransparent = materialOpacity < RENDERER_OPACITY.OPAQUE_THRESHOLD;
     if (isTransparent) {
       renderingContext.enable(renderingContext.BLEND);
       renderingContext.blendFunc(renderingContext.SRC_ALPHA, renderingContext.ONE_MINUS_SRC_ALPHA);
@@ -9668,9 +9887,9 @@ var Renderer = class {
       renderingContext.depthMask(true);
     }
     const applyParameterCount = material.apply.length;
-    const wantsWorldMatrix = applyParameterCount >= MATERIAL_APPLY_WORLD_MATRIX_PARAM_COUNT;
-    const wantsNormalMatrix = applyParameterCount >= MATERIAL_APPLY_WORLD_INVERSE_TRANSPOSE_PARAM_COUNT;
-    const wantsCameraPosition = applyParameterCount >= MATERIAL_APPLY_CAMERA_POSITION_PARAM_COUNT;
+    const wantsWorldMatrix = applyParameterCount >= RENDERER_MATERIAL_APPLY_PARAM_COUNTS.WORLD_MATRIX;
+    const wantsNormalMatrix = applyParameterCount >= RENDERER_MATERIAL_APPLY_PARAM_COUNTS.WORLD_INVERSE_TRANSPOSE;
+    const wantsCameraPosition = applyParameterCount >= RENDERER_MATERIAL_APPLY_PARAM_COUNTS.CAMERA_POSITION;
     if (!wantsWorldMatrix) {
       material.apply(this.#finalMatrix);
     } else if (!wantsNormalMatrix) {
@@ -9694,7 +9913,7 @@ var Renderer = class {
       mode,
       indexCount,
       geometry.getIndexComponentType(isWireframeEnabled),
-      INDEX_BUFFER_OFFSET_BYTES
+      RENDERER_DRAW.INDEX_BUFFER_OFFSET_BYTES
     );
   }
   /**
@@ -9708,9 +9927,9 @@ var Renderer = class {
     this.#activeDirectionalLight = null;
     this.#activeAmbientLight = null;
     const stack = this.#lightSearchStack;
-    stack.length = STACK_EMPTY_LENGTH;
+    stack.length = RENDERER_TRAVERSAL.STACK_EMPTY_LENGTH;
     stack.push(scene);
-    while (stack.length > STACK_EMPTY_LENGTH && (this.#activeDirectionalLight === null || this.#activeAmbientLight === null)) {
+    while (stack.length > RENDERER_TRAVERSAL.STACK_EMPTY_LENGTH && (this.#activeDirectionalLight === null || this.#activeAmbientLight === null)) {
       const node = stack.pop();
       if (this.#activeDirectionalLight === null && node instanceof DirectionalLight && node.isEnabled()) {
         this.#activeDirectionalLight = node;
@@ -9718,7 +9937,7 @@ var Renderer = class {
         this.#activeAmbientLight = node;
       }
       const children = node.children;
-      for (let index = LOOP_START_INDEX; index < children.length; index += LOOP_INCREMENT) {
+      for (let index = RENDERER_TRAVERSAL.CHILD_LOOP_START_INDEX; index < children.length; index += RENDERER_TRAVERSAL.CHILD_LOOP_INCREMENT) {
         stack.push(children[index]);
       }
     }
@@ -9737,22 +9956,31 @@ function resolvePrimitiveMode(renderingContext, primitive) {
     case PRIMITIVE_POINTS:
       return renderingContext.POINTS;
     default:
-      throw new Error(ERROR_UNKNOWN_PRIMITIVE);
+      throw new Error(RENDERER_EXCEPTION_MESSAGES.UNKNOWN_PRIMITIVE);
   }
 }
 
+// core/constants/engine.js
+var ENGINE_CAMERA_DEFAULTS = Object.freeze({
+  FIELD_OF_VIEW_RADIANS: Math.PI / 4,
+  NEAR_CLIPPING_PLANE: 0.1,
+  FAR_CLIPPING_PLANE: 100,
+  INITIAL_CAMERA_Z: 5,
+  INITIAL_CAMERA_ASPECT_RATIO: 1
+});
+var ENGINE_CANVAS_DEFAULTS = Object.freeze({ FIT_TO_WINDOW: false });
+var ENGINE_HELPER_DEFAULTS = Object.freeze({ BOX_SIZE: 1 });
+var ENGINE_VALIDATION_LIMITS = Object.freeze({
+  MIN_BOX_SIZE_EXCLUSIVE: 0,
+  MIN_NUMBER_EXCLUSIVE: 0
+});
+var ENGINE_TIME = Object.freeze({ MILLISECONDS_TO_SECONDS: 1e-3 });
+var ENGINE_STATE_RESET = Object.freeze({
+  ANIMATION_FRAME_ID: 0,
+  TIME_SECONDS: 0
+});
+
 // core/engine/engine.js
-var DEFAULT_FIELD_OF_VIEW_RADIANS3 = Math.PI / 4;
-var DEFAULT_NEAR3 = 0.1;
-var DEFAULT_FAR3 = 100;
-var DEFAULT_INITIAL_CAMERA_Z = 5;
-var MILLISECONDS_TO_SECONDS = 1e-3;
-var DEFAULT_BOX_SIZE2 = 1;
-var MIN_BOX_SIZE = 0;
-var ENGINE_ANIMATION_FRAME_ID_RESET_VALUE = 0;
-var ENGINE_TIME_SECONDS_RESET_VALUE = 0;
-var INITIAL_CAMERA_ASPECT_RATIO = 1;
-var MIN_EXCLUSIVE_NUMBER = 0;
 var Engine = class {
   /**
    * WebGL context wrapper used by the engine.
@@ -9798,13 +10026,13 @@ var Engine = class {
    */
   #isRunning = false;
   /**
-   * Stores the active requestAnimationFrame id.
+   * Stores the active `requestAnimationFrame` id.
    * A reset value (usually `0`) indicates, that no frame is currently scheduled.
    *
    * @type {number}
    * @private
    */
-  #requestAnimationFrameId = ENGINE_ANIMATION_FRAME_ID_RESET_VALUE;
+  #requestAnimationFrameId = ENGINE_STATE_RESET.ANIMATION_FRAME_ID;
   /**
    * Timestamp (in seconds) of the previous frame.
    * Used to compute deltaTimeSeconds.
@@ -9812,7 +10040,7 @@ var Engine = class {
    * @type {number}
    * @private
    */
-  #lastTimeSeconds = ENGINE_TIME_SECONDS_RESET_VALUE;
+  #lastTimeSeconds = ENGINE_STATE_RESET.TIME_SECONDS;
   /**
    * Start timestamp (in seconds) of the engine loop.
    * Used to compute `engineTimeSeconds`.
@@ -9820,7 +10048,7 @@ var Engine = class {
    * @type {number}
    * @private
    */
-  #startTimeSeconds = ENGINE_TIME_SECONDS_RESET_VALUE;
+  #startTimeSeconds = ENGINE_STATE_RESET.TIME_SECONDS;
   /**
    * Optional per-frame callback invoked by `Engine.start(callback)`.
    *
@@ -9835,7 +10063,7 @@ var Engine = class {
    * @type {{ fitToWindow: boolean }}
    * @private
    */
-  #resizeOptions = { fitToWindow: false };
+  #resizeOptions = { fitToWindow: ENGINE_CANVAS_DEFAULTS.FIT_TO_WINDOW };
   /**
    * @param {HTMLCanvasElement} canvas - Canvas used for rendering.
    * @param {EngineOptions} [options]  - Engine options.
@@ -9848,16 +10076,16 @@ var Engine = class {
       throw new TypeError("Engine expects an options object (plain object).");
     }
     const {
-      fieldOfViewRadians = DEFAULT_FIELD_OF_VIEW_RADIANS3,
-      near = DEFAULT_NEAR3,
-      far = DEFAULT_FAR3,
-      initialCameraZ = DEFAULT_INITIAL_CAMERA_Z,
-      fitToWindow = false
+      fieldOfViewRadians = ENGINE_CAMERA_DEFAULTS.FIELD_OF_VIEW_RADIANS,
+      near = ENGINE_CAMERA_DEFAULTS.NEAR_CLIPPING_PLANE,
+      far = ENGINE_CAMERA_DEFAULTS.FAR_CLIPPING_PLANE,
+      initialCameraZ = ENGINE_CAMERA_DEFAULTS.INITIAL_CAMERA_Z,
+      fitToWindow = ENGINE_CANVAS_DEFAULTS.FIT_TO_WINDOW
     } = options;
-    if (typeof fieldOfViewRadians !== "number" || fieldOfViewRadians <= MIN_EXCLUSIVE_NUMBER) {
+    if (typeof fieldOfViewRadians !== "number" || fieldOfViewRadians <= ENGINE_VALIDATION_LIMITS.MIN_NUMBER_EXCLUSIVE) {
       throw new RangeError("Engine option `fieldOfViewRadians` must be a positive number.");
     }
-    if (typeof near !== "number" || typeof far !== "number" || near <= MIN_EXCLUSIVE_NUMBER || far <= MIN_EXCLUSIVE_NUMBER || near >= far) {
+    if (typeof near !== "number" || typeof far !== "number" || near <= ENGINE_VALIDATION_LIMITS.MIN_NUMBER_EXCLUSIVE || far <= ENGINE_VALIDATION_LIMITS.MIN_NUMBER_EXCLUSIVE || near >= far) {
       throw new RangeError("Engine options `near` and `far` must be positive numbers and near < far.");
     }
     if (typeof initialCameraZ !== "number") {
@@ -9870,7 +10098,7 @@ var Engine = class {
     this.#contextWrapper = new WebGLContext(canvas);
     this.#renderer = new Renderer(this.#contextWrapper);
     this.#scene = new Scene();
-    this.#camera = new PerspectiveCamera(fieldOfViewRadians, INITIAL_CAMERA_ASPECT_RATIO, near, far);
+    this.#camera = new PerspectiveCamera(fieldOfViewRadians, ENGINE_CAMERA_DEFAULTS.INITIAL_CAMERA_ASPECT_RATIO, near, far);
     this.#camera.position.z = initialCameraZ;
   }
   /** @returns {WebGLContext} */
@@ -9907,8 +10135,8 @@ var Engine = class {
     if (options === null || typeof options !== "object" || Array.isArray(options)) {
       throw new TypeError("`Engine.createBoxMesh` expects an options object (plain object).");
     }
-    const { size = DEFAULT_BOX_SIZE2, material } = options;
-    if (typeof size !== "number" || size <= MIN_BOX_SIZE) {
+    const { size = ENGINE_HELPER_DEFAULTS.BOX_SIZE, material } = options;
+    if (typeof size !== "number" || size <= ENGINE_VALIDATION_LIMITS.MIN_BOX_SIZE_EXCLUSIVE) {
       throw new RangeError("`Engine.createBoxMesh` option `size` must be a positive number.");
     }
     if (material !== void 0 && !(material instanceof Material)) {
@@ -9941,8 +10169,8 @@ var Engine = class {
     }
     this.#isRunning = true;
     this.#frameCallback = frameCallback || null;
-    this.#lastTimeSeconds = ENGINE_TIME_SECONDS_RESET_VALUE;
-    this.#startTimeSeconds = ENGINE_TIME_SECONDS_RESET_VALUE;
+    this.#lastTimeSeconds = ENGINE_STATE_RESET.TIME_SECONDS;
+    this.#startTimeSeconds = ENGINE_STATE_RESET.TIME_SECONDS;
     this.#requestAnimationFrameId = window.requestAnimationFrame((timeMs) => this.#renderFrame(timeMs));
   }
   /**
@@ -9953,7 +10181,7 @@ var Engine = class {
       return;
     }
     window.cancelAnimationFrame(this.#requestAnimationFrameId);
-    this.#requestAnimationFrameId = ENGINE_ANIMATION_FRAME_ID_RESET_VALUE;
+    this.#requestAnimationFrameId = ENGINE_STATE_RESET.ANIMATION_FRAME_ID;
     this.#isRunning = false;
     this.#frameCallback = null;
   }
@@ -9973,8 +10201,8 @@ var Engine = class {
    * @private
    */
   #renderFrame(timeMs) {
-    const timeSeconds = timeMs * MILLISECONDS_TO_SECONDS;
-    if (this.#startTimeSeconds === ENGINE_TIME_SECONDS_RESET_VALUE) {
+    const timeSeconds = timeMs * ENGINE_TIME.MILLISECONDS_TO_SECONDS;
+    if (this.#startTimeSeconds === ENGINE_STATE_RESET.TIME_SECONDS) {
       this.#startTimeSeconds = timeSeconds;
       this.#lastTimeSeconds = timeSeconds;
     }
@@ -10880,14 +11108,13 @@ var COMPONENT_INDEX_X = 0;
 var COMPONENT_INDEX_Y = 1;
 var COMPONENT_INDEX_Z = 2;
 var VERTEX_KEY_SEPARATOR = "|";
-var LOOP_INCREMENT2 = 1;
+var LOOP_INCREMENT = 1;
 var LINE_MIN_VERTEX_COUNT = 2;
 var ENTRY_TYPE_MESH = "mesh";
 var ENTRY_TYPE_POINTS = "points";
 var ENTRY_TYPE_LINE = "line";
 var ERROR_WEBGL_CONTEXT_TYPE3 = "`ObjGeometryBuilder` expects a `WebGL2RenderingContext`.";
 var ERROR_PARSED_DATA_TYPE = "`ObjGeometryBuilder.build` expects parsed OBJ data as an object.";
-var TYPEOF_OBJECT2 = "object";
 var ObjGeometryBuilder = class _ObjGeometryBuilder {
   /**
    * WebGL2 rendering context used to create the geometries.
@@ -10914,7 +11141,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
    * @throws {TypeError} When `parsedData` is invalid.
    */
   build(parsedData) {
-    if (parsedData === null || typeof parsedData !== TYPEOF_OBJECT2 || Array.isArray(parsedData)) {
+    if (parsedData === null || typeof parsedData !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(parsedData)) {
       throw new TypeError(ERROR_PARSED_DATA_TYPE);
     }
     const root = new Object3D();
@@ -11070,7 +11297,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
           _ObjGeometryBuilder.#appendColor(colors, positionIndex, colorsOut);
         }
         indicesOut.push(vertexIndex);
-        vertexIndex += LOOP_INCREMENT2;
+        vertexIndex += LOOP_INCREMENT;
       }
     }
   }
@@ -11324,10 +11551,6 @@ var ERROR_CLAMP_OPTION_TYPE = "`MtlTextureCache.getTexture` expects `options.cla
 var ERROR_WRAP_S_OPTION_TYPE = "`MtlTextureCache.getTexture` expects `options.wrapS` as a number.";
 var ERROR_WRAP_T_OPTION_TYPE = "`MtlTextureCache.getTexture` expects `options.wrapT` as a number.";
 var CACHE_KEY_SEPARATOR = "|";
-var TYPEOF_STRING = "string";
-var TYPEOF_OBJECT3 = "object";
-var TYPEOF_BOOLEAN3 = "boolean";
-var TYPEOF_NUMBER2 = "number";
 var MtlTextureCache = class _MtlTextureCache {
   /**
    * WebGL2 rendering context, used to create the textures.
@@ -11366,23 +11589,23 @@ var MtlTextureCache = class _MtlTextureCache {
    * @throws {TypeError} When url or output are invalid.
    */
   async getTexture(url, output, options = {}) {
-    if (typeof url !== TYPEOF_STRING) {
+    if (typeof url !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
       throw new TypeError(ERROR_TEXTURE_URL_TYPE);
     }
     if (!Array.isArray(output)) {
       throw new TypeError(ERROR_OUTPUT_LIST_TYPE);
     }
-    if (options === null || typeof options !== TYPEOF_OBJECT3 || Array.isArray(options)) {
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
       throw new TypeError(ERROR_OPTIONS_TYPE2);
     }
     const { clamp = false, wrapS, wrapT } = options;
-    if (typeof clamp !== TYPEOF_BOOLEAN3) {
+    if (typeof clamp !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
       throw new TypeError(ERROR_CLAMP_OPTION_TYPE);
     }
-    if (wrapS !== void 0 && typeof wrapS !== TYPEOF_NUMBER2) {
+    if (wrapS !== void 0 && typeof wrapS !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER) {
       throw new TypeError(ERROR_WRAP_S_OPTION_TYPE);
     }
-    if (wrapT !== void 0 && typeof wrapT !== TYPEOF_NUMBER2) {
+    if (wrapT !== void 0 && typeof wrapT !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER) {
       throw new TypeError(ERROR_WRAP_T_OPTION_TYPE);
     }
     const resolvedWrapS = wrapS !== void 0 ? wrapS : clamp ? this.#webglContext.CLAMP_TO_EDGE : this.#webglContext.REPEAT;
@@ -11417,7 +11640,7 @@ var MtlTextureCache = class _MtlTextureCache {
 // core/loaders/obj-mtl/obj-material-factory.js
 var DEFAULT_TEXTURE_UNIT_INDEX3 = 0;
 var DEFAULT_OPACITY2 = 1;
-var DEFAULT_AMBIENT_STRENGTH2 = 0.2;
+var DEFAULT_AMBIENT_STRENGTH = 0.2;
 var COLOR_COMPONENT_COUNT6 = 3;
 var DEFAULT_DIFFUSE_COLOR2 = new Float32Array([1, 1, 1]);
 var DEFAULT_SHININESS3 = 16;
@@ -11446,8 +11669,6 @@ var ERROR_DEFAULT_COLOR_LENGTH = "`ObjMaterialFactory` expects `defaultColor` to
 var ERROR_TEXTURE_CACHE_TYPE = "`ObjMaterialFactory` expects `textureCache` as `MtlTextureCache`.";
 var ERROR_TEXTURES_OUTPUT_TYPE = "`ObjMaterialFactory.createMaterial` expects `textures` as an array.";
 var ERROR_TEXTURE_UNITS_LIMIT = "`ObjMaterialFactory` cannot allocate texture units for MTL maps. Increase available texture units or reduce the number of maps.";
-var TYPEOF_OBJECT4 = "object";
-var TYPEOF_NUMBER3 = "number";
 var ObjMaterialFactory = class _ObjMaterialFactory {
   /**
    * WebGL2 rendering context used to create the materials.
@@ -11486,7 +11707,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
       throw new TypeError(ERROR_WEBGL_CONTEXT_TYPE5);
     }
-    if (options === null || typeof options !== TYPEOF_OBJECT4 || Array.isArray(options)) {
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
       throw new TypeError(ERROR_OPTIONS_TYPE3);
     }
     const {
@@ -11536,7 +11757,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
         ambientColor,
         specularColor: definition.specularColor,
         emissiveColor: definition.emissiveColor,
-        ambientStrength: DEFAULT_AMBIENT_STRENGTH2
+        ambientStrength: DEFAULT_AMBIENT_STRENGTH
       });
       material.setOpacity(opacity);
       material.setShininess(_ObjMaterialFactory.#clampShininess(definition.specularExponent));
@@ -11686,7 +11907,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
    * @private
    */
   static #isColorNearZero(color) {
-    if (!color || typeof color.length !== TYPEOF_NUMBER3 || color.length < COLOR_COMPONENT_COUNT6) {
+    if (!color || typeof color.length !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || color.length < COLOR_COMPONENT_COUNT6) {
       return true;
     }
     return Math.abs(color[FIRST_INDEX2]) <= AMBIENT_COLOR_EPSILON && Math.abs(color[SECOND_INDEX2]) <= AMBIENT_COLOR_EPSILON && Math.abs(color[THIRD_INDEX2]) <= AMBIENT_COLOR_EPSILON;
@@ -11699,7 +11920,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
    * @private
    */
   static #clampShininess(value) {
-    if (typeof value !== TYPEOF_NUMBER3 || !Number.isFinite(value)) {
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
       return DEFAULT_SHININESS3;
     }
     return Math.min(Math.max(value, MIN_SHININESS), MAX_SHININESS);
@@ -11799,7 +12020,6 @@ var PATH_SEPARATOR = "/";
 var EMPTY_STRING = "";
 var SECOND_INDEX3 = 1;
 var SPACE_SEPARATOR = " ";
-var TYPEOF_STRING2 = "string";
 var ERROR_MATERIAL_NAME_TYPE = "`MaterialNameNormalizer.normalize` expects `name` as a string.";
 var MaterialNameNormalizer = class {
   /**
@@ -11810,7 +12030,7 @@ var MaterialNameNormalizer = class {
    * @throws {TypeError} When name is not a string.
    */
   static normalize(name) {
-    if (typeof name !== TYPEOF_STRING2) {
+    if (typeof name !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
       throw new TypeError(ERROR_MATERIAL_NAME_TYPE);
     }
     let normalized = name.replace(CARRIAGE_RETURN_REGEX, EMPTY_STRING).trim();
@@ -11846,7 +12066,6 @@ var LINE_SPLIT_REGEX = /\s+/u;
 var LINE_BREAK_REGEX = /\r?\n/u;
 var QUOTE_TOKEN2 = '"';
 var NOT_FOUND_INDEX = -1;
-var TYPEOF_STRING3 = "string";
 var FACE_MIN_VERTEX_COUNT = 3;
 var LINE_MIN_VERTEX_COUNT2 = 2;
 var POSITION_COMPONENT_COUNT7 = 3;
@@ -11957,7 +12176,7 @@ var ObjParser = class _ObjParser {
    * @throws {TypeError} When `objText` is not a string.
    */
   parse(objText) {
-    if (typeof objText !== TYPEOF_STRING3) {
+    if (typeof objText !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
       throw new TypeError(ERROR_OBJ_TEXT_TYPE);
     }
     this.#resetState();
@@ -12552,7 +12771,6 @@ var SECOND_INDEX5 = 1;
 var THIRD_INDEX4 = 2;
 var FOURTH_INDEX2 = 3;
 var DECIMAL_RADIX2 = 10;
-var TYPEOF_STRING4 = "string";
 var ERROR_MTL_TEXT_TYPE = "`MtlParser.parse` expects `mtlText` as a string.";
 var MtlParser = class _MtlParser {
   /**
@@ -12563,7 +12781,7 @@ var MtlParser = class _MtlParser {
    * @throws {TypeError} When mtlText is not a string.
    */
   parse(mtlText) {
-    if (typeof mtlText !== TYPEOF_STRING4) {
+    if (typeof mtlText !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
       throw new TypeError(ERROR_MTL_TEXT_TYPE);
     }
     const materials = /* @__PURE__ */ new Map();
@@ -12783,7 +13001,7 @@ var MtlParser = class _MtlParser {
    * @private
    */
   static #parseMtlMapLine(line) {
-    if (typeof line !== TYPEOF_STRING4) {
+    if (typeof line !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
       return null;
     }
     let sanitized = line;
@@ -12955,7 +13173,7 @@ var MtlParser = class _MtlParser {
    * @private
    */
   static #isNumericToken(token) {
-    if (typeof token !== TYPEOF_STRING4) {
+    if (typeof token !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
       return false;
     }
     return MAP_FLOAT_TOKEN_REGEX.test(token);
@@ -12988,7 +13206,7 @@ var MtlParser = class _MtlParser {
    * @private
    */
   static #normalizeQuotedPath(path) {
-    if (typeof path !== TYPEOF_STRING4) {
+    if (typeof path !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
       return EMPTY_STRING3;
     }
     let normalized = path.trim();
@@ -13020,8 +13238,6 @@ var COLOR_COMPONENT_COUNT9 = 3;
 var ENTRY_TYPE_MESH2 = "mesh";
 var ENTRY_TYPE_POINTS2 = "points";
 var ENTRY_TYPE_LINE2 = "line";
-var TYPEOF_STRING5 = "string";
-var TYPEOF_OBJECT5 = "object";
 var ERROR_WEBGL_CONTEXT_TYPE6 = "`ObjMtlLoader` expects a `WebGL2RenderingContext`.";
 var ERROR_OPTIONS_TYPE4 = "`ObjMtlLoader` expects options as a plain object.";
 var ERROR_TEXTURE_UNIT_INDEX_TYPE2 = "`ObjMtlLoader` expects `textureUnitIndex` as a non-negative integer.";
@@ -13116,7 +13332,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
       throw new TypeError(ERROR_WEBGL_CONTEXT_TYPE6);
     }
-    if (options === null || typeof options !== TYPEOF_OBJECT5 || Array.isArray(options)) {
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
       throw new TypeError(ERROR_OPTIONS_TYPE4);
     }
     const {
@@ -13155,7 +13371,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
    * @throws {TypeError} When options are invalid.
    */
   async loadFromUrls(options = {}) {
-    if (options === null || typeof options !== TYPEOF_OBJECT5 || Array.isArray(options)) {
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
       throw new TypeError(ERROR_LOAD_OPTIONS_TYPE);
     }
     const {
@@ -13164,16 +13380,16 @@ var ObjMtlLoader = class _ObjMtlLoader {
       baseUrl = DEFAULT_BASE_URL,
       textureBaseUrl
     } = options;
-    if (typeof objUrl !== TYPEOF_STRING5) {
+    if (typeof objUrl !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
       throw new TypeError(ERROR_OBJ_URL_TYPE);
     }
-    if (mtlUrl !== void 0 && typeof mtlUrl !== TYPEOF_STRING5) {
+    if (mtlUrl !== void 0 && typeof mtlUrl !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
       throw new TypeError(ERROR_MTL_URL_TYPE);
     }
-    if (typeof baseUrl !== TYPEOF_STRING5) {
+    if (typeof baseUrl !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
       throw new TypeError(ERROR_BASE_URL_TYPE);
     }
-    if (textureBaseUrl !== void 0 && typeof textureBaseUrl !== TYPEOF_STRING5) {
+    if (textureBaseUrl !== void 0 && typeof textureBaseUrl !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
       throw new TypeError(ERROR_TEXTURE_BASE_URL_TYPE);
     }
     const objText = await _ObjMtlLoader.#fetchText(objUrl);
@@ -13223,7 +13439,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
    * @throws {TypeError} When options are invalid.
    */
   async loadFromFiles(options = {}) {
-    if (options === null || typeof options !== TYPEOF_OBJECT5 || Array.isArray(options)) {
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
       throw new TypeError(ERROR_LOAD_OPTIONS_TYPE);
     }
     const {
@@ -13242,10 +13458,10 @@ var ObjMtlLoader = class _ObjMtlLoader {
     if (assetUrlMap !== void 0 && !(assetUrlMap instanceof Map)) {
       throw new TypeError(ERROR_ASSET_URL_MAP_TYPE);
     }
-    if (typeof baseUrl !== TYPEOF_STRING5) {
+    if (typeof baseUrl !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
       throw new TypeError(ERROR_FILES_BASE_URL_TYPE);
     }
-    if (textureBaseUrl !== void 0 && typeof textureBaseUrl !== TYPEOF_STRING5) {
+    if (textureBaseUrl !== void 0 && typeof textureBaseUrl !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
       throw new TypeError(ERROR_FILES_TEXTURE_BASE_URL_TYPE);
     }
     const objText = await objFile.text();
@@ -13473,7 +13689,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
    * @private
    */
   static #normalizePath(path) {
-    if (typeof path !== TYPEOF_STRING5) {
+    if (typeof path !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
       return EMPTY_STRING4;
     }
     let normalized = path.trim();
@@ -14083,7 +14299,7 @@ var INPUT_BACKWARD = -1;
 var INPUT_NONE = 0;
 var SPEED_SCALE_DEFAULT = 1;
 var INPUT_EPSILON = 1e-4;
-var LOOP_START_INDEX2 = 0;
+var LOOP_START_INDEX = 0;
 var LOOP_INDEX_INCREMENT = 1;
 var MINIMUM_NON_NEGATIVE_VALUE = 0;
 var MINIMUM_POSITIVE_VALUE = 0;
@@ -14593,7 +14809,7 @@ var KeyboardControls = class _KeyboardControls {
    */
   #initActionStates() {
     const actionValues = Object.values(ACTIONS);
-    for (let index = LOOP_START_INDEX2; index < actionValues.length; index += LOOP_INDEX_INCREMENT) {
+    for (let index = LOOP_START_INDEX; index < actionValues.length; index += LOOP_INDEX_INCREMENT) {
       this.#actionStates.set(actionValues[index], false);
     }
   }
@@ -15199,7 +15415,7 @@ var DEFAULT_SORT = true;
 var NDC_NEAR = -1;
 var NDC_FAR = 1;
 var CLIP_W = 1;
-var ZERO_COMPONENT2 = 0;
+var ZERO_COMPONENT = 0;
 var ONE_COMPONENT = 1;
 var MATRIX_INDEX_00 = 0;
 var MATRIX_INDEX_01 = 1;
@@ -15217,8 +15433,8 @@ var MATRIX_INDEX_30 = 12;
 var MATRIX_INDEX_31 = 13;
 var MATRIX_INDEX_32 = 14;
 var MATRIX_INDEX_33 = 15;
-var LOOP_START_INDEX3 = 0;
-var LOOP_INCREMENT3 = 1;
+var LOOP_START_INDEX2 = 0;
+var LOOP_INCREMENT2 = 1;
 var VECTOR_INDEX_X = 0;
 var VECTOR_INDEX_Y = 1;
 var VECTOR_INDEX_Z = 2;
@@ -15296,7 +15512,7 @@ var Raycaster = class _Raycaster {
       scene.traverse((object) => _Raycaster.#collectIntersection(object, ray, filter, intersections));
     } else {
       const children = scene.children;
-      for (let index = LOOP_START_INDEX3; index < children.length; index += LOOP_INCREMENT3) {
+      for (let index = LOOP_START_INDEX2; index < children.length; index += LOOP_INCREMENT2) {
         _Raycaster.#collectIntersection(children[index], ray, filter, intersections);
       }
     }
@@ -15327,7 +15543,7 @@ var Raycaster = class _Raycaster {
     const boundingBoxMax = geometry.getBoundingBoxMax();
     const inverseWorldMatrix = Matrix4.invert(object.worldMatrix);
     const localOrigin = _Raycaster.#transformPoint(inverseWorldMatrix, ray.origin, ONE_COMPONENT);
-    const localDirection = _Raycaster.#transformPoint(inverseWorldMatrix, ray.direction, ZERO_COMPONENT2);
+    const localDirection = _Raycaster.#transformPoint(inverseWorldMatrix, ray.direction, ZERO_COMPONENT);
     const hitDistance = _Raycaster.#intersectRayAabb(localOrigin, localDirection, boundingBoxMin, boundingBoxMax);
     if (hitDistance === null) {
       return;
@@ -15382,7 +15598,7 @@ var Raycaster = class _Raycaster {
     const worldY = matrix[MATRIX_INDEX_01] * clipX + matrix[MATRIX_INDEX_11] * clipY + matrix[MATRIX_INDEX_21] * clipZ + matrix[MATRIX_INDEX_31] * clipW;
     const worldZ = matrix[MATRIX_INDEX_02] * clipX + matrix[MATRIX_INDEX_12] * clipY + matrix[MATRIX_INDEX_22] * clipZ + matrix[MATRIX_INDEX_32] * clipW;
     const worldW = matrix[MATRIX_INDEX_03] * clipX + matrix[MATRIX_INDEX_13] * clipY + matrix[MATRIX_INDEX_23] * clipZ + matrix[MATRIX_INDEX_33] * clipW;
-    if (worldW === ZERO_COMPONENT2) {
+    if (worldW === ZERO_COMPONENT) {
       throw new Error(ERROR_UNPROJECT_W_ZERO);
     }
     const inverseW = ONE_COMPONENT / worldW;
@@ -15419,11 +15635,11 @@ var Raycaster = class _Raycaster {
     const y = vector[COMPONENT_Y];
     const z = vector[COMPONENT_Z];
     const length = Math.sqrt(x * x + y * y + z * z);
-    if (length === ZERO_COMPONENT2) {
+    if (length === ZERO_COMPONENT) {
       return {
-        [COMPONENT_X]: ZERO_COMPONENT2,
-        [COMPONENT_Y]: ZERO_COMPONENT2,
-        [COMPONENT_Z]: ZERO_COMPONENT2
+        [COMPONENT_X]: ZERO_COMPONENT,
+        [COMPONENT_Y]: ZERO_COMPONENT,
+        [COMPONENT_Z]: ZERO_COMPONENT
       };
     }
     const inverseLength = ONE_COMPONENT / length;
@@ -15550,7 +15766,6 @@ var GeraWebGL = Object.freeze({
     Matrix4,
     Vector3,
     Vector3Math,
-    CameraMath,
     Curve3,
     CatmullRomCurve3,
     Path3D
