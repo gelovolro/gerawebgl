@@ -158,10 +158,13 @@ npm run dev
 
 ```bash
 # Check:
-npx eslint core
+npm run lint
+
+# More verbose output:
+npm run lint -- --debug
 
 # Fixing:
-npx eslint core --fix
+npm run lint -- --fix
 ```
 
 ## Docs generation commands:

@@ -34,6 +34,7 @@
     "build:dist-github-pages": "npm run clear:github-pages-root-dir && npm run build:dist && npm run docs:build-locally && npm run copy:all",
     "build:local-dev-stand-and-serve": "npm run build:dist-github-pages && npm run github-pages:serve-locally",
     "build": "npm run build:dist-github-pages",
+    "lint": "eslint core tests *.mjs",
     "dev": "npm run build:local-dev-stand-and-serve",
     "serve": "npm run github-pages:serve-locally",
     "clear:zip": "rimraf *.zip",

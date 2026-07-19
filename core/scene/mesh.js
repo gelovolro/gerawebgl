@@ -1,22 +1,8 @@
-import { Object3D } from './object3d.js';
-import { Geometry } from '../geometry/geometry.js';
-import { Material } from '../material/material.js';
-
-/**
- * Default ownership flag for geometry.
- * When true, `Mesh.dispose()` disposes geometry.
- *
- * @type {boolean}
- */
-const DEFAULT_OWNS_GEOMETRY = true;
-
-/**
- * Default ownership flag for material.
- * When true, `Mesh.dispose()` disposes material.
- *
- * @type {boolean}
- */
-const DEFAULT_OWNS_MATERIAL = true;
+import * as MeshConstants            from '../constants/mesh.js';
+import { ECMASCRIPT_TYPEOF_RESULTS } from '../constants/ecmascript-types.js';
+import { Geometry }                  from '../geometry/geometry.js';
+import { Material }                  from '../material/material.js';
+import { Object3D }                  from './object3d.js';
 
 /**
  * Ownership options for Mesh.
@@ -88,20 +74,26 @@ export class Mesh extends Object3D {
             throw new TypeError('Mesh constructor expects a Material instance.');
         }
 
-        if (ownershipOptions === null || typeof ownershipOptions !== 'object' || Array.isArray(ownershipOptions)) {
+        const ownershipOptionsPrototype = ownershipOptions === null ? null : Object.getPrototypeOf(ownershipOptions);
+
+        if (ownershipOptions === null
+            || typeof ownershipOptions !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT
+            || Array.isArray(ownershipOptions)
+            || (ownershipOptionsPrototype !== Object.prototype && ownershipOptionsPrototype !== null)
+        ) {
             throw new TypeError('Mesh constructor expects `ownershipOptions` as a plain object.');
         }
 
         const {
-            ownsGeometry = DEFAULT_OWNS_GEOMETRY,
-            ownsMaterial = DEFAULT_OWNS_MATERIAL
+            ownsGeometry = MeshConstants.MESH_DEFAULTS.OWNS_GEOMETRY,
+            ownsMaterial = MeshConstants.MESH_DEFAULTS.OWNS_MATERIAL
         } = ownershipOptions;
 
-        if (typeof ownsGeometry !== 'boolean') {
+        if (typeof ownsGeometry !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
             throw new TypeError('Mesh constructor option `ownsGeometry` must be a boolean.');
         }
 
-        if (typeof ownsMaterial !== 'boolean') {
+        if (typeof ownsMaterial !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
             throw new TypeError('Mesh constructor option `ownsMaterial` must be a boolean.');
         }
 
