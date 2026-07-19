@@ -688,13 +688,16 @@ test("'Matrix4.createRotationY' should reject a non-numeric angle", () => {
 
 test("'Matrix4.createRotationZ' should create a rotation matrix around Z axis", () => {
     // Arrange
-    const angleRadians   = Matrix4TestFixtures.ROTATION_ANGLE_RADIANS;
+    const angleRadians = Matrix4TestFixtures.ROTATION_ANGLE_RADIANS;
+
+    /* eslint-disable indent */
     const expectedMatrix = new Float32Array([
          0, 1, 0, 0,
         -1, 0, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
+         0, 0, 1, 0,
+         0, 0, 0, 1
     ]);
+    /* eslint-enable indent */
 
     // Act
     const actualMatrix = Matrix4.createRotationZ(angleRadians);

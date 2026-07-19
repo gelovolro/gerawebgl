@@ -15,6 +15,7 @@ class CameraTestFixtures {
         ]);
     }
 
+    /* eslint-disable indent */
     static createExpectedTranslationViewMatrix() {
         return new Float32Array([
               1,   0,   0,  0,
@@ -32,6 +33,7 @@ class CameraTestFixtures {
              0,  0,  0,  1
         ]);
     }
+    /* eslint-enable indent */
 
     static createExpectedScaleViewMatrix() {
         return new Float32Array([

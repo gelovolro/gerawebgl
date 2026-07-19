@@ -48,7 +48,9 @@ export class RunningChildProcess {
                 }
 
                 await response.arrayBuffer();
-            } catch { }
+            } catch {
+                // Ignore the connection errors while waiting for the server to start
+            }
 
             await AsyncProcessUtils.delay(TestConstants.DEFAULT_HTTP_POLL_INTERVAL_MS);
         }

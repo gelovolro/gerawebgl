@@ -53,8 +53,8 @@ const activeProcessFixture = new ActiveProcessFixture();
 afterEach(async () => await activeProcessFixture.stopIfRunning());
 
 test("Serve smoke: direct 'http-server' process should start the local GitHub pages site", {
-        timeout: TestConstants.DEFAULT_SERVE_SMOKE_TEST_TIMEOUT_MS
-    }, async () => {
+    timeout: TestConstants.DEFAULT_SERVE_SMOKE_TEST_TIMEOUT_MS
+}, async () => {
 
     // Arrange
     const awaitedHttpCode = 200;
