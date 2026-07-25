@@ -1,5 +1,5 @@
 name: Install the deps, build and run the tests
-description: Install Graphviz, install the NPM dependencies, run build and run tests
+description: Install Graphviz and restore the NPM dependencies. Build the project, run tests and create the NPM package.
 
 runs:
   using: composite
@@ -19,3 +19,7 @@ runs:
     - name: Test stage
       shell: bash
       run: npm test
+
+    - name: Pack the npm package
+      shell: bash
+      run: npm pack
