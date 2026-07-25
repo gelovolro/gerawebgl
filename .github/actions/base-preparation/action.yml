@@ -1,4 +1,4 @@
-name: Install the deps, build and run the tests
+name: Install the deps, build, run the tests and create the NPM package
 description: Install Graphviz and restore the NPM dependencies. Build the project, run tests and create the NPM package.
 
 runs:

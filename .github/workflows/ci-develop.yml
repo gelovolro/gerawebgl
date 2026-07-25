@@ -19,5 +19,5 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Restore the dependencies, build and run the tests
+      - name: Restore the dependencies, build, run the tests and create the NPM package
         uses: ./.github/actions/base-preparation
