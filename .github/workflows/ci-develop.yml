@@ -1,8 +1,8 @@
-name: CI (develop branch) on PR
+name: CI on PR
 
 on:
   pull_request:
-    branches: [develop]
+    branches: [develop, master]
   workflow_dispatch:
 
 permissions:
