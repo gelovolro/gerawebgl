@@ -34,12 +34,13 @@
     "build:dist-github-pages": "npm run clear:github-pages-root-dir && npm run build:dist && npm run docs:build-locally && npm run copy:all",
     "build:local-dev-stand-and-serve": "npm run build:dist-github-pages && npm run github-pages:serve-locally",
     "build": "npm run build:dist-github-pages",
+    "prepack": "npm run build:dist",
     "lint": "eslint core tests *.mjs",
     "dev": "npm run build:local-dev-stand-and-serve",
     "serve": "npm run github-pages:serve-locally",
     "clear:zip": "rimraf *.zip",
-    "create:zip-full": "npm run clear:zip && zip -r \"gerawebgl-full-sources-$(date +%d%m%y%H%M%S).zip\" . -x \"*.zip\" \"node_modules/*\" \".git/*\"",
-    "create:zip-lite": "npm run clear:zip && zip -r \"gerawebgl-lite-sources-$(date +%d%m%y%H%M%S).zip\" . -x \"*.zip\" \"node_modules/*\" \".git/*\" \"demo-assets/*\" \"dist-github-pages/*\" \"docs/*\"",
+    "create:zip-full": "npm run clear:zip && zip -r \"gerawebgl-full-sources-$(date +%d%m%y%H%M%S).zip\" . -x \"*.zip\" \"*.tgz\" \"node_modules/*\" \".git/*\"",
+    "create:zip-lite": "npm run clear:zip && zip -r \"gerawebgl-lite-sources-$(date +%d%m%y%H%M%S).zip\" . -x \"*.zip\" \"*.tgz\" \"node_modules/*\" \".git/*\" \"demo-assets/*\" \"dist-github-pages/*\" \"docs/*\"",
     "deps:check": "depcruise core --include-only '^core'",
     "deps:showgraph:raw": "depcruise core --include-only '^core' --output-type mermaid",
     "deps:generate:diagrams": "node ./render-dependency-graph.mjs",
@@ -49,7 +50,9 @@
     "test:smoke:serve": "node --test tests/smoke/scripts-serve.test.mjs",
     "test:smoke": "npm run test:smoke:oneshot && npm run test:smoke:serve",
     "test": "npm run lint -- --debug && npm run test:unit:coverage && npm run test:smoke",
-    "git:restore:generated": "git restore -- dist dist-github-pages docs"
+    "git:restore:generated": "git restore -- dist dist-github-pages docs",
+    "package-version:update": "node update-package-version.mjs --action=update",
+    "package-version:rollback": "node update-package-version.mjs --action=rollback"
   },
   "keywords": [
     "gera",

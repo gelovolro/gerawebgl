@@ -229,3 +229,39 @@ Run the unit tests and print the coverage stats:
 ```bash
 npm run test:unit:coverage
 ```
+
+## Package version update/rollback
+
+Update the version:
+
+```bash
+npm run package-version:update -- --base-version=x.x.x-dev
+```
+
+Rollback to the version, stored in git (using: `git show HEAD:package.json`):
+
+```bash
+npm run package-version:rollback
+```
+
+Create the npm package:
+
+```bash
+npm pack
+```
+
+The `prepack` script automatically rebuilds `dist` before packaging.
+
+### Quick update/rollback check
+
+```bash
+npm run package-version:update -- --base-version=0.2.0-dev
+node -p "require('./package.json').version"
+node -p "require('./package-lock.json').version"
+
+npm run package-version:rollback
+node -p "require('./package.json').version"
+node -p "require('./package-lock.json').version"
+```
+
+After update, both files must contain new timestamped version. After rollback, both versions must match the version, stored in git `HEAD`.

@@ -21,3 +21,6 @@ jobs:
 
       - name: Restore the dependencies, build and run the tests
         uses: ./.github/actions/base-preparation
+
+      - name: Pack the npm package
+        run: npm pack
