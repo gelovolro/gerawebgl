@@ -1,13 +1,17 @@
-name: Release check
+name: Release
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  check:
+  release:
     runs-on: ubuntu-24.04
 
     steps:
@@ -16,37 +20,47 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check the selected branch
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "master" ]; then
+              echo "The release workflow must be started from the 'master' branch."
+              exit 1
+          fi
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
 
-      - name: Read and check the package version
-        id: package
+      - name: Read and check the project version
+        id: project
         shell: bash
         run: |
-          packageVersion="$(node -p "require('./package.json').version")"
+          projectVersion="$(node -p "require('./package.json').version")"
           lockVersion="$(node -p "require('./package-lock.json').version")"
+          lockProjectVersion="$(node -p "require('./package-lock.json').packages[''].version")"
 
-          if [ "${packageVersion}" != "${lockVersion}" ]; then
-              echo "The package.json and package-lock.json versions do not match."
+          if [ "${projectVersion}" != "${lockVersion}" ] || [ "${projectVersion}" != "${lockProjectVersion}" ]; then
+              echo "The project versions do not match."
               exit 1
           fi
 
-          echo "version=${packageVersion}" >> "${GITHUB_OUTPUT}"
-          echo "Package version: ${packageVersion}"
+          echo "version=${projectVersion}" >> "${GITHUB_OUTPUT}"
+          echo "Project version: ${projectVersion}"
 
       - name: Check the future git tag
         shell: bash
         run: |
-          version="${{ steps.package.outputs.version }}"
+          version="${{ steps.project.outputs.version }}"
 
           if git ls-remote --exit-code --tags origin "refs/tags/${version}" > /dev/null 2>&1; then
               echo "git tag '${version}' already exists."
-          else
-              echo "git tag '${version}' is available."
+              exit 1
           fi
+
+          echo "git tag '${version}' is available."
 
       - name: Restore the dependencies, build, run the tests and create the NPM package
         uses: ./.github/actions/base-preparation
@@ -54,3 +68,11 @@ jobs:
       - name: Show the generated NPM package
         shell: bash
         run: ls -lh *.tgz
+
+      - name: Create and push the git tag
+        shell: bash
+        run: |
+          version="${{ steps.project.outputs.version }}"
+
+          git tag "${version}"
+          git push origin "refs/tags/${version}"
