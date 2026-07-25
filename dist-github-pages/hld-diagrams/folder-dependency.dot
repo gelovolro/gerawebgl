@@ -4,9 +4,11 @@ digraph FolderDependencies {
     node [shape=box, style="rounded", fontsize=10, fontname="Arial"];
     edge [fontsize=9, fontname="Arial"];
 
+    "constants";
     "controls";
     "debug";
     "engine";
+    "exception-messages";
     "geometry";
     "interaction";
     "light";
@@ -25,6 +27,7 @@ digraph FolderDependencies {
     "debug" -> "material";
     "debug" -> "math";
     "debug" -> "scene";
+    "engine" -> "constants";
     "engine" -> "geometry";
     "engine" -> "material";
     "engine" -> "render";
@@ -32,19 +35,28 @@ digraph FolderDependencies {
     "geometry" -> "math";
     "interaction" -> "math";
     "interaction" -> "scene";
+    "light" -> "constants";
+    "light" -> "exception-messages";
     "light" -> "scene";
+    "loaders" -> "constants";
     "loaders" -> "geometry";
     "loaders" -> "material";
     "loaders" -> "math";
     "loaders" -> "scene";
     "loaders" -> "texture";
+    "material" -> "constants";
+    "material" -> "exception-messages";
     "material" -> "shader";
     "material" -> "texture";
+    "math" -> "constants";
+    "render" -> "constants";
+    "render" -> "exception-messages";
     "render" -> "geometry";
     "render" -> "light";
     "render" -> "material";
     "render" -> "math";
     "render" -> "scene";
+    "scene" -> "constants";
     "scene" -> "geometry";
     "scene" -> "material";
     "scene" -> "math";

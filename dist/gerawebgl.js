@@ -8314,9 +8314,13 @@ var Object3D = class _Object3D {
   }
 };
 
+// core/constants/mesh.js
+var MESH_DEFAULTS = Object.freeze({
+  OWNS_GEOMETRY: true,
+  OWNS_MATERIAL: true
+});
+
 // core/scene/mesh.js
-var DEFAULT_OWNS_GEOMETRY = true;
-var DEFAULT_OWNS_MATERIAL = true;
 var Mesh = class extends Object3D {
   /**
    * Geometry used by this mesh (vertex/index buffers, VAO).
@@ -8367,17 +8371,18 @@ var Mesh = class extends Object3D {
     if (!(material instanceof Material)) {
       throw new TypeError("Mesh constructor expects a Material instance.");
     }
-    if (ownershipOptions === null || typeof ownershipOptions !== "object" || Array.isArray(ownershipOptions)) {
+    const ownershipOptionsPrototype = ownershipOptions === null ? null : Object.getPrototypeOf(ownershipOptions);
+    if (ownershipOptions === null || typeof ownershipOptions !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(ownershipOptions) || ownershipOptionsPrototype !== Object.prototype && ownershipOptionsPrototype !== null) {
       throw new TypeError("Mesh constructor expects `ownershipOptions` as a plain object.");
     }
     const {
-      ownsGeometry = DEFAULT_OWNS_GEOMETRY,
-      ownsMaterial = DEFAULT_OWNS_MATERIAL
+      ownsGeometry = MESH_DEFAULTS.OWNS_GEOMETRY,
+      ownsMaterial = MESH_DEFAULTS.OWNS_MATERIAL
     } = ownershipOptions;
-    if (typeof ownsGeometry !== "boolean") {
+    if (typeof ownsGeometry !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
       throw new TypeError("Mesh constructor option `ownsGeometry` must be a boolean.");
     }
-    if (typeof ownsMaterial !== "boolean") {
+    if (typeof ownsMaterial !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
       throw new TypeError("Mesh constructor option `ownsMaterial` must be a boolean.");
     }
     this.#geometry = geometry;
