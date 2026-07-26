@@ -1,11 +1,8 @@
-/** @type {number} */
-const ZERO_COMPONENT = 0;
-
-/** @type {number} */
-const UNIT_COMPONENT = 1;
+import * as MathConstants from '../constants/math.js';
 
 /**
- * 3D vector with observable components. Can invoke an onChange callback, when `x, y, z` changes.
+ * 3D vector with the observable 'x, y, z' components.
+ * Invokes an optional 'onChange' callback, when any component changes.
  */
 export class Vector3 {
     /** @type {number} */
@@ -24,16 +21,21 @@ export class Vector3 {
      * @param {number} [x = 0] - X component.
      * @param {number} [y = 0] - Y component.
      * @param {number} [z = 0] - Z component.
-     * @param {Function | null} [onChange = null] - Called when any component changes.
+     * @param {Function | null} [onChange = null] - Called, when any component changes.
      */
-    constructor(x = ZERO_COMPONENT, y = ZERO_COMPONENT, z = ZERO_COMPONENT, onChange = null) {
+    constructor(
+        x = MathConstants.MATH_VECTOR3_COMPONENTS.ZERO,
+        y = MathConstants.MATH_VECTOR3_COMPONENTS.ZERO,
+        z = MathConstants.MATH_VECTOR3_COMPONENTS.ZERO,
+        onChange = null
+    ) {
         if (onChange !== null && typeof onChange !== 'function') {
             throw new TypeError('Vector3 constructor expects `onChange` as a function or null.');
         }
 
-        this.#x = ZERO_COMPONENT;
-        this.#y = ZERO_COMPONENT;
-        this.#z = ZERO_COMPONENT;
+        this.#x = MathConstants.MATH_VECTOR3_COMPONENTS.ZERO;
+        this.#y = MathConstants.MATH_VECTOR3_COMPONENTS.ZERO;
+        this.#z = MathConstants.MATH_VECTOR3_COMPONENTS.ZERO;
         this.#onChange = onChange;
         this.set(x, y, z);
     }
@@ -41,29 +43,31 @@ export class Vector3 {
     /**
      * Creates a new (0, 0, 0) vector.
      *
-     * @param {Function | null} [onChange=null] - Optional callback invoked when the vector changes, or null to disable change notifications.
-     * @returns {Vector3}                       - A new Vector3 instance with all components set to zero (0, 0, 0).
+     * @param {Function | null} [onChange = null] - Optional callback invoked, when the vector changes.
+     * @returns {Vector3}                         - New vector with all components set to zero.
      */
     static createZero(onChange = null) {
         return new Vector3(
-            ZERO_COMPONENT,
-            ZERO_COMPONENT,
-            ZERO_COMPONENT,
+            MathConstants.MATH_VECTOR3_COMPONENTS.ZERO,
+            MathConstants.MATH_VECTOR3_COMPONENTS.ZERO,
+            MathConstants.MATH_VECTOR3_COMPONENTS.ZERO,
             onChange
         );
     }
 
     /**
-     * Creates a new (1, 1, 1) vector (unit scale vector).
+     * Creates a new (1, 1, 1) vector.
      *
-     * @param {Function | null} [onChange=null] - Optional callback invoked when the vector changes, or null to disable change notifications.
-     * @returns {Vector3}                       - A new Vector3 instance with all components set to one (1, 1, 1).
+     * This value is commonly used as a unit scale vector.
+     *
+     * @param {Function | null} [onChange = null] - Optional callback invoked, when the vector changes.
+     * @returns {Vector3}                         - New vector with all components set to one.
      */
     static createUnitScale(onChange = null) {
         return new Vector3(
-            UNIT_COMPONENT,
-            UNIT_COMPONENT,
-            UNIT_COMPONENT,
+            MathConstants.MATH_VECTOR3_COMPONENTS.UNIT,
+            MathConstants.MATH_VECTOR3_COMPONENTS.UNIT,
+            MathConstants.MATH_VECTOR3_COMPONENTS.UNIT,
             onChange
         );
     }
@@ -172,9 +176,9 @@ export class Vector3 {
     }
 
     /**
-     * Sets/updates the onChange callback.
+     * Sets or clears the 'onChange' callback.
      *
-     * @param {Function | null} onChange - Callback invoked when any component changes, or null to disable change notifications.
+     * @param {Function | null} onChange - Callback invoked, when any component changes or null to disable the change notifications.
      * @returns {Vector3}                - This vector instance (for chaining).
      */
     setOnChange(onChange) {
@@ -187,6 +191,8 @@ export class Vector3 {
     }
 
     /**
+     * Emits the change notification, when a callback is registered.
+     *
      * @private
      */
     #emitChange() {

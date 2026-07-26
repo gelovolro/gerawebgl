@@ -1,19 +1,6 @@
-import { Camera }     from './camera.js';
-import { CameraMath } from '../math/camera-math.js';
-
-/**
- * Element count for a 4x4 matrix stored in a flat array.
- *
- * @type {number}
- */
-const MATRIX_4x4_ELEMENT_COUNT = 16;
-
-/**
- * Minimum allowed aspect ratio.
- *
- * @type {number}
- */
-const MINIMUM_ASPECT_RATIO = 0.0;
+import * as MathConstants from '../constants/math.js';
+import { Camera }         from './camera.js';
+import { Matrix4 }        from '../math/matrix4.js';
 
 /**
  * Minimum allowed view size (height in world units).
@@ -136,7 +123,7 @@ export class OrthographicCamera extends Camera {
      */
     constructor(leftOrOptions, right, bottom, top, near, far) {
         super();
-        this.#projectionMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
+        this.#projectionMatrix = new Float32Array(MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
 
         if (leftOrOptions !== null && typeof leftOrOptions === 'object') {
             if (Array.isArray(leftOrOptions) === true) {
@@ -167,7 +154,7 @@ export class OrthographicCamera extends Camera {
             throw new TypeError('`OrthographicCamera.setAspectRatio` expects `aspectRatio` as a number.');
         }
 
-        if (aspectRatio <= MINIMUM_ASPECT_RATIO) {
+        if (aspectRatio <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
             throw new RangeError('`OrthographicCamera.setAspectRatio` expects `aspectRatio` to be a positive number.');
         }
 
@@ -192,7 +179,7 @@ export class OrthographicCamera extends Camera {
      */
     getProjectionMatrix() {
         if (this.#isProjectionMatrixDirty === true) {
-            CameraMath.writeOrthographicMatrixTo(
+            Matrix4.writeOrthographicTo(
                 this.#projectionMatrix,
                 this.#left,
                 this.#right,
@@ -296,7 +283,7 @@ export class OrthographicCamera extends Camera {
             throw new RangeError('`OrthographicCamera` expects `viewSize` to be a positive number.');
         }
 
-        if (aspectRatio <= MINIMUM_ASPECT_RATIO) {
+        if (aspectRatio <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
             throw new RangeError('`OrthographicCamera` expects `aspectRatio` to be a positive number.');
         }
 

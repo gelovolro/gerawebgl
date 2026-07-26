@@ -2,14 +2,15 @@
 
 I first developed my own WebGL library (based on v1.0) back in 2014. Now I’ve decided to revisit those ideas, explore what WebGL 2.0 offers, and rebuild everything from scratch. The project is named in memory of my cat, who died in 2017.
 
-- **API reference (JSDoc):** https://gelovolro.github.io/gerawebgl/
-- **Materials demo:** https://gelovolro.github.io/gerawebgl/demo/materials.html
-- **Geometries demo:** https://gelovolro.github.io/gerawebgl/demo/geometries.html
-- **OBJ/MTL loader demo:** https://gelovolro.github.io/gerawebgl/demo/obj-mtl-demo.html
-- **Character controls demo (WASD, sprinting, jumping, mouse look, bobbing, 1st/3rd person camera):** https://gelovolro.github.io/gerawebgl/demo/character-controls.html
-- **Heightmap terrain generation demo:** https://gelovolro.github.io/gerawebgl/demo/heightmap-terrain-demo.html
-- **Raycasting demo (picking the cube):** https://gelovolro.github.io/gerawebgl/demo/picking-demo.html
-- **Points render & 3D object path movement demo:** https://gelovolro.github.io/gerawebgl/demo/points-and-path-demo.html
+- **GitHub pages site root:** https://gelovolro.github.io/gerawebgl/
+- **API reference (JSDoc):** https://gelovolro.github.io/gerawebgl/api/
+- **Materials demo:** https://gelovolro.github.io/gerawebgl/demos/materials.html
+- **Geometries demo:** https://gelovolro.github.io/gerawebgl/demos/geometries.html
+- **OBJ/MTL loader demo:** https://gelovolro.github.io/gerawebgl/demos/obj-mtl-demo.html
+- **Character controls demo (WASD, sprinting, jumping, mouse look, bobbing, 1st/3rd person camera):** https://gelovolro.github.io/gerawebgl/demos/character-controls.html
+- **Heightmap terrain generation demo:** https://gelovolro.github.io/gerawebgl/demos/heightmap-terrain-demo.html
+- **Raycasting demo (picking the cube):** https://gelovolro.github.io/gerawebgl/demos/picking-demo.html
+- **Points render & 3D object path movement demo:** https://gelovolro.github.io/gerawebgl/demos/points-and-path-demo.html
 
 ## Quick start
 
@@ -149,7 +150,7 @@ Face order for the **18-length** buffer is: **Front, Back, Top, Bottom, Right, L
 # Restore the dependencies:
 npm install
 
-# Building project and serving the demo:
+# Build the project and serve the GitHub pages content locally (demos + docs):
 npm run dev
 ```
 
@@ -157,14 +158,110 @@ npm run dev
 
 ```bash
 # Check:
-npx eslint core
+npm run lint
+
+# More verbose output:
+npm run lint -- --debug
 
 # Fixing:
-npx eslint core --fix
+npm run lint -- --fix
 ```
 
 ## Docs generation commands:
 
 ```bash
+# Generate JSDoc only, without the dependency diagrams:
+npm run docs:build:jsdoc-only
+
+# Generate the local docs bundle, 'JSDoc + HLD dependency diagrams':
+npm run docs:build-locally
+
+# Serve the generated docs locally on port '9091':
+npm run docs:serve
+
+# Generate the full local docs bundle and start the local server:
 npm run docs:build-and-serve
 ```
+
+## Dependency graphs check
+
+This project uses `dependency-cruiser` to inspect the dependencies inside the `core/` directory.
+It can also export the dependency graph in `Mermaid`, a text-based diagram format used for documentation and visualization.
+
+Available commands:
+
+```bash
+# Validates the dependency graph for `core/` using the rules from `.dependency-cruiser.cjs`.  
+# At the moment, this is mainly used to detect the circular dependencies.
+npm run deps:check
+```
+
+```bash
+# Prints the raw `Mermaid` dependency graph for `core/` to stdout.  
+# This is useful, if you want to inspect or reuse the generated `Mermaid` source directly.
+npm run deps:showgraph:raw
+```
+
+```bash
+# Generates the dependency HLD-diagrams under `docs/hld-component-diagrams/`.  
+# This includes the full dependency graph, focused subsystem graphs, and a folder-level overview.
+npm run deps:generate:diagrams
+```
+
+Note: SVG generation requires Graphviz, with the `dot` executable available in `PATH`.
+
+## Testing
+
+Run the full test suite:
+
+```bash
+npm test
+```
+
+Run the unit tests only:
+
+```bash
+npm run test:unit
+```
+
+Run the unit tests and print the coverage stats:
+
+```bash
+npm run test:unit:coverage
+```
+
+## Package version update/rollback
+
+Update the version:
+
+```bash
+npm run package-version:update -- --base-version=x.x.x-dev
+```
+
+Rollback to the version, stored in git (using: `git show HEAD:package.json`):
+
+```bash
+npm run package-version:rollback
+```
+
+Create the npm package:
+
+```bash
+npm pack
+```
+
+The `prepack` script automatically rebuilds `dist` before packaging.
+
+### Quick update/rollback check
+
+```bash
+npm run package-version:update -- --base-version=0.2.0-dev
+node -p "require('./package.json').version"
+node -p "require('./package-lock.json').version"
+
+npm run package-version:rollback
+node -p "require('./package.json').version"
+node -p "require('./package-lock.json').version"
+```
+
+After update, both files must contain new timestamped version. After rollback, both versions must match the version, stored in git `HEAD`.

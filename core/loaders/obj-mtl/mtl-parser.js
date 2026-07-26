@@ -1,4 +1,5 @@
-import { MaterialNameNormalizer } from './material-name-normalizer.js';
+import { ECMASCRIPT_TYPEOF_RESULTS } from '../../constants/ecmascript-types.js';
+import { MaterialNameNormalizer }    from './material-name-normalizer.js';
 
 /**
  * Token, that starts a comment line in MTL files.
@@ -463,13 +464,6 @@ const FOURTH_INDEX = 3;
 const DECIMAL_RADIX = 10;
 
 /**
- * String literal for typeof checks.
- *
- * @type {string}
- */
-const TYPEOF_STRING = 'string';
-
-/**
  * Error message for invalid MTL text input.
  *
  * @type {string}
@@ -522,7 +516,7 @@ export class MtlParser {
      * @throws {TypeError} When mtlText is not a string.
      */
     parse(mtlText) {
-        if (typeof mtlText !== TYPEOF_STRING) {
+        if (typeof mtlText !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
             throw new TypeError(ERROR_MTL_TEXT_TYPE);
         }
 
@@ -793,7 +787,7 @@ export class MtlParser {
      * @private
      */
     static #parseMtlMapLine(line) {
-        if (typeof line !== TYPEOF_STRING) {
+        if (typeof line !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
             return null;
         }
 
@@ -1004,7 +998,7 @@ export class MtlParser {
      * @private
      */
     static #isNumericToken(token) {
-        if (typeof token !== TYPEOF_STRING) {
+        if (typeof token !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
             return false;
         }
 
@@ -1044,7 +1038,7 @@ export class MtlParser {
      * @private
      */
     static #normalizeQuotedPath(path) {
-        if (typeof path !== TYPEOF_STRING) {
+        if (typeof path !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
             return EMPTY_STRING;
         }
 

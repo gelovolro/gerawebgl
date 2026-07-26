@@ -1,7 +1,6 @@
 import { WebGLContext }             from './webgl-context.js';
 import { Matrix4 }                  from './math/matrix4.js';
 import { Vector3 }                  from './math/vector3.js';
-import { CameraMath }               from './math/camera-math.js';
 import { Vector3Math }              from './math/vector3-math.js';
 import { Curve3 }                   from './math/curve3.js';
 import { CatmullRomCurve3 }         from './math/catmull-rom-curve3.js';
@@ -94,7 +93,6 @@ export const GeraWebGL = Object.freeze({
         Matrix4,
         Vector3,
         Vector3Math,
-        CameraMath,
         Curve3,
         CatmullRomCurve3,
         Path3D

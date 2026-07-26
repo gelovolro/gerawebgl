@@ -1,13 +1,14 @@
-import { Mesh }               from '../../scene/mesh.js';
-import { Points }             from '../../scene/points.js';
-import { Line }               from '../../scene/line.js';
-import { PointsMaterial }     from '../../material/points-material.js';
-import { SolidColorMaterial } from '../../material/solid-color-material.js';
-import { ObjGeometryBuilder } from './obj-geometry-builder.js';
-import { ObjMaterialFactory } from './obj-material-factory.js';
-import { ObjParser }          from './obj-parser.js';
-import { MtlParser }          from './mtl-parser.js';
-import { MtlTextureCache }    from './mtl-texture-cache.js';
+import { ECMASCRIPT_TYPEOF_RESULTS } from '../../constants/ecmascript-types.js';
+import { Mesh }                      from '../../scene/mesh.js';
+import { Points }                    from '../../scene/points.js';
+import { Line }                      from '../../scene/line.js';
+import { PointsMaterial }            from '../../material/points-material.js';
+import { SolidColorMaterial }        from '../../material/solid-color-material.js';
+import { ObjGeometryBuilder }        from './obj-geometry-builder.js';
+import { ObjMaterialFactory }        from './obj-material-factory.js';
+import { ObjParser }                 from './obj-parser.js';
+import { MtlParser }                 from './mtl-parser.js';
+import { MtlTextureCache }           from './mtl-texture-cache.js';
 
 /**
  * Default texture unit index.
@@ -148,20 +149,6 @@ const ENTRY_TYPE_POINTS = 'points';
  * @type {string}
  */
 const ENTRY_TYPE_LINE = 'line';
-
-/**
- * String literal for typeof checks.
- *
- * @type {string}
- */
-const TYPEOF_STRING = 'string';
-
-/**
- * String literal for typeof checks (object).
- *
- * @type {string}
- */
-const TYPEOF_OBJECT = 'object';
 
 /**
  * Error message for invalid WebGL context.
@@ -478,7 +465,7 @@ export class ObjMtlLoader {
             throw new TypeError(ERROR_WEBGL_CONTEXT_TYPE);
         }
 
-        if (options === null || typeof options !== TYPEOF_OBJECT || Array.isArray(options)) {
+        if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
             throw new TypeError(ERROR_OPTIONS_TYPE);
         }
 
@@ -524,7 +511,7 @@ export class ObjMtlLoader {
      * @throws {TypeError} When options are invalid.
      */
     async loadFromUrls(options = {}) {
-        if (options === null || typeof options !== TYPEOF_OBJECT || Array.isArray(options)) {
+        if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
             throw new TypeError(ERROR_LOAD_OPTIONS_TYPE);
         }
 
@@ -535,19 +522,19 @@ export class ObjMtlLoader {
             textureBaseUrl
         } = options;
 
-        if (typeof objUrl !== TYPEOF_STRING) {
+        if (typeof objUrl !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
             throw new TypeError(ERROR_OBJ_URL_TYPE);
         }
 
-        if (mtlUrl !== undefined && typeof mtlUrl !== TYPEOF_STRING) {
+        if (mtlUrl !== undefined && typeof mtlUrl !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
             throw new TypeError(ERROR_MTL_URL_TYPE);
         }
 
-        if (typeof baseUrl !== TYPEOF_STRING) {
+        if (typeof baseUrl !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
             throw new TypeError(ERROR_BASE_URL_TYPE);
         }
 
-        if (textureBaseUrl !== undefined && typeof textureBaseUrl !== TYPEOF_STRING) {
+        if (textureBaseUrl !== undefined && typeof textureBaseUrl !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
             throw new TypeError(ERROR_TEXTURE_BASE_URL_TYPE);
         }
 
@@ -607,7 +594,7 @@ export class ObjMtlLoader {
      * @throws {TypeError} When options are invalid.
      */
     async loadFromFiles(options = {}) {
-        if (options === null || typeof options !== TYPEOF_OBJECT || Array.isArray(options)) {
+        if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
             throw new TypeError(ERROR_LOAD_OPTIONS_TYPE);
         }
 
@@ -631,11 +618,11 @@ export class ObjMtlLoader {
             throw new TypeError(ERROR_ASSET_URL_MAP_TYPE);
         }
 
-        if (typeof baseUrl !== TYPEOF_STRING) {
+        if (typeof baseUrl !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
             throw new TypeError(ERROR_FILES_BASE_URL_TYPE);
         }
 
-        if (textureBaseUrl !== undefined && typeof textureBaseUrl !== TYPEOF_STRING) {
+        if (textureBaseUrl !== undefined && typeof textureBaseUrl !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
             throw new TypeError(ERROR_FILES_TEXTURE_BASE_URL_TYPE);
         }
 
@@ -911,7 +898,7 @@ export class ObjMtlLoader {
      * @private
      */
     static #normalizePath(path) {
-        if (typeof path !== TYPEOF_STRING) {
+        if (typeof path !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
             return EMPTY_STRING;
         }
 

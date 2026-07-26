@@ -1,32 +1,7 @@
-import { Object3D } from '../scene/object3d.js';
-
-/**
- * Default enabled state for lights.
- *
- * @type {boolean}
- */
-const DEFAULT_ENABLED = true;
-
-/**
- * String literal for `typeof boolean` checks.
- *
- * @type {string}
- */
-const TYPEOF_BOOLEAN = 'boolean';
-
-/**
- * Error message used, when instantiating Light directly.
- *
- * @type {string}
- */
-const ERROR_ABSTRACT_CONSTRUCTOR = '`Light` is an abstract class and cannot be instantiated directly.';
-
-/**
- * Error message for invalid enabled flag.
- *
- * @type {string}
- */
-const ERROR_ENABLED_TYPE = '`Light.setEnabled` expects a boolean.';
+import { ECMASCRIPT_TYPEOF_RESULTS } from '../constants/ecmascript-types.js';
+import * as LightConstants           from '../constants/light.js';
+import * as LightExceptionMessages   from '../exception-messages/light.js';
+import { Object3D }                  from '../scene/object3d.js';
 
 /**
  * Abstract base class for light sources.
@@ -39,7 +14,7 @@ export class Light extends Object3D {
      * @type {boolean}
      * @private
      */
-    #enabled = DEFAULT_ENABLED;
+    #enabled = LightConstants.LIGHT_DEFAULTS.ENABLED;
 
     /**
      * Creates a new light. This class is abstract and cannot be instantiated directly.
@@ -50,7 +25,7 @@ export class Light extends Object3D {
         super();
 
         if (new.target === Light) {
-            throw new Error(ERROR_ABSTRACT_CONSTRUCTOR);
+            throw new Error(LightExceptionMessages.LIGHT_EXCEPTION_MESSAGES.ABSTRACT_CONSTRUCTOR);
         }
     }
 
@@ -62,8 +37,8 @@ export class Light extends Object3D {
      * @throws {TypeError} When the value is not a boolean.
      */
     setEnabled(enabled) {
-        if (typeof enabled !== TYPEOF_BOOLEAN) {
-            throw new TypeError(ERROR_ENABLED_TYPE);
+        if (typeof enabled !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+            throw new TypeError(LightExceptionMessages.LIGHT_EXCEPTION_MESSAGES.ENABLED_TYPE);
         }
 
         this.#enabled = enabled;

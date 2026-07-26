@@ -1,4 +1,5 @@
-import { Texture2D } from '../../texture/texture2d.js';
+import { ECMASCRIPT_TYPEOF_RESULTS } from '../../constants/ecmascript-types.js';
+import { Texture2D }                 from '../../texture/texture2d.js';
 
 /**
  * Error message for invalid WebGL context.
@@ -57,34 +58,6 @@ const ERROR_WRAP_T_OPTION_TYPE = '`MtlTextureCache.getTexture` expects `options.
 const CACHE_KEY_SEPARATOR = '|';
 
 /**
- * String literal for `typeof` checks.
- *
- * @type {string}
- */
-const TYPEOF_STRING = 'string';
-
-/**
- * String literal for `typeof` object checks.
- *
- * @type {string}
- */
-const TYPEOF_OBJECT = 'object';
-
-/**
- * String literal for `typeof` boolean checks.
- *
- * @type {string}
- */
-const TYPEOF_BOOLEAN = 'boolean';
-
-/**
- * String literal for `typeof` number checks.
- *
- * @type {string}
- */
-const TYPEOF_NUMBER = 'number';
-
-/**
  * Caches the textures by the normalized URL.
  */
 export class MtlTextureCache {
@@ -130,7 +103,7 @@ export class MtlTextureCache {
      * @throws {TypeError} When url or output are invalid.
      */
     async getTexture(url, output, options = {}) {
-        if (typeof url !== TYPEOF_STRING) {
+        if (typeof url !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
             throw new TypeError(ERROR_TEXTURE_URL_TYPE);
         }
 
@@ -138,21 +111,21 @@ export class MtlTextureCache {
             throw new TypeError(ERROR_OUTPUT_LIST_TYPE);
         }
 
-        if (options === null || typeof options !== TYPEOF_OBJECT || Array.isArray(options)) {
+        if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
             throw new TypeError(ERROR_OPTIONS_TYPE);
         }
 
         const { clamp = false, wrapS, wrapT } = options;
 
-        if (typeof clamp !== TYPEOF_BOOLEAN) {
+        if (typeof clamp !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
             throw new TypeError(ERROR_CLAMP_OPTION_TYPE);
         }
 
-        if (wrapS !== undefined && typeof wrapS !== TYPEOF_NUMBER) {
+        if (wrapS !== undefined && typeof wrapS !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER) {
             throw new TypeError(ERROR_WRAP_S_OPTION_TYPE);
         }
 
-        if (wrapT !== undefined && typeof wrapT !== TYPEOF_NUMBER) {
+        if (wrapT !== undefined && typeof wrapT !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER) {
             throw new TypeError(ERROR_WRAP_T_OPTION_TYPE);
         }
 

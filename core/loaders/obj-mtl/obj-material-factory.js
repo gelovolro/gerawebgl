@@ -1,8 +1,9 @@
-import { LambertMaterial }     from '../../material/lambert-material.js';
-import { PhongMaterial }       from '../../material/phong-material.js';
-import { VertexColorMaterial } from '../../material/vertex-color-material.js';
-import { MtlStandardMaterial } from '../../material/mtl-standard-material.js';
-import { MtlTextureCache }     from './mtl-texture-cache.js';
+import { ECMASCRIPT_TYPEOF_RESULTS } from '../../constants/ecmascript-types.js';
+import { LambertMaterial }           from '../../material/lambert-material.js';
+import { PhongMaterial }             from '../../material/phong-material.js';
+import { VertexColorMaterial }       from '../../material/vertex-color-material.js';
+import { MtlStandardMaterial }       from '../../material/mtl-standard-material.js';
+import { MtlTextureCache }           from './mtl-texture-cache.js';
 
 /**
  * Default texture unit index.
@@ -222,20 +223,6 @@ const ERROR_TEXTURES_OUTPUT_TYPE = '`ObjMaterialFactory.createMaterial` expects 
 const ERROR_TEXTURE_UNITS_LIMIT = '`ObjMaterialFactory` cannot allocate texture units for MTL maps. Increase available texture units or reduce the number of maps.';
 
 /**
- * String literal for typeof checks.
- *
- * @type {string}
- */
-const TYPEOF_OBJECT = 'object';
-
-/**
- * String literal for typeof checks (number).
- *
- * @type {string}
- */
-const TYPEOF_NUMBER = 'number';
-
-/**
  * Type definition for options used by `ObjMaterialFactory`.
  *
  * @typedef {Object} ObjMaterialFactoryOptions
@@ -304,7 +291,7 @@ export class ObjMaterialFactory {
             throw new TypeError(ERROR_WEBGL_CONTEXT_TYPE);
         }
 
-        if (options === null || typeof options !== TYPEOF_OBJECT || Array.isArray(options)) {
+        if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
             throw new TypeError(ERROR_OPTIONS_TYPE);
         }
 
@@ -547,7 +534,7 @@ export class ObjMaterialFactory {
      * @private
      */
     static #isColorNearZero(color) {
-        if (!color || typeof color.length !== TYPEOF_NUMBER || color.length < COLOR_COMPONENT_COUNT) {
+        if (!color || typeof color.length !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || color.length < COLOR_COMPONENT_COUNT) {
             return true;
         }
 
@@ -564,7 +551,7 @@ export class ObjMaterialFactory {
      * @private
      */
     static #clampShininess(value) {
-        if (typeof value !== TYPEOF_NUMBER || !Number.isFinite(value)) {
+        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
             return DEFAULT_SHININESS;
         }
 

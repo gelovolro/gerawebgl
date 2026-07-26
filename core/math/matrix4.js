@@ -1,42 +1,82 @@
-/** @type {number} */
-const HALF_FIELD_OF_VIEW_DIVISOR = 2.0;
-
-/** @type {number} */
-const PROJECTION_SCALE_NUMERATOR = 1.0;
-
-/** @type {number} */
-const DEPTH_RANGE_NUMERATOR = 1.0;
-
-/** @type {number} */
-const PERSPECTIVE_Z_RANGE_MULTIPLIER = 2.0;
-
-/** @type {number} */
-const PERSPECTIVE_W_COMPONENT_SCALE = -1.0;
-
-/** @type {number} */
-const MATRIX_4x4_ELEMENT_COUNT = 16;
-
-/** @type {number} */
-const MATRIX_COLUMN_COUNT = 4;
-
-/** @type {number} */
-const MATRIX_ROW_COUNT = 4;
-
-/** @type {number} */
-const MATRIX_STRIDE = 4;
-
-/** @type {number} */
-const MIN_INVERTIBLE_DETERMINANT_ABS = 1e-12;
-
-/** @type {number} */
-const INVERSE_DETERMINANT_NUMERATOR = 1.0;
+import * as MathConstants from '../constants/math.js';
 
 /**
- * Utility class for working with 4x4 matrices in column-major order.
+ * Utility class for 4x4 transformation matrices.
+ *
+ * Matrices are stored as flat 'Float32Array' values in column-major order.
+ *
+ * A matrix can be flattened into an array in two common ways:
+ * 1). row-major stores it row by row
+ * 2). column-major stores it column by column
+ *
+ * Example:
+ *
+ * [ m00 m01 m02 m03 ]
+ * [ m10 m11 m12 m13 ]
+ * [ m20 m21 m22 m23 ]
+ * [ m30 m31 m32 m33 ]
+ *
+ * Row-major    : [ m00, m01, m02, m03, m10, m11, m12, m13, ... ]
+ * Column-major : [ m00, m10, m20, m30, m01, m11, m21, m31, ... ]
+ *
+ * To read or write a matrix cell in this flat array,
+ * convert its column and row position into an array index.
+ *
+ * 'row count'                - is always '4', because each column of a 4x4 matrix contains 4 row values
+ * 'column index * row count' - gives the start index of the target column
+ * 'row index'                - selects the value inside the target column
+ *
+ * The resulting formula is:
+ * 'cell index = column index * row count + row index'
+ *
+ * So:
+ * m20 -> cell index = 0 * 4 + 2 = 2
+ * m01 -> cell index = 1 * 4 + 0 = 4
+ *
+ * It is also important to highlight that, when a 4x4 matrix represents
+ * an 'affine transform', its translation part is stored in the last column.
+ *
+ * Conceptually, this translation column is multiplied
+ * by the input 'homogeneous' coordinate called 'w':
+ *
+ * [ ... ... ... tx ]
+ * [ ... ... ... ty ]
+ * [ ... ... ... tz ]
+ * [ ... ... ...  w ]
+ *
+ * Here, 'tx, ty and tz' are 'x, y, z' translation components.
+ *
+ * When a transform is applied as 'transformed value = matrix * input value',
+ * the translation part contributes to the result through input 'w':
+ *
+ * 'new x = ... + tx * w'
+ * 'new y = ... + ty * w'
+ * 'new z = ... + tz * w'
+ *
+ * So, if 'w = 1', translation is added to the result.
+ * If 'w = 0', translation becomes zero and is ignored.
+ *
+ * Since 'tx', 'ty' and 'tz' are stored in the last column,
+ * their flat array indices are calculated by the same formula:
+ *
+ * tx -> m03 -> cell index = 3 * 4 + 0 = 12
+ * ty -> m13 -> cell index = 3 * 4 + 1 = 13
+ * tz -> m23 -> cell index = 3 * 4 + 2 = 14
+ *
+ * For a usual affine transform, the last row is: [ 0, 0, 0, 1 ]
+ * It keeps the input 'w' unchanged during multiplication.
+ *
+ * Matrix multiplication is ordered: 'left * right' is not the same as 'right * left'.
+ * When the result is applied to a column vector, the right matrix is applied first.
  */
 export class Matrix4 {
     /**
-     * Creates a new 4x4 identity matrix.
+     * Creates a new 4x4 identity matrix:
+     *
+     * column 0: [ 1, 0, 0, 0 ]
+     * column 1: [ 0, 1, 0, 0 ]
+     * column 2: [ 0, 0, 1, 0 ]
+     * column 3: [ 0, 0, 0, 1 ]
      *
      * @returns {Float32Array} - A new identity matrix.
      */
@@ -50,7 +90,12 @@ export class Matrix4 {
     }
 
     /**
-     * Creates a scale matrix.
+     * Creates a scale matrix:
+     *
+     * column 0: [ scaleX, 0,      0,      0 ]
+     * column 1: [ 0,      scaleY, 0,      0 ]
+     * column 2: [ 0,      0,      scaleZ, 0 ]
+     * column 3: [ 0,      0,      0,      1 ]
      *
      * @param {number} scaleX  - Scale along X.
      * @param {number} scaleY  - Scale along Y.
@@ -61,7 +106,7 @@ export class Matrix4 {
         if (typeof scaleX    !== 'number'
             || typeof scaleY !== 'number'
             || typeof scaleZ !== 'number') {
-            throw new TypeError('Matrix4.createScale expects numeric arguments.');
+            throw new TypeError('`Matrix4.createScale` expects numeric arguments.');
         }
 
         const out = Matrix4.#createEmpty();
@@ -73,12 +118,59 @@ export class Matrix4 {
     }
 
     /**
-     * Creates a perspective projection matrix.
+     * Creates a perspective projection matrix:
+     *
+     * column 0: [ projectionScale / aspectRatio, 0,               0,           0 ]
+     * column 1: [ 0,                             projectionScale, 0,           0 ]
+     * column 2: [ 0,                             0,               depthScale, -1 ]
+     * column 3: [ 0,                             0,               depthOffset, 0 ]
+     *
+     * Perspective projection:
+     * - makes farther objects appear smaller and closer objects appear larger
+     * - unlike the orthographic projection, object size depends on distance from the camera
+     *
+     * How the matrix is applied to a 3D point?
+     * - the matrix stores projection coefficients, not a projected point
+     * - a view-space 3D point [x, y, z] is used as a homogeneous input [x, y, z, 1]
+     * - homogeneous input means a 3D point, stored with a helper 'w-component', not a point in 4D space
+     * - 'w = 1' means a position, 'w = 0' means a direction, so the translation/depth offset wouldn't apply
+     *
+     * Multiplying this homogeneous form of the 3D point by the matrix produces the clip-space coordinates:
+     *
+     * clip x: [ x * projectionScale / aspectRatio ]
+     * clip y: [ y * projectionScale               ]
+     * clip z: [ z * depthScale + 1 * depthOffset  ]
+     * clip w: [ z * (-1) + 1 * 0 = -z             ]
+     *
+     * About spaces:
+     * - world-space describes where an object is in the scene
+     * - view-space describes the same object relative to the camera, before the projection
+     * - the perspective projection matrix converts the 'view-space' coordinates into the 'clip-space' coordinates
+     * - clip-space stores 4 components: [clip x, clip y, clip z, clip w]
+     * - clip-space is where projected coordinates are checked against the visible camera volume
+     * - after clipping, the perspective divide ('/ clip w') converts clip-space coordinates into NDC coordinates
+     *
+     * Notes about the projection scale:
+     * - the scale uses the half-angle between the camera center line and the vertical view boundary (that's why tangent is used)
+     * - tangent describes how wide the vertical view opens from this half-angle
+     * - the inverse is used, because tangent gives the view opening, while the matrix needs a scale, that brings this opening back to the unit boundary
+     * - the final scale value is the inverse of that opening value (tangent of half of the vertical FOV)
+     *
+     * Depth mapping:
+     * - depth scale controls how the view-space z value is scaled for clip-space z
+     * - depth offset shifts the scaled z value so 'near' and 'far' can be mapped to the clip-space depth limits
+     *
+     * Formulas:
+     * - aspect ratio                = viewport width / viewport height
+     * - vertical projection scale   = inverse of tangent(half vertical field of view)
+     * - horizontal projection scale = vertical projection scale / aspect ratio
+     * - depth scale                 = (far + near) / (near - far)
+     * - depth offset                = 2 * far * near / (near - far)
      *
      * @param {number} fieldOfViewRadians - Vertical field of view in radians.
      * @param {number} aspectRatio        - Viewport aspect ratio (width / height).
-     * @param {number} near               - Near clipping plane, must be > 0.
-     * @param {number} far                - Far clipping plane, must be > near.
+     * @param {number} near               - Near clipping plane, must be '> 0'.
+     * @param {number} far                - Far clipping plane, must be '> near'.
      * @returns {Float32Array}            - A new perspective projection matrix.
      */
     static createPerspective(fieldOfViewRadians, aspectRatio, near, far) {
@@ -86,43 +178,145 @@ export class Matrix4 {
             || typeof aspectRatio     !== 'number'
             || typeof near            !== 'number'
             || typeof far             !== 'number') {
-            throw new TypeError('Matrix4.createPerspective expects numeric arguments.');
+            throw new TypeError('`Matrix4.createPerspective` expects numeric arguments.');
         }
 
-        if (near <= 0 || far <= near) {
-            throw new RangeError('Matrix4.createPerspective expects 0 < near < far.');
+        if (aspectRatio <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
+            throw new RangeError('`Matrix4.createPerspective` expects a positive aspect ratio.');
         }
 
-        const out               = Matrix4.#createEmpty();
-        const projectionScale   = PROJECTION_SCALE_NUMERATOR / Math.tan(fieldOfViewRadians / HALF_FIELD_OF_VIEW_DIVISOR);
-        const inverseDepthRange = DEPTH_RANGE_NUMERATOR / (near - far);
+        if (near <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
+            throw new RangeError('`Matrix4.createPerspective` expects `0 < near < far`.');
+        }
 
-        // Column-major layout:
-        out[0]  = projectionScale / aspectRatio;
-        out[1]  = 0;
-        out[2]  = 0;
-        out[3]  = 0;
+        return Matrix4.#writePerspectiveIntoUnchecked(
+            Matrix4.#createEmpty(),
+            fieldOfViewRadians,
+            aspectRatio,
+            near,
+            far
+        );
+    }
 
-        out[4]  = 0;
-        out[5]  = projectionScale;
-        out[6]  = 0;
-        out[7]  = 0;
+    /**
+     * Writes a perspective projection matrix to the provided output buffer.
+     *
+     * The output buffer is updated in place and returned without allocating a new matrix.
+     *
+     * @param {Float32Array} out                - Output 4x4 matrix buffer.
+     * @param {number}       fieldOfViewRadians - Vertical field of view in radians.
+     * @param {number}       aspectRatio        - Viewport width-to-height ratio.
+     * @param {number}       near               - Near clipping distance.
+     * @param {number}       far                - Far clipping distance.
+     * @returns {Float32Array}                  - The provided output buffer.
+     * @throws {TypeError}                      - If the output buffer or arguments are invalid.
+     * @throws {RangeError}                     - If the aspect ratio or clipping distances are invalid.
+     */
+    static writePerspectiveTo(out, fieldOfViewRadians, aspectRatio, near, far) {
+        if (!(out instanceof Float32Array) || out.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
+            throw new TypeError('`Matrix4.writePerspectiveTo` expects out to be `Float32Array(16)`.');
+        }
 
-        out[8]  = 0;
-        out[9]  = 0;
-        out[10] = (far + near) * inverseDepthRange;
-        out[11] = PERSPECTIVE_W_COMPONENT_SCALE;
+        if (typeof fieldOfViewRadians !== 'number'
+            || typeof aspectRatio     !== 'number'
+            || typeof near            !== 'number'
+            || typeof far             !== 'number') {
+            throw new TypeError('`Matrix4.writePerspectiveTo` expects numeric arguments.');
+        }
 
-        out[12] = 0;
-        out[13] = 0;
-        out[14] = (PERSPECTIVE_Z_RANGE_MULTIPLIER * far * near) * inverseDepthRange;
-        out[15] = 0;
+        if (aspectRatio <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
+            throw new RangeError('`Matrix4.writePerspectiveTo` expects a positive aspect ratio.');
+        }
+
+        if (near <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
+            throw new RangeError('`Matrix4.writePerspectiveTo` expects `0 < near < far`.');
+        }
+
+        return Matrix4.#writePerspectiveIntoUnchecked(
+            out,
+            fieldOfViewRadians,
+            aspectRatio,
+            near,
+            far
+        );
+    }
+
+    /**
+     * Writes an orthographic projection matrix to the provided output buffer.
+     *
+     * The output buffer is updated in place and returned without allocating a new matrix.
+     *
+     * @param {Float32Array} out    - Output 4x4 matrix buffer.
+     * @param {number}       left   - Left clipping plane.
+     * @param {number}       right  - Right clipping plane.
+     * @param {number}       bottom - Bottom clipping plane.
+     * @param {number}       top    - Top clipping plane.
+     * @param {number}       near   - Near clipping distance.
+     * @param {number}       far    - Far clipping distance.
+     * @returns {Float32Array}      - The provided output buffer.
+     * @throws {TypeError}          - If the output buffer or arguments are invalid.
+     * @throws {RangeError}         - If the projection bounds or clipping distances are invalid.
+     */
+    static writeOrthographicTo(out, left, right, bottom, top, near, far) {
+        if (!(out instanceof Float32Array) || out.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
+            throw new TypeError('`Matrix4.writeOrthographicTo` expects out to be `Float32Array(16)`.');
+        }
+
+        if (typeof left      !== 'number'
+            || typeof right  !== 'number'
+            || typeof bottom !== 'number'
+            || typeof top    !== 'number'
+            || typeof near   !== 'number'
+            || typeof far    !== 'number') {
+            throw new TypeError('`Matrix4.writeOrthographicTo` expects numeric arguments.');
+        }
+
+        if (left === right) {
+            throw new RangeError('`Matrix4.writeOrthographicTo` expects `left !== right`.');
+        }
+
+        if (bottom === top) {
+            throw new RangeError('`Matrix4.writeOrthographicTo` expects `bottom !== top`.');
+        }
+
+        if (far <= near) {
+            throw new RangeError('`Matrix4.writeOrthographicTo` expects `near < far`.');
+        }
+
+        const inverseWidth  = MathConstants.MATH_MATRIX_VALUES.UNIT / (right - left);
+        const inverseHeight = MathConstants.MATH_MATRIX_VALUES.UNIT / (top - bottom);
+        const inverseDepth  = MathConstants.MATH_MATRIX_VALUES.UNIT / (near - far);
+
+        out[0]  = MathConstants.MATH_ORTHOGRAPHIC.SCALE_NUMERATOR * inverseWidth;
+        out[1]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[2]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[3]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+
+        out[4]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[5]  = MathConstants.MATH_ORTHOGRAPHIC.SCALE_NUMERATOR * inverseHeight;
+        out[6]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[7]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+
+        out[8]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[9]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[10] = MathConstants.MATH_ORTHOGRAPHIC.SCALE_NUMERATOR * inverseDepth;
+        out[11] = MathConstants.MATH_MATRIX_VALUES.ZERO;
+
+        out[12] = -(right + left) * inverseWidth;
+        out[13] = -(top + bottom) * inverseHeight;
+        out[14] = (far + near) * inverseDepth;
+        out[15] = MathConstants.MATH_MATRIX_VALUES.UNIT;
 
         return out;
     }
 
     /**
-     * Creates a translation matrix.
+     * Creates a translation matrix:
+     *
+     * [ 1 0 0 translateX ]
+     * [ 0 1 0 translateY ]
+     * [ 0 0 1 translateZ ]
+     * [ 0 0 0 1          ]
      *
      * @param {number} translateX - Translation along X axis.
      * @param {number} translateY - Translation along Y axis.
@@ -133,7 +327,7 @@ export class Matrix4 {
         if (typeof translateX    !== 'number'
             || typeof translateY !== 'number'
             || typeof translateZ !== 'number') {
-            throw new TypeError('Matrix4.createTranslation expects numeric arguments.');
+            throw new TypeError('`Matrix4.createTranslation` expects numeric arguments.');
         }
 
         const out = Matrix4.createIdentity();
@@ -144,14 +338,19 @@ export class Matrix4 {
     }
 
     /**
-     * Creates a rotation matrix around the X axis.
+     * Creates a rotation matrix around the X axis:
+     *
+     * [ 1 0         0        0 ]
+     * [ 0 cosAngle -sinAngle 0 ]
+     * [ 0 sinAngle  cosAngle 0 ]
+     * [ 0 0         0        1 ]
      *
      * @param {number} angleRadians - Angle in radians.
      * @returns {Float32Array}      - A new rotation matrix.
      */
     static createRotationX(angleRadians) {
         if (typeof angleRadians !== 'number') {
-            throw new TypeError('Matrix4.createRotationX expects a numeric argument.');
+            throw new TypeError('`Matrix4.createRotationX` expects a numeric argument.');
         }
 
         const cosAngle = Math.cos(angleRadians);
@@ -182,14 +381,19 @@ export class Matrix4 {
     }
 
     /**
-     * Creates a rotation matrix around the Y axis.
+     * Creates a rotation matrix around the Y axis:
+     *
+     * [  cosAngle 0 sinAngle 0 ]
+     * [  0        1 0        0 ]
+     * [ -sinAngle 0 cosAngle 0 ]
+     * [  0        0 0        1 ]
      *
      * @param {number} angleRadians - Angle in radians.
      * @returns {Float32Array}      - A new rotation matrix.
      */
     static createRotationY(angleRadians) {
         if (typeof angleRadians !== 'number') {
-            throw new TypeError('Matrix4.createRotationY expects a numeric argument.');
+            throw new TypeError('`Matrix4.createRotationY` expects a numeric argument.');
         }
 
         const cosAngle = Math.cos(angleRadians);
@@ -220,14 +424,19 @@ export class Matrix4 {
     }
 
     /**
-     * Creates a rotation matrix around the Z axis.
+     * Creates a rotation matrix around the Z axis:
+     *
+     * [ cosAngle -sinAngle 0 0 ]
+     * [ sinAngle  cosAngle 0 0 ]
+     * [ 0         0        1 0 ]
+     * [ 0         0        0 1 ]
      *
      * @param {number} angleRadians - Angle in radians.
      * @returns {Float32Array}      - A new rotation matrix.
      */
     static createRotationZ(angleRadians) {
         if (typeof angleRadians !== 'number') {
-            throw new TypeError('Matrix4.createRotationZ expects a numeric argument.');
+            throw new TypeError('`Matrix4.createRotationZ` expects a numeric argument.');
         }
 
         const cosAngle = Math.cos(angleRadians);
@@ -258,7 +467,9 @@ export class Matrix4 {
     }
 
     /**
-     * Multiplies two 4x4 matrices: result = leftMatrix * rightMatrix.
+     * Multiplies two 4x4 matrices: 'result = leftMatrix * rightMatrix'.
+     *
+     * Order matters. With column-vector style, right matrix is applied first.
      *
      * @param {Float32Array} leftMatrix  - Left-hand matrix (4x4).
      * @param {Float32Array} rightMatrix - Right-hand matrix (4x4).
@@ -266,21 +477,22 @@ export class Matrix4 {
      */
     static multiply(leftMatrix, rightMatrix) {
         if (!(leftMatrix instanceof Float32Array)
-            || leftMatrix.length !== MATRIX_4x4_ELEMENT_COUNT
+            || leftMatrix.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT
             || !(rightMatrix instanceof Float32Array)
-            || rightMatrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
-            throw new TypeError('Matrix4.multiply expects two 4x4 Float32Array matrices.');
+            || rightMatrix.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
+            throw new TypeError('`Matrix4.multiply` expects two 4x4 `Float32Array` matrices.');
         }
 
-        const out = Matrix4.#createEmpty();
-        return Matrix4.#multiplyIntoUnchecked(out, leftMatrix, rightMatrix);
+        return Matrix4.#multiplyIntoUnchecked(Matrix4.#createEmpty(), leftMatrix, rightMatrix);
     }
 
     /**
      * Multiplies two 4x4 matrices into an existing output matrix:
-     * out = leftMatrix * rightMatrix.
+     * 'out = leftMatrix * rightMatrix'.
      *
-     * Notes: out must not be the same object as leftMatrix or rightMatrix.
+     * Notes:
+     * - order matters, with column-vector style the right matrix is applied first
+     * - out must not be the same object as 'leftMatrix' or 'rightMatrix'
      *
      * @param {Float32Array} out         - Output 4x4 matrix.
      * @param {Float32Array} leftMatrix  - Left-hand matrix (4x4).
@@ -289,16 +501,16 @@ export class Matrix4 {
      */
     static multiplyTo(out, leftMatrix, rightMatrix) {
         if (!(out instanceof Float32Array)
-            || out.length !== MATRIX_4x4_ELEMENT_COUNT
+            || out.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT
             || !(leftMatrix instanceof Float32Array)
-            || leftMatrix.length !== MATRIX_4x4_ELEMENT_COUNT
+            || leftMatrix.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT
             || !(rightMatrix instanceof Float32Array)
-            || rightMatrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
-            throw new TypeError('Matrix4.multiplyTo expects three 4x4 Float32Array matrices.');
+            || rightMatrix.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
+            throw new TypeError('`Matrix4.multiplyTo` expects three 4x4 `Float32Array` matrices.');
         }
 
         if (out === leftMatrix || out === rightMatrix) {
-            throw new Error('Matrix4.multiplyTo does not support in-place multiplication. Use a separate output matrix.');
+            throw new Error('`Matrix4.multiplyTo` does not support in-place multiplication. Use a separate output matrix.');
         }
 
         return Matrix4.#multiplyIntoUnchecked(out, leftMatrix, rightMatrix);
@@ -306,9 +518,12 @@ export class Matrix4 {
 
     /**
      * Multiplies several matrices in sequence:
-     * result = m0 * m1 * m2 * ... * mn
+     * 'result = m0 * m1 * m2 * ... * mn'
      *
-     * Notes: If no matrices are provided, returns a new identity matrix. If exactly one matrix is provided, returns the same matrix instance (no copy).
+     * Notes:
+     * - order matters, with column-vector style, the last matrix is applied first
+     * - if no matrices are provided, returns a new identity matrix
+     * - if exactly one matrix is provided, returns the same matrix instance (no copy)
      *
      * @param {...Float32Array} matrices - Matrices to multiply, in order.
      * @returns {Float32Array}           - The resulting matrix.
@@ -316,6 +531,13 @@ export class Matrix4 {
     static multiplyMany(...matrices) {
         if (matrices.length === 0) {
             return Matrix4.createIdentity();
+        }
+
+        for (const matrix of matrices) {
+            if (!(matrix instanceof Float32Array)
+                || matrix.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
+                throw new TypeError('`Matrix4.multiplyMany` expects the 4x4 `Float32Array` matrices.');
+            }
         }
 
         let result = matrices[0];
@@ -328,24 +550,23 @@ export class Matrix4 {
     }
 
     /**
-     * Transposes a 4x4 matrix.
+     * Transposes a 4x4 matrix by swapping its rows and columns.
      *
      * @param {Float32Array} matrix - Input 4x4 matrix.
      * @returns {Float32Array}      - A new transposed matrix.
      */
     static transpose(matrix) {
-        if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+        if (!(matrix instanceof Float32Array) || matrix.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
             throw new TypeError('`Matrix4.transpose` expects a 4x4 `Float32Array` matrix.');
         }
 
-        const out = Matrix4.#createEmpty();
-        return Matrix4.#transposeIntoUnchecked(out, matrix);
+        return Matrix4.#transposeIntoUnchecked(Matrix4.#createEmpty(), matrix);
     }
 
     /**
-     * Transposes a 4x4 matrix into an existing output matrix.
+     * Transposes a 4x4 matrix into an existing output matrix by swapping rows and columns.
      *
-     * Notes: out must not be the same object as matrix.
+     * Note: out must not be the same object as matrix.
      *
      * @param {Float32Array} out    - Output 4x4 matrix.
      * @param {Float32Array} matrix - Input 4x4 matrix.
@@ -353,9 +574,9 @@ export class Matrix4 {
      */
     static transposeTo(out, matrix) {
         if (!(out instanceof Float32Array)
-            || out.length !== MATRIX_4x4_ELEMENT_COUNT
+            || out.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT
             || !(matrix instanceof Float32Array)
-            || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+            || matrix.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
             throw new TypeError('`Matrix4.transposeTo` expects two 4x4 `Float32Array` matrices.');
         }
 
@@ -367,22 +588,25 @@ export class Matrix4 {
     }
 
     /**
-     * Inverts a 4x4 matrix.
+     * Inverts a 4x4 matrix using its adjugate and determinant.
+     *
+     * A near-zero determinant means the matrix is singular or unsafe to invert.
      *
      * @param {Float32Array} matrix - Input 4x4 matrix.
      * @returns {Float32Array}      - A new inverted matrix.
      */
     static invert(matrix) {
-        if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+        if (!(matrix instanceof Float32Array) || matrix.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
             throw new TypeError('`Matrix4.invert` expects a 4x4 `Float32Array` matrix.');
         }
 
-        const out = Matrix4.#createEmpty();
-        return Matrix4.#invertIntoUnchecked(out, matrix);
+        return Matrix4.#invertIntoUnchecked(Matrix4.#createEmpty(), matrix);
     }
 
     /**
-     * Inverts a 4x4 matrix into an existing output matrix.
+     * Inverts a 4x4 matrix into an existing output matrix using its adjugate and determinant.
+     *
+     * A near-zero determinant means the matrix is singular or unsafe to invert.
      *
      * @param {Float32Array} out    - Output 4x4 matrix.
      * @param {Float32Array} matrix - Input 4x4 matrix.
@@ -390,9 +614,9 @@ export class Matrix4 {
      */
     static invertTo(out, matrix) {
         if (!(out instanceof Float32Array)
-            || out.length !== MATRIX_4x4_ELEMENT_COUNT
+            || out.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT
             || !(matrix instanceof Float32Array)
-            || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
+            || matrix.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
             throw new TypeError('`Matrix4.invertTo` expects two 4x4 `Float32Array` matrices.');
         }
 
@@ -404,7 +628,9 @@ export class Matrix4 {
     }
 
     /**
-     * Multiplies two 4x4 matrices into out without validation.
+     * Multiplies two validated 4x4 matrices into out.
+     *
+     * Assumes public validation already checked matrix types, sizes, and output aliasing.
      *
      * @param {Float32Array} out         - Output 4x4 matrix that will receive the result.
      * @param {Float32Array} leftMatrix  - Left-hand 4x4 matrix.
@@ -413,17 +639,17 @@ export class Matrix4 {
      * @private
      */
     static #multiplyIntoUnchecked(out, leftMatrix, rightMatrix) {
-        for (let columnIndex = 0; columnIndex < MATRIX_COLUMN_COUNT; columnIndex += 1) {
-            const rightColumnOffset = columnIndex * MATRIX_STRIDE;
+        for (let columnIndex = 0; columnIndex < MathConstants.MATH_LAYOUT.MATRIX_COLUMN_COUNT; columnIndex += 1) {
+            const rightColumnOffset = columnIndex * MathConstants.MATH_LAYOUT.MATRIX_STRIDE;
 
-            for (let rowIndex = 0; rowIndex < MATRIX_ROW_COUNT; rowIndex += 1) {
+            for (let rowIndex = 0; rowIndex < MathConstants.MATH_LAYOUT.MATRIX_ROW_COUNT; rowIndex += 1) {
                 const resultIndex = rightColumnOffset + rowIndex;
 
                 out[resultIndex] =
-                  leftMatrix[0 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 0]
-                + leftMatrix[1 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 1]
-                + leftMatrix[2 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 2]
-                + leftMatrix[3 * MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 3];
+                  leftMatrix[0 * MathConstants.MATH_LAYOUT.MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 0]
+                + leftMatrix[1 * MathConstants.MATH_LAYOUT.MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 1]
+                + leftMatrix[2 * MathConstants.MATH_LAYOUT.MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 2]
+                + leftMatrix[3 * MathConstants.MATH_LAYOUT.MATRIX_STRIDE + rowIndex] * rightMatrix[rightColumnOffset + 3];
             }
         }
 
@@ -431,7 +657,58 @@ export class Matrix4 {
     }
 
     /**
-     * Transposes a 4x4 matrix into out without validation.
+     * Writes a perspective projection matrix to the provided output buffer.
+     *
+     * Assumes public method validation already checked the output buffer and projection parameters.
+     *
+     * @param {Float32Array} out                - Output 4x4 matrix.
+     * @param {number}       fieldOfViewRadians - Vertical field of view in radians.
+     * @param {number}       aspectRatio        - Viewport width-to-height ratio.
+     * @param {number}       near               - Near clipping distance.
+     * @param {number}       far                - Far clipping distance.
+     * @returns {Float32Array}                  - The output matrix (out).
+     * @private
+     */
+    static #writePerspectiveIntoUnchecked(out, fieldOfViewRadians, aspectRatio, near, far) {
+        const inverseDepthRange =
+            MathConstants.MATH_PERSPECTIVE.DEPTH_RANGE_NUMERATOR
+            / (near - far);
+
+        const halfFieldOfViewRadians =
+            fieldOfViewRadians
+            / MathConstants.MATH_PERSPECTIVE.HALF_FIELD_OF_VIEW_DIVISOR;
+
+        const projectionScale =
+            MathConstants.MATH_PERSPECTIVE.PROJECTION_SCALE_NUMERATOR
+            / Math.tan(halfFieldOfViewRadians);
+
+        out[0]  = projectionScale / aspectRatio;
+        out[1]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[2]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[3]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+
+        out[4]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[5]  = projectionScale;
+        out[6]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[7]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+
+        out[8]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[9]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[10] = (far + near) * inverseDepthRange;
+        out[11] = MathConstants.MATH_PERSPECTIVE.W_COMPONENT_SCALE;
+
+        out[12] = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[13] = MathConstants.MATH_MATRIX_VALUES.ZERO;
+        out[14] = (MathConstants.MATH_PERSPECTIVE.Z_RANGE_MULTIPLIER * far * near) * inverseDepthRange;
+        out[15] = MathConstants.MATH_MATRIX_VALUES.ZERO;
+
+        return out;
+    }
+
+    /**
+     * Transposes a validated 4x4 matrix into out.
+     *
+     * Assumes public validation already checked matrix types, sizes, and output aliasing.
      *
      * @param {Float32Array} out    - Output 4x4 matrix, that will receive the result.
      * @param {Float32Array} matrix - Input 4x4 matrix.
@@ -463,7 +740,10 @@ export class Matrix4 {
     }
 
     /**
-     * Inverts a 4x4 matrix into out without validation. Throws when the matrix is not invertible.
+     * Inverts a validated 4x4 matrix into out.
+     *
+     * Uses the adjugate and determinant, throws when the determinant is too close to zero.
+     * Assumes public validation already checked matrix types, sizes, and output aliasing.
      *
      * @param {Float32Array} out    - Output 4x4 matrix, that will receive the result.
      * @param {Float32Array} matrix - Input 4x4 matrix.
@@ -512,11 +792,11 @@ export class Matrix4 {
         - b04 * b07
         + b05 * b06;
 
-        if (Math.abs(determinant) < MIN_INVERTIBLE_DETERMINANT_ABS) {
-            throw new Error('`Matrix4.invertTo`: matrix is not invertible.');
+        if (Math.abs(determinant) < MathConstants.MATH_MATRIX_INVERSION.MIN_INVERTIBLE_DETERMINANT_ABS) {
+            throw new Error('`Matrix4.#invertIntoUnchecked` matrix is not invertible.');
         }
 
-        const inverseDeterminant = INVERSE_DETERMINANT_NUMERATOR / determinant;
+        const inverseDeterminant = MathConstants.MATH_MATRIX_INVERSION.INVERSE_DETERMINANT_NUMERATOR / determinant;
 
         out[0]  = (a11 * b11 - a12 * b10 + a13 * b09) * inverseDeterminant;
         out[1]  = (a02 * b10 - a01 * b11 - a03 * b09) * inverseDeterminant;
@@ -548,6 +828,6 @@ export class Matrix4 {
      * @private
      */
     static #createEmpty() {
-        return new Float32Array(MATRIX_4x4_ELEMENT_COUNT);
+        return new Float32Array(MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
     }
 }

@@ -1,25 +1,23 @@
-name: CI (develop build)
+name: CI on PR
 
 on:
-  push:
-    branches: [develop]
   pull_request:
-    branches: [develop]
+    branches: [develop, master]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  build:
+  baserun:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
-      - run: npm ci
-      - run: npm run build:all-with-docs
+      - name: Restore the dependencies, build, run the tests and create the NPM package
+        uses: ./.github/actions/base-preparation

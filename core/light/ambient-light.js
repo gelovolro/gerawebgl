@@ -1,18 +1,7 @@
-import { Light } from './light.js';
-
-/**
- * Default ambient strength.
- *
- * @type {number}
- */
-const DEFAULT_STRENGTH = 0.2;
-
-/**
- * Error message for invalid ambient strength.
- *
- * @type {string}
- */
-const ERROR_STRENGTH_TYPE = '`AmbientLight.setStrength` expects a finite number.';
+import { ECMASCRIPT_TYPEOF_RESULTS } from '../constants/ecmascript-types.js';
+import * as LightConstants           from '../constants/light.js';
+import * as LightExceptionMessages   from '../exception-messages/light.js';
+import { Light }                     from './light.js';
 
 /**
  * Ambient light source.
@@ -25,7 +14,7 @@ export class AmbientLight extends Light {
      * @type {number}
      * @private
      */
-    #strength = DEFAULT_STRENGTH;
+    #strength = LightConstants.LIGHT_AMBIENT.DEFAULT_STRENGTH;
 
     /**
      * Creates a new ambient light.
@@ -42,8 +31,8 @@ export class AmbientLight extends Light {
      * @throws {TypeError} When the strength is invalid.
      */
     setStrength(strength) {
-        if (typeof strength !== 'number' || !Number.isFinite(strength)) {
-            throw new TypeError(ERROR_STRENGTH_TYPE);
+        if (typeof strength !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(strength)) {
+            throw new TypeError(LightExceptionMessages.LIGHT_EXCEPTION_MESSAGES.AMBIENT_STRENGTH_TYPE);
         }
 
         this.#strength = strength;

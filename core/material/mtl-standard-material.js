@@ -1,21 +1,8 @@
-import { ShaderProgram } from '../shader/shader-program.js';
-import { Texture2D }     from '../texture/texture2d.js';
-import {
-    DirectionalLightMaterial,
-    POSITION_ATTRIBUTE_LOCATION,
-    NORMAL_ATTRIBUTE_LOCATION,
-    FINAL_MATRIX_UNIFORM_NAME,
-    WORLD_MATRIX_UNIFORM_NAME,
-    WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME,
-    COLOR_UNIFORM_NAME,
-    LIGHT_DIRECTION_UNIFORM_NAME,
-    CAMERA_POSITION_UNIFORM_NAME,
-    AMBIENT_STRENGTH_UNIFORM_NAME,
-    DIRECTIONAL_STRENGTH_UNIFORM_NAME,
-    LIGHTING_ENABLED_UNIFORM_NAME,
-    OPACITY_UNIFORM_NAME,
-    VECTOR3_ELEMENT_COUNT
-} from './directional-light-material.js';
+import { ECMASCRIPT_TYPEOF_RESULTS } from '../constants/ecmascript-types.js';
+import * as MaterialConstants        from '../constants/directional-light-material.js';
+import { ShaderProgram }             from '../shader/shader-program.js';
+import { Texture2D }                 from '../texture/texture2d.js';
+import { DirectionalLightMaterial }  from './directional-light-material.js';
 
 /**
  * Attribute location used by `vec2` UV-coordinates.
@@ -23,27 +10,6 @@ import {
  * @type {number}
  */
 const UV_ATTRIBUTE_LOCATION = 2;
-
-/**
- * String literal for `typeof object` checks.
- *
- * @type {string}
- */
-const TYPEOF_OBJECT = 'object';
-
-/**
- * String literal for `typeof boolean` checks.
- *
- * @type {string}
- */
-const TYPEOF_BOOLEAN = 'boolean';
-
-/**
- * String literal for `typeof number` checks.
- *
- * @type {string}
- */
-const TYPEOF_NUMBER = 'number';
 
 /**
  * Diffuse map sampler uniform name.
@@ -556,12 +522,12 @@ const ERROR_EXPECTS_VECTOR3_COMPONENTS_SUFFIX = ' expects exactly 3 components.'
  */
 const VERTEX_SHADER_SOURCE = `#version 300 es
 precision mediump float;
-layout(location = ${POSITION_ATTRIBUTE_LOCATION}) in vec3 a_position;
-layout(location = ${NORMAL_ATTRIBUTE_LOCATION}) in vec3 a_normal;
+layout(location = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.POSITION_LOCATION}) in vec3 a_position;
+layout(location = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.NORMAL_LOCATION}) in vec3 a_normal;
 layout(location = ${UV_ATTRIBUTE_LOCATION}) in vec2 a_uv;
-uniform mat4 ${FINAL_MATRIX_UNIFORM_NAME};
-uniform mat4 ${WORLD_MATRIX_UNIFORM_NAME};
-uniform mat4 ${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME};
+uniform mat4 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX};
+uniform mat4 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX};
+uniform mat4 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX};
 uniform sampler2D ${DISPLACEMENT_MAP_UNIFORM_NAME};
 uniform float ${USE_DISPLACEMENT_MAP_UNIFORM_NAME};
 uniform float ${DISPLACEMENT_SCALE_UNIFORM_NAME};
@@ -580,9 +546,9 @@ void main() {
     }
 
     vec3 displaced_position = a_position + (a_normal * displacement);
-    gl_Position = ${FINAL_MATRIX_UNIFORM_NAME} * vec4(displaced_position, 1.0);
-    v_worldPosition = (${WORLD_MATRIX_UNIFORM_NAME} * vec4(displaced_position, 1.0)).xyz;
-    v_normal = (${WORLD_INVERSE_TRANSPOSE_MATRIX_UNIFORM_NAME} * vec4(a_normal, 0.0)).xyz;
+    gl_Position     = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX} * vec4(displaced_position, 1.0);
+    v_worldPosition = (${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX} * vec4(displaced_position, 1.0)).xyz;
+    v_normal        = (${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX} * vec4(a_normal, 0.0)).xyz;
     v_uv = a_uv;
 }
 `;
@@ -597,19 +563,19 @@ precision mediump float;
 in vec3 v_worldPosition;
 in vec3 v_normal;
 in vec2 v_uv;
-uniform vec3 ${COLOR_UNIFORM_NAME};
+uniform vec3 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR};
 uniform vec3 ${AMBIENT_COLOR_UNIFORM_NAME};
 uniform vec3 ${SPECULAR_COLOR_UNIFORM_NAME};
 uniform vec3 ${EMISSIVE_COLOR_UNIFORM_NAME};
-uniform vec3 ${LIGHT_DIRECTION_UNIFORM_NAME};
-uniform vec3 ${CAMERA_POSITION_UNIFORM_NAME};
-uniform float ${AMBIENT_STRENGTH_UNIFORM_NAME};
-uniform float ${DIRECTIONAL_STRENGTH_UNIFORM_NAME};
-uniform float ${LIGHTING_ENABLED_UNIFORM_NAME};
+uniform vec3 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION};
+uniform vec3 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION};
+uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH};
+uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH};
+uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED};
 uniform float ${SPECULAR_STRENGTH_UNIFORM_NAME};
 uniform float ${SHININESS_UNIFORM_NAME};
 uniform float ${SPECULAR_ENABLED_UNIFORM_NAME};
-uniform float ${OPACITY_UNIFORM_NAME};
+uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY};
 uniform float ${OPTICAL_DENSITY_UNIFORM_NAME};
 uniform float ${BUMP_MULTIPLIER_UNIFORM_NAME};
 uniform sampler2D ${DIFFUSE_MAP_UNIFORM_NAME};
@@ -644,54 +610,64 @@ vec2 apply_uv(vec2 base_uv, vec2 offset, vec2 scale) {
 
 vec3 compute_bump_normal(vec3 normal, vec2 uv) {
     vec3 tangent_normal = texture(${BUMP_MAP_UNIFORM_NAME}, uv).xyz * 2.0 - 1.0;
-    tangent_normal.xy *= ${BUMP_MULTIPLIER_UNIFORM_NAME};
-    tangent_normal = normalize(tangent_normal);
+    tangent_normal.xy  *= ${BUMP_MULTIPLIER_UNIFORM_NAME};
+    tangent_normal      = normalize(tangent_normal);
 
-    vec3 dp1 = dFdx(v_worldPosition);
-    vec3 dp2 = dFdy(v_worldPosition);
-    vec2 duv1 = dFdx(uv);
-    vec2 duv2 = dFdy(uv);
-    vec3 tangent = normalize(dp1 * duv2.y - dp2 * duv1.y);
+    vec3 dp1       = dFdx(v_worldPosition);
+    vec3 dp2       = dFdy(v_worldPosition);
+    vec2 duv1      = dFdx(uv);
+    vec2 duv2      = dFdy(uv);
+    vec3 tangent   = normalize(dp1 * duv2.y - dp2 * duv1.y);
     vec3 bitangent = normalize(-dp1 * duv2.x + dp2 * duv1.x);
+
     mat3 tbn = mat3(tangent, bitangent, normal);
     return normalize(tbn * tangent_normal);
 }
 
 vec2 compute_reflection_uv(vec3 normal, vec3 view_dir) {
     vec3 reflect_dir = reflect(-view_dir, normal);
-    float m = 2.0 * sqrt(reflect_dir.x * reflect_dir.x
+    float uv_scale   = 2.0 * sqrt(
+          reflect_dir.x * reflect_dir.x
         + reflect_dir.y * reflect_dir.y
-        + (reflect_dir.z + 1.0) * (reflect_dir.z + 1.0));
-    return (reflect_dir.xy / m) + vec2(0.5, 0.5);
+        + (reflect_dir.z + 1.0) * (reflect_dir.z + 1.0)
+    );
+
+    return (reflect_dir.xy / uv_scale) + vec2(0.5, 0.5);
 }
 
 void main() {
-    vec3 diffuse_color = ${COLOR_UNIFORM_NAME};
+    vec3 diffuse_color     = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR};
     vec3 diffuse_map_color = vec3(1.0);
+
     if (${USE_DIFFUSE_MAP_UNIFORM_NAME} > 0.5) {
         vec2 diff_uv = apply_uv(v_uv, ${DIFFUSE_UV_OFFSET_UNIFORM_NAME}, ${DIFFUSE_UV_SCALE_UNIFORM_NAME});
         diffuse_map_color = texture(${DIFFUSE_MAP_UNIFORM_NAME}, diff_uv).rgb;
         diffuse_color *= diffuse_map_color;
     }
 
-    float alpha = ${OPACITY_UNIFORM_NAME};
+    float alpha = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY};
+
     if (${USE_ALPHA_MAP_UNIFORM_NAME} > 0.5) {
         vec2 alpha_uv = apply_uv(v_uv, ${ALPHA_UV_OFFSET_UNIFORM_NAME}, ${ALPHA_UV_SCALE_UNIFORM_NAME});
         alpha *= texture(${ALPHA_MAP_UNIFORM_NAME}, alpha_uv).r;
     }
 
-    if (${LIGHTING_ENABLED_UNIFORM_NAME} <= ${LIGHTING_ENABLED_THRESHOLD}) {
+    if (${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED} <= ${LIGHTING_ENABLED_THRESHOLD}) {
         vec3 unlit_color = diffuse_color;
+
         if (${USE_DIFFUSE_MAP_UNIFORM_NAME} > 0.5) {
             unlit_color = diffuse_map_color;
         }
+
         vec3 rgb = unlit_color + ${EMISSIVE_COLOR_UNIFORM_NAME};
         outColor = vec4(rgb, alpha);
         return;
     }
 
-    vec3 normal = normalize(v_normal);
-    vec3 view_dir = normalize(${CAMERA_POSITION_UNIFORM_NAME} - v_worldPosition);
+    vec3 normal         = normalize(v_normal);
+    vec3 view_dir       = normalize(${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION} - v_worldPosition);
+    vec3 ambient_tint   = ${AMBIENT_COLOR_UNIFORM_NAME};
+    vec3 specular_color = ${SPECULAR_COLOR_UNIFORM_NAME};
 
     if (${USE_BUMP_MAP_UNIFORM_NAME} > 0.5) {
         vec2 bump_uv = apply_uv(v_uv, ${BUMP_UV_OFFSET_UNIFORM_NAME}, ${BUMP_UV_SCALE_UNIFORM_NAME});
@@ -702,24 +678,23 @@ void main() {
         normal = -normal;
     }
 
-    vec3 ambient_tint = ${AMBIENT_COLOR_UNIFORM_NAME};
     if (${USE_AMBIENT_MAP_UNIFORM_NAME} > 0.5) {
-        vec2 amb_uv = apply_uv(v_uv, ${AMBIENT_UV_OFFSET_UNIFORM_NAME}, ${AMBIENT_UV_SCALE_UNIFORM_NAME});
+        vec2 amb_uv   = apply_uv(v_uv, ${AMBIENT_UV_OFFSET_UNIFORM_NAME}, ${AMBIENT_UV_SCALE_UNIFORM_NAME});
         ambient_tint *= texture(${AMBIENT_MAP_UNIFORM_NAME}, amb_uv).rgb;
     }
 
-    vec3 specular_color = ${SPECULAR_COLOR_UNIFORM_NAME};
     if (${USE_SPECULAR_MAP_UNIFORM_NAME} > 0.5) {
-        vec2 spec_uv = apply_uv(v_uv, ${SPECULAR_UV_OFFSET_UNIFORM_NAME}, ${SPECULAR_UV_SCALE_UNIFORM_NAME});
+        vec2 spec_uv    = apply_uv(v_uv, ${SPECULAR_UV_OFFSET_UNIFORM_NAME}, ${SPECULAR_UV_SCALE_UNIFORM_NAME});
         specular_color *= texture(${SPECULAR_MAP_UNIFORM_NAME}, spec_uv).rgb;
     }
 
-    vec3 light_direction = normalize(${LIGHT_DIRECTION_UNIFORM_NAME});
-    float diffuse_intensity = max(dot(normal, light_direction), 0.0);
-    vec3 ambient = diffuse_color * ambient_tint * ${AMBIENT_STRENGTH_UNIFORM_NAME};
-    vec3 diffuse = diffuse_color * (diffuse_intensity * ${DIRECTIONAL_STRENGTH_UNIFORM_NAME});
-
     float specular_intensity = 0.0;
+    vec3 light_direction     = normalize(${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION});
+    float diffuse_intensity  = max(dot(normal, light_direction), 0.0);
+
+    vec3 ambient = diffuse_color * ambient_tint * ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH};
+    vec3 diffuse = diffuse_color * (diffuse_intensity * ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH});
+
     if (${SPECULAR_ENABLED_UNIFORM_NAME} > 0.5 && diffuse_intensity > 0.0) {
         vec3 reflection_direction = reflect(-light_direction, normal);
         float specular_base = max(dot(view_dir, reflection_direction), 0.0);
@@ -727,16 +702,17 @@ void main() {
     }
 
     vec3 specular = specular_color * (specular_intensity * ${SPECULAR_STRENGTH_UNIFORM_NAME}
-        * ${DIRECTIONAL_STRENGTH_UNIFORM_NAME});
+        * ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH});
+
     vec3 emissive = ${EMISSIVE_COLOR_UNIFORM_NAME};
-    vec3 rgb = ambient + diffuse + specular + emissive;
+    vec3 rgb      = ambient + diffuse + specular + emissive;
 
     if (${USE_REFLECTION_MAP_UNIFORM_NAME} > 0.5) {
-        vec2 refl_uv = compute_reflection_uv(normal, view_dir);
+        vec2 refl_uv        = compute_reflection_uv(normal, view_dir);
         vec2 refl_uv_scaled = apply_uv(refl_uv, ${REFLECTION_UV_OFFSET_UNIFORM_NAME}, ${REFLECTION_UV_SCALE_UNIFORM_NAME});
-        vec3 refl_color = texture(${REFLECTION_MAP_UNIFORM_NAME}, refl_uv_scaled).rgb;
+        vec3 refl_color     = texture(${REFLECTION_MAP_UNIFORM_NAME}, refl_uv_scaled).rgb;
         float refl_strength = clamp(${OPTICAL_DENSITY_UNIFORM_NAME} - 1.0, 0.0, 1.0);
-        rgb = mix(rgb, refl_color, refl_strength);
+        rgb                 = mix(rgb, refl_color, refl_strength);
     }
 
     outColor = vec4(rgb, alpha);
@@ -747,12 +723,12 @@ void main() {
  * Options used by `MtlStandardMaterial`.
  *
  * @typedef {Object} MtlStandardMaterialOptions
- * @property {Float32Array | number[]} [diffuseColor]  - Diffuse RGB color in 0..1 range.
- * @property {Float32Array | number[]} [ambientColor]  - Ambient RGB color in 0..1 range.
- * @property {Float32Array | number[]} [specularColor] - Specular RGB color in 0..1 range.
- * @property {Float32Array | number[]} [emissiveColor] - Emissive RGB color in 0..1 range.
- * @property {Float32Array | number[]} [lightDirection]- Directional light direction (world space).
- * @property {number} [ambientStrength]                - Ambient strength multiplier.
+ * @property {Float32Array | number[]} [diffuseColor]   - Diffuse RGB color in 0..1 range.
+ * @property {Float32Array | number[]} [ambientColor]   - Ambient RGB color in 0..1 range.
+ * @property {Float32Array | number[]} [specularColor]  - Specular RGB color in 0..1 range.
+ * @property {Float32Array | number[]} [emissiveColor]  - Emissive RGB color in 0..1 range.
+ * @property {Float32Array | number[]} [lightDirection] - Directional light direction (world space).
+ * @property {number} [ambientStrength]                 - Ambient strength multiplier.
  * @property {number} [shininess]                       - Specular exponent.
  * @property {number} [specularStrength]                - Specular strength multiplier.
  * @property {number} [opticalDensity]                  - Optical density used for reflection blending.
@@ -1139,7 +1115,7 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
      * @param {MtlStandardMaterialOptions} [options] - Material options.
      */
     constructor(webglContext, options = {}) {
-        if (options === null || typeof options !== TYPEOF_OBJECT || Array.isArray(options)) {
+        if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
             throw new TypeError(ERROR_OPTIONS_OBJECT);
         }
 
@@ -1200,8 +1176,8 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
      */
     applyAdditionalUniforms(worldMatrix, cameraPosition) {
         // Transform & camera uniforms:
-        this.shaderProgram.setMatrix4(WORLD_MATRIX_UNIFORM_NAME, worldMatrix);
-        this.shaderProgram.setVector3(CAMERA_POSITION_UNIFORM_NAME, cameraPosition);
+        this.shaderProgram.setMatrix4(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX, worldMatrix);
+        this.shaderProgram.setVector3(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION, cameraPosition);
 
         // Material colors & shading parameters:
         this.shaderProgram.setVector3(AMBIENT_COLOR_UNIFORM_NAME, this.#ambientColor);
@@ -1287,7 +1263,7 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
      * @param {number} value - Shininess exponent.
      */
     setShininess(value) {
-        if (typeof value !== TYPEOF_NUMBER || !Number.isFinite(value)) {
+        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
             throw new TypeError(ERROR_SHININESS_TYPE);
         }
 
@@ -1300,7 +1276,7 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
      * @param {number} value - Specular strength.
      */
     setSpecularStrength(value) {
-        if (typeof value !== TYPEOF_NUMBER || !Number.isFinite(value)) {
+        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
             throw new TypeError(ERROR_SPECULAR_STRENGTH_TYPE);
         }
 
@@ -1313,7 +1289,7 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
      * @param {boolean} enabled - Specular usage flag.
      */
     setSpecularEnabled(enabled) {
-        if (typeof enabled !== TYPEOF_BOOLEAN) {
+        if (typeof enabled !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
             throw new TypeError(ERROR_SPECULAR_ENABLED_TYPE);
         }
 
@@ -1326,7 +1302,7 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
      * @param {number} value - Optical density.
      */
     setOpticalDensity(value) {
-        if (typeof value !== TYPEOF_NUMBER || !Number.isFinite(value)) {
+        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
             throw new TypeError(ERROR_OPTICAL_DENSITY_TYPE);
         }
 
@@ -1339,7 +1315,7 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
      * @param {number} value - Bump multiplier.
      */
     setBumpMultiplier(value) {
-        if (typeof value !== TYPEOF_NUMBER || !Number.isFinite(value)) {
+        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
             throw new TypeError(ERROR_BUMP_MULTIPLIER_TYPE);
         }
 
@@ -1352,7 +1328,7 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
      * @param {number} value - Displacement scale factor.
      */
     setDisplacementScale(value) {
-        if (typeof value !== TYPEOF_NUMBER || !Number.isFinite(value)) {
+        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
             throw new TypeError(ERROR_DISPLACEMENT_SCALE_TYPE);
         }
 
@@ -1536,7 +1512,7 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
             throw new TypeError(context + ERROR_EXPECTS_TEXTURE_SUFFIX);
         }
 
-        if (options === null || typeof options !== TYPEOF_OBJECT || Array.isArray(options)) {
+        if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
             throw new TypeError(context + ERROR_EXPECTS_OPTIONS_OBJECT_SUFFIX);
         }
 
@@ -1592,7 +1568,7 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
             throw new TypeError(context + ERROR_EXPECTS_VECTOR2_TYPE_SUFFIX);
         }
 
-        if (value.length !== VECTOR3_ELEMENT_COUNT) {
+        if (value.length !== MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_VECTOR3_ELEMENT_COUNT) {
             throw new TypeError(context + ERROR_EXPECTS_VECTOR3_COMPONENTS_SUFFIX);
         }
     }
