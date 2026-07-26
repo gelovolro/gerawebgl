@@ -1,0 +1,95 @@
+name: Publish packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact git tag and package version
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+concurrency:
+  group: publish-packages-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout the release tag
+        uses: actions/checkout@v5
+        with:
+          ref: refs/tags/${{ inputs.version }}
+          fetch-depth: 0
+
+      - name: Setup Node.js for npmjs
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Read and check the release version
+        id: project
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          projectVersion="$(node -p "require('./package.json').version")"
+          lockVersion="$(node -p "require('./package-lock.json').version")"
+          lockProjectVersion="$(node -p "require('./package-lock.json').packages[''].version")"
+
+          if [ "${projectVersion}" != "${RELEASE_VERSION}" ]; then
+              echo "Package version '${projectVersion}' does not match tag '${RELEASE_VERSION}'."
+              exit 1
+          fi
+
+          if [ "${projectVersion}" != "${lockVersion}" ] || [ "${projectVersion}" != "${lockProjectVersion}" ]; then
+              echo "The project versions do not match."
+              exit 1
+          fi
+
+          if [[ "${projectVersion}" == *-* ]]; then
+              distTag="${projectVersion#*-}"
+              distTag="${distTag%%.*}"
+          else
+              distTag="latest"
+          fi
+
+          echo "version=${projectVersion}" >> "${GITHUB_OUTPUT}"
+          echo "dist_tag=${distTag}" >> "${GITHUB_OUTPUT}"
+          echo "Package version: ${projectVersion}"
+          echo "Distribution tag: ${distTag}"
+
+      - name: Restore the dependencies, build, run the tests and create the NPM package
+        uses: ./.github/actions/base-preparation
+
+      - name: Publish to npmjs
+        shell: bash
+        run: npm publish --access public --tag "${{ steps.project.outputs.dist_tag }}"
+
+      - name: Setup Node.js for GitHub Packages
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://npm.pkg.github.com
+          scope: '@gelovolro'
+          package-manager-cache: false
+
+      - name: Prepare the GitHub package metadata
+        shell: bash
+        run: |
+          npm pkg set name="@gelovolro/gerawebgl"
+          npm pkg set publishConfig.registry="https://npm.pkg.github.com"
+
+      - name: Publish to GitHub Packages
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm publish --ignore-scripts --tag "${{ steps.project.outputs.dist_tag }}"
