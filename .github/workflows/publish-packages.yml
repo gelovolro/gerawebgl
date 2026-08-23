@@ -18,8 +18,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  publish-npmjs:
     runs-on: ubuntu-24.04
+
+    outputs:
+      version: ${{ steps.preparation.outputs.version }}
+      dist_tag: ${{ steps.preparation.outputs.dist_tag }}
 
     steps:
       - name: Checkout the release tag
@@ -35,44 +39,52 @@ jobs:
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
-      - name: Read and check the release version
-        id: project
-        shell: bash
-        env:
-          RELEASE_VERSION: ${{ inputs.version }}
-        run: |
-          projectVersion="$(node -p "require('./package.json').version")"
-          lockVersion="$(node -p "require('./package-lock.json').version")"
-          lockProjectVersion="$(node -p "require('./package-lock.json').packages[''].version")"
-
-          if [ "${projectVersion}" != "${RELEASE_VERSION}" ]; then
-              echo "Package version '${projectVersion}' does not match tag '${RELEASE_VERSION}'."
-              exit 1
-          fi
-
-          if [ "${projectVersion}" != "${lockVersion}" ] || [ "${projectVersion}" != "${lockProjectVersion}" ]; then
-              echo "The project versions do not match."
-              exit 1
-          fi
-
-          if [[ "${projectVersion}" == *-* ]]; then
-              distTag="${projectVersion#*-}"
-              distTag="${distTag%%.*}"
-          else
-              distTag="latest"
-          fi
-
-          echo "version=${projectVersion}" >> "${GITHUB_OUTPUT}"
-          echo "dist_tag=${distTag}" >> "${GITHUB_OUTPUT}"
-          echo "Package version: ${projectVersion}"
-          echo "Distribution tag: ${distTag}"
-
-      - name: Restore the dependencies, build, run the tests and create the NPM package
-        uses: ./.github/actions/base-preparation
+      - name: Prepare the release package
+        id: preparation
+        uses: ./.github/actions/release-preparation
+        with:
+          version: ${{ inputs.version }}
 
       - name: Publish to npmjs
         shell: bash
-        run: npm publish --access public --tag "${{ steps.project.outputs.dist_tag }}"
+        run: npm publish --access public --tag "${{ steps.preparation.outputs.dist_tag }}"
+
+  update-npmjs-latest:
+    needs: publish-npmjs
+    if: needs.publish-npmjs.outputs.dist_tag != 'latest'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Setup Node.js for npmjs
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Update the latest npmjs tag
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_DIST_TAG_TOKEN }}
+        run: |
+          npm dist-tag add \
+            "gerawebgl@${{ needs.publish-npmjs.outputs.version }}" \
+            latest \
+            --registry=https://registry.npmjs.org
+
+  publish-github-packages:
+    runs-on: ubuntu-24.04
+
+    outputs:
+      version: ${{ steps.preparation.outputs.version }}
+      dist_tag: ${{ steps.preparation.outputs.dist_tag }}
+
+    steps:
+      - name: Checkout the release tag
+        uses: actions/checkout@v5
+        with:
+          ref: refs/tags/${{ inputs.version }}
+          fetch-depth: 0
 
       - name: Setup Node.js for GitHub Packages
         uses: actions/setup-node@v6
@@ -81,6 +93,12 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: '@gelovolro'
           package-manager-cache: false
+
+      - name: Prepare the release package
+        id: preparation
+        uses: ./.github/actions/release-preparation
+        with:
+          version: ${{ inputs.version }}
 
       - name: Prepare the GitHub package metadata
         shell: bash
@@ -92,4 +110,28 @@ jobs:
         shell: bash
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm publish --ignore-scripts --tag "${{ steps.project.outputs.dist_tag }}"
+        run: npm publish --ignore-scripts --tag "${{ steps.preparation.outputs.dist_tag }}"
+
+  update-github-packages-latest:
+    needs: publish-github-packages
+    if: needs.publish-github-packages.outputs.dist_tag != 'latest'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Setup Node.js for GitHub Packages
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://npm.pkg.github.com
+          scope: '@gelovolro'
+          package-manager-cache: false
+
+      - name: Update the latest GitHub Packages tag
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm dist-tag add \
+            "@gelovolro/gerawebgl@${{ needs.publish-github-packages.outputs.version }}" \
+            latest \
+            --registry=https://npm.pkg.github.com

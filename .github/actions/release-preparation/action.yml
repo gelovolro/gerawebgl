@@ -1,0 +1,54 @@
+name: Prepare the release package
+description: Check the release version, determine the distribution tag and prepare the NPM package.
+
+inputs:
+  version:
+    description: Exact git tag and package version
+    required: true
+
+outputs:
+  version:
+    description: Package version
+    value: ${{ steps.project.outputs.version }}
+  dist_tag:
+    description: NPM distribution tag
+    value: ${{ steps.project.outputs.dist_tag }}
+
+runs:
+  using: composite
+
+  steps:
+    - name: Read and check the release version
+      id: project
+      shell: bash
+      env:
+        RELEASE_VERSION: ${{ inputs.version }}
+      run: |
+        projectVersion="$(node -p "require('./package.json').version")"
+        lockVersion="$(node -p "require('./package-lock.json').version")"
+        lockProjectVersion="$(node -p "require('./package-lock.json').packages[''].version")"
+
+        if [ "${projectVersion}" != "${RELEASE_VERSION}" ]; then
+            echo "Package version '${projectVersion}' does not match tag '${RELEASE_VERSION}'."
+            exit 1
+        fi
+
+        if [ "${projectVersion}" != "${lockVersion}" ] || [ "${projectVersion}" != "${lockProjectVersion}" ]; then
+            echo "The project versions do not match."
+            exit 1
+        fi
+
+        if [[ "${projectVersion}" == *-* ]]; then
+            distTag="${projectVersion#*-}"
+            distTag="${distTag%%.*}"
+        else
+            distTag="latest"
+        fi
+
+        echo "version=${projectVersion}" >> "${GITHUB_OUTPUT}"
+        echo "dist_tag=${distTag}" >> "${GITHUB_OUTPUT}"
+        echo "Package version: ${projectVersion}"
+        echo "Distribution tag: ${distTag}"
+
+    - name: Restore the dependencies, build, run the tests and create the NPM package
+      uses: ./.github/actions/base-preparation
