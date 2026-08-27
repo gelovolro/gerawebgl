@@ -467,6 +467,140 @@ export class Matrix4 {
     }
 
     /**
+     * Writes a transformation matrix combining translation, Euler rotation and scale.
+     *
+     * The transformation is calculated as:
+     * 'M = T * Rz * Ry * Rx * S'
+     *
+     * Where:
+     * M  - final transformation matrix
+     * T  - translation matrix
+     * Rx - rotation matrix around the X axis
+     * Ry - rotation matrix around the Y axis
+     * Rz - rotation matrix around the Z axis
+     * S  - scale matrix
+     *
+     * For a point, the transformations are applied in reverse order:
+     * 'S -> Rx -> Ry -> Rz -> T'
+     *
+     * This happens because 'Matrix4' uses column vectors and applies the rightmost transformation first.
+     *
+     * This means that a point is transformed in the following sequence:
+     * 1). scaled along its local X, Y and Z axes
+     * 2). rotated around X
+     * 3). rotated around Y
+     * 4). rotated around Z
+     * 5). translated to its final position
+     *
+     * The combined Euler rotation is 'R = Rz * Ry * Rx' using the following abbreviations:
+     * 'cx, sx' - cosine and sine of rotation X
+     * 'cy, sy' - cosine and sine of rotation Y
+     * 'cz, sz' - cosine and sine of rotation Z
+     *
+     * The resulting 3x3 rotation part is:
+     *
+     * [ cz*cy   cz*sy*sx - sz*cx   cz*sy*cx + sz*sx ]
+     * [ sz*cy   sz*sy*sx + cz*cx   sz*sy*cx - cz*sx ]
+     * [ -sy     cy*sx              cy*cx            ]
+     *
+     * Each rotation column is multiplied by the corresponding scale value and
+     * translation is stored in the last column, producing this affine 4x4 matrix:
+     *
+     * column 0: [ (rotation00 * scaleX), (rotation10 * scaleX), (rotation20 * scaleX) , 0 ]
+     * column 1: [ (rotation01 * scaleY), (rotation11 * scaleY), (rotation21 * scaleY) , 0 ]
+     * column 2: [ (rotation02 * scaleZ), (rotation12 * scaleZ), (rotation22 * scaleZ) , 0 ]
+     * column 3: [ translateX,            translateY,            translateZ,             1 ]
+     *
+     * Writes directly to the output buffer without intermediate matrix allocations.
+     *
+     * @param {Float32Array} out        - Output 4x4 matrix buffer.
+     * @param {number}       translateX - Translation along X axis.
+     * @param {number}       translateY - Translation along Y axis.
+     * @param {number}       translateZ - Translation along Z axis.
+     * @param {number}       rotationX  - Rotation around X axis in radians.
+     * @param {number}       rotationY  - Rotation around Y axis in radians.
+     * @param {number}       rotationZ  - Rotation around Z axis in radians.
+     * @param {number}       scaleX     - Scale along X axis.
+     * @param {number}       scaleY     - Scale along Y axis.
+     * @param {number}       scaleZ     - Scale along Z axis.
+     * @returns {Float32Array}          - The provided output buffer.
+     * @throws {TypeError}              - If the output buffer or arguments are invalid.
+     */
+    static writeTransformationTo(
+        out,
+        translateX,
+        translateY,
+        translateZ,
+        rotationX,
+        rotationY,
+        rotationZ,
+        scaleX,
+        scaleY,
+        scaleZ
+    ) {
+        if (!(out instanceof Float32Array) || out.length !== MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
+            throw new TypeError('`Matrix4.writeTransformationTo` expects out to be `Float32Array(16)`.');
+        }
+
+        if (typeof translateX    !== 'number'
+            || typeof translateY !== 'number'
+            || typeof translateZ !== 'number'
+            || typeof rotationX  !== 'number'
+            || typeof rotationY  !== 'number'
+            || typeof rotationZ  !== 'number'
+            || typeof scaleX     !== 'number'
+            || typeof scaleY     !== 'number'
+            || typeof scaleZ     !== 'number') {
+            throw new TypeError('`Matrix4.writeTransformationTo` expects numeric arguments.');
+        }
+
+        const cosX = Math.cos(rotationX);
+        const sinX = Math.sin(rotationX);
+        const cosY = Math.cos(rotationY);
+        const sinY = Math.sin(rotationY);
+        const cosZ = Math.cos(rotationZ);
+        const sinZ = Math.sin(rotationZ);
+
+        const rotation00 = cosZ * cosY;
+        const rotation01 = (cosZ * sinY * sinX) - (sinZ * cosX);
+        const rotation02 = (cosZ * sinY * cosX) + (sinZ * sinX);
+
+        const rotation10 = sinZ * cosY;
+        const rotation11 = (sinZ * sinY * sinX) + (cosZ * cosX);
+        const rotation12 = (sinZ * sinY * cosX) - (cosZ * sinX);
+
+        const rotation20 = -sinY;
+        const rotation21 = cosY * sinX;
+        const rotation22 = cosY * cosX;
+
+        // X axis:
+        out[0] = rotation00 * scaleX;
+        out[1] = rotation10 * scaleX;
+        out[2] = rotation20 * scaleX;
+        out[3] = MathConstants.MATH_MATRIX_VALUES.ZERO;
+
+        // Y axis:
+        out[4] = rotation01 * scaleY;
+        out[5] = rotation11 * scaleY;
+        out[6] = rotation21 * scaleY;
+        out[7] = MathConstants.MATH_MATRIX_VALUES.ZERO;
+
+        // Z axis:
+        out[8]  = rotation02 * scaleZ;
+        out[9]  = rotation12 * scaleZ;
+        out[10] = rotation22 * scaleZ;
+        out[11] = MathConstants.MATH_MATRIX_VALUES.ZERO;
+
+        // Translation:
+        out[12] = translateX;
+        out[13] = translateY;
+        out[14] = translateZ;
+        out[15] = MathConstants.MATH_MATRIX_VALUES.UNIT;
+
+        return out;
+    }
+
+    /**
      * Multiplies two 4x4 matrices: 'result = leftMatrix * rightMatrix'.
      *
      * Order matters. With column-vector style, right matrix is applied first.
