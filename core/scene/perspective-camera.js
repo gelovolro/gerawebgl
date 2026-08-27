@@ -3,7 +3,9 @@ import { Camera }         from './camera.js';
 import { Matrix4 }        from '../math/matrix4.js';
 
 /**
- * Perspective camera with field of view, aspect ratio and clipping planes.
+ * Perspective camera with a vertical field of view, viewport aspect ratio and near/far clipping planes.
+ *
+ * The projection matrix is computed on demand, cached and recomputed after the aspect ratio changes.
  */
 export class PerspectiveCamera extends Camera {
 
@@ -40,8 +42,9 @@ export class PerspectiveCamera extends Camera {
     #far;
 
     /**
-     * Cached projection matrix buffer.
-     * The buffer is reused between frames to avoid allocations.
+     * Cached perspective projection matrix.
+     *
+     * Reused between calls to avoid allocations.
      *
      * @type {Float32Array}
      * @private
@@ -49,7 +52,7 @@ export class PerspectiveCamera extends Camera {
     #projectionMatrix;
 
     /**
-     * When true, projection matrix must be recomputed.
+     * Indicates that the cached projection matrix must be rebuilt.
      *
      * @type {boolean}
      * @private
@@ -57,10 +60,14 @@ export class PerspectiveCamera extends Camera {
     #isProjectionMatrixDirty = true;
 
     /**
+     * Creates a perspective camera.
+     *
      * @param {number} fieldOfViewRadians - Vertical field of view in radians.
      * @param {number} aspectRatio        - Viewport aspect ratio (width / height).
-     * @param {number} near               - Distance to the near clipping plane (must be greater, than 0).
-     * @param {number} far                - Distance to the far clipping plane (must be greater, than near).
+     * @param {number} near               - Distance to the near clipping plane, must be greater than 0.
+     * @param {number} far                - Distance to the far clipping plane, must be greater than near.
+     * @throws {TypeError}                - If any argument is not a number.
+     * @throws {RangeError}               - If the aspect ratio or clipping distances are invalid.
      */
     constructor(fieldOfViewRadians, aspectRatio, near, far) {
         super();
@@ -97,9 +104,12 @@ export class PerspectiveCamera extends Camera {
     }
 
     /**
-     * Updates the aspect ratio and marks projection cache as dirty.
+     * Updates the viewport aspect ratio and invalidates the projection cache, when the value changes.
      *
      * @param {number} aspectRatio - New viewport aspect ratio (canvas width divided by canvas height).
+     * @returns {void}
+     * @throws {TypeError}  - If the aspect ratio is not a number.
+     * @throws {RangeError} - If the aspect ratio is not positive.
      */
     setAspectRatio(aspectRatio) {
         if (typeof aspectRatio !== 'number') {
@@ -119,7 +129,7 @@ export class PerspectiveCamera extends Camera {
     }
 
     /**
-     * Returns the projection matrix for this camera. The returned matrix is cached and reused between calls.
+     * Returns the cached projection matrix, rebuilding it when needed.
      *
      * @returns {Float32Array} - Cached projection matrix.
      */
