@@ -16,6 +16,15 @@ class Matrix4TestFixtures {
     static ORTHOGRAPHIC_TOP_PLANE            = 4;
     static ZERO_ASPECT_RATIO                 = 0;
     static ZERO_NEAR_CLIPPING_PLANE          = 0;
+    static TRANSFORMATION_TRANSLATE_X        = 3;
+    static TRANSFORMATION_TRANSLATE_Y        = -4;
+    static TRANSFORMATION_TRANSLATE_Z        = 5;
+    static TRANSFORMATION_ROTATION_X         = Math.PI / 6;
+    static TRANSFORMATION_ROTATION_Y         = Math.PI / 4;
+    static TRANSFORMATION_ROTATION_Z         = Math.PI / 3;
+    static TRANSFORMATION_SCALE_X            = 2;
+    static TRANSFORMATION_SCALE_Y            = 3;
+    static TRANSFORMATION_SCALE_Z            = 4;
 
     static createExpectedIdentity() {
         return new Float32Array([
@@ -716,6 +725,104 @@ test("'Matrix4.createRotationZ' should reject a non-numeric angle", () => {
 
     // Assert
     assert.throws(actualCall, expectedErrorMatch);
+});
+
+test("'Matrix4.writeTransformationTo' should compose translation, rotation and scale into the output matrix", () => {
+    // Arrange
+    const actualMatrix      = Matrix4TestFixtures.createEmptyMatrix();
+    const translationMatrix = Matrix4.createTranslation(
+        Matrix4TestFixtures.TRANSFORMATION_TRANSLATE_X,
+        Matrix4TestFixtures.TRANSFORMATION_TRANSLATE_Y,
+        Matrix4TestFixtures.TRANSFORMATION_TRANSLATE_Z
+    );
+
+    const rotationZMatrix = Matrix4.createRotationZ(Matrix4TestFixtures.TRANSFORMATION_ROTATION_Z);
+    const rotationYMatrix = Matrix4.createRotationY(Matrix4TestFixtures.TRANSFORMATION_ROTATION_Y);
+    const rotationXMatrix = Matrix4.createRotationX(Matrix4TestFixtures.TRANSFORMATION_ROTATION_X);
+    const scaleMatrix     = Matrix4.createScale(
+        Matrix4TestFixtures.TRANSFORMATION_SCALE_X,
+        Matrix4TestFixtures.TRANSFORMATION_SCALE_Y,
+        Matrix4TestFixtures.TRANSFORMATION_SCALE_Z
+    );
+
+    const expectedMatrix = Matrix4.multiplyMany(
+        translationMatrix,
+        rotationZMatrix,
+        rotationYMatrix,
+        rotationXMatrix,
+        scaleMatrix
+    );
+
+    // Act
+    const returnedMatrix = Matrix4.writeTransformationTo(
+        actualMatrix,
+        Matrix4TestFixtures.TRANSFORMATION_TRANSLATE_X,
+        Matrix4TestFixtures.TRANSFORMATION_TRANSLATE_Y,
+        Matrix4TestFixtures.TRANSFORMATION_TRANSLATE_Z,
+        Matrix4TestFixtures.TRANSFORMATION_ROTATION_X,
+        Matrix4TestFixtures.TRANSFORMATION_ROTATION_Y,
+        Matrix4TestFixtures.TRANSFORMATION_ROTATION_Z,
+        Matrix4TestFixtures.TRANSFORMATION_SCALE_X,
+        Matrix4TestFixtures.TRANSFORMATION_SCALE_Y,
+        Matrix4TestFixtures.TRANSFORMATION_SCALE_Z
+    );
+
+    // Assert
+    assert.equal(returnedMatrix, actualMatrix);
+    TestAssertions.assertFloat32ArrayApproximatelyEquals(actualMatrix, expectedMatrix);
+});
+
+test("'Matrix4.writeTransformationTo' should reject invalid output matrices", () => {
+    // Arrange
+    const invalidMatrixType   = [];
+    const invalidMatrixLength = Matrix4TestFixtures.createInvalidLengthMatrix();
+    const expectedErrorMatch  = /Float32Array\(16\)/;
+    const validArguments      = [
+        Matrix4TestFixtures.TRANSFORMATION_TRANSLATE_X,
+        Matrix4TestFixtures.TRANSFORMATION_TRANSLATE_Y,
+        Matrix4TestFixtures.TRANSFORMATION_TRANSLATE_Z,
+        Matrix4TestFixtures.TRANSFORMATION_ROTATION_X,
+        Matrix4TestFixtures.TRANSFORMATION_ROTATION_Y,
+        Matrix4TestFixtures.TRANSFORMATION_ROTATION_Z,
+        Matrix4TestFixtures.TRANSFORMATION_SCALE_X,
+        Matrix4TestFixtures.TRANSFORMATION_SCALE_Y,
+        Matrix4TestFixtures.TRANSFORMATION_SCALE_Z
+    ];
+
+    // Act
+    const actualTypeCall   = () => Matrix4.writeTransformationTo(invalidMatrixType, ...validArguments);
+    const actualLengthCall = () => Matrix4.writeTransformationTo(invalidMatrixLength, ...validArguments);
+
+    // Assert
+    assert.throws(actualTypeCall, expectedErrorMatch);
+    assert.throws(actualLengthCall, expectedErrorMatch);
+});
+
+test("'Matrix4.writeTransformationTo' should reject non-numeric transformation arguments", () => {
+    // Arrange
+    const actualMatrix       = Matrix4TestFixtures.createEmptyMatrix();
+    const invalidValue       = 'invalid';
+    const expectedErrorMatch = /numeric arguments/;
+    const validArguments     = [
+        Matrix4TestFixtures.TRANSFORMATION_TRANSLATE_X,
+        Matrix4TestFixtures.TRANSFORMATION_TRANSLATE_Y,
+        Matrix4TestFixtures.TRANSFORMATION_TRANSLATE_Z,
+        Matrix4TestFixtures.TRANSFORMATION_ROTATION_X,
+        Matrix4TestFixtures.TRANSFORMATION_ROTATION_Y,
+        Matrix4TestFixtures.TRANSFORMATION_ROTATION_Z,
+        Matrix4TestFixtures.TRANSFORMATION_SCALE_X,
+        Matrix4TestFixtures.TRANSFORMATION_SCALE_Y,
+        Matrix4TestFixtures.TRANSFORMATION_SCALE_Z
+    ];
+
+    // Act & Assert
+    for (let argumentIndex = 0; argumentIndex < validArguments.length; argumentIndex += 1) {
+        const invalidArguments = [...validArguments];
+        invalidArguments[argumentIndex] = invalidValue;
+
+        const actualCall = () => Matrix4.writeTransformationTo(actualMatrix, ...invalidArguments);
+        assert.throws(actualCall, expectedErrorMatch);
+    }
 });
 
 test("'Matrix4.multiply' should preserve a matrix, when multiplied by identity", () => {
