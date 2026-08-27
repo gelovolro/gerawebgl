@@ -30,7 +30,9 @@
     
         <h2><span class="attribs"><span class="type-signature"></span></span>PerspectiveCamera<span class="signature">(fieldOfViewRadians, aspectRatio, near, far)</span><span class="type-signature"></span></h2>
         
-            <div class="class-description">Perspective camera with field of view, aspect ratio and clipping planes.</div>
+            <div class="class-description">Perspective camera with a vertical field of view, viewport aspect ratio and near/far clipping planes.
+
+The projection matrix is computed on demand, cached and recomputed after the aspect ratio changes.</div>
         
     
 </header>
@@ -51,6 +53,10 @@
     
 
 
+
+<div class="description">
+    Creates a perspective camera.
+</div>
 
 
 
@@ -147,7 +153,7 @@
 
             
 
-            <td class="description last">Distance to the near clipping plane (must be greater, than 0).</td>
+            <td class="description last">Distance to the near clipping plane, must be greater than 0.</td>
         </tr>
 
     
@@ -170,7 +176,7 @@
 
             
 
-            <td class="description last">Distance to the far clipping plane (must be greater, than near).</td>
+            <td class="description last">Distance to the far clipping plane, must be greater than near.</td>
         </tr>
 
     
@@ -211,7 +217,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_perspective-camera.js.html">scene/perspective-camera.js</a>, <a href="scene_perspective-camera.js.html#line8">line 8</a>
+        <a href="scene_perspective-camera.js.html">scene/perspective-camera.js</a>, <a href="scene_perspective-camera.js.html#line10">line 10</a>
     </li></ul></dd>
     
 
@@ -234,6 +240,62 @@
 
 
 
+<h5>Throws:</h5>
+<ul>
+        <li>
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        - If any argument is not a number.
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">TypeError</span>
+
+
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+</li>
+    
+        <li>
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        - If the aspect ratio or clipping distances are invalid.
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">RangeError</span>
+
+
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+</li>
+    </ul>
 
 
 
@@ -282,7 +344,7 @@
 
 
 <div class="description">
-    Returns the projection matrix for this camera. The returned matrix is cached and reused between calls.
+    Returns the cached projection matrix, rebuilding it when needed.
 </div>
 
 
@@ -326,7 +388,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_perspective-camera.js.html">scene/perspective-camera.js</a>, <a href="scene_perspective-camera.js.html#line126">line 126</a>
+        <a href="scene_perspective-camera.js.html">scene/perspective-camera.js</a>, <a href="scene_perspective-camera.js.html#line136">line 136</a>
     </li></ul></dd>
     
 
@@ -384,7 +446,7 @@
     
 
     
-    <h4 class="name" id="setAspectRatio"><span class="type-signature"></span>setAspectRatio<span class="signature">(aspectRatio)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="setAspectRatio"><span class="type-signature"></span>setAspectRatio<span class="signature">(aspectRatio)</span><span class="type-signature"> &rarr; {void}</span></h4>
     
 
     
@@ -392,7 +454,7 @@
 
 
 <div class="description">
-    Updates the aspect ratio and marks projection cache as dirty.
+    Updates the viewport aspect ratio and invalidates the projection cache, when the value changes.
 </div>
 
 
@@ -485,7 +547,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="scene_perspective-camera.js.html">scene/perspective-camera.js</a>, <a href="scene_perspective-camera.js.html#line104">line 104</a>
+        <a href="scene_perspective-camera.js.html">scene/perspective-camera.js</a>, <a href="scene_perspective-camera.js.html#line114">line 114</a>
     </li></ul></dd>
     
 
@@ -508,8 +570,82 @@
 
 
 
+<h5>Throws:</h5>
+<ul>
+        <li>
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        - If the aspect ratio is not a number.
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">TypeError</span>
 
 
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+</li>
+    
+        <li>
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        - If the aspect ratio is not positive.
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">RangeError</span>
+
+
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+</li>
+    </ul>
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">void</span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 
@@ -537,7 +673,7 @@
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Thu Aug 27 2026 15:35:54 GMT+0300 (Moscow Standard Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Fri Aug 28 2026 00:04:29 GMT+0300 (Moscow Standard Time)
 </footer>
 
 <script> prettyPrint(); </script>
