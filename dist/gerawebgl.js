@@ -183,6 +183,8 @@ var MATH_PERSPECTIVE = Object.freeze({
 });
 var MATH_ORTHOGRAPHIC = Object.freeze({ SCALE_NUMERATOR: 2 });
 var MATH_CAMERA_LIMITS = Object.freeze({
+  MINIMUM_FIELD_OF_VIEW_RADIANS: 0,
+  MAXIMUM_FIELD_OF_VIEW_RADIANS: Math.PI,
   MINIMUM_ASPECT_RATIO: 0,
   MINIMUM_NEAR_CLIP_DISTANCE: 0
 });
@@ -291,10 +293,15 @@ var Matrix4 = class _Matrix4 {
    * @param {number} near               - Near clipping plane, must be '> 0'.
    * @param {number} far                - Far clipping plane, must be '> near'.
    * @returns {Float32Array}            - A new perspective projection matrix.
+   * @throws {TypeError}                - If any argument is not a finite number.
+   * @throws {RangeError}               - If the projection parameters are invalid or produce non-finite matrix values.
    */
   static createPerspective(fieldOfViewRadians, aspectRatio, near, far) {
-    if (typeof fieldOfViewRadians !== "number" || typeof aspectRatio !== "number" || typeof near !== "number" || typeof far !== "number") {
-      throw new TypeError("`Matrix4.createPerspective` expects numeric arguments.");
+    if (!Number.isFinite(fieldOfViewRadians) || !Number.isFinite(aspectRatio) || !Number.isFinite(near) || !Number.isFinite(far)) {
+      throw new TypeError("`Matrix4.createPerspective` expects finite numeric arguments.");
+    }
+    if (fieldOfViewRadians <= MATH_CAMERA_LIMITS.MINIMUM_FIELD_OF_VIEW_RADIANS || fieldOfViewRadians >= MATH_CAMERA_LIMITS.MAXIMUM_FIELD_OF_VIEW_RADIANS) {
+      throw new RangeError("`Matrix4.createPerspective` expects `0 < fieldOfViewRadians < Math.PI`.");
     }
     if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
       throw new RangeError("`Matrix4.createPerspective` expects a positive aspect ratio.");
@@ -321,15 +328,18 @@ var Matrix4 = class _Matrix4 {
    * @param {number}       near               - Near clipping distance.
    * @param {number}       far                - Far clipping distance.
    * @returns {Float32Array}                  - The provided output buffer.
-   * @throws {TypeError}                      - If the output buffer or arguments are invalid.
-   * @throws {RangeError}                     - If the aspect ratio or clipping distances are invalid.
+   * @throws {TypeError}                      - If the output buffer is invalid or any argument is not a finite number.
+   * @throws {RangeError}                     - If the projection parameters are invalid or produce non-finite matrix values.
    */
   static writePerspectiveTo(out, fieldOfViewRadians, aspectRatio, near, far) {
     if (!(out instanceof Float32Array) || out.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
       throw new TypeError("`Matrix4.writePerspectiveTo` expects out to be `Float32Array(16)`.");
     }
-    if (typeof fieldOfViewRadians !== "number" || typeof aspectRatio !== "number" || typeof near !== "number" || typeof far !== "number") {
-      throw new TypeError("`Matrix4.writePerspectiveTo` expects numeric arguments.");
+    if (!Number.isFinite(fieldOfViewRadians) || !Number.isFinite(aspectRatio) || !Number.isFinite(near) || !Number.isFinite(far)) {
+      throw new TypeError("`Matrix4.writePerspectiveTo` expects finite numeric arguments.");
+    }
+    if (fieldOfViewRadians <= MATH_CAMERA_LIMITS.MINIMUM_FIELD_OF_VIEW_RADIANS || fieldOfViewRadians >= MATH_CAMERA_LIMITS.MAXIMUM_FIELD_OF_VIEW_RADIANS) {
+      throw new RangeError("`Matrix4.writePerspectiveTo` expects `0 < fieldOfViewRadians < Math.PI`.");
     }
     if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
       throw new RangeError("`Matrix4.writePerspectiveTo` expects a positive aspect ratio.");
@@ -793,21 +803,30 @@ var Matrix4 = class _Matrix4 {
     const inverseDepthRange = MATH_PERSPECTIVE.DEPTH_RANGE_NUMERATOR / (near - far);
     const halfFieldOfViewRadians = fieldOfViewRadians / MATH_PERSPECTIVE.HALF_FIELD_OF_VIEW_DIVISOR;
     const projectionScale = MATH_PERSPECTIVE.PROJECTION_SCALE_NUMERATOR / Math.tan(halfFieldOfViewRadians);
-    out[0] = projectionScale / aspectRatio;
+    const horizontalProjectionScale = Math.fround(projectionScale / aspectRatio);
+    const verticalProjectionScale = Math.fround(projectionScale);
+    const depthScale = Math.fround((far + near) * inverseDepthRange);
+    const depthOffset = Math.fround(
+      MATH_PERSPECTIVE.Z_RANGE_MULTIPLIER * far * near * inverseDepthRange
+    );
+    if (!Number.isFinite(horizontalProjectionScale) || !Number.isFinite(verticalProjectionScale) || !Number.isFinite(depthScale) || !Number.isFinite(depthOffset)) {
+      throw new RangeError("Perspective projection values must remain finite after conversion to `Float32Array`.");
+    }
+    out[0] = horizontalProjectionScale;
     out[1] = MATH_MATRIX_VALUES.ZERO;
     out[2] = MATH_MATRIX_VALUES.ZERO;
     out[3] = MATH_MATRIX_VALUES.ZERO;
     out[4] = MATH_MATRIX_VALUES.ZERO;
-    out[5] = projectionScale;
+    out[5] = verticalProjectionScale;
     out[6] = MATH_MATRIX_VALUES.ZERO;
     out[7] = MATH_MATRIX_VALUES.ZERO;
     out[8] = MATH_MATRIX_VALUES.ZERO;
     out[9] = MATH_MATRIX_VALUES.ZERO;
-    out[10] = (far + near) * inverseDepthRange;
+    out[10] = depthScale;
     out[11] = MATH_PERSPECTIVE.W_COMPONENT_SCALE;
     out[12] = MATH_MATRIX_VALUES.ZERO;
     out[13] = MATH_MATRIX_VALUES.ZERO;
-    out[14] = MATH_PERSPECTIVE.Z_RANGE_MULTIPLIER * far * near * inverseDepthRange;
+    out[14] = depthOffset;
     out[15] = MATH_MATRIX_VALUES.ZERO;
     return out;
   }
@@ -8969,22 +8988,25 @@ var PerspectiveCamera = class extends Camera {
    * @param {number} aspectRatio        - Viewport aspect ratio (width / height).
    * @param {number} near               - Distance to the near clipping plane, must be greater than 0.
    * @param {number} far                - Distance to the far clipping plane, must be greater than near.
-   * @throws {TypeError}                - If any argument is not a number.
-   * @throws {RangeError}               - If the aspect ratio or clipping distances are invalid.
+   * @throws {TypeError}                - If any argument is not a finite number.
+   * @throws {RangeError}               - If the field of view, aspect ratio or clipping distances are invalid.
    */
   constructor(fieldOfViewRadians, aspectRatio, near, far) {
     super();
-    if (typeof fieldOfViewRadians !== "number") {
+    if (typeof fieldOfViewRadians !== "number" || !Number.isFinite(fieldOfViewRadians)) {
       throw new TypeError("`PerspectiveCamera` expects `fieldOfViewRadians` as a number.");
     }
-    if (typeof aspectRatio !== "number") {
+    if (typeof aspectRatio !== "number" || !Number.isFinite(aspectRatio)) {
       throw new TypeError("`PerspectiveCamera` expects `aspectRatio` as a number.");
     }
-    if (typeof near !== "number") {
+    if (typeof near !== "number" || !Number.isFinite(near)) {
       throw new TypeError("`PerspectiveCamera` expects `near` as a number.");
     }
-    if (typeof far !== "number") {
+    if (typeof far !== "number" || !Number.isFinite(far)) {
       throw new TypeError("`PerspectiveCamera` expects `far` as a number.");
+    }
+    if (fieldOfViewRadians <= MATH_CAMERA_LIMITS.MINIMUM_FIELD_OF_VIEW_RADIANS || fieldOfViewRadians >= MATH_CAMERA_LIMITS.MAXIMUM_FIELD_OF_VIEW_RADIANS) {
+      throw new RangeError("`PerspectiveCamera` expects `0 < fieldOfViewRadians < Math.PI`.");
     }
     if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
       throw new RangeError("`PerspectiveCamera` expects a positive `aspect ratio`.");
@@ -9003,11 +9025,11 @@ var PerspectiveCamera = class extends Camera {
    *
    * @param {number} aspectRatio - New viewport aspect ratio (canvas width divided by canvas height).
    * @returns {void}
-   * @throws {TypeError}  - If the aspect ratio is not a number.
+   * @throws {TypeError}  - If the aspect ratio is not a finite number.
    * @throws {RangeError} - If the aspect ratio is not positive.
    */
   setAspectRatio(aspectRatio) {
-    if (typeof aspectRatio !== "number") {
+    if (typeof aspectRatio !== "number" || !Number.isFinite(aspectRatio)) {
       throw new TypeError("`PerspectiveCamera.setAspectRatio` expects `aspectRatio` as a number.");
     }
     if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
