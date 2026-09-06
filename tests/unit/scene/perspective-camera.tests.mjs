@@ -1,8 +1,9 @@
-import test                  from 'node:test';
-import assert                from 'node:assert/strict';
-import { Matrix4 }           from '../../../core/math/matrix4.js';
-import { PerspectiveCamera } from '../../../core/scene/perspective-camera.js';
-import { TestAssertions }    from '../../helpers/test-assertions.mjs';
+import test                   from 'node:test';
+import assert                 from 'node:assert/strict';
+import { Matrix4 }            from '../../../core/math/matrix4.js';
+import { PerspectiveCamera }  from '../../../core/scene/perspective-camera.js';
+import * as MathTestConstants from '../../test-constants/math.js';
+import { TestAssertions }     from '../../helpers/test-assertions.mjs';
 
 class PerspectiveCameraTestFixtures {
     static FIELD_OF_VIEW_RADIANS = Math.PI / 2;
@@ -42,6 +43,7 @@ test("'PerspectiveCamera' constructor should create a valid perspective projecti
 
     // Assert
     assert.ok(actualMatrix instanceof Float32Array);
+    assert.equal(actualMatrix.every(Number.isFinite), true);
     TestAssertions.assertFloat32ArrayApproximatelyEquals(actualMatrix, expectedMatrix);
 });
 
@@ -90,6 +92,61 @@ test("'PerspectiveCamera' constructor should reject non-numeric arguments", () =
     assert.throws(actualNearCall, /expects `near` as a number/);
     assert.throws(actualFarCall, TypeError);
     assert.throws(actualFarCall, /expects `far` as a number/);
+});
+
+test("'PerspectiveCamera' constructor should reject non-finite arguments", () => {
+    // Arrange
+    const invalidValues = MathTestConstants.MATH_NON_FINITE_VALUES;
+
+    // Act & Assert
+    invalidValues.forEach((invalidValue) => {
+        assert.throws(() => new PerspectiveCamera(
+            invalidValue,
+            PerspectiveCameraTestFixtures.ASPECT_RATIO,
+            PerspectiveCameraTestFixtures.NEAR_CLIPPING_PLANE,
+            PerspectiveCameraTestFixtures.FAR_CLIPPING_PLANE
+        ), TypeError);
+
+        assert.throws(() => new PerspectiveCamera(
+            PerspectiveCameraTestFixtures.FIELD_OF_VIEW_RADIANS,
+            invalidValue,
+            PerspectiveCameraTestFixtures.NEAR_CLIPPING_PLANE,
+            PerspectiveCameraTestFixtures.FAR_CLIPPING_PLANE
+        ), TypeError);
+
+        assert.throws(() => new PerspectiveCamera(
+            PerspectiveCameraTestFixtures.FIELD_OF_VIEW_RADIANS,
+            PerspectiveCameraTestFixtures.ASPECT_RATIO,
+            invalidValue,
+            PerspectiveCameraTestFixtures.FAR_CLIPPING_PLANE
+        ), TypeError);
+
+        assert.throws(() => new PerspectiveCamera(
+            PerspectiveCameraTestFixtures.FIELD_OF_VIEW_RADIANS,
+            PerspectiveCameraTestFixtures.ASPECT_RATIO,
+            PerspectiveCameraTestFixtures.NEAR_CLIPPING_PLANE,
+            invalidValue
+        ), TypeError);
+    });
+});
+
+test("'PerspectiveCamera' constructor should reject invalid FOV-values", () => {
+    // Arrange
+    const invalidValues      = MathTestConstants.PERSPECTIVE_INVALID_FIELD_OF_VIEW_VALUES;
+    const expectedErrorMatch = /0 < fieldOfViewRadians < Math.PI/;
+
+    // Act & Assert
+    invalidValues.forEach((invalidValue) => {
+        const actualCall = () => new PerspectiveCamera(
+            invalidValue,
+            PerspectiveCameraTestFixtures.ASPECT_RATIO,
+            PerspectiveCameraTestFixtures.NEAR_CLIPPING_PLANE,
+            PerspectiveCameraTestFixtures.FAR_CLIPPING_PLANE
+        );
+
+        assert.throws(actualCall, RangeError);
+        assert.throws(actualCall, expectedErrorMatch);
+    });
 });
 
 test("'PerspectiveCamera' constructor should reject invalid aspect ratio", () => {
@@ -160,6 +217,28 @@ test("'PerspectiveCamera.getProjectionMatrix' should reuse the cached matrix, wh
     assert.equal(secondProjectionMatrix, firstProjectionMatrix);
 });
 
+test("'PerspectiveCamera.getProjectionMatrix' should reject a projection that is not finite in 'Float32'", () => {
+    // Arrange
+    const invalidFieldOfViewRadians = MathTestConstants.PERSPECTIVE_FLOAT32_OVERFLOW_FOV_RADIANS;
+    const actualCamera              = new PerspectiveCamera(
+        invalidFieldOfViewRadians,
+        PerspectiveCameraTestFixtures.ASPECT_RATIO,
+        PerspectiveCameraTestFixtures.NEAR_CLIPPING_PLANE,
+        PerspectiveCameraTestFixtures.FAR_CLIPPING_PLANE
+    );
+
+    const expectedError = {
+        name    : 'RangeError',
+        message : /remain finite after conversion to `Float32Array`/
+    };
+
+    // Act
+    const actualCall = () => actualCamera.getProjectionMatrix();
+
+    // Assert
+    assert.throws(actualCall, expectedError);
+});
+
 test("'PerspectiveCamera.setAspectRatio' should reject a non-number value", () => {
     // Arrange
     const actualCamera       = PerspectiveCameraTestFixtures.createCamera();
@@ -172,6 +251,17 @@ test("'PerspectiveCamera.setAspectRatio' should reject a non-number value", () =
     // Assert
     assert.throws(actualCall, TypeError);
     assert.throws(actualCall, expectedErrorMatch);
+});
+
+test("'PerspectiveCamera.setAspectRatio' should reject non-finite values", () => {
+    // Arrange
+    const actualCamera  = PerspectiveCameraTestFixtures.createCamera();
+    const invalidValues = MathTestConstants.MATH_NON_FINITE_VALUES;
+
+    // Act & Assert
+    invalidValues.forEach((invalidValue) => {
+        assert.throws(() => actualCamera.setAspectRatio(invalidValue), TypeError);
+    });
 });
 
 test("'PerspectiveCamera.setAspectRatio' should reject non-positive values", () => {

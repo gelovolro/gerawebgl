@@ -53,8 +53,10 @@ export const MATH_ORTHOGRAPHIC = Object.freeze({ SCALE_NUMERATOR: 2.0 });
 
 // Camera projection validation limits, used by camera classes and 'Matrix4'
 export const MATH_CAMERA_LIMITS = Object.freeze({
-    MINIMUM_ASPECT_RATIO       : 0.0,
-    MINIMUM_NEAR_CLIP_DISTANCE : 0.0
+    MINIMUM_FIELD_OF_VIEW_RADIANS : 0.0,
+    MAXIMUM_FIELD_OF_VIEW_RADIANS : Math.PI,
+    MINIMUM_ASPECT_RATIO          : 0.0,
+    MINIMUM_NEAR_CLIP_DISTANCE    : 0.0
 });
 
 // View matrix constants, used by 'Camera'

@@ -1,8 +1,9 @@
-import test               from 'node:test';
-import assert             from 'node:assert/strict';
-import * as MathConstants from '../../../core/constants/math.js';
-import { Matrix4 }        from '../../../core/math/matrix4.js';
-import { TestAssertions } from '../../helpers/test-assertions.mjs';
+import test                   from 'node:test';
+import assert                 from 'node:assert/strict';
+import * as MathConstants     from '../../../core/constants/math.js';
+import * as MathTestConstants from '../../test-constants/math.js';
+import { Matrix4 }            from '../../../core/math/matrix4.js';
+import { TestAssertions }     from '../../helpers/test-assertions.mjs';
 
 class Matrix4TestFixtures {
     static PERSPECTIVE_FIELD_OF_VIEW_RADIANS = Math.PI / 2;
@@ -25,6 +26,7 @@ class Matrix4TestFixtures {
     static TRANSFORMATION_SCALE_X            = 2;
     static TRANSFORMATION_SCALE_Y            = 3;
     static TRANSFORMATION_SCALE_Z            = 4;
+    static VERTICAL_OVERFLOW_ASPECT_RATIO    = 1e10;
 
     static createExpectedIdentity() {
         return new Float32Array([
@@ -68,6 +70,53 @@ class Matrix4TestFixtures {
             0,   0, -1.2, -1,
             0,   0, -2.2,  0
         ]);
+    }
+
+    static createUnrepresentablePerspectiveArguments() {
+        return [
+            // Halving the FOV underflows to zero
+            [
+                Number.MIN_VALUE,
+                Matrix4TestFixtures.PERSPECTIVE_ASPECT_RATIO,
+                Matrix4TestFixtures.NEAR_CLIPPING_PLANE,
+                Matrix4TestFixtures.FAR_CLIPPING_PLANE
+            ],
+            // The projection scale is too large for 'Float32' and becomes infinite
+            [
+                MathTestConstants.PERSPECTIVE_FLOAT32_OVERFLOW_FOV_RADIANS,
+                Matrix4TestFixtures.PERSPECTIVE_ASPECT_RATIO,
+                Matrix4TestFixtures.NEAR_CLIPPING_PLANE,
+                Matrix4TestFixtures.FAR_CLIPPING_PLANE
+            ],
+            // The tiny aspect ratio makes the horizontal scale infinite
+            [
+                Matrix4TestFixtures.PERSPECTIVE_FIELD_OF_VIEW_RADIANS,
+                Number.MIN_VALUE,
+                Matrix4TestFixtures.NEAR_CLIPPING_PLANE,
+                Matrix4TestFixtures.FAR_CLIPPING_PLANE
+            ],
+            // The sum of the clipping distances overflows
+            [
+                Matrix4TestFixtures.PERSPECTIVE_FIELD_OF_VIEW_RADIANS,
+                Matrix4TestFixtures.PERSPECTIVE_ASPECT_RATIO,
+                Number.MAX_VALUE / 2,
+                Number.MAX_VALUE
+            ],
+            // The depth scale stays finite, but the depth offset overflows
+            [
+                Matrix4TestFixtures.PERSPECTIVE_FIELD_OF_VIEW_RADIANS,
+                Matrix4TestFixtures.PERSPECTIVE_ASPECT_RATIO,
+                Number.MAX_VALUE / 4,
+                Number.MAX_VALUE / 2
+            ],
+            // Keep the horizontal scale finite to check vertical overflow
+            [
+                MathTestConstants.PERSPECTIVE_FLOAT32_OVERFLOW_FOV_RADIANS,
+                Matrix4TestFixtures.VERTICAL_OVERFLOW_ASPECT_RATIO,
+                Matrix4TestFixtures.NEAR_CLIPPING_PLANE,
+                Matrix4TestFixtures.FAR_CLIPPING_PLANE
+            ]
+        ];
     }
 
     static createExpectedOrthographicMatrix() {
@@ -138,6 +187,7 @@ test("'Matrix4.createPerspective' should create a perspective projection matrix"
     );
 
     // Assert
+    assert.equal(actualMatrix.every(Number.isFinite), true);
     TestAssertions.assertFloat32ArrayApproximatelyEquals(actualMatrix, expectedMatrix);
 });
 
@@ -183,6 +233,65 @@ test("'Matrix4.createPerspective' should reject non-numeric arguments", () => {
     assert.throws(actualAspectRatioCall, expectedErrorMatch);
     assert.throws(actualNearCall, expectedErrorMatch);
     assert.throws(actualFarCall, expectedErrorMatch);
+});
+
+test("'Matrix4.createPerspective' should reject non-finite arguments", () => {
+    // Arrange
+    const invalidValues = MathTestConstants.MATH_NON_FINITE_VALUES;
+    const expectedError = {
+        name    : 'TypeError',
+        message : /finite numeric arguments/
+    };
+
+    // Act & Assert
+    invalidValues.forEach((invalidValue) => {
+        assert.throws(() => Matrix4.createPerspective(
+            invalidValue,
+            Matrix4TestFixtures.PERSPECTIVE_ASPECT_RATIO,
+            Matrix4TestFixtures.NEAR_CLIPPING_PLANE,
+            Matrix4TestFixtures.FAR_CLIPPING_PLANE
+        ), expectedError);
+
+        assert.throws(() => Matrix4.createPerspective(
+            Matrix4TestFixtures.PERSPECTIVE_FIELD_OF_VIEW_RADIANS,
+            invalidValue,
+            Matrix4TestFixtures.NEAR_CLIPPING_PLANE,
+            Matrix4TestFixtures.FAR_CLIPPING_PLANE
+        ), expectedError);
+
+        assert.throws(() => Matrix4.createPerspective(
+            Matrix4TestFixtures.PERSPECTIVE_FIELD_OF_VIEW_RADIANS,
+            Matrix4TestFixtures.PERSPECTIVE_ASPECT_RATIO,
+            invalidValue,
+            Matrix4TestFixtures.FAR_CLIPPING_PLANE
+        ), expectedError);
+
+        assert.throws(() => Matrix4.createPerspective(
+            Matrix4TestFixtures.PERSPECTIVE_FIELD_OF_VIEW_RADIANS,
+            Matrix4TestFixtures.PERSPECTIVE_ASPECT_RATIO,
+            Matrix4TestFixtures.NEAR_CLIPPING_PLANE,
+            invalidValue
+        ), expectedError);
+    });
+});
+
+test("'Matrix4.createPerspective' should reject invalid FOV-values", () => {
+    // Arrange
+    const invalidValues = MathTestConstants.PERSPECTIVE_INVALID_FIELD_OF_VIEW_VALUES;
+    const expectedError = {
+        name    : 'RangeError',
+        message : /0 < fieldOfViewRadians < Math.PI/
+    };
+
+    // Act & Assert
+    invalidValues.forEach((invalidValue) => {
+        assert.throws(() => Matrix4.createPerspective(
+            invalidValue,
+            Matrix4TestFixtures.PERSPECTIVE_ASPECT_RATIO,
+            Matrix4TestFixtures.NEAR_CLIPPING_PLANE,
+            Matrix4TestFixtures.FAR_CLIPPING_PLANE
+        ), expectedError);
+    });
 });
 
 test("'Matrix4.createPerspective' should reject invalid aspect ratio", () => {
@@ -235,6 +344,114 @@ test("'Matrix4.createPerspective' should reject invalid clipping planes", () => 
     // Assert
     assert.throws(actualNearCall, expectedErrorMatch);
     assert.throws(actualFarCall, expectedErrorMatch);
+});
+
+test("'Matrix4.createPerspective' should reject projection values that cannot be represented as finite 'Float32'", () => {
+    // Arrange
+    const invalidArguments = Matrix4TestFixtures.createUnrepresentablePerspectiveArguments();
+    const expectedError    = {
+        name    : 'RangeError',
+        message : /remain finite after conversion to `Float32Array`/
+    };
+
+    // Act & Assert
+    invalidArguments.forEach(([fieldOfViewRadians, aspectRatio, near, far]) => {
+        assert.throws(() => Matrix4.createPerspective(fieldOfViewRadians, aspectRatio, near, far), expectedError);
+    });
+});
+
+test("'Matrix4.writePerspectiveTo' should reject non-finite arguments", () => {
+    // Arrange
+    const actualMatrix  = Matrix4TestFixtures.createEmptyMatrix();
+    const invalidValues = MathTestConstants.MATH_NON_FINITE_VALUES;
+    const expectedError = {
+        name    : 'TypeError',
+        message : /finite numeric arguments/
+    };
+
+    // Act & Assert
+    invalidValues.forEach((invalidValue) => {
+        assert.throws(() => Matrix4.writePerspectiveTo(
+            actualMatrix,
+            invalidValue,
+            Matrix4TestFixtures.PERSPECTIVE_ASPECT_RATIO,
+            Matrix4TestFixtures.NEAR_CLIPPING_PLANE,
+            Matrix4TestFixtures.FAR_CLIPPING_PLANE
+        ), expectedError);
+
+        assert.throws(() => Matrix4.writePerspectiveTo(
+            actualMatrix,
+            Matrix4TestFixtures.PERSPECTIVE_FIELD_OF_VIEW_RADIANS,
+            invalidValue,
+            Matrix4TestFixtures.NEAR_CLIPPING_PLANE,
+            Matrix4TestFixtures.FAR_CLIPPING_PLANE
+        ), expectedError);
+
+        assert.throws(() => Matrix4.writePerspectiveTo(
+            actualMatrix,
+            Matrix4TestFixtures.PERSPECTIVE_FIELD_OF_VIEW_RADIANS,
+            Matrix4TestFixtures.PERSPECTIVE_ASPECT_RATIO,
+            invalidValue,
+            Matrix4TestFixtures.FAR_CLIPPING_PLANE
+        ), expectedError);
+
+        assert.throws(() => Matrix4.writePerspectiveTo(
+            actualMatrix,
+            Matrix4TestFixtures.PERSPECTIVE_FIELD_OF_VIEW_RADIANS,
+            Matrix4TestFixtures.PERSPECTIVE_ASPECT_RATIO,
+            Matrix4TestFixtures.NEAR_CLIPPING_PLANE,
+            invalidValue
+        ), expectedError);
+    });
+
+    assert.deepEqual(actualMatrix, Matrix4TestFixtures.createEmptyMatrix());
+});
+
+test("'Matrix4.writePerspectiveTo' should reject invalid FOV-values", () => {
+    // Arrange
+    const actualMatrix  = Matrix4TestFixtures.createEmptyMatrix();
+    const invalidValues = MathTestConstants.PERSPECTIVE_INVALID_FIELD_OF_VIEW_VALUES;
+    const expectedError = {
+        name    : 'RangeError',
+        message : /0 < fieldOfViewRadians < Math.PI/
+    };
+
+    // Act & Assert
+    invalidValues.forEach((invalidValue) => {
+        assert.throws(() => Matrix4.writePerspectiveTo(
+            actualMatrix,
+            invalidValue,
+            Matrix4TestFixtures.PERSPECTIVE_ASPECT_RATIO,
+            Matrix4TestFixtures.NEAR_CLIPPING_PLANE,
+            Matrix4TestFixtures.FAR_CLIPPING_PLANE
+        ), expectedError);
+    });
+
+    assert.deepEqual(actualMatrix, Matrix4TestFixtures.createEmptyMatrix());
+});
+
+test("'Matrix4.writePerspectiveTo' should reject projection values that cannot be represented as finite 'Float32'", () => {
+    // Arrange
+    const actualMatrix     = Matrix4.createIdentity();
+    const expectedMatrix   = Matrix4.createIdentity();
+    const invalidArguments = Matrix4TestFixtures.createUnrepresentablePerspectiveArguments();
+    const expectedError    = {
+        name    : 'RangeError',
+        message : /remain finite after conversion to `Float32Array`/
+    };
+
+    // Act & Assert
+    invalidArguments.forEach(([fieldOfViewRadians, aspectRatio, near, far]) => {
+        assert.throws(() => Matrix4.writePerspectiveTo(
+            actualMatrix,
+            fieldOfViewRadians,
+            aspectRatio,
+            near,
+            far
+        ), expectedError);
+    });
+
+    assert.deepEqual(actualMatrix, expectedMatrix);
 });
 
 test("'Matrix4.writePerspectiveTo' should write a perspective projection matrix", () => {

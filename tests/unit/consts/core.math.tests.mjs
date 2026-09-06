@@ -138,13 +138,17 @@ test("Camera and projection validation limit constants should keep existing valu
     // Arrange
     const actualConstants   = MathConstants.MATH_CAMERA_LIMITS;
     const expectedConstants = {
-        MINIMUM_ASPECT_RATIO       : 0.0,
-        MINIMUM_NEAR_CLIP_DISTANCE : 0.0
+        MINIMUM_FIELD_OF_VIEW_RADIANS : 0.0,
+        MAXIMUM_FIELD_OF_VIEW_RADIANS : Math.PI,
+        MINIMUM_ASPECT_RATIO          : 0.0,
+        MINIMUM_NEAR_CLIP_DISTANCE    : 0.0
     };
 
     // Act & Assert
-    assert.equal(actualConstants.MINIMUM_ASPECT_RATIO       , expectedConstants.MINIMUM_ASPECT_RATIO);
-    assert.equal(actualConstants.MINIMUM_NEAR_CLIP_DISTANCE , expectedConstants.MINIMUM_NEAR_CLIP_DISTANCE);
+    assert.equal(actualConstants.MINIMUM_FIELD_OF_VIEW_RADIANS , expectedConstants.MINIMUM_FIELD_OF_VIEW_RADIANS);
+    assert.equal(actualConstants.MAXIMUM_FIELD_OF_VIEW_RADIANS , expectedConstants.MAXIMUM_FIELD_OF_VIEW_RADIANS);
+    assert.equal(actualConstants.MINIMUM_ASPECT_RATIO          , expectedConstants.MINIMUM_ASPECT_RATIO);
+    assert.equal(actualConstants.MINIMUM_NEAR_CLIP_DISTANCE    , expectedConstants.MINIMUM_NEAR_CLIP_DISTANCE);
 });
 
 test("'Camera' view matrix constants should keep existing values", () => {
