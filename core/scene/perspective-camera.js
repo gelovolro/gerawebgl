@@ -66,26 +66,31 @@ export class PerspectiveCamera extends Camera {
      * @param {number} aspectRatio        - Viewport aspect ratio (width / height).
      * @param {number} near               - Distance to the near clipping plane, must be greater than 0.
      * @param {number} far                - Distance to the far clipping plane, must be greater than near.
-     * @throws {TypeError}                - If any argument is not a number.
-     * @throws {RangeError}               - If the aspect ratio or clipping distances are invalid.
+     * @throws {TypeError}                - If any argument is not a finite number.
+     * @throws {RangeError}               - If the field of view, aspect ratio or clipping distances are invalid.
      */
     constructor(fieldOfViewRadians, aspectRatio, near, far) {
         super();
 
-        if (typeof fieldOfViewRadians !== 'number') {
+        if (typeof fieldOfViewRadians !== 'number' || !Number.isFinite(fieldOfViewRadians)) {
             throw new TypeError('`PerspectiveCamera` expects `fieldOfViewRadians` as a number.');
         }
 
-        if (typeof aspectRatio !== 'number') {
+        if (typeof aspectRatio !== 'number' || !Number.isFinite(aspectRatio)) {
             throw new TypeError('`PerspectiveCamera` expects `aspectRatio` as a number.');
         }
 
-        if (typeof near !== 'number') {
+        if (typeof near !== 'number' || !Number.isFinite(near)) {
             throw new TypeError('`PerspectiveCamera` expects `near` as a number.');
         }
 
-        if (typeof far !== 'number') {
+        if (typeof far !== 'number' || !Number.isFinite(far)) {
             throw new TypeError('`PerspectiveCamera` expects `far` as a number.');
+        }
+
+        if (fieldOfViewRadians <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_FIELD_OF_VIEW_RADIANS ||
+            fieldOfViewRadians >= MathConstants.MATH_CAMERA_LIMITS.MAXIMUM_FIELD_OF_VIEW_RADIANS) {
+            throw new RangeError('`PerspectiveCamera` expects `0 < fieldOfViewRadians < Math.PI`.');
         }
 
         if (aspectRatio <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
@@ -108,11 +113,11 @@ export class PerspectiveCamera extends Camera {
      *
      * @param {number} aspectRatio - New viewport aspect ratio (canvas width divided by canvas height).
      * @returns {void}
-     * @throws {TypeError}  - If the aspect ratio is not a number.
+     * @throws {TypeError}  - If the aspect ratio is not a finite number.
      * @throws {RangeError} - If the aspect ratio is not positive.
      */
     setAspectRatio(aspectRatio) {
-        if (typeof aspectRatio !== 'number') {
+        if (typeof aspectRatio !== 'number' || !Number.isFinite(aspectRatio)) {
             throw new TypeError('`PerspectiveCamera.setAspectRatio` expects `aspectRatio` as a number.');
         }
 
