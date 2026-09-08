@@ -1,54 +1,8 @@
-/**
- * String identifier passed to canvas.getContext to request a WebGL2 context.
- * @type {string}
- */
-const WEBGL2_CONTEXT_TYPE = 'webgl2';
+import * as WebGLContextConstants    from './constants/webgl-context.js';
+import { ECMASCRIPT_TYPEOF_RESULTS } from './constants/ecmascript-types.js';
 
 /**
- * Fallback device pixel ratio used when window.devicePixelRatio is not set.
- * @type {number}
- */
-const DEFAULT_DEVICE_PIXEL_RATIO = 1;
-
-/**
- * X coordinate of the viewport origin.
- * @type {number}
- */
-const VIEWPORT_ORIGIN_X = 0;
-
-/**
- * Y coordinate of the viewport origin.
- * @type {number}
- */
-const VIEWPORT_ORIGIN_Y = 0;
-
-/**
- * Minimum drawing buffer size (in pixels) for `canvas.width/canvas.height`.
- * Used as a safeguard, when the canvas CSS size is 0.
- *
- * @type {number}
- */
-const MIN_DRAWING_BUFFER_DIMENSION = 1;
-
-/**
- * Minimum allowed value for an RGBA color component.
- * Used to validate clear color inputs in the range [0 -> 1].
- *
- * @type {number}
- */
-const MIN_COLOR_COMPONENT = 0.0;
-
-/**
- * Maximum allowed value for an RGBA color component.
- * Used to validate clear color inputs in the range [0 -> 1].
- *
- * @type {number}
- */
-const MAX_COLOR_COMPONENT = 1.0;
-
-/**
- * RGBA color represented as [red, green, blue, alpha],
- * each component in the range [0 -> 1].
+ * RGBA color represented as [red, green, blue, alpha], each component in the range [0 -> 1].
  * @typedef {number[]} RGBAColor
  */
 
@@ -69,20 +23,44 @@ const MAX_COLOR_COMPONENT = 1.0;
  * - clearing the color and depth buffers
  */
 export class WebGLContext {
-    /** @type {HTMLCanvasElement} */
+    /**
+     * Canvas element used by this context.
+     * Its drawing buffer dimensions are updated by `resizeToDisplaySize()`.
+     *
+     * @type {HTMLCanvasElement}
+     * @private
+     */
     #canvas;
 
-    /** @type {WebGL2RenderingContext} */
+    /**
+     * Underlying WebGL2 context used to manage rendering state.
+     * Used for updating the viewport and clearing the buffers.
+     *
+     * @type {WebGL2RenderingContext}
+     * @private
+     */
     #webglContext;
 
-    /** @type {RGBAColor} */
-    static #DEFAULT_CLEAR_COLOR = [0.0, 0.0, 0.0, 1.0];
-
-    /** @type {boolean} */
-    static #ENABLE_DEPTH_TEST = true;
+    /**
+     * Default clear color for new context instances.
+     * Can be changed through `setDefaultClearColor()`.
+     *
+     * @type {RGBAColor}
+     * @private
+     */
+    static #DEFAULT_CLEAR_COLOR = WebGLContextConstants.WEBGL_CONTEXT_DEFAULT_CLEAR_COLOR;
 
     /**
-     * Creates a new WebGLContext bound to the provided canvas element.
+     * Indicates whether depth testing is enabled for new context instances.
+     * Can be changed through `setDepthTestEnabled()`.
+     *
+     * @type {boolean}
+     * @private
+     */
+    static #ENABLE_DEPTH_TEST = WebGLContextConstants.WEBGL_CONTEXT_DEFAULTS.ENABLE_DEPTH_TEST;
+
+    /**
+     * Creates a new webgl context, bound to the provided canvas element.
      *
      * @param {HTMLCanvasElement} canvas - Target canvas element used for WebGL rendering.
      * @throws {TypeError} If the provided value is not an HTMLCanvasElement.
@@ -94,7 +72,7 @@ export class WebGLContext {
         }
 
         this.#canvas = canvas;
-        const webglContext = this.#canvas.getContext(WEBGL2_CONTEXT_TYPE);
+        const webglContext = this.#canvas.getContext(WebGLContextConstants.WEBGL_CONTEXT_DEFAULTS.CONTEXT_TYPE);
 
         if (!webglContext) {
             throw new Error('WebGL2 is not supported in this browser.');
@@ -137,29 +115,29 @@ export class WebGLContext {
      * @returns {boolean}                            - True if the canvas was resized, false otherwise.
      */
     resizeToDisplaySize(options) {
-        if (options !== undefined && (options === null || typeof options !== 'object' || Array.isArray(options))) {
+        if (options !== undefined && (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options))) {
             throw new TypeError('WebGLContext.resizeToDisplaySize expects an options object or undefined.');
         }
 
         const fitToWindow = options !== undefined && options.fitToWindow === true;
 
-        if (options !== undefined && 'fitToWindow' in options && typeof options.fitToWindow !== 'boolean') {
+        if (options !== undefined && 'fitToWindow' in options && typeof options.fitToWindow !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
             throw new TypeError('WebGLContext.resizeToDisplaySize option `fitToWindow` must be a boolean.');
         }
 
-        const pixelRatio   = window.devicePixelRatio || DEFAULT_DEVICE_PIXEL_RATIO;
+        const pixelRatio   = window.devicePixelRatio || WebGLContextConstants.WEBGL_CONTEXT_DEFAULTS.DEVICE_PIXEL_RATIO;
         const cssWidth     = fitToWindow ? window.innerWidth  : this.#canvas.clientWidth;
         const cssHeight    = fitToWindow ? window.innerHeight : this.#canvas.clientHeight;
-        const targetWidth  = Math.max(MIN_DRAWING_BUFFER_DIMENSION, Math.floor(cssWidth  * pixelRatio));
-        const targetHeight = Math.max(MIN_DRAWING_BUFFER_DIMENSION, Math.floor(cssHeight * pixelRatio));
+        const targetWidth  = Math.max(WebGLContextConstants.WEBGL_CONTEXT_DRAWING_BUFFER.MIN_DIMENSION, Math.floor(cssWidth  * pixelRatio));
+        const targetHeight = Math.max(WebGLContextConstants.WEBGL_CONTEXT_DRAWING_BUFFER.MIN_DIMENSION, Math.floor(cssHeight * pixelRatio));
         const isResized    = (this.#canvas.width !== targetWidth) || (this.#canvas.height !== targetHeight);
 
         if (isResized === true) {
             this.#canvas.width  = targetWidth;
             this.#canvas.height = targetHeight;
             this.#webglContext.viewport(
-                VIEWPORT_ORIGIN_X,
-                VIEWPORT_ORIGIN_Y,
+                WebGLContextConstants.WEBGL_CONTEXT_VIEWPORT_ORIGIN.X,
+                WebGLContextConstants.WEBGL_CONTEXT_VIEWPORT_ORIGIN.Y,
                 this.#canvas.width,
                 this.#canvas.height
             );
@@ -203,7 +181,7 @@ export class WebGLContext {
      * @throws {TypeError} If the provided value is not a boolean.
      */
     static setDepthTestEnabled(enabled) {
-        if (typeof enabled !== 'boolean') {
+        if (typeof enabled !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
             throw new TypeError('setDepthTestEnabled expects a boolean value.');
         }
 
@@ -220,11 +198,12 @@ export class WebGLContext {
      * @private
      */
     static #validateColorComponent(componentName, value) {
-        if (typeof value !== 'number' || Number.isNaN(value)) {
+        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || Number.isNaN(value)) {
             throw new TypeError(`Color component "${componentName}" must be a valid number.`);
         }
 
-        if (value < MIN_COLOR_COMPONENT || value > MAX_COLOR_COMPONENT) {
+        if (value < WebGLContextConstants.WEBGL_CONTEXT_COLOR_LIMITS.MIN_COMPONENT ||
+            value > WebGLContextConstants.WEBGL_CONTEXT_COLOR_LIMITS.MAX_COMPONENT) {
             throw new RangeError(`Color component "${componentName}" must be in the range [0, 1].`);
         }
     }
