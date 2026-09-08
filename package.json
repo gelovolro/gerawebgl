@@ -52,7 +52,8 @@
     "test": "npm run lint -- --debug && npm run test:unit:coverage && npm run test:smoke",
     "git:restore:generated": "git restore -- dist dist-github-pages docs",
     "package-version:update": "node update-package-version.mjs --action=update",
-    "package-version:rollback": "node update-package-version.mjs --action=rollback"
+    "package-version:rollback": "node update-package-version.mjs --action=rollback",
+    "package-version:update:preparation": "npm run build:lib:all && npm run docs:build:jsdoc-only"
   },
   "keywords": [
     "gera",
