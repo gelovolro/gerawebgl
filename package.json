@@ -1,6 +1,6 @@
 {
   "name": "gerawebgl",
-  "version": "0.2.4-dev.20260906221259",
+  "version": "0.2.5-dev.20260908213148",
   "description": "Gera WebGL, browser 3D engine using WebGL 2.0",
   "scripts": {
     "ensure:docs-jsdoc-dir": "node -e \"require('fs').mkdirSync('docs/latest-jsdoc-generation',{recursive:true})\"",
@@ -52,7 +52,8 @@
     "test": "npm run lint -- --debug && npm run test:unit:coverage && npm run test:smoke",
     "git:restore:generated": "git restore -- dist dist-github-pages docs",
     "package-version:update": "node update-package-version.mjs --action=update",
-    "package-version:rollback": "node update-package-version.mjs --action=rollback"
+    "package-version:rollback": "node update-package-version.mjs --action=rollback",
+    "package-version:update:preparation": "npm run build:lib:all && npm run docs:build:jsdoc-only"
   },
   "keywords": [
     "gera",
