@@ -1,94 +1,18 @@
-import { Geometry } from './geometry.js';
+import { GeometryUtils }                            from './geometry-utils.js';
+import { GeneratedGeometry }                        from './generated-geometry.js';
+import { MATH_COMMON_VALUES, MATH_VECTOR3_INDEXES } from '../constants/math.js';
+import { ECMASCRIPT_TYPEOF_RESULTS }                from '../constants/ecmascript-types.js';
+import { TORUS_DEFAULTS, TORUS_LIMITS }             from '../constants/torus-geometry.js';
+
 import {
     DEFAULT_VERTEX_COLOR,
-    createColorsFromSpec,
-    createIndexArray,
-    createWireframeIndicesFromSolidIndices
-} from './geometry-utils.js';
-
-/**
- * Default torus major diameter (center ring diameter without tube).
- *
- * @type {number}
- */
-const DEFAULT_MAJOR_DIAMETER = 1.5;
-
-/**
- * Default torus tube diameter.
- *
- * @type {number}
- */
-const DEFAULT_TUBE_DIAMETER = 0.5;
-
-/**
- * Default radial segment count (tube segments).
- *
- * @type {number}
- */
-const DEFAULT_RADIAL_SEGMENTS = 16;
-
-/**
- * Default tubular segment count (around the ring).
- *
- * @type {number}
- */
-const DEFAULT_TUBULAR_SEGMENTS = 32;
-
-/**
- * Minimum segment count for torus grids.
- *
- * @type {number}
- */
-const MIN_SEGMENT_COUNT = 3;
-
-/**
- * Divisor used to compute radius from diameter.
- *
- * @type {number}
- */
-const HALF_SIZE_DIVISOR = 2.0;
-
-/**
- * Adds one vertex per grid intersection, so vertex count along an axis is `segments + 1`.
- *
- * @type {number}
- */
-const VERTICES_PER_SEGMENT_INCREMENT = 1;
-
-/**
- * UV/V coordinate is flipped to keep (0, 0) at top-left.
- *
- * @type {number}
- */
-const UV_V_FLIP_BASE = 1.0;
-
-/**
- * Number of float components per `vec3` (position/normal).
- *
- * @type {number}
- */
-const VEC3_COMPONENT_COUNT = 3;
-
-/**
- * Number of float components per `vec2` (uv).
- *
- * @type {number}
- */
-const VEC2_COMPONENT_COUNT = 2;
-
-/**
- * Constant for `2 * pi`.
- *
- * @type {number}
- */
-const TWO_PI = Math.PI * 2.0;
-
-/**
- * Offset to move from a vertex to the next vertex in the same row.
- *
- * @type {number}
- */
-const NEXT_VERTEX_OFFSET = 1;
+    GEOMETRY_SIZES,
+    GEOMETRY_GRID,
+    GEOMETRY_LAYOUT,
+    GEOMETRY_ANGLES,
+    GEOMETRY_UV_INDEXES,
+    GEOMETRY_UV
+} from '../constants/geometry.js';
 
 /**
  * Torus geometry options.
@@ -126,26 +50,7 @@ const NEXT_VERTEX_OFFSET = 1;
 /**
  * Segmented torus geometry.
  */
-export class TorusGeometry extends Geometry {
-
-    /**
-     * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
-     * @param {TorusGeometryOptions} [options = {}] - Geometry options.
-     */
-    constructor(webglContext, options = {}) {
-        const normalized = TorusGeometry.#normalizeOptions(options);
-        const data       = TorusGeometry.#createGeometryData(normalized);
-
-        super(
-            webglContext,
-            data.positions,
-            data.colors,
-            data.indicesSolid,
-            data.indicesWireframe,
-            data.uvs,
-            data.normals
-        );
-    }
+export class TorusGeometry extends GeneratedGeometry {
 
     /**
      * Normalizes constructor input to a `TorusGeometryOptions` object.
@@ -155,136 +60,66 @@ export class TorusGeometry extends Geometry {
      * @private
      */
     static #normalizeOptions(options) {
-        if (options === null || typeof options !== 'object') {
-            throw new TypeError('`TorusGeometry` expects options as an object.');
+        if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT) {
+            throw new TypeError('TorusGeometry expects options as an object.');
         }
 
         const {
-            width           = DEFAULT_MAJOR_DIAMETER,
-            height          = DEFAULT_TUBE_DIAMETER,
-            tubularSegments = DEFAULT_TUBULAR_SEGMENTS,
-            radialSegments  = DEFAULT_RADIAL_SEGMENTS,
+            width           = TORUS_DEFAULTS.MAJOR_DIAMETER,
+            height          = TORUS_DEFAULTS.TUBE_DIAMETER,
+            tubularSegments = TORUS_DEFAULTS.TUBULAR_SEGMENTS,
+            radialSegments  = TORUS_DEFAULTS.RADIAL_SEGMENTS,
             colors          = DEFAULT_VERTEX_COLOR
         } = options;
 
-        if (typeof width !== 'number' || typeof height !== 'number') {
-            throw new TypeError('`TorusGeometry` expects `width/height` as numbers.');
+        if (typeof width !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || typeof height !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER) {
+            throw new TypeError('TorusGeometry expects width/height as numbers.');
         }
 
         if (!Number.isFinite(width) || !Number.isFinite(height)) {
-            throw new RangeError('`TorusGeometry` expects finite `width/height`.');
+            throw new RangeError('TorusGeometry expects finite width/height.');
         }
 
         if (!(colors instanceof Float32Array)) {
-            throw new TypeError('`TorusGeometry` expects colors as a `Float32Array`.');
+            throw new TypeError('TorusGeometry expects colors as a Float32Array.');
         }
 
         return {
             width,
             height,
-            tubularSegments : TorusGeometry.#normalizeSegmentCount(tubularSegments, 'tubularSegments'),
-            radialSegments  : TorusGeometry.#normalizeSegmentCount(radialSegments,  'radialSegments'),
+            tubularSegments : GeometryUtils.normalizeSegmentCount(tubularSegments, 'tubularSegments', TORUS_LIMITS.MIN_SEGMENT_COUNT, 'TorusGeometry'),
+            radialSegments  : GeometryUtils.normalizeSegmentCount(radialSegments, 'radialSegments', TORUS_LIMITS.MIN_SEGMENT_COUNT, 'TorusGeometry'),
             colors
         };
     }
 
     /**
-     * Normalizes and validates a segment count parameter.
+     * Generates vertex and index buffers from construction options.
      *
-     * @param {number} value      - Segment count value.
-     * @param {string} optionName - Name of the option for error messages.
-     * @returns {number}          - Normalized integer `>= 3`.
-     * @private
+     * @param {TorusGeometryOptions} [options] - Geometry options.
+     * @returns {TorusGeometryData}            - Generated CPU buffers.
+     * @protected
      */
-    static #normalizeSegmentCount(value, optionName) {
-        if (typeof value !== 'number' || !Number.isFinite(value)) {
-            throw new TypeError('`TorusGeometry` expects `{name}` as a finite number.'.replace('{name}', optionName));
-        }
+    static createGeometryData(options = {}) {
+        const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+        const uvComponentCount       = GEOMETRY_LAYOUT.UV_COMPONENT_COUNT;
+        const normalized             = TorusGeometry.#normalizeOptions(options);
+        const tubularSegments        = normalized.tubularSegments;
+        const radialSegments         = normalized.radialSegments;
+        const tubularVertexCount     = tubularSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+        const radialVertexCount      = radialSegments  + GEOMETRY_GRID.VERTEX_INCREMENT;
+        const vertexCount            = tubularVertexCount * radialVertexCount;
+        const positions              = new Float32Array(vertexCount * positionComponentCount);
+        const normals                = new Float32Array(vertexCount * positionComponentCount);
+        const uvs                    = new Float32Array(vertexCount * uvComponentCount);
 
-        const intValue = Math.floor(value);
-
-        if (intValue < MIN_SEGMENT_COUNT) {
-            /* eslint-disable indent */
-            throw new RangeError(
-                '`TorusGeometry` expects `{name}` to be `>= {min}`.'
-                .replace('{name}', optionName)
-                .replace('{min}', String(MIN_SEGMENT_COUNT))
-            );
-            /* eslint-enable indent */
-        }
-
-        return intValue;
-    }
-
-    /**
-     * Creates full geometry data for a torus.
-     *
-     * @param {Required<TorusGeometryOptions>} options - Normalized options.
-     * @returns {TorusGeometryData}                    - Geometry buffers.
-     * @private
-     */
-    static #createGeometryData(options) {
-        const majorRadius        = options.width  / HALF_SIZE_DIVISOR;
-        const tubeRadius         = options.height / HALF_SIZE_DIVISOR;
-        const tubularSegments    = options.tubularSegments;
-        const radialSegments     = options.radialSegments;
-        const tubularVertexCount = tubularSegments + VERTICES_PER_SEGMENT_INCREMENT;
-        const radialVertexCount  = radialSegments  + VERTICES_PER_SEGMENT_INCREMENT;
-        const vertexCount        = tubularVertexCount * radialVertexCount;
-        const positions          = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT);
-        const normals            = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT);
-        const uvs                = new Float32Array(vertexCount * VEC2_COMPONENT_COUNT);
-        let vertexIndex = 0;
-
-        for (let radialIndex = 0; radialIndex < radialVertexCount; radialIndex += 1) {
-            const vNormalized = radialIndex / radialSegments;
-            const phi         = vNormalized * TWO_PI;
-            const cosPhi      = Math.cos(phi);
-            const sinPhi      = Math.sin(phi);
-
-            for (let tubularIndex = 0; tubularIndex < tubularVertexCount; tubularIndex += 1) {
-                const uNormalized = tubularIndex / tubularSegments;
-                const theta       = uNormalized * TWO_PI;
-                const cosTheta    = Math.cos(theta);
-                const sinTheta    = Math.sin(theta);
-                const ringRadius  = majorRadius + (tubeRadius * cosPhi);
-
-                const positionX = ringRadius * cosTheta;
-                const positionY = tubeRadius * sinPhi;
-                const positionZ = ringRadius * sinTheta;
-
-                const positionBase = vertexIndex * VEC3_COMPONENT_COUNT;
-                positions[positionBase + 0] = positionX;
-                positions[positionBase + 1] = positionY;
-                positions[positionBase + 2] = positionZ;
-
-                normals[positionBase + 0] = cosTheta * cosPhi;
-                normals[positionBase + 1] = sinPhi;
-                normals[positionBase + 2] = sinTheta * cosPhi;
-
-                const uvBase = vertexIndex * VEC2_COMPONENT_COUNT;
-                uvs[uvBase + 0] = uNormalized;
-                uvs[uvBase + 1] = UV_V_FLIP_BASE - vNormalized;
-                vertexIndex += 1;
-            }
-        }
-
+        TorusGeometry.#writeVertices(positions, normals, uvs, normalized);
         const indicesSolidList = [];
+        GeometryUtils.appendGridTriangleIndices(indicesSolidList, tubularSegments, radialSegments);
 
-        for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
-            for (let tubularIndex = 0; tubularIndex < tubularSegments; tubularIndex += 1) {
-                const topLeftVertexIndex     = (radialIndex * tubularVertexCount) + tubularIndex;
-                const topRightVertexIndex    = topLeftVertexIndex    + NEXT_VERTEX_OFFSET;
-                const bottomLeftVertexIndex  = topLeftVertexIndex    + tubularVertexCount;
-                const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET;
-                indicesSolidList.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
-                indicesSolidList.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
-            }
-        }
-
-        const indicesSolid     = createIndexArray(vertexCount, indicesSolidList);
-        const indicesWireframe = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
-        const colors           = createColorsFromSpec(vertexCount, options.colors);
+        const indicesSolid     = GeometryUtils.createIndexArray(vertexCount, indicesSolidList);
+        const indicesWireframe = GeometryUtils.createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
+        const colors           = GeometryUtils.createColorsFromSpec(vertexCount, normalized.colors);
 
         return {
             positions,
@@ -294,5 +129,61 @@ export class TorusGeometry extends Geometry {
             indicesSolid,
             indicesWireframe
         };
+    }
+
+    /**
+     * Writes the grid positions, normals and texture coordinates.
+     *
+     * @param {Float32Array} positions                    - Output positions.
+     * @param {Float32Array} normals                      - Output normals.
+     * @param {Float32Array} uvs                          - Output texture coordinates.
+     * @param {Required<TorusGeometryOptions>} normalized - Normalized geometry options.
+     * @private
+     */
+    static #writeVertices(positions, normals, uvs, normalized) {
+        const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+        const uvComponentCount       = GEOMETRY_LAYOUT.UV_COMPONENT_COUNT;
+        const fullTurn               = GEOMETRY_ANGLES.FULL_TURN;
+        const xComponentIndex        = MATH_VECTOR3_INDEXES.X;
+        const yComponentIndex        = MATH_VECTOR3_INDEXES.Y;
+        const zComponentIndex        = MATH_VECTOR3_INDEXES.Z;
+        const majorRadius            = normalized.width  / GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
+        const tubeRadius             = normalized.height / GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
+        const tubularSegments        = normalized.tubularSegments;
+        const radialSegments         = normalized.radialSegments;
+        const tubularVertexCount     = tubularSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+        const radialVertexCount      = radialSegments  + GEOMETRY_GRID.VERTEX_INCREMENT;
+        let vertexIndex              = MATH_COMMON_VALUES.ZERO;
+
+        for (let radialIndex = MATH_COMMON_VALUES.ZERO; radialIndex < radialVertexCount; radialIndex += MATH_COMMON_VALUES.UNIT) {
+            const vNormalized = radialIndex / radialSegments;
+            const phi         = vNormalized * fullTurn;
+            const cosPhi      = Math.cos(phi);
+            const sinPhi      = Math.sin(phi);
+
+            for (let tubularIndex = MATH_COMMON_VALUES.ZERO; tubularIndex < tubularVertexCount; tubularIndex += MATH_COMMON_VALUES.UNIT) {
+                const uNormalized = tubularIndex / tubularSegments;
+                const theta       = uNormalized * fullTurn;
+                const cosTheta    = Math.cos(theta);
+                const sinTheta    = Math.sin(theta);
+                const ringRadius  = majorRadius + (tubeRadius * cosPhi);
+                const positionX   = ringRadius * cosTheta;
+                const positionY   = tubeRadius * sinPhi;
+                const positionZ   = ringRadius * sinTheta;
+
+                const positionBase = vertexIndex * positionComponentCount;
+                positions[positionBase + xComponentIndex] = positionX;
+                positions[positionBase + yComponentIndex] = positionY;
+                positions[positionBase + zComponentIndex] = positionZ;
+                normals[positionBase + xComponentIndex]   = cosTheta * cosPhi;
+                normals[positionBase + yComponentIndex]   = sinPhi;
+                normals[positionBase + zComponentIndex]   = sinTheta * cosPhi;
+
+                const uvBase = vertexIndex * uvComponentCount;
+                uvs[uvBase + GEOMETRY_UV_INDEXES.U] = uNormalized;
+                uvs[uvBase + GEOMETRY_UV_INDEXES.V] = GEOMETRY_UV.V_FLIP_BASE - vNormalized;
+                vertexIndex += MATH_COMMON_VALUES.UNIT;
+            }
+        }
     }
 }

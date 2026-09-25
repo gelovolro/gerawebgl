@@ -1,148 +1,29 @@
-import { Geometry } from './geometry.js';
+import { GeometryUtils }                            from './geometry-utils.js';
+import { GeneratedGeometry }                        from './generated-geometry.js';
+import { MATH_COMMON_VALUES, MATH_VECTOR3_INDEXES } from '../constants/math.js';
+import { ECMASCRIPT_TYPEOF_RESULTS }                from '../constants/ecmascript-types.js';
+
 import {
+    GEOMETRY_DEFAULTS,
     DEFAULT_VERTEX_COLOR,
-    createColorsFromSpec,
-    createIndexArray,
-    createWireframeIndicesFromSolidIndices
-} from './geometry-utils.js';
+    GEOMETRY_SIZES,
+    GEOMETRY_GRID,
+    GEOMETRY_UV
+} from '../constants/geometry.js';
 
-/**
- * Default pyramid base width.
- *
- * @type {number}
- */
-const DEFAULT_PYRAMID_WIDTH = 1.0;
-
-/**
- * Default pyramid height.
- *
- * @type {number}
- */
-const DEFAULT_PYRAMID_HEIGHT = 1.5;
-
-/**
- * Default segment count for base edges.
- *
- * @type {number}
- */
-const DEFAULT_BASE_SEGMENT_COUNT = 1;
-
-/**
- * Default segment count along side height.
- *
- * @type {number}
- */
-const DEFAULT_HEIGHT_SEGMENT_COUNT = 1;
-
-/**
- * Minimum segment count supported by segmented geometries.
- *
- * @type {number}
- */
-const MIN_SEGMENT_COUNT = 1;
-
-/**
- * Divisor used to compute half sizes.
- *
- * @type {number}
- */
-const HALF_SIZE_DIVISOR = 2.0;
-
-/**
- * Used to center coordinates around the origin: `(t - 0.5) * size`.
- *
- * @type {number}
- */
-const CENTER_T_OFFSET = 0.5;
-
-/**
- * UV/V coordinate is flipped to keep (0, 0) at top-left.
- *
- * @type {number}
- */
-const UV_V_FLIP_BASE = 1.0;
-
-/**
- * Adds one vertex per grid intersection, so vertex count along an axis is `segments + 1`.
- *
- * @type {number}
- */
-const VERTICES_PER_SEGMENT_INCREMENT = 1;
-
-/**
- * Offset to move from a vertex to the next vertex in the same row.
- *
- * @type {number}
- */
-const NEXT_VERTEX_OFFSET = 1;
-
-/**
- * Common numeric constants.
- *
- * @type {number}
- */
-const ZERO_VALUE = 0.0;
-
-/**
- * Common numeric constants.
- *
- * @type {number}
- */
-const ONE_VALUE = 1.0;
-
-/**
- * Common numeric constants.
- *
- * @type {number}
- */
-const NEGATIVE_ONE_VALUE = -1.0;
-
-/**
- * Default UV for apex vertex.
- *
- * @type {number}
- */
-const APEX_UV_U = 0.5;
-
-/**
- * Default UV for apex vertex.
- *
- * @type {number}
- */
-const APEX_UV_V = 0.0;
-
-/**
- * Outward direction hints used to ensure side face normals point outside.
- *
- * @type {number[]}
- */
-const OUTWARD_HINT_FRONT = [0.0, 0.0, 1.0];
-
-/**
- * Outward direction hints used to ensure side face normals point outside.
- *
- * @type {number[]}
- */
-const OUTWARD_HINT_RIGHT = [1.0, 0.0, 0.0];
-
-/**
- * Outward direction hints used to ensure side face normals point outside.
- *
- * @type {number[]}
- */
-const OUTWARD_HINT_BACK = [0.0, 0.0, -1.0];
-
-/**
- * Outward direction hints used to ensure side face normals point outside.
- *
- * @type {number[]}
- */
-const OUTWARD_HINT_LEFT = [-1.0, 0.0, 0.0];
+import {
+    PYRAMID_DEFAULTS,
+    PYRAMID_LIMITS,
+    PYRAMID_LAYOUT,
+    PYRAMID_DIRECTIONS
+} from '../constants/pyramid-geometry.js';
 
 /**
  * Pyramid geometry options.
  *
- * `width` is the base size along X. `depth` (optional) is the base size along Z.
+ * `width` is the base size along X.
+ * `depth` (optional) is the base size along Z.
+ *
  * If `depth` is not provided, it defaults to `width` (square base).
  *
  * `colors` supports:
@@ -152,14 +33,14 @@ const OUTWARD_HINT_LEFT = [-1.0, 0.0, 0.0];
  * Segment parameters must be integers `>= 1`.
  *
  * @typedef {Object} PyramidGeometryOptions
- * @property {number} [width = 1.0]         - Base width along X.
- * @property {number} [height = 1.5]        - Pyramid height along Y.
- * @property {number} [depth = width]       - Base depth along Z.
- * @property {number} [widthSegments = 1]   - Subdivisions along X (base grid and faces that use X edges).
- * @property {number} [depthSegments = 1]   - Subdivisions along Z (base grid and faces that use Z edges).
- * @property {number} [heightSegments = 1]  - Subdivisions along side height.
- * @property {boolean} [capped = true]      - Whether to generate the bottom face.
- * @property {Float32Array} [colors]        - Color specification buffer.
+ * @property {number} [width = 1.0]                        - Base width along X.
+ * @property {number} [height = 1.5]                       - Pyramid height along Y.
+ * @property {number} [depth = width]                      - Base depth along Z.
+ * @property {number} [widthSegments = 1]                  - Subdivisions along X (base grid and faces that use X edges).
+ * @property {number} [depthSegments = 1]                  - Subdivisions along Z (base grid and faces that use Z edges).
+ * @property {number} [heightSegments = 1]                 - Subdivisions along side height.
+ * @property {boolean} [capped = GEOMETRY_DEFAULTS.CAPPED] - Whether to generate the bottom face.
+ * @property {Float32Array} [colors]                       - Color specification buffer.
  */
 
 /**
@@ -185,26 +66,7 @@ const OUTWARD_HINT_LEFT = [-1.0, 0.0, 0.0];
  * Segmented pyramid geometry with a rectangular base and 4 planar side faces.
  * Side faces use flat normals (sharp edges).
  */
-export class PyramidGeometry extends Geometry {
-
-    /**
-     * @param {WebGL2RenderingContext} webglContext   - WebGL2 rendering context.
-     * @param {PyramidGeometryOptions} [options = {}] - Geometry options.
-     */
-    constructor(webglContext, options = {}) {
-        const normalized = PyramidGeometry.#normalizeOptions(options);
-        const data       = PyramidGeometry.#createGeometryData(normalized);
-
-        super(
-            webglContext,
-            data.positions,
-            data.colors,
-            data.indicesSolid,
-            data.indicesWireframe,
-            data.uvs,
-            data.normals
-        );
-    }
+export class PyramidGeometry extends GeneratedGeometry {
 
     /**
      * Normalizes constructor input to a `PyramidGeometryOptions` object.
@@ -214,189 +76,72 @@ export class PyramidGeometry extends Geometry {
      * @private
      */
     static #normalizeOptions(options) {
-        if (options === null || typeof options !== 'object') {
-            throw new TypeError('`PyramidGeometry` expects options as an object.');
+        if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT) {
+            throw new TypeError('PyramidGeometry expects options as an object.');
         }
 
         const {
-            width          = DEFAULT_PYRAMID_WIDTH,
-            height         = DEFAULT_PYRAMID_HEIGHT,
+            width          = PYRAMID_DEFAULTS.WIDTH,
+            height         = PYRAMID_DEFAULTS.HEIGHT,
             depth          = width,
-            widthSegments  = DEFAULT_BASE_SEGMENT_COUNT,
+            widthSegments  = PYRAMID_DEFAULTS.BASE_SEGMENT_COUNT,
             depthSegments  = widthSegments,
-            heightSegments = DEFAULT_HEIGHT_SEGMENT_COUNT,
-            capped         = true,
+            heightSegments = PYRAMID_DEFAULTS.HEIGHT_SEGMENT_COUNT,
+            capped         = GEOMETRY_DEFAULTS.CAPPED,
             colors         = DEFAULT_VERTEX_COLOR
         } = options;
 
-        if (typeof width !== 'number' || typeof height !== 'number' || typeof depth !== 'number') {
-            throw new TypeError('`PyramidGeometry` expects `width/height/depth` as numbers.');
+        if (typeof width  !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER ||
+            typeof height !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER ||
+            typeof depth  !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER) {
+            throw new TypeError('PyramidGeometry expects width, height or depth as numbers.');
         }
 
         if (!Number.isFinite(width) || !Number.isFinite(height) || !Number.isFinite(depth)) {
-            throw new RangeError('`PyramidGeometry` expects finite `width/height/depth`.');
+            throw new RangeError('PyramidGeometry expects finite width, height or depth.');
         }
 
         if (!(colors instanceof Float32Array)) {
-            throw new TypeError('`PyramidGeometry` expects colors as a `Float32Array`.');
+            throw new TypeError('PyramidGeometry expects colors as a Float32Array.');
         }
 
         return {
             width,
             height,
             depth,
-            widthSegments  : PyramidGeometry.#normalizeSegmentCount(widthSegments,  'widthSegments',  MIN_SEGMENT_COUNT),
-            depthSegments  : PyramidGeometry.#normalizeSegmentCount(depthSegments,  'depthSegments',  MIN_SEGMENT_COUNT),
-            heightSegments : PyramidGeometry.#normalizeSegmentCount(heightSegments, 'heightSegments', MIN_SEGMENT_COUNT),
+            widthSegments  : GeometryUtils.normalizeSegmentCount(widthSegments, 'widthSegments', PYRAMID_LIMITS.MIN_SEGMENT_COUNT, 'PyramidGeometry'),
+            depthSegments  : GeometryUtils.normalizeSegmentCount(depthSegments, 'depthSegments', PYRAMID_LIMITS.MIN_SEGMENT_COUNT, 'PyramidGeometry'),
+            heightSegments : GeometryUtils.normalizeSegmentCount(heightSegments, 'heightSegments', PYRAMID_LIMITS.MIN_SEGMENT_COUNT, 'PyramidGeometry'),
             capped         : Boolean(capped),
             colors
         };
     }
 
     /**
-     * Normalizes and validates a segment count parameter.
+     * Generates vertex and index buffers from construction options.
      *
-     * @param {number} value      - Segment count.
-     * @param {string} optionName - Option name.
-     * @param {number} minValue   - Minimal allowed value.
-     * @returns {number}          - Integer segment count.
-     * @private
+     * @param {PyramidGeometryOptions} [options] - Geometry options.
+     * @returns {PyramidGeometryData}            - Generated CPU buffers.
+     * @protected
      */
-    static #normalizeSegmentCount(value, optionName, minValue) {
-        if (typeof value !== 'number' || !Number.isFinite(value)) {
-            throw new TypeError('`PyramidGeometry` expects `{name}` as a finite number.'.replace('{name}', optionName));
+    static createGeometryData(options = {}) {
+        const normalized = PyramidGeometry.#normalizeOptions(options);
+        const buffers    = { positions: [], normals: [], uvs: [], indicesSolid: [] };
+        let vertexOffset = MATH_COMMON_VALUES.ZERO;
+
+        if (normalized.capped) {
+            vertexOffset = PyramidGeometry.#appendBottom(buffers, normalized);
         }
 
-        const intValue = Math.floor(value);
-
-        if (intValue < minValue) {
-            /* eslint-disable indent */
-            throw new RangeError(
-                '`PyramidGeometry` expects `{name}` to be `>= {min}`.'
-                .replace('{name}', optionName)
-                .replace('{min}', String(minValue))
-            );
-            /* eslint-enable indent */
-        }
-
-        return intValue;
-    }
-
-    /**
-     * Creates full geometry data for a segmented pyramid.
-     *
-     * @param {Required<PyramidGeometryOptions>} options - Normalized options.
-     * @returns {PyramidGeometryData}                    - Geometry buffers.
-     * @private
-     */
-    static #createGeometryData(options) {
-        const halfWidth  = options.width  / HALF_SIZE_DIVISOR;
-        const halfDepth  = options.depth  / HALF_SIZE_DIVISOR;
-        const halfHeight = options.height / HALF_SIZE_DIVISOR;
-
-        const apexPoint        = [ZERO_VALUE, halfHeight, ZERO_VALUE];
-        const positions        = [];
-        const normals          = [];
-        const uvs              = [];
-        const indicesSolidList = [];
-        let vertexOffset = 0;
-
-        // Base (optional):
-        if (options.capped) {
-            const baseAppendResult = PyramidGeometry.#appendBase(
-                positions,
-                normals,
-                uvs,
-                indicesSolidList,
-                vertexOffset,
-                halfWidth,
-                halfDepth,
-                halfHeight,
-                options.widthSegments,
-                options.depthSegments
-            );
-
-            vertexOffset += baseAppendResult.vertexCount;
-        }
-
-        // Side faces:
-        const baseY   = -halfHeight;
-        const corners = {
-            frontLeft  : [-halfWidth,  baseY,  halfDepth],
-            frontRight : [ halfWidth,  baseY,  halfDepth],
-            backRight  : [ halfWidth,  baseY, -halfDepth],
-            backLeft   : [-halfWidth,  baseY, -halfDepth]
-        };
-
-        // Front face (+Z):
-        vertexOffset += PyramidGeometry.#appendSideFace(
-            positions,
-            normals,
-            uvs,
-            indicesSolidList,
-            vertexOffset,
-            corners.frontLeft,
-            corners.frontRight,
-            apexPoint,
-            options.widthSegments,
-            options.heightSegments,
-            OUTWARD_HINT_FRONT
-        );
-
-        // Right face (+X):
-        vertexOffset += PyramidGeometry.#appendSideFace(
-            positions,
-            normals,
-            uvs,
-            indicesSolidList,
-            vertexOffset,
-            corners.frontRight,
-            corners.backRight,
-            apexPoint,
-            options.depthSegments,
-            options.heightSegments,
-            OUTWARD_HINT_RIGHT
-        );
-
-        // Back face (-Z):
-        vertexOffset += PyramidGeometry.#appendSideFace(
-            positions,
-            normals,
-            uvs,
-            indicesSolidList,
-            vertexOffset,
-            corners.backRight,
-            corners.backLeft,
-            apexPoint,
-            options.widthSegments,
-            options.heightSegments,
-            OUTWARD_HINT_BACK
-        );
-
-        // Left face (-X):
-        vertexOffset += PyramidGeometry.#appendSideFace(
-            positions,
-            normals,
-            uvs,
-            indicesSolidList,
-            vertexOffset,
-            corners.backLeft,
-            corners.frontLeft,
-            apexPoint,
-            options.depthSegments,
-            options.heightSegments,
-            OUTWARD_HINT_LEFT
-        );
-
-        const vertexCount      = vertexOffset;
-        const indicesSolid     = createIndexArray(vertexCount, indicesSolidList);
-        const indicesWireframe = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
-        const colors           = createColorsFromSpec(vertexCount, options.colors);
+        const vertexCount      = PyramidGeometry.#appendSides(buffers, normalized, vertexOffset);
+        const indicesSolid     = GeometryUtils.createIndexArray(vertexCount, buffers.indicesSolid);
+        const indicesWireframe = GeometryUtils.createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
+        const colors           = GeometryUtils.createColorsFromSpec(vertexCount, normalized.colors);
 
         return {
-            positions : new Float32Array(positions),
-            normals   : new Float32Array(normals),
-            uvs       : new Float32Array(uvs),
+            positions : new Float32Array(buffers.positions),
+            normals   : new Float32Array(buffers.normals),
+            uvs       : new Float32Array(buffers.uvs),
             colors,
             indicesSolid,
             indicesWireframe
@@ -431,38 +176,30 @@ export class PyramidGeometry extends Geometry {
         widthSegments,
         depthSegments
     ) {
+        const centerOffset = GEOMETRY_GRID.CENTER_OFFSET;
+        const zeroValue    = MATH_COMMON_VALUES.ZERO;
         const xSegments    = widthSegments;
         const zSegments    = depthSegments;
-        const xVertexCount = xSegments + VERTICES_PER_SEGMENT_INCREMENT;
-        const zVertexCount = zSegments + VERTICES_PER_SEGMENT_INCREMENT;
+        const xVertexCount = xSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+        const zVertexCount = zSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
         const baseY        = -halfHeight;
-        const fullWidth    = halfWidth * HALF_SIZE_DIVISOR;
-        const fullDepth    = halfDepth * HALF_SIZE_DIVISOR;
+        const fullWidth    = halfWidth * GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
+        const fullDepth    = halfDepth * GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
 
-        for (let zIndex = 0; zIndex < zVertexCount; zIndex += 1) {
+        for (let zIndex = MATH_COMMON_VALUES.ZERO; zIndex < zVertexCount; zIndex += MATH_COMMON_VALUES.UNIT) {
             const vNormalized = zIndex / zSegments;
-            const positionZ   = (vNormalized - CENTER_T_OFFSET) * fullDepth;
+            const positionZ   = (vNormalized - centerOffset) * fullDepth;
 
-            for (let xIndex = 0; xIndex < xVertexCount; xIndex += 1) {
+            for (let xIndex = MATH_COMMON_VALUES.ZERO; xIndex < xVertexCount; xIndex += MATH_COMMON_VALUES.UNIT) {
                 const uNormalized = xIndex / xSegments;
-                const positionX   = (uNormalized - CENTER_T_OFFSET) * fullWidth;
+                const positionX   = (uNormalized - centerOffset) * fullWidth;
                 positions.push(positionX, baseY, positionZ);
-                normals.push(ZERO_VALUE, NEGATIVE_ONE_VALUE, ZERO_VALUE);
-                uvs.push(uNormalized, UV_V_FLIP_BASE - vNormalized);
+                normals.push(zeroValue, PYRAMID_LAYOUT.NEGATIVE_ONE_VALUE, zeroValue);
+                uvs.push(uNormalized, GEOMETRY_UV.V_FLIP_BASE - vNormalized);
             }
         }
 
-        for (let zIndex = 0; zIndex < zSegments; zIndex += 1) {
-            for (let xIndex = 0; xIndex < xSegments; xIndex += 1) {
-                const topLeftVertexIndex     = vertexOffset + (zIndex * xVertexCount) + xIndex;
-                const topRightVertexIndex    = topLeftVertexIndex + NEXT_VERTEX_OFFSET;
-                const bottomLeftVertexIndex  = topLeftVertexIndex + xVertexCount;
-                const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET;
-                indicesSolid.push(topLeftVertexIndex, topRightVertexIndex, bottomLeftVertexIndex);
-                indicesSolid.push(topRightVertexIndex, bottomRightVertexIndex, bottomLeftVertexIndex);
-            }
-        }
-
+        GeometryUtils.appendGridTriangleIndices(indicesSolid, xSegments, zSegments, vertexOffset, true);
         return { vertexCount: xVertexCount * zVertexCount };
     }
 
@@ -470,10 +207,7 @@ export class PyramidGeometry extends Geometry {
      * Appends a single planar side face subdivided into a grid.
      * The face uses a flat normal (sharp edges).
      *
-     * @param {number[]} positions    - Output positions.
-     * @param {number[]} normals      - Output normals.
-     * @param {number[]} uvs          - Output UVs.
-     * @param {number[]} indicesSolid - Output solid indices.
+     * @param {Object} buffers        - Output vertex and index lists.
      * @param {number} vertexOffset   - Starting vertex index.
      * @param {number[]} baseStart    - Base edge start point [x, y, z].
      * @param {number[]} baseEnd      - Base edge end point [x, y, z].
@@ -484,72 +218,49 @@ export class PyramidGeometry extends Geometry {
      * @returns {number}              - Number of vertices appended.
      * @private
      */
-    static #appendSideFace(
-        positions,
-        normals,
-        uvs,
-        indicesSolid,
-        vertexOffset,
-        baseStart,
-        baseEnd,
-        apex,
-        edgeSegments,
-        heightSegments,
-        outwardHint
-    ) {
-        let edgeStart  = baseStart;
-        let edgeEnd    = baseEnd;
-        let faceNormal = PyramidGeometry.#computeFaceNormal(edgeStart, edgeEnd, apex);
+    static #appendSideFace(buffers, vertexOffset, baseStart, baseEnd, apex, edgeSegments, heightSegments, outwardHint) {
+        const { positions, normals, uvs, indicesSolid } = buffers;
+        const vertexIncrement  = GEOMETRY_GRID.VERTEX_INCREMENT;
+        const nextVertexOffset = GEOMETRY_GRID.NEXT_VERTEX_OFFSET;
+        let edgeStart          = baseStart;
+        let edgeEnd            = baseEnd;
+        let faceNormal         = PyramidGeometry.#computeFaceNormal(edgeStart, edgeEnd, apex);
 
-        if (PyramidGeometry.#dot(faceNormal, outwardHint) < ZERO_VALUE) {
+        if (PyramidGeometry.#dot(faceNormal, outwardHint) < MATH_COMMON_VALUES.ZERO) {
             edgeStart  = baseEnd;
             edgeEnd    = baseStart;
             faceNormal = PyramidGeometry.#computeFaceNormal(edgeStart, edgeEnd, apex);
         }
 
-        const edgeVertexCount = edgeSegments + VERTICES_PER_SEGMENT_INCREMENT;
+        const edgeVertexCount = edgeSegments + vertexIncrement;
         const ringCount       = heightSegments;
-        const faceVertexCount = (ringCount * edgeVertexCount) + VERTICES_PER_SEGMENT_INCREMENT;
+        const faceVertexCount = (ringCount * edgeVertexCount) + vertexIncrement;
 
-        for (let ringIndex = 0; ringIndex < ringCount; ringIndex += 1) {
+        for (let ringIndex = MATH_COMMON_VALUES.ZERO; ringIndex < ringCount; ringIndex += MATH_COMMON_VALUES.UNIT) {
             const heightNormalized = ringIndex / heightSegments;
             const rowStart         = PyramidGeometry.#lerp3(edgeStart, apex, heightNormalized);
             const rowEnd           = PyramidGeometry.#lerp3(edgeEnd, apex, heightNormalized);
 
-            for (let edgeIndex = 0; edgeIndex < edgeVertexCount; edgeIndex += 1) {
+            for (let edgeIndex = MATH_COMMON_VALUES.ZERO; edgeIndex < edgeVertexCount; edgeIndex += MATH_COMMON_VALUES.UNIT) {
                 const edgeNormalized = edgeIndex / edgeSegments;
                 const point          = PyramidGeometry.#lerp3(rowStart, rowEnd, edgeNormalized);
-                positions.push(point[0], point[1], point[2]);
-                normals.push(faceNormal[0], faceNormal[1], faceNormal[2]);
-                uvs.push(edgeNormalized, UV_V_FLIP_BASE - heightNormalized);
+                positions.push(point[MATH_VECTOR3_INDEXES.X], point[MATH_VECTOR3_INDEXES.Y], point[MATH_VECTOR3_INDEXES.Z]);
+                normals.push(faceNormal[MATH_VECTOR3_INDEXES.X], faceNormal[MATH_VECTOR3_INDEXES.Y], faceNormal[MATH_VECTOR3_INDEXES.Z]);
+                uvs.push(edgeNormalized, GEOMETRY_UV.V_FLIP_BASE - heightNormalized);
             }
         }
 
-        positions.push(apex[0], apex[1], apex[2]);
-        normals.push(faceNormal[0], faceNormal[1], faceNormal[2]);
-        uvs.push(APEX_UV_U, APEX_UV_V);
+        positions.push(apex[MATH_VECTOR3_INDEXES.X], apex[MATH_VECTOR3_INDEXES.Y], apex[MATH_VECTOR3_INDEXES.Z]);
+        normals.push(faceNormal[MATH_VECTOR3_INDEXES.X], faceNormal[MATH_VECTOR3_INDEXES.Y], faceNormal[MATH_VECTOR3_INDEXES.Z]);
+        uvs.push(PYRAMID_LAYOUT.APEX_UV_U, PYRAMID_LAYOUT.APEX_UV_V);
 
-        const apexVertexIndex = vertexOffset + faceVertexCount - VERTICES_PER_SEGMENT_INCREMENT;
+        const apexVertexIndex = vertexOffset + faceVertexCount - vertexIncrement;
+        GeometryUtils.appendGridTriangleIndices(indicesSolid, edgeSegments, ringCount - vertexIncrement, vertexOffset);
+        const topRingStartVertexIndex = vertexOffset + ((ringCount - vertexIncrement) * edgeVertexCount);
 
-        for (let ringIndex = 0; ringIndex < (ringCount - VERTICES_PER_SEGMENT_INCREMENT); ringIndex += 1) {
-            const ringStartVertexIndex = vertexOffset + (ringIndex * edgeVertexCount);
-            const nextRingVertexIndex  = vertexOffset + ((ringIndex + VERTICES_PER_SEGMENT_INCREMENT) * edgeVertexCount);
-
-            for (let edgeIndex = 0; edgeIndex < edgeSegments; edgeIndex += 1) {
-                const topLeftVertexIndex     = ringStartVertexIndex + edgeIndex;
-                const topRightVertexIndex    = topLeftVertexIndex + NEXT_VERTEX_OFFSET;
-                const bottomLeftVertexIndex  = nextRingVertexIndex + edgeIndex;
-                const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET;
-                indicesSolid.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
-                indicesSolid.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
-            }
-        }
-
-        const topRingStartVertexIndex = vertexOffset + ((ringCount - VERTICES_PER_SEGMENT_INCREMENT) * edgeVertexCount);
-
-        for (let edgeIndex = 0; edgeIndex < edgeSegments; edgeIndex += 1) {
+        for (let edgeIndex = MATH_COMMON_VALUES.ZERO; edgeIndex < edgeSegments; edgeIndex += MATH_COMMON_VALUES.UNIT) {
             const topLeftVertexIndex  = topRingStartVertexIndex + edgeIndex;
-            const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET;
+            const topRightVertexIndex = topLeftVertexIndex + nextVertexOffset;
             indicesSolid.push(topLeftVertexIndex, apexVertexIndex, topRightVertexIndex);
         }
 
@@ -567,20 +278,20 @@ export class PyramidGeometry extends Geometry {
      */
     static #computeFaceNormal(pointA, pointB, pointC) {
         const vectorAB = [
-            pointB[0] - pointA[0],
-            pointB[1] - pointA[1],
-            pointB[2] - pointA[2]
+            pointB[MATH_VECTOR3_INDEXES.X] - pointA[MATH_VECTOR3_INDEXES.X],
+            pointB[MATH_VECTOR3_INDEXES.Y] - pointA[MATH_VECTOR3_INDEXES.Y],
+            pointB[MATH_VECTOR3_INDEXES.Z] - pointA[MATH_VECTOR3_INDEXES.Z]
         ];
 
         const vectorAC = [
-            pointC[0] - pointA[0],
-            pointC[1] - pointA[1],
-            pointC[2] - pointA[2]
+            pointC[MATH_VECTOR3_INDEXES.X] - pointA[MATH_VECTOR3_INDEXES.X],
+            pointC[MATH_VECTOR3_INDEXES.Y] - pointA[MATH_VECTOR3_INDEXES.Y],
+            pointC[MATH_VECTOR3_INDEXES.Z] - pointA[MATH_VECTOR3_INDEXES.Z]
         ];
 
-        const normalX0 = (vectorAB[1] * vectorAC[2]) - (vectorAB[2] * vectorAC[1]);
-        const normalY0 = (vectorAB[2] * vectorAC[0]) - (vectorAB[0] * vectorAC[2]);
-        const normalZ0 = (vectorAB[0] * vectorAC[1]) - (vectorAB[1] * vectorAC[0]);
+        const normalX0 = (vectorAB[MATH_VECTOR3_INDEXES.Y] * vectorAC[MATH_VECTOR3_INDEXES.Z]) - (vectorAB[MATH_VECTOR3_INDEXES.Z] * vectorAC[MATH_VECTOR3_INDEXES.Y]);
+        const normalY0 = (vectorAB[MATH_VECTOR3_INDEXES.Z] * vectorAC[MATH_VECTOR3_INDEXES.X]) - (vectorAB[MATH_VECTOR3_INDEXES.X] * vectorAC[MATH_VECTOR3_INDEXES.Z]);
+        const normalZ0 = (vectorAB[MATH_VECTOR3_INDEXES.X] * vectorAC[MATH_VECTOR3_INDEXES.Y]) - (vectorAB[MATH_VECTOR3_INDEXES.Y] * vectorAC[MATH_VECTOR3_INDEXES.X]);
         const inverseNormalLength = PyramidGeometry.#inverseLength(normalX0, normalY0, normalZ0);
         return [normalX0 * inverseNormalLength, normalY0 * inverseNormalLength, normalZ0 * inverseNormalLength];
     }
@@ -596,9 +307,9 @@ export class PyramidGeometry extends Geometry {
      */
     static #lerp3(pointA, pointB, interpolationFactor) {
         return [
-            pointA[0] + ((pointB[0] - pointA[0]) * interpolationFactor),
-            pointA[1] + ((pointB[1] - pointA[1]) * interpolationFactor),
-            pointA[2] + ((pointB[2] - pointA[2]) * interpolationFactor)
+            pointA[MATH_VECTOR3_INDEXES.X] + ((pointB[MATH_VECTOR3_INDEXES.X] - pointA[MATH_VECTOR3_INDEXES.X]) * interpolationFactor),
+            pointA[MATH_VECTOR3_INDEXES.Y] + ((pointB[MATH_VECTOR3_INDEXES.Y] - pointA[MATH_VECTOR3_INDEXES.Y]) * interpolationFactor),
+            pointA[MATH_VECTOR3_INDEXES.Z] + ((pointB[MATH_VECTOR3_INDEXES.Z] - pointA[MATH_VECTOR3_INDEXES.Z]) * interpolationFactor)
         ];
     }
 
@@ -611,7 +322,11 @@ export class PyramidGeometry extends Geometry {
      * @private
      */
     static #dot(vectorA, vectorB) {
-        return (vectorA[0] * vectorB[0]) + (vectorA[1] * vectorB[1]) + (vectorA[2] * vectorB[2]);
+        return (
+            (vectorA[MATH_VECTOR3_INDEXES.X] * vectorB[MATH_VECTOR3_INDEXES.X]) +
+            (vectorA[MATH_VECTOR3_INDEXES.Y] * vectorB[MATH_VECTOR3_INDEXES.Y]) +
+            (vectorA[MATH_VECTOR3_INDEXES.Z] * vectorB[MATH_VECTOR3_INDEXES.Z])
+        );
     }
 
     /**
@@ -627,10 +342,77 @@ export class PyramidGeometry extends Geometry {
     static #inverseLength(x, y, z) {
         const length = Math.sqrt((x * x) + (y * y) + (z * z));
 
-        if (length === ZERO_VALUE) {
-            return ZERO_VALUE;
+        if (length === MATH_COMMON_VALUES.ZERO) {
+            return MATH_COMMON_VALUES.ZERO;
         }
 
-        return ONE_VALUE / length;
+        return MATH_COMMON_VALUES.UNIT / length;
+    }
+
+    /**
+     * Appends the optional bottom grid before the side faces.
+     *
+     * @param {Object} buffers                           - Output vertex and index lists.
+     * @param {Required<PyramidGeometryOptions>} options - Normalized geometry options.
+     * @returns {number} - Number of base vertices.
+     * @private
+     */
+    static #appendBottom(buffers, options) {
+        const divisor = GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
+        const result  = PyramidGeometry.#appendBase(
+            buffers.positions,
+            buffers.normals,
+            buffers.uvs,
+            buffers.indicesSolid,
+            MATH_COMMON_VALUES.ZERO,
+            options.width / divisor,
+            options.depth / divisor,
+            options.height / divisor,
+            options.widthSegments,
+            options.depthSegments
+        );
+
+        return result.vertexCount;
+    }
+
+    /**
+     * Appends the front, right, back and left faces in their existing order.
+     *
+     * @param {Object} buffers                           - Output vertex and index lists.
+     * @param {Required<PyramidGeometryOptions>} options - Normalized geometry options.
+     * @param {number} vertexOffset                      - First side vertex.
+     * @returns {number}                                 - Total vertex count after appending all sides.
+     * @private
+     */
+    static #appendSides(buffers, options, vertexOffset) {
+        const divisor        = GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
+        const halfWidth      = options.width / divisor;
+        const halfDepth      = options.depth / divisor;
+        const halfHeight     = options.height / divisor;
+        const apex           = [MATH_COMMON_VALUES.ZERO, halfHeight, MATH_COMMON_VALUES.ZERO];
+        const frontLeft      = [-halfWidth, -halfHeight,  halfDepth];
+        const frontRight     = [ halfWidth, -halfHeight,  halfDepth];
+        const backRight      = [ halfWidth, -halfHeight, -halfDepth];
+        const backLeft       = [-halfWidth, -halfHeight, -halfDepth];
+        const heightSegments = options.heightSegments;
+
+        const appendFace = (firstCorner, secondCorner, segmentCount, direction) => {
+            vertexOffset += PyramidGeometry.#appendSideFace(
+                buffers,
+                vertexOffset,
+                firstCorner,
+                secondCorner,
+                apex,
+                segmentCount,
+                heightSegments,
+                direction
+            );
+        };
+
+        appendFace(frontLeft, frontRight, options.widthSegments, PYRAMID_DIRECTIONS.FRONT);
+        appendFace(frontRight, backRight, options.depthSegments, PYRAMID_DIRECTIONS.RIGHT);
+        appendFace(backRight, backLeft, options.widthSegments, PYRAMID_DIRECTIONS.BACK);
+        appendFace(backLeft, frontLeft, options.depthSegments, PYRAMID_DIRECTIONS.LEFT);
+        return vertexOffset;
     }
 }

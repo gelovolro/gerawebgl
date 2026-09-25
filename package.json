@@ -1,6 +1,6 @@
 {
   "name": "gerawebgl",
-  "version": "0.2.5-dev.20260908213148",
+  "version": "0.3.0-dev.20260925220108",
   "description": "Gera WebGL, browser 3D engine using WebGL 2.0",
   "scripts": {
     "ensure:docs-jsdoc-dir": "node -e \"require('fs').mkdirSync('docs/latest-jsdoc-generation',{recursive:true})\"",
