@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: scene/camera.js</title>
+    <title>JSDoc: Class: GeometryUtils</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,371 +17,1664 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: scene/camera.js</h1>
+    <h1 class="page-title">Class: GeometryUtils</h1>
 
     
 
 
 
+
+<section>
+
+<header>
     
-    <section>
-        <article>
-            <pre class="prettyprint source linenums"><code>import * as MathConstants from '../constants/math.js';
-import { Object3D }       from './object3d.js';
+        <h2><span class="attribs"><span class="type-signature"></span></span>GeometryUtils<span class="signature">()</span><span class="type-signature"></span></h2>
+        
+            <div class="class-description">Utility class for geometry color and index buffers.
 
-/**
- * Base camera class. Responsibilities:
- * - Caches view matrix (inverse of local TRS transform).
- * - Defines a common camera contract for derived camera types.
- */
-export class Camera extends Object3D {
+Provides static methods for:
+- expanding a uniform RGB color into a per-vertex buffer
+- choosing between 16-bit and 32-bit index buffers
+- generating sequential vertex indexes
+- extracting unique wireframe edges from triangle indexes</div>
+        
+    
+</header>
 
-    /**
-     * Cached view matrix buffer. Reused between frames to avoid allocations.
-     *
-     * @type {Float32Array}
-     * @private
-     */
-    #viewMatrix;
+<article>
+    <div class="container-overview">
+    
+        
 
-    /**
-     * Cached local `position X` component used to detect transform changes.
-     *
-     * @type {number}
-     * @private
-     */
-    #cachedPositionX = Number.NaN;
+    
+    <h2>Constructor</h2>
+    
 
-    /**
-     * Cached local `position Y` component used to detect transform changes.
-     *
-     * @type {number}
-     * @private
-     */
-    #cachedPositionY = Number.NaN;
+    
+    <h4 class="name" id="GeometryUtils"><span class="type-signature"></span>new GeometryUtils<span class="signature">()</span><span class="type-signature"></span></h4>
+    
 
-    /**
-     * Cached local `position Z` component used to detect transform changes.
-     *
-     * @type {number}
-     * @private
-     */
-    #cachedPositionZ = Number.NaN;
+    
 
-    /**
-     * Cached local `rotation X` component (radians) used to detect transform changes.
-     *
-     * @type {number}
-     * @private
-     */
-    #cachedRotationX = Number.NaN;
 
-    /**
-     * Cached local `rotation Y` component (radians) used to detect transform changes.
-     *
-     * @type {number}
-     * @private
-     */
-    #cachedRotationY = Number.NaN;
 
-    /**
-     * Cached local `rotation Z` component (radians) used to detect transform changes.
-     *
-     * @type {number}
-     * @private
-     */
-    #cachedRotationZ = Number.NaN;
 
-    /**
-     * Cached local `scale X` component used to detect transform changes.
-     *
-     * @type {number}
-     * @private
-     */
-    #cachedScaleX = Number.NaN;
 
-    /**
-     * Cached local `scale Y` component used to detect transform changes.
-     *
-     * @type {number}
-     * @private
-     */
-    #cachedScaleY = Number.NaN;
 
-    /**
-     * Cached local `scale Z` component used to detect transform changes.
-     *
-     * @type {number}
-     * @private
-     */
-    #cachedScaleZ = Number.NaN;
 
-    constructor() {
-        super();
-        this.#viewMatrix = new Float32Array(MathConstants.MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
-    }
 
-    /**
-     * Returns the view matrix (inverse of camera local TRS transform).
-     * The returned matrix is cached and reused between calls.
-     *
-     * @returns {Float32Array} - Cached view matrix.
-     */
-    getViewMatrix() {
-        this.#updateViewMatrixIfRequired();
-        return this.#viewMatrix;
-    }
 
-    /**
-     * Returns the projection matrix for this camera.
-     * Derived camera classes must implement this method.
-     *
-     * @throws {Error} Always throws in the base class.
-     * @returns {Float32Array} - Projection matrix.
-     */
-    getProjectionMatrix() {
-        throw new Error('`Camera.getProjectionMatrix` must be implemented in a derived camera class.');
-    }
 
-    /**
-     * Updates the camera aspect ratio (width/height).
-     * Base camera class does not define, how aspect ratio affects the projection.
-     *
-     * @param {number} aspectRatio - New viewport aspect ratio.
-     */
-    setAspectRatio(aspectRatio) {
-        if (typeof aspectRatio !== 'number') {
-            throw new TypeError('`Camera.setAspectRatio` expects `aspectRatio` as a number.');
-        }
 
-        throw new Error('`Camera.setAspectRatio` must be implemented in a derived camera class.');
-    }
 
-    /**
-     * Recomputes the view matrix only, when local transform changes since the last call.
-     *
-     * @private
-     */
-    #updateViewMatrixIfRequired() {
-        const position    = this.position;
-        const rotation    = this.rotation;
-        const scale       = this.scale;
-        const isViewDirty = this.#isTransformChanged(position, rotation, scale);
 
-        if (isViewDirty === true) {
-            this.#writeViewMatrixTo(this.#viewMatrix, position, rotation, scale);
-            this.#cacheTransform(position, rotation, scale);
-        }
-    }
 
-    /**
-     * Writes a view matrix into an existing output matrix.
-     *
-     * A view matrix is the inverse of the camera transform.
-     * It moves the world-space coordinates into the camera-relative view-space.
-     *
-     * 'Object3D' builds local transforms in this order:
-     *
-     * local = T * (Rz * Ry * Rx) * S
-     *
-     * Therefore the inverse view transform is applied in reverse order:
-     *
-     * view = inv(S) * inv(R) * inv(T)
-     *
-     * The inverse of the rotation block is its transpose, because the rotation
-     * matrix is orthonormal. The inverse scale is applied to the rows of that
-     * transposed rotation block, forming matrix:
-     *
-     * A = inv(S) * R^T
-     *
-     * Camera translation is then inverted as '-A * position', because the world must be
-     * shifted by the opposite camera position after the inverse rotation/scale basis is known.
-     *
-     * Scale components must be non-zero. A zero scale would have no reciprocal,
-     * so the camera transform could not be inverted into a valid view matrix.
-     *
-     * The method writes the matrix into 'out' and returns that same 'out' buffer.
-     *
-     * @private
-     * @param {Float32Array} out      - Output 4x4 matrix (length 16), that will receive the view matrix.
-     * @param {Vector3}      position - Camera position.
-     * @param {Vector3}      rotation - Camera rotation in radians.
-     * @param {Vector3}      scale    - Camera scale (must be non-zero on all axes).
-     * @returns {Float32Array}        - The output matrix (out).
-     */
-    #writeViewMatrixTo(out, position, rotation, scale) {
-        if (scale.x === MathConstants.MATH_MATRIX_VALUES.ZERO
-            || scale.y === MathConstants.MATH_MATRIX_VALUES.ZERO
-            || scale.z === MathConstants.MATH_MATRIX_VALUES.ZERO) {
-            throw new RangeError('Private method `Camera.#writeViewMatrixTo` cannot invert a zero scale.');
-        }
 
-        const positionX = position.x;
-        const positionY = position.y;
-        const positionZ = position.z;
+<dl class="details">
 
-        const rotationX = rotation.x;
-        const rotationY = rotation.y;
-        const rotationZ = rotation.z;
+    
 
-        const inverseScaleX = MathConstants.MATH_VIEW_MATRIX.SCALE_INVERSE_NUMERATOR / scale.x;
-        const inverseScaleY = MathConstants.MATH_VIEW_MATRIX.SCALE_INVERSE_NUMERATOR / scale.y;
-        const inverseScaleZ = MathConstants.MATH_VIEW_MATRIX.SCALE_INVERSE_NUMERATOR / scale.z;
+    
 
-        const cosX = Math.cos(rotationX);
-        const sinX = Math.sin(rotationX);
-        const cosY = Math.cos(rotationY);
-        const sinY = Math.sin(rotationY);
-        const cosZ = Math.cos(rotationZ);
-        const sinZ = Math.sin(rotationZ);
+    
 
-        // Rotation matrix, R = Rz * Ry * Rx
-        const rot00 = cosZ * cosY;
-        const rot01 = (cosZ * sinY * sinX) - (sinZ * cosX);
-        const rot02 = (cosZ * sinY * cosX) + (sinZ * sinX);
+    
 
-        const rot10 = sinZ * cosY;
-        const rot11 = (sinZ * sinY * sinX) + (cosZ * cosX);
-        const rot12 = (sinZ * sinY * cosX) - (cosZ * sinX);
+    
 
-        const rot20 = -sinY;
-        const rot21 = cosY * sinX;
-        const rot22 = cosY * cosX;
+    
 
-        // view = invS * R^T * invT
-        // A    = invS * R^T (invS scales rows of R^T)
-        const a00 = rot00 * inverseScaleX;
-        const a01 = rot10 * inverseScaleX;
-        const a02 = rot20 * inverseScaleX;
+    
 
-        const a10 = rot01 * inverseScaleY;
-        const a11 = rot11 * inverseScaleY;
-        const a12 = rot21 * inverseScaleY;
+    
 
-        const a20 = rot02 * inverseScaleZ;
-        const a21 = rot12 * inverseScaleZ;
-        const a22 = rot22 * inverseScaleZ;
+    
 
-        // t' = -A * position
-        const translateX = -(a00 * positionX + a01 * positionY + a02 * positionZ);
-        const translateY = -(a10 * positionX + a11 * positionY + a12 * positionZ);
-        const translateZ = -(a20 * positionX + a21 * positionY + a22 * positionZ);
+    
 
-        out[0]  = a00;
-        out[1]  = a10;
-        out[2]  = a20;
-        out[3]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+    
 
-        out[4]  = a01;
-        out[5]  = a11;
-        out[6]  = a21;
-        out[7]  = MathConstants.MATH_MATRIX_VALUES.ZERO;
+    
 
-        out[8]  = a02;
-        out[9]  = a12;
-        out[10] = a22;
-        out[11] = MathConstants.MATH_MATRIX_VALUES.ZERO;
-        out[12] = translateX;
-        out[13] = translateY;
-        out[14] = translateZ;
-        out[15] = MathConstants.MATH_MATRIX_VALUES.UNIT;
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_geometry-utils.js.html">geometry/geometry-utils.js</a>, <a href="geometry_geometry-utils.js.html#line14">line 14</a>
+    </li></ul></dd>
+    
 
-        return out;
-    }
+    
 
-    /**
-     * Checks whether the local transform has changed, since the last cached snapshot.
-     *
-     * @param {Object} position - Camera position vector.
-     * @param {Object} rotation - Camera rotation vector in radians.
-     * @param {Object} scale    - Camera scale vector.
-     * @returns {boolean}       - True, when local transform differs from cached snapshot.
-     * @private
-     */
-    #isTransformChanged(position, rotation, scale) {
-        if (this.#isPositionChanged(position) === true) {
-            return true;
-        }
+    
 
-        if (this.#isRotationChanged(rotation) === true) {
-            return true;
-        }
+    
+</dl>
 
-        if (this.#isScaleChanged(scale) === true) {
-            return true;
-        }
 
-        return false;
-    }
 
-    /* eslint-disable indent */
 
-    /**
-     * @param {Object} position - Position vector.
-     * @returns {boolean}       - True, when local position differs from the cached snapshot.
-     * @private
-     */
-    #isPositionChanged(position) {
-        return (
-               position.x !== this.#cachedPositionX
-            || position.y !== this.#cachedPositionY
-            || position.z !== this.#cachedPositionZ
-        );
-    }
 
-    /**
-     * @param {Object} rotation - Rotation vector.
-     * @returns {boolean}       - True, when local rotation differs from the cached snapshot.
-     * @private
-     */
-    #isRotationChanged(rotation) {
-        return (
-               rotation.x !== this.#cachedRotationX
-            || rotation.y !== this.#cachedRotationY
-            || rotation.z !== this.#cachedRotationZ
-        );
-    }
 
-    /**
-     * @param {Object} scale - Scale vector.
-     * @returns {boolean}    - True, when local scale differs from the cached snapshot.
-     * @private
-     */
-    #isScaleChanged(scale) {
-        return (
-               scale.x !== this.#cachedScaleX
-            || scale.y !== this.#cachedScaleY
-            || scale.z !== this.#cachedScaleZ
-        );
-    }
 
-    /* eslint-enable indent */
 
-    /**
-     * Stores the current local transform components as a cached snapshot for future comparisons.
-     *
-     * @param {Object} position - Position vector.
-     * @param {Object} rotation - Rotation vector.
-     * @param {Object} scale    - Scale vector.
-     * @private
-     */
-    #cacheTransform(position, rotation, scale) {
-        this.#cachedPositionX = position.x;
-        this.#cachedPositionY = position.y;
-        this.#cachedPositionZ = position.z;
 
-        this.#cachedRotationX = rotation.x;
-        this.#cachedRotationY = rotation.y;
-        this.#cachedRotationZ = rotation.z;
 
-        this.#cachedScaleX = scale.x;
-        this.#cachedScaleY = scale.y;
-        this.#cachedScaleZ = scale.z;
-    }
-}
-</code></pre>
-        </article>
-    </section>
+
+
+
+
+
+
+
+
+
+
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Methods</h3>
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".appendGridTriangleIndices"><span class="type-signature">(static) </span>appendGridTriangleIndices<span class="signature">(indices, columnSegments, rowSegments, vertexOffset<span class="signature-attributes">opt</span>, reverse<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Appends triangles for a rectangular vertex grid in row order.
+Dimensions and offsets come from normalized geometry options.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>indices</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;number></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">Output triangle indexes.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>columnSegments</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">Number of cells per row.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>rowSegments</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">Number of cell rows.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>vertexOffset</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    0
+                
+                </td>
+            
+
+            <td class="description last">First vertex in the grid.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>reverse</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    false
+                
+                </td>
+            
+
+            <td class="description last">Whether to reverse each triangle's winding.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_geometry-utils.js.html">geometry/geometry-utils.js</a>, <a href="geometry_geometry-utils.js.html#line235">line 235</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".createColorsFromSpec"><span class="type-signature">(static) </span>createColorsFromSpec<span class="signature">(vertexCount, colors, expectedPerVertexLength<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Float32Array}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Creates a per-vertex RGB buffer from a uniform color or an existing color buffer.
+A positive `expectedPerVertexLength` overrides the length derived from `vertexCount`.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>vertexCount</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">Total vertex count.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>colors</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Float32Array</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">Uniform RGB color or per-vertex colors.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>expectedPerVertexLength</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    0
+                
+                </td>
+            
+
+            <td class="description last">Optional explicit expected buffer length.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_geometry-utils.js.html">geometry/geometry-utils.js</a>, <a href="geometry_geometry-utils.js.html#line25">line 25</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Throws:</h5>
+
+        
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        When colors have an unsupported type or length.
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">TypeError</span>
+
+
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+
+    
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - A new uniform-color buffer or the supplied per-vertex buffer.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Float32Array</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".createIndexArray"><span class="type-signature">(static) </span>createIndexArray<span class="signature">(vertexCount, indices)</span><span class="type-signature"> &rarr; {Uint16Array|Uint32Array}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Creates an index buffer using the smallest type required by the vertex count.
+The largest vertex index is `vertexCount - 1`.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>vertexCount</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Total vertex count.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>indices</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;number></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Index list.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_geometry-utils.js.html">geometry/geometry-utils.js</a>, <a href="geometry_geometry-utils.js.html#line82">line 82</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Throws:</h5>
+
+        
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        When indices are not an ordinary array.
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">TypeError</span>
+
+
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+
+    
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - A new typed index buffer.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Uint16Array</span>
+|
+
+<span class="param-type">Uint32Array</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".createSequentialIndexArray"><span class="type-signature">(static) </span>createSequentialIndexArray<span class="signature">(vertexCount)</span><span class="type-signature"> &rarr; {Uint16Array|Uint32Array}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Creates a sequential index buffer without an intermediate JavaScript array.
+The buffer contains every vertex index, from zero through `vertexCount - 1`.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>vertexCount</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Total vertex count.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_geometry-utils.js.html">geometry/geometry-utils.js</a>, <a href="geometry_geometry-utils.js.html#line108">line 108</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Throws:</h5>
+<ul>
+        <li>
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        When `vertexCount` is not a finite number.
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">TypeError</span>
+
+
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+</li>
+    
+        <li>
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        When `vertexCount` is negative or non-integer.
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">RangeError</span>
+
+
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+</li>
+    </ul>
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - A new sequential index buffer.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Uint16Array</span>
+|
+
+<span class="param-type">Uint32Array</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".createWireframeIndicesFromSolidIndices"><span class="type-signature">(static) </span>createWireframeIndicesFromSolidIndices<span class="signature">(vertexCount, triangleIndices)</span><span class="type-signature"> &rarr; {Uint16Array|Uint32Array}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Creates a wireframe line index buffer from a solid triangle index buffer.
+Shared edges are included once, regardless of their direction in each triangle.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>vertexCount</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Total vertex count.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>triangleIndices</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Uint16Array</span>
+|
+
+<span class="param-type">Uint32Array</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Solid triangle indexes.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_geometry-utils.js.html">geometry/geometry-utils.js</a>, <a href="geometry_geometry-utils.js.html#line149">line 149</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Throws:</h5>
+
+        
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        When triangle indices have an unsupported type.
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">TypeError</span>
+
+
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+
+    
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - Wireframe indexes, with two indexes per edge.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Uint16Array</span>
+|
+
+<span class="param-type">Uint32Array</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".normalizeSegmentCount"><span class="type-signature">(static) </span>normalizeSegmentCount<span class="signature">(value, optionName, minimumValue, geometryName)</span><span class="type-signature"> &rarr; {number}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Floors a finite segment count and checks the minimum required by a geometry.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>value</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Requested segment count.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>optionName</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Option name included in errors.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>minimumValue</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Minimum supported count.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>geometryName</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Geometry class name included in errors.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="geometry_geometry-utils.js.html">geometry/geometry-utils.js</a>, <a href="geometry_geometry-utils.js.html#line186">line 186</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Throws:</h5>
+<ul>
+        <li>
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        When the value is not a finite number.
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">TypeError</span>
+
+
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+</li>
+    
+        <li>
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        When the rounded count is below the minimum.
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">RangeError</span>
+
+
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+</li>
+    </ul>
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - Validated integer segment count.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">number</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+    
+
+    
+
+    
+</article>
+
+</section>
 
 
 
