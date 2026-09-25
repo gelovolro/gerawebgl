@@ -1,108 +1,22 @@
-import { Geometry } from './geometry.js';
+import { GeometryUtils }                            from './geometry-utils.js';
+import { GeneratedGeometry }                        from './generated-geometry.js';
+import { MATH_COMMON_VALUES, MATH_VECTOR3_INDEXES } from '../constants/math.js';
+import { ECMASCRIPT_TYPEOF_RESULTS }                from '../constants/ecmascript-types.js';
+
+import {
+    PLANE_DEFAULTS,
+    PLANE_LIMITS,
+    PLANE_LAYOUT,
+    PLANE_NORMALS
+} from '../constants/plane-geometry.js';
+
 import {
     DEFAULT_VERTEX_COLOR,
-    createColorsFromSpec,
-    createIndexArray,
-    createWireframeIndicesFromSolidIndices
-} from './geometry-utils.js';
-
-/**
- * Default plane width.
- *
- * @type {number}
- */
-const DEFAULT_PLANE_WIDTH = 1.0;
-
-/**
- * Default plane height.
- *
- * @type {number}
- */
-const DEFAULT_PLANE_HEIGHT = 1.0;
-
-/**
- * Default segment count per axis.
- *
- * @type {number}
- */
-const DEFAULT_SEGMENT_COUNT = 1;
-
-/**
- * Minimum segment count supported by segmented geometries.
- *
- * @type {number}
- */
-const MIN_SEGMENT_COUNT = 1;
-
-/**
- * Adds one vertex per grid intersection, so vertex count along an axis is `segments + 1`.
- *
- * @type {number}
- */
-const VERTICES_PER_SEGMENT_INCREMENT = 1;
-
-/**
- * Offset to move from a vertex to the next vertex in the same row.
- *
- * @type {number}
- */
-const NEXT_VERTEX_OFFSET = 1;
-
-/**
- * Used to center coordinates around the origin: `(t - 0.5) * size`.
- *
- * @type {number}
- */
-const CENTER_T_OFFSET = 0.5;
-
-/**
- * UV/V coordinate is flipped to keep (0, 0) at top-left.
- *
- * @type {number}
- */
-const UV_V_FLIP_BASE = 1.0;
-
-/**
- * Plane is on XY plane, so Z is constant.
- *
- * @type {number}
- */
-const PLANE_Z_POSITION = 0.0;
-
-/**
- * Number of float components per `vec3` (position/normal).
- *
- * @type {number}
- */
-const VEC3_COMPONENT_COUNT = 3;
-
-/**
- * Number of float components per `vec2` (uv).
- *
- * @type {number}
- */
-const VEC2_COMPONENT_COUNT = 2;
-
-/**
- * Plane normal components.
- *
- * @type {number}
- */
-const PLANE_NORMAL_X = 0.0;
-
-/**
- * Plane normal components.
- *
- * @type {number}
- */
-const PLANE_NORMAL_Y = 0.0;
-
-/**
- * Plane normal components.
- *
- * @type {number}
- */
-const PLANE_NORMAL_Z = 1.0;
+    GEOMETRY_GRID,
+    GEOMETRY_LAYOUT,
+    GEOMETRY_UV_INDEXES,
+    GEOMETRY_UV
+} from '../constants/geometry.js';
 
 /**
  * Plane geometry options.
@@ -136,26 +50,7 @@ const PLANE_NORMAL_Z = 1.0;
 /**
  * Segmented plane geometry on the XY plane with normal pointing towards +Z.
  */
-export class PlaneGeometry extends Geometry {
-
-    /**
-     * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
-     * @param {PlaneGeometryOptions} [options = {}] - Geometry options.
-     */
-    constructor(webglContext, options = {}) {
-        const normalized = PlaneGeometry.#normalizeOptions(options);
-        const data       = PlaneGeometry.#createGeometryData(normalized);
-
-        super(
-            webglContext,
-            data.positions,
-            data.colors,
-            data.indicesSolid,
-            data.indicesWireframe,
-            data.uvs,
-            data.normals
-        );
-    }
+export class PlaneGeometry extends GeneratedGeometry {
 
     /**
      * Normalizes constructor input to a `PlaneGeometryOptions` object.
@@ -165,125 +60,66 @@ export class PlaneGeometry extends Geometry {
      * @private
      */
     static #normalizeOptions(options) {
-        if (options === null || typeof options !== 'object') {
-            throw new TypeError('`PlaneGeometry` expects options as an object.');
+        if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT) {
+            throw new TypeError('PlaneGeometry expects options as an object.');
         }
 
         const {
-            width          = DEFAULT_PLANE_WIDTH,
-            height         = DEFAULT_PLANE_HEIGHT,
-            widthSegments  = DEFAULT_SEGMENT_COUNT,
-            heightSegments = DEFAULT_SEGMENT_COUNT,
+            width          = PLANE_DEFAULTS.WIDTH,
+            height         = PLANE_DEFAULTS.HEIGHT,
+            widthSegments  = PLANE_DEFAULTS.SEGMENT_COUNT,
+            heightSegments = PLANE_DEFAULTS.SEGMENT_COUNT,
             colors         = DEFAULT_VERTEX_COLOR
         } = options;
 
-        if (typeof width !== 'number' || typeof height !== 'number') {
-            throw new TypeError('`PlaneGeometry` expects `width/height` as numbers.');
+        if (typeof width !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || typeof height !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER) {
+            throw new TypeError('PlaneGeometry expects width/height as numbers.');
         }
 
         if (!Number.isFinite(width) || !Number.isFinite(height)) {
-            throw new RangeError('`PlaneGeometry` expects finite `width/height`.');
+            throw new RangeError('PlaneGeometry expects finite width/height.');
         }
 
         if (!(colors instanceof Float32Array)) {
-            throw new TypeError('`PlaneGeometry` expects colors as a `Float32Array`.');
+            throw new TypeError('PlaneGeometry expects colors as a Float32Array.');
         }
 
         return {
             width,
             height,
-            widthSegments  : PlaneGeometry.#normalizeSegmentCount(widthSegments,  'widthSegments'),
-            heightSegments : PlaneGeometry.#normalizeSegmentCount(heightSegments, 'heightSegments'),
+            widthSegments  : GeometryUtils.normalizeSegmentCount(widthSegments, 'widthSegments', PLANE_LIMITS.MIN_SEGMENT_COUNT, 'PlaneGeometry'),
+            heightSegments : GeometryUtils.normalizeSegmentCount(heightSegments, 'heightSegments', PLANE_LIMITS.MIN_SEGMENT_COUNT, 'PlaneGeometry'),
             colors
         };
     }
 
     /**
-     * Normalizes and validates a segment count parameter.
+     * Generates vertex and index buffers from construction options.
      *
-     * @param {number} value      - Segment count value.
-     * @param {string} optionName - Name of the option for error messages.
-     * @returns {number}          - Normalized integer `>= 1`.
-     * @private
+     * @param {PlaneGeometryOptions} [options] - Geometry options.
+     * @returns {PlaneGeometryData}            - Generated CPU buffers.
+     * @protected
      */
-    static #normalizeSegmentCount(value, optionName) {
-        if (typeof value !== 'number' || !Number.isFinite(value)) {
-            throw new TypeError('`PlaneGeometry` expects `{name}` as a finite number.'.replace('{name}', optionName));
-        }
+    static createGeometryData(options = {}) {
+        const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+        const uvComponentCount       = GEOMETRY_LAYOUT.UV_COMPONENT_COUNT;
+        const normalized             = PlaneGeometry.#normalizeOptions(options);
+        const widthSegments          = normalized.widthSegments;
+        const heightSegments         = normalized.heightSegments;
+        const widthVertexCount       = widthSegments  + GEOMETRY_GRID.VERTEX_INCREMENT;
+        const heightVertexCount      = heightSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+        const vertexCount            = widthVertexCount * heightVertexCount;
+        const positions              = new Float32Array(vertexCount * positionComponentCount);
+        const normals                = new Float32Array(vertexCount * positionComponentCount);
+        const uvs                    = new Float32Array(vertexCount * uvComponentCount);
 
-        const intValue = Math.floor(value);
-
-        if (intValue < MIN_SEGMENT_COUNT) {
-            /* eslint-disable indent */
-            throw new RangeError(
-                '`PlaneGeometry` expects `{name}` to be `>= {min}`.'
-                .replace('{name}', optionName)
-                .replace('{min}', String(MIN_SEGMENT_COUNT))
-            );
-            /* eslint-enable indent */
-        }
-
-        return intValue;
-    }
-
-    /**
-     * Creates full geometry data for a segmented plane.
-     *
-     * @param {Required<PlaneGeometryOptions>} options - Normalized options.
-     * @returns {PlaneGeometryData}                    - Geometry buffers.
-     * @private
-     */
-    static #createGeometryData(options) {
-        const widthSegments     = options.widthSegments;
-        const heightSegments    = options.heightSegments;
-        const widthVertexCount  = widthSegments  + VERTICES_PER_SEGMENT_INCREMENT;
-        const heightVertexCount = heightSegments + VERTICES_PER_SEGMENT_INCREMENT;
-        const vertexCount       = widthVertexCount * heightVertexCount;
-        const positions         = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT);
-        const normals           = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT);
-        const uvs               = new Float32Array(vertexCount * VEC2_COMPONENT_COUNT);
-        let vertexIndex = 0;
-
-        for (let rowIndex = 0; rowIndex < heightVertexCount; rowIndex += 1) {
-            const vNormalized = rowIndex / heightSegments;
-            const positionY   = (vNormalized - CENTER_T_OFFSET) * options.height;
-
-            for (let columnIndex = 0; columnIndex < widthVertexCount; columnIndex += 1) {
-                const uNormalized = columnIndex / widthSegments;
-                const positionX   = (uNormalized - CENTER_T_OFFSET) * options.width;
-
-                const positionBaseOffset = vertexIndex * VEC3_COMPONENT_COUNT;
-                positions[positionBaseOffset + 0] = positionX;
-                positions[positionBaseOffset + 1] = positionY;
-                positions[positionBaseOffset + 2] = PLANE_Z_POSITION;
-
-                normals[positionBaseOffset + 0] = PLANE_NORMAL_X;
-                normals[positionBaseOffset + 1] = PLANE_NORMAL_Y;
-                normals[positionBaseOffset + 2] = PLANE_NORMAL_Z;
-
-                const uvBaseOffset = vertexIndex * VEC2_COMPONENT_COUNT;
-                uvs[uvBaseOffset + 0] = uNormalized;
-                uvs[uvBaseOffset + 1] = UV_V_FLIP_BASE - vNormalized;
-                vertexIndex += 1;
-            }
-        }
-
+        PlaneGeometry.#writeVertices(positions, normals, uvs, normalized);
         const solidTriangleIndices = [];
+        GeometryUtils.appendGridTriangleIndices(solidTriangleIndices, widthSegments, heightSegments);
 
-        for (let rowIndex = 0; rowIndex < heightSegments; rowIndex += 1) {
-            for (let columnIndex = 0; columnIndex < widthSegments; columnIndex += 1) {
-                const topLeftVertexIndex     = (rowIndex * widthVertexCount) + columnIndex;
-                const topRightVertexIndex    = topLeftVertexIndex    + NEXT_VERTEX_OFFSET;
-                const bottomLeftVertexIndex  = topLeftVertexIndex    + widthVertexCount;
-                const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET;
-                solidTriangleIndices.push(topLeftVertexIndex , bottomLeftVertexIndex, topRightVertexIndex);
-                solidTriangleIndices.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
-            }
-        }
-
-        const indicesSolid     = createIndexArray(vertexCount, solidTriangleIndices);
-        const indicesWireframe = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
-        const colors           = createColorsFromSpec(vertexCount, options.colors);
+        const indicesSolid     = GeometryUtils.createIndexArray(vertexCount, solidTriangleIndices);
+        const indicesWireframe = GeometryUtils.createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
+        const colors           = GeometryUtils.createColorsFromSpec(vertexCount, normalized.colors);
 
         return {
             positions,
@@ -293,5 +129,51 @@ export class PlaneGeometry extends Geometry {
             indicesSolid,
             indicesWireframe
         };
+    }
+
+    /**
+     * Writes the grid positions, normals and texture coordinates.
+     *
+     * @param {Float32Array} positions                    - Output positions.
+     * @param {Float32Array} normals                      - Output normals.
+     * @param {Float32Array} uvs                          - Output texture coordinates.
+     * @param {Required<PlaneGeometryOptions>} normalized - Normalized geometry options.
+     * @private
+     */
+    static #writeVertices(positions, normals, uvs, normalized) {
+        const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+        const uvComponentCount       = GEOMETRY_LAYOUT.UV_COMPONENT_COUNT;
+        const centerOffset           = GEOMETRY_GRID.CENTER_OFFSET;
+        const xComponentIndex        = MATH_VECTOR3_INDEXES.X;
+        const yComponentIndex        = MATH_VECTOR3_INDEXES.Y;
+        const zComponentIndex        = MATH_VECTOR3_INDEXES.Z;
+        const widthSegments          = normalized.widthSegments;
+        const heightSegments         = normalized.heightSegments;
+        const widthVertexCount       = widthSegments  + GEOMETRY_GRID.VERTEX_INCREMENT;
+        const heightVertexCount      = heightSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+        let vertexIndex              = MATH_COMMON_VALUES.ZERO;
+
+        for (let rowIndex = MATH_COMMON_VALUES.ZERO; rowIndex < heightVertexCount; rowIndex += MATH_COMMON_VALUES.UNIT) {
+            const vNormalized = rowIndex / heightSegments;
+            const positionY   = (vNormalized - centerOffset) * normalized.height;
+
+            for (let columnIndex = MATH_COMMON_VALUES.ZERO; columnIndex < widthVertexCount; columnIndex += MATH_COMMON_VALUES.UNIT) {
+                const uNormalized        = columnIndex / widthSegments;
+                const positionX          = (uNormalized - centerOffset) * normalized.width;
+                const positionBaseOffset = vertexIndex * positionComponentCount;
+
+                positions[positionBaseOffset + xComponentIndex] = positionX;
+                positions[positionBaseOffset + yComponentIndex] = positionY;
+                positions[positionBaseOffset + zComponentIndex] = PLANE_LAYOUT.Z_POSITION;
+                normals[positionBaseOffset + xComponentIndex]   = PLANE_NORMALS.X;
+                normals[positionBaseOffset + yComponentIndex]   = PLANE_NORMALS.Y;
+                normals[positionBaseOffset + zComponentIndex]   = PLANE_NORMALS.Z;
+
+                const uvBaseOffset = vertexIndex * uvComponentCount;
+                uvs[uvBaseOffset + GEOMETRY_UV_INDEXES.U] = uNormalized;
+                uvs[uvBaseOffset + GEOMETRY_UV_INDEXES.V] = GEOMETRY_UV.V_FLIP_BASE - vNormalized;
+                vertexIndex += MATH_COMMON_VALUES.UNIT;
+            }
+        }
     }
 }

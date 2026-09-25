@@ -1,52 +1,8 @@
-import { Geometry } from './geometry.js';
-import {
-    createColorsFromSpec,
-    createIndexArray,
-    createWireframeIndicesFromSolidIndices
-} from './geometry-utils.js';
-
-/**
- * Default wireframe indices input value.
- * When used, wireframe indices are generated from solid indices.
- *
- * @type {null}
- */
-const DEFAULT_WIREFRAME_INDICES = null;
-
-/**
- * Default colors input value. When used, no color buffer is created.
- *
- * @type {null}
- */
-const DEFAULT_COLORS = null;
-
-/**
- * Default UV input value. When used, no UV buffer is created.
- *
- * @type {null}
- */
-const DEFAULT_UVS = null;
-
-/**
- * Default normals input value. When used, no normal buffer is created.
- *
- * @type {null}
- */
-const DEFAULT_NORMALS = null;
-
-/**
- * Number of position components per vertex.
- *
- * @type {number}
- */
-const POSITION_COMPONENT_COUNT = 3;
-
-/**
- * Zero value used for numeric comparisons.
- *
- * @type {number}
- */
-const ZERO_VALUE = 0;
+import { GeneratedGeometry }                  from './generated-geometry.js';
+import { GEOMETRY_DEFAULTS, GEOMETRY_LAYOUT } from '../constants/geometry.js';
+import { MATH_COMMON_VALUES }                 from '../constants/math.js';
+import { ECMASCRIPT_TYPEOF_RESULTS }          from '../constants/ecmascript-types.js';
+import { GeometryUtils }                      from './geometry-utils.js';
 
 /**
  * Options used by `CustomGeometry`.
@@ -64,50 +20,50 @@ const ZERO_VALUE = 0;
  * `CustomGeometry` allows creating geometry from user-provided buffers.
  * It supports: positions, optional colors, uvs, normals and index buffers.
  */
-export class CustomGeometry extends Geometry {
+export class CustomGeometry extends GeneratedGeometry {
 
     /**
-     * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
-     * @param {CustomGeometryOptions} options       - Geometry buffers.
+     * @param {CustomGeometryOptions} options - Geometry buffers.
+     * @returns {GeneratedGeometryData}       - Generated CPU buffers.
+     * @protected
      */
-    constructor(webglContext, options = {}) {
-        if (options === null || typeof options !== 'object' || Array.isArray(options)) {
-            throw new TypeError('`CustomGeometry` expects options as a plain object.');
+    static createGeometryData(options = {}) {
+        if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
+            throw new TypeError('CustomGeometry expects options as a plain object.');
         }
 
         const {
             positions,
             indices,
-            wireframeIndices = DEFAULT_WIREFRAME_INDICES,
-            colors           = DEFAULT_COLORS,
-            uvs              = DEFAULT_UVS,
-            normals          = DEFAULT_NORMALS
+            wireframeIndices = GEOMETRY_DEFAULTS.WIREFRAME_INDICES,
+            colors           = GEOMETRY_DEFAULTS.COLORS,
+            uvs              = GEOMETRY_DEFAULTS.UVS,
+            normals          = GEOMETRY_DEFAULTS.NORMALS
         } = options;
 
         if (!(positions instanceof Float32Array)) {
-            throw new TypeError('`CustomGeometry` expects `positions` as `Float32Array`.');
+            throw new TypeError('CustomGeometry expects positions as Float32Array.');
         }
 
-        if ((positions.length % POSITION_COMPONENT_COUNT) !== ZERO_VALUE) {
-            throw new RangeError('`CustomGeometry` expects `positions` length to be a multiple of 3.');
+        if ((positions.length % GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT) !== MATH_COMMON_VALUES.ZERO) {
+            throw new RangeError('CustomGeometry expects positions length to be a multiple of 3.');
         }
 
-        const vertexCount      = positions.length / POSITION_COMPONENT_COUNT;
+        const vertexCount      = positions.length / GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
         const solidIndexBuffer = CustomGeometry.#normalizeIndices(vertexCount, indices, 'indices');
         const wireIndexBuffer  = CustomGeometry.#normalizeWireframeIndices(vertexCount, solidIndexBuffer, wireframeIndices);
         const colorBuffer      = CustomGeometry.#normalizeColors(vertexCount, colors);
         const uvBuffer         = CustomGeometry.#normalizeOptionalFloat32Array(uvs, 'uvs');
         const normalBuffer     = CustomGeometry.#normalizeOptionalFloat32Array(normals, 'normals');
 
-        super(
-            webglContext,
-            positions,
-            colorBuffer,
-            solidIndexBuffer,
-            wireIndexBuffer,
-            uvBuffer,
-            normalBuffer
-        );
+        return {
+            positions        : positions,
+            colors           : colorBuffer,
+            indicesSolid     : solidIndexBuffer,
+            indicesWireframe : wireIndexBuffer,
+            uvs              : uvBuffer,
+            normals          : normalBuffer
+        };
     }
 
     /**
@@ -121,14 +77,14 @@ export class CustomGeometry extends Geometry {
      */
     static #normalizeIndices(vertexCount, indices, optionName) {
         if (Array.isArray(indices)) {
-            return createIndexArray(vertexCount, indices);
+            return GeometryUtils.createIndexArray(vertexCount, indices);
         }
 
         if (indices instanceof Uint16Array || indices instanceof Uint32Array) {
             return indices;
         }
 
-        throw new TypeError(`\`CustomGeometry\` expects \`${optionName}\` as an array, Uint16Array or Uint32Array.`);
+        throw new TypeError(`CustomGeometry expects ${optionName} as an array, Uint16Array or Uint32Array.`);
     }
 
     /**
@@ -142,18 +98,18 @@ export class CustomGeometry extends Geometry {
      */
     static #normalizeWireframeIndices(vertexCount, solidIndices, wireframeIndices) {
         if (wireframeIndices === null || wireframeIndices === undefined) {
-            return createWireframeIndicesFromSolidIndices(vertexCount, solidIndices);
+            return GeometryUtils.createWireframeIndicesFromSolidIndices(vertexCount, solidIndices);
         }
 
         if (Array.isArray(wireframeIndices)) {
-            return createIndexArray(vertexCount, wireframeIndices);
+            return GeometryUtils.createIndexArray(vertexCount, wireframeIndices);
         }
 
         if (wireframeIndices instanceof Uint16Array || wireframeIndices instanceof Uint32Array) {
             return wireframeIndices;
         }
 
-        throw new TypeError('`CustomGeometry` expects `wireframeIndices` as an array, `Uint16Array`, `Uint32Array` or null.');
+        throw new TypeError('CustomGeometry expects wireframeIndices as an array, Uint16Array, Uint32Array or null.');
     }
 
     /**
@@ -170,10 +126,10 @@ export class CustomGeometry extends Geometry {
         }
 
         if (!(colors instanceof Float32Array)) {
-            throw new TypeError('`CustomGeometry` expects `colors` as `Float32Array` or null.');
+            throw new TypeError('CustomGeometry expects colors as Float32Array or null.');
         }
 
-        return createColorsFromSpec(vertexCount, colors);
+        return GeometryUtils.createColorsFromSpec(vertexCount, colors);
     }
 
     /**
@@ -190,7 +146,7 @@ export class CustomGeometry extends Geometry {
         }
 
         if (!(value instanceof Float32Array)) {
-            throw new TypeError(`\`CustomGeometry\` expects \`${optionName}\` as \`Float32Array\` or null.`);
+            throw new TypeError(`CustomGeometry expects ${optionName} as Float32Array or null.`);
         }
 
         return value;

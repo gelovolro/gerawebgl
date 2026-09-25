@@ -1,259 +1,27 @@
-/**
- * Attribute location used by vec3 position.
- * Must match shader `layout(location = X)` declaration.
- *
- * @type {number}
- */
-const POSITION_ATTRIBUTE_LOCATION = 0;
+import { MATH_VECTOR3_INDEXES }      from '../constants/math.js';
+import { ECMASCRIPT_TYPEOF_RESULTS } from '../constants/ecmascript-types.js';
 
-/**
- * Number of float components per vertex position.
- *
- * @type {number}
- */
-const POSITION_COMPONENT_COUNT = 3;
-
-/**
- * Attribute location used by vertex color.
- * Must match shader `layout(location = X)` declaration.
- *
- * @type {number}
- */
-const COLOR_ATTRIBUTE_LOCATION = 1;
-
-/**
- * Number of float components per vertex color.
- *
- * @type {number}
- */
-const COLOR_COMPONENT_COUNT = 3;
-
-/**
- * Attribute location used by the UV coordinates.
- * Must match shader `layout(location = X)` declaration.
- *
- * @type {number}
- */
-const UV_ATTRIBUTE_LOCATION = 2;
-
-/**
- * Number of float components per UV coordinate.
- *
- * @type {number}
- */
-const UV_COMPONENT_COUNT = 2;
-
-/**
- * Attribute location used by the normals.
- * Must match shader `layout(location = X)` declaration.
- *
- * @type {number}
- */
-const NORMAL_ATTRIBUTE_LOCATION = 3;
-
-/**
- * Number of float components per vertex normal.
- *
- * @type {number}
- */
-const NORMAL_COMPONENT_COUNT = 3;
-
-/**
- * Flag passed to `vertexAttribPointer()` method.
- * When false, attribute values are used as-is (no normalization).
- *
- * @type {boolean}
- */
-const ATTRIBUTE_NORMALIZED = false;
-
-/**
- * Stride parameter for `vertexAttribPointer()`, when the attribute data is tightly packed.
- * Zero means: compute stride automatically from attribute size and type.
- *
- * @type {number}
- */
-const ATTRIBUTE_NO_STRIDE = 0;
-
-/**
- * Offset parameter for `vertexAttribPointer()` for attributes starting at the beginning of the buffer.
- *
- * @type {number}
- */
-const ATTRIBUTE_NO_OFFSET = 0;
-
-/**
- * Modulo result expected for correct component alignment.
- *
- * @type {number}
- */
-const MODULO_ALIGNED_VALUE = 0;
-
-/**
- * Component count for AABB min/max vectors.
- *
- * @type {number}
- */
-const BOUNDING_BOX_COMPONENT_COUNT = 3;
-
-/**
- * Starting index for vertex data traversal.
- *
- * @type {number}
- */
-const POSITION_START_INDEX = 0;
-
-/**
- * Offset for the X component in a position triplet.
- *
- * @type {number}
- */
-const POSITION_X_OFFSET = 0;
-
-/**
- * Offset for the Y component in a position triplet.
- *
- * @type {number}
- */
-const POSITION_Y_OFFSET = 1;
-
-/**
- * Offset for the Z component in a position triplet.
- *
- * @type {number}
- */
-const POSITION_Z_OFFSET = 2;
-
-/**
- * Default bounding box component value for empty geometry.
- *
- * @type {number}
- */
-const EMPTY_BOUND_COMPONENT = 0.0;
-
-/**
- * Initial value used for bounding box minimum computations.
- *
- * @type {number}
- */
-const BOUND_MIN_INIT = Number.POSITIVE_INFINITY;
-
-/**
- * Initial value used for bounding box maximum computations.
- *
- * @type {number}
- */
-const BOUND_MAX_INIT = Number.NEGATIVE_INFINITY;
-
-/**
- * Error message for invalid bounding box positions buffer.
- *
- * @type {string}
- */
-const ERROR_BOUNDING_BOX_POSITIONS_TYPE = '`Geometry.#writeBoundingBox` expects positions as `Float32Array`.';
-
-/**
- * Error message for invalid bounding box minimum buffer.
- *
- * @type {string}
- */
-const ERROR_BOUNDING_BOX_MIN_TYPE = '`Geometry.#writeBoundingBox` expects `outMin` as `Float32Array(3)`.';
-
-/**
- * Error message for invalid bounding box maximum buffer.
- *
- * @type {string}
- */
-const ERROR_BOUNDING_BOX_MAX_TYPE = '`Geometry.#writeBoundingBox` expects `outMax` as `Float32Array(3)`.';
-
-/**
- * Number of indices, that form a single triangle.
- *
- * @type {number}
- */
-const TRIANGLE_INDEX_COMPONENT_COUNT = 3;
-
-/**
- * Number of indices, that form a single line segment.
- *
- * @type {number}
- */
-const LINE_INDEX_COMPONENT_COUNT = 2;
-
-/**
- * Primitive type name of the triangle meshes.
- *
- * @type {string}
- */
-export const PRIMITIVE_TRIANGLES = 'triangles';
-
-/**
- * Primitive type name of the independent line segments.
- *
- * @type {string}
- */
-export const PRIMITIVE_LINES = 'lines';
-
-/**
- * Primitive type name of the connected line strip.
- *
- * @type {string}
- */
-export const PRIMITIVE_LINE_STRIP = 'line_strip';
-
-/**
- * Primitive type name of the closed line loop.
- *
- * @type {string}
- */
-export const PRIMITIVE_LINE_LOOP = 'line_loop';
-
-/**
- * Primitive type name of the point sprites.
- *
- * @type {string}
- */
-export const PRIMITIVE_POINTS = 'points';
-
-/**
- * Default solid primitive, used by geometry (triangles).
- *
- * @type {string}
- */
-const DEFAULT_SOLID_PRIMITIVE = PRIMITIVE_TRIANGLES;
-
-/**
- * Default wireframe primitive, used by geometry (lines).
- *
- * @type {string}
- */
-const DEFAULT_WIREFRAME_PRIMITIVE = PRIMITIVE_LINES;
-
-/**
- * Minimum index count for line strip/loop primitives.
- *
- * @type {number}
- */
-const MIN_LINE_STRIP_INDEX_COUNT = 2;
-
-/**
- * Supported primitive names.
- *
- * @type {Set<string>}
- */
-const SUPPORTED_PRIMITIVES = new Set([
+export {
     PRIMITIVE_TRIANGLES,
     PRIMITIVE_LINES,
     PRIMITIVE_LINE_STRIP,
     PRIMITIVE_LINE_LOOP,
     PRIMITIVE_POINTS
-]);
+} from '../constants/geometry.js';
 
-/**
- * Error message used for invalid primitive options.
- *
- * @type {string}
- */
-const ERROR_INVALID_PRIMITIVE = '`Geometry` expects the primitive options to use known primitive constants.';
+import {
+    PRIMITIVE_TRIANGLES,
+    PRIMITIVE_LINES,
+    PRIMITIVE_LINE_STRIP,
+    PRIMITIVE_LINE_LOOP,
+    PRIMITIVE_POINTS,
+    SUPPORTED_PRIMITIVES,
+    GEOMETRY_PRIMITIVE_DEFAULTS,
+    GEOMETRY_LAYOUT,
+    GEOMETRY_BUFFER_LAYOUT,
+    GEOMETRY_LIMITS,
+    GEOMETRY_ERRORS
+} from '../constants/geometry.js';
 
 /**
  * Geometry primitive override options.
@@ -429,36 +197,36 @@ export class Geometry {
         options = null
     ) {
         if (!(webglContext instanceof WebGL2RenderingContext)) {
-            throw new TypeError('`Geometry` expects a `WebGL2RenderingContext`.');
+            throw new TypeError('Geometry expects a WebGL2RenderingContext.');
         }
 
         if (!(positions instanceof Float32Array)) {
-            throw new TypeError('`Geometry` expects positions as `Float32Array`.');
+            throw new TypeError('Geometry expects positions as Float32Array.');
         }
 
         if (colors !== null && !(colors instanceof Float32Array)) {
-            throw new TypeError('`Geometry` expects colors as `Float32Array` or null.');
+            throw new TypeError('Geometry expects colors as Float32Array or null.');
         }
 
         if (uvs !== null && !(uvs instanceof Float32Array)) {
-            throw new TypeError('`Geometry` expects uvs as `Float32Array` or null.');
+            throw new TypeError('Geometry expects uvs as Float32Array or null.');
         }
 
         if (normals !== null && !(normals instanceof Float32Array)) {
-            throw new TypeError('`Geometry` expects normals as `Float32Array` or null.');
+            throw new TypeError('Geometry expects normals as Float32Array or null.');
         }
 
         if (!Geometry.#isSupportedIndexArray(indicesSolid) || !Geometry.#isSupportedIndexArray(indicesWireframe)) {
-            throw new TypeError('`Geometry` expects indices as `Uint16Array` or `Uint32Array`.');
+            throw new TypeError('Geometry expects indices as Uint16Array or Uint32Array.');
         }
 
-        if (options !== null && (typeof options !== 'object' || Array.isArray(options))) {
-            throw new TypeError('`Geometry` expects `options` as a plain object or null.');
+        if (options !== null && (typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options))) {
+            throw new TypeError('Geometry expects options as a plain object or null.');
         }
 
         const {
-            solidPrimitive     = DEFAULT_SOLID_PRIMITIVE,
-            wireframePrimitive = DEFAULT_WIREFRAME_PRIMITIVE
+            solidPrimitive     = GEOMETRY_PRIMITIVE_DEFAULTS.SOLID_PRIMITIVE,
+            wireframePrimitive = GEOMETRY_PRIMITIVE_DEFAULTS.WIREFRAME_PRIMITIVE
         } = options || {};
 
         Geometry.#assertPrimitiveName(solidPrimitive);
@@ -478,10 +246,11 @@ export class Geometry {
         this.#normalBuffer                = normals ? this.#createStaticArrayBuffer(normals) : null;
         this.#indexBufferSolid            = this.#createIndexBuffer(indicesSolid);
         this.#indexBufferWireframe        = this.#createIndexBuffer(indicesWireframe);
-        this.#boundingBoxMin              = new Float32Array(BOUNDING_BOX_COMPONENT_COUNT);
-        this.#boundingBoxMax              = new Float32Array(BOUNDING_BOX_COMPONENT_COUNT);
+        this.#boundingBoxMin              = new Float32Array(GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT);
+        this.#boundingBoxMax              = new Float32Array(GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT);
         this.#solidPrimitive              = solidPrimitive;
         this.#wireframePrimitive          = wireframePrimitive;
+
         Geometry.#writeBoundingBox(positions, this.#boundingBoxMin, this.#boundingBoxMax);
         this.#configureVertexArray();
     }
@@ -619,7 +388,7 @@ export class Geometry {
         const buffer = this.#webglContext.createBuffer();
 
         if (!buffer) {
-            throw new Error('Failed to create `ARRAY_BUFFER`.');
+            throw new Error('Failed to create ARRAY_BUFFER.');
         }
 
         this.#webglContext.bindBuffer(this.#webglContext.ARRAY_BUFFER, buffer);
@@ -638,11 +407,7 @@ export class Geometry {
         const buffer = this.#webglContext.createBuffer();
 
         if (!buffer) {
-            throw new Error('Failed to create `ELEMENT_ARRAY_BUFFER`.');
-        }
-
-        if (!Geometry.#isSupportedIndexArray(indices)) {
-            throw new TypeError('`Geometry` expects indices as `Uint16Array` or `Uint32Array`.');
+            throw new Error('Failed to create ELEMENT_ARRAY_BUFFER.');
         }
 
         this.#webglContext.bindBuffer(this.#webglContext.ELEMENT_ARRAY_BUFFER, buffer);
@@ -683,18 +448,18 @@ export class Geometry {
      * @private
      */
     #validateAttributeSizes(positions, colors, uvs, normals) {
-        if ((positions.length % POSITION_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
-            throw new Error('Geometry positions length must be a multiple of `POSITION_COMPONENT_COUNT`.');
+        if ((positions.length % GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT) !== GEOMETRY_BUFFER_LAYOUT.MODULO_ALIGNED_VALUE) {
+            throw new Error('Geometry positions length must be a multiple of POSITION_COMPONENT_COUNT.');
         }
 
-        const vertexCount = positions.length / POSITION_COMPONENT_COUNT;
+        const vertexCount = positions.length / GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
 
         if (colors !== null) {
-            if ((colors.length % COLOR_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
-                throw new Error('Geometry colors length must be a multiple of `COLOR_COMPONENT_COUNT`.');
+            if ((colors.length % GEOMETRY_LAYOUT.COLOR_COMPONENT_COUNT) !== GEOMETRY_BUFFER_LAYOUT.MODULO_ALIGNED_VALUE) {
+                throw new Error('Geometry colors length must be a multiple of COLOR_COMPONENT_COUNT.');
             }
 
-            const colorVertexCount = colors.length / COLOR_COMPONENT_COUNT;
+            const colorVertexCount = colors.length / GEOMETRY_LAYOUT.COLOR_COMPONENT_COUNT;
 
             if (colorVertexCount !== vertexCount) {
                 throw new Error('Geometry colors vertex count must match positions vertex count.');
@@ -702,11 +467,11 @@ export class Geometry {
         }
 
         if (uvs !== null) {
-            if ((uvs.length % UV_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
-                throw new Error('Geometry uvs length must be a multiple of `UV_COMPONENT_COUNT`.');
+            if ((uvs.length % GEOMETRY_LAYOUT.UV_COMPONENT_COUNT) !== GEOMETRY_BUFFER_LAYOUT.MODULO_ALIGNED_VALUE) {
+                throw new Error('Geometry uvs length must be a multiple of UV_COMPONENT_COUNT.');
             }
 
-            const uvVertexCount = uvs.length / UV_COMPONENT_COUNT;
+            const uvVertexCount = uvs.length / GEOMETRY_LAYOUT.UV_COMPONENT_COUNT;
 
             if (uvVertexCount !== vertexCount) {
                 throw new Error('Geometry uvs vertex count must match positions vertex count.');
@@ -714,11 +479,11 @@ export class Geometry {
         }
 
         if (normals !== null) {
-            if ((normals.length % NORMAL_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
-                throw new Error('Geometry normals length must be a multiple of `NORMAL_COMPONENT_COUNT`.');
+            if ((normals.length % GEOMETRY_LAYOUT.NORMAL_COMPONENT_COUNT) !== GEOMETRY_BUFFER_LAYOUT.MODULO_ALIGNED_VALUE) {
+                throw new Error('Geometry normals length must be a multiple of NORMAL_COMPONENT_COUNT.');
             }
 
-            const normalVertexCount = normals.length / NORMAL_COMPONENT_COUNT;
+            const normalVertexCount = normals.length / GEOMETRY_LAYOUT.NORMAL_COMPONENT_COUNT;
 
             if (normalVertexCount !== vertexCount) {
                 throw new Error('Geometry normals vertex count must match positions vertex count.');
@@ -749,14 +514,14 @@ export class Geometry {
     static #validateIndexSizeForPrimitive(indices, primitive, label) {
         switch (primitive) {
             case PRIMITIVE_TRIANGLES:
-                if ((indices.length % TRIANGLE_INDEX_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
+                if ((indices.length % GEOMETRY_LAYOUT.TRIANGLE_INDEX_COUNT) !== GEOMETRY_BUFFER_LAYOUT.MODULO_ALIGNED_VALUE) {
                     throw new Error(`Geometry ${label} indices length must be a multiple of TRIANGLE_INDEX_COMPONENT_COUNT.`);
                 }
 
                 return;
 
             case PRIMITIVE_LINES:
-                if ((indices.length % LINE_INDEX_COMPONENT_COUNT) !== MODULO_ALIGNED_VALUE) {
+                if ((indices.length % GEOMETRY_LAYOUT.LINE_INDEX_COUNT) !== GEOMETRY_BUFFER_LAYOUT.MODULO_ALIGNED_VALUE) {
                     throw new Error(`Geometry ${label} indices length must be a multiple of LINE_INDEX_COMPONENT_COUNT.`);
                 }
 
@@ -764,8 +529,8 @@ export class Geometry {
 
             case PRIMITIVE_LINE_STRIP:
             case PRIMITIVE_LINE_LOOP:
-                if (indices.length < MIN_LINE_STRIP_INDEX_COUNT) {
-                    throw new Error(`Geometry ${label} indices length must be at least ${MIN_LINE_STRIP_INDEX_COUNT}.`);
+                if (indices.length < GEOMETRY_LIMITS.MIN_LINE_STRIP_INDEX_COUNT) {
+                    throw new Error(`Geometry ${label} indices length must be at least ${GEOMETRY_LIMITS.MIN_LINE_STRIP_INDEX_COUNT}.`);
                 }
 
                 return;
@@ -774,7 +539,7 @@ export class Geometry {
                 return;
 
             default:
-                throw new Error(ERROR_INVALID_PRIMITIVE);
+                throw new Error(GEOMETRY_ERRORS.INVALID_PRIMITIVE);
         }
     }
 
@@ -785,8 +550,8 @@ export class Geometry {
      * @private
      */
     static #assertPrimitiveName(value) {
-        if (typeof value !== 'string' || !SUPPORTED_PRIMITIVES.has(value)) {
-            throw new TypeError(ERROR_INVALID_PRIMITIVE);
+        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.STRING || !SUPPORTED_PRIMITIVES.has(value)) {
+            throw new TypeError(GEOMETRY_ERRORS.INVALID_PRIMITIVE);
         }
     }
 
@@ -799,41 +564,30 @@ export class Geometry {
      * @private
      */
     static #writeBoundingBox(positions, outMin, outMax) {
-        if (!(positions instanceof Float32Array)) {
-            throw new TypeError(ERROR_BOUNDING_BOX_POSITIONS_TYPE);
-        }
-
-        if (!(outMin instanceof Float32Array) || outMin.length !== BOUNDING_BOX_COMPONENT_COUNT) {
-            throw new TypeError(ERROR_BOUNDING_BOX_MIN_TYPE);
-        }
-
-        if (!(outMax instanceof Float32Array) || outMax.length !== BOUNDING_BOX_COMPONENT_COUNT) {
-            throw new TypeError(ERROR_BOUNDING_BOX_MAX_TYPE);
-        }
-
-        // Handle the empty geometry, write `empty` bounds and exit early:
-        if (positions.length === POSITION_START_INDEX) {
-            outMin[POSITION_X_OFFSET] = EMPTY_BOUND_COMPONENT;
-            outMin[POSITION_Y_OFFSET] = EMPTY_BOUND_COMPONENT;
-            outMin[POSITION_Z_OFFSET] = EMPTY_BOUND_COMPONENT;
-            outMax[POSITION_X_OFFSET] = EMPTY_BOUND_COMPONENT;
-            outMax[POSITION_Y_OFFSET] = EMPTY_BOUND_COMPONENT;
-            outMax[POSITION_Z_OFFSET] = EMPTY_BOUND_COMPONENT;
+        // Buffer types are validated by the constructor; output buffers are allocated internally.
+        // Handle the empty geometry, write the empty bounds and exit early
+        if (positions.length === GEOMETRY_BUFFER_LAYOUT.POSITION_START_INDEX) {
+            outMin[MATH_VECTOR3_INDEXES.X] = GEOMETRY_BUFFER_LAYOUT.EMPTY_BOUND_COMPONENT;
+            outMin[MATH_VECTOR3_INDEXES.Y] = GEOMETRY_BUFFER_LAYOUT.EMPTY_BOUND_COMPONENT;
+            outMin[MATH_VECTOR3_INDEXES.Z] = GEOMETRY_BUFFER_LAYOUT.EMPTY_BOUND_COMPONENT;
+            outMax[MATH_VECTOR3_INDEXES.X] = GEOMETRY_BUFFER_LAYOUT.EMPTY_BOUND_COMPONENT;
+            outMax[MATH_VECTOR3_INDEXES.Y] = GEOMETRY_BUFFER_LAYOUT.EMPTY_BOUND_COMPONENT;
+            outMax[MATH_VECTOR3_INDEXES.Z] = GEOMETRY_BUFFER_LAYOUT.EMPTY_BOUND_COMPONENT;
             return;
         }
 
-        // Initialize min/max accumulators for the AABB computation:
-        let minX = BOUND_MIN_INIT;
-        let minY = BOUND_MIN_INIT;
-        let minZ = BOUND_MIN_INIT;
-        let maxX = BOUND_MAX_INIT;
-        let maxY = BOUND_MAX_INIT;
-        let maxZ = BOUND_MAX_INIT;
+        // Initialize min/max accumulators for the AABB-computation
+        let minX = GEOMETRY_BUFFER_LAYOUT.BOUND_MIN_INIT;
+        let minY = GEOMETRY_BUFFER_LAYOUT.BOUND_MIN_INIT;
+        let minZ = GEOMETRY_BUFFER_LAYOUT.BOUND_MIN_INIT;
+        let maxX = GEOMETRY_BUFFER_LAYOUT.BOUND_MAX_INIT;
+        let maxY = GEOMETRY_BUFFER_LAYOUT.BOUND_MAX_INIT;
+        let maxZ = GEOMETRY_BUFFER_LAYOUT.BOUND_MAX_INIT;
 
-        for (let index = POSITION_START_INDEX; index < positions.length; index += POSITION_COMPONENT_COUNT) {
-            const x = positions[index + POSITION_X_OFFSET];
-            const y = positions[index + POSITION_Y_OFFSET];
-            const z = positions[index + POSITION_Z_OFFSET];
+        for (let index = GEOMETRY_BUFFER_LAYOUT.POSITION_START_INDEX; index < positions.length; index += GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT) {
+            const x = positions[index + MATH_VECTOR3_INDEXES.X];
+            const y = positions[index + MATH_VECTOR3_INDEXES.Y];
+            const z = positions[index + MATH_VECTOR3_INDEXES.Z];
 
             if (x < minX) {
                 minX = x;
@@ -860,13 +614,13 @@ export class Geometry {
             }
         }
 
-        // Write the computed AABB bounds to the output buffers:
-        outMin[POSITION_X_OFFSET] = minX;
-        outMin[POSITION_Y_OFFSET] = minY;
-        outMin[POSITION_Z_OFFSET] = minZ;
-        outMax[POSITION_X_OFFSET] = maxX;
-        outMax[POSITION_Y_OFFSET] = maxY;
-        outMax[POSITION_Z_OFFSET] = maxZ;
+        // Write the computed AABB bounds to the output buffers
+        outMin[MATH_VECTOR3_INDEXES.X] = minX;
+        outMin[MATH_VECTOR3_INDEXES.Y] = minY;
+        outMin[MATH_VECTOR3_INDEXES.Z] = minZ;
+        outMax[MATH_VECTOR3_INDEXES.X] = maxX;
+        outMax[MATH_VECTOR3_INDEXES.Y] = maxY;
+        outMax[MATH_VECTOR3_INDEXES.Z] = maxZ;
     }
 
     /**
@@ -876,66 +630,62 @@ export class Geometry {
      */
     #configureVertexArray() {
         const webglContext = this.#webglContext;
-
         webglContext.bindVertexArray(this.#vertexArrayObject);
 
-        // Positions:
-        webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#positionBuffer);
-        webglContext.enableVertexAttribArray(POSITION_ATTRIBUTE_LOCATION);
-        webglContext.vertexAttribPointer(
-            POSITION_ATTRIBUTE_LOCATION,
-            POSITION_COMPONENT_COUNT,
-            webglContext.FLOAT,
-            ATTRIBUTE_NORMALIZED,
-            ATTRIBUTE_NO_STRIDE,
-            ATTRIBUTE_NO_OFFSET
+        this.#configureAttribute(
+            this.#positionBuffer,
+            GEOMETRY_BUFFER_LAYOUT.POSITION_ATTRIBUTE_LOCATION,
+            GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT
         );
 
-        // Colors (optional):
         if (this.#colorBuffer) {
-            webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#colorBuffer);
-            webglContext.enableVertexAttribArray(COLOR_ATTRIBUTE_LOCATION);
-            webglContext.vertexAttribPointer(
-                COLOR_ATTRIBUTE_LOCATION,
-                COLOR_COMPONENT_COUNT,
-                webglContext.FLOAT,
-                ATTRIBUTE_NORMALIZED,
-                ATTRIBUTE_NO_STRIDE,
-                ATTRIBUTE_NO_OFFSET
+            this.#configureAttribute(
+                this.#colorBuffer,
+                GEOMETRY_BUFFER_LAYOUT.COLOR_ATTRIBUTE_LOCATION,
+                GEOMETRY_LAYOUT.COLOR_COMPONENT_COUNT
             );
         }
 
-        // UVs (optional):
         if (this.#uvBuffer) {
-            webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#uvBuffer);
-            webglContext.enableVertexAttribArray(UV_ATTRIBUTE_LOCATION);
-            webglContext.vertexAttribPointer(
-                UV_ATTRIBUTE_LOCATION,
-                UV_COMPONENT_COUNT,
-                webglContext.FLOAT,
-                ATTRIBUTE_NORMALIZED,
-                ATTRIBUTE_NO_STRIDE,
-                ATTRIBUTE_NO_OFFSET
+            this.#configureAttribute(
+                this.#uvBuffer,
+                GEOMETRY_BUFFER_LAYOUT.UV_ATTRIBUTE_LOCATION,
+                GEOMETRY_LAYOUT.UV_COMPONENT_COUNT
             );
         }
 
-        // Normals (optional):
         if (this.#normalBuffer) {
-            webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#normalBuffer);
-            webglContext.enableVertexAttribArray(NORMAL_ATTRIBUTE_LOCATION);
-            webglContext.vertexAttribPointer(
-                NORMAL_ATTRIBUTE_LOCATION,
-                NORMAL_COMPONENT_COUNT,
-                webglContext.FLOAT,
-                ATTRIBUTE_NORMALIZED,
-                ATTRIBUTE_NO_STRIDE,
-                ATTRIBUTE_NO_OFFSET
+            this.#configureAttribute(
+                this.#normalBuffer,
+                GEOMETRY_BUFFER_LAYOUT.NORMAL_ATTRIBUTE_LOCATION,
+                GEOMETRY_LAYOUT.NORMAL_COMPONENT_COUNT
             );
         }
 
-        // Bind the default index buffer (solid) to the VAO:
         webglContext.bindBuffer(webglContext.ELEMENT_ARRAY_BUFFER, this.#indexBufferSolid);
         webglContext.bindVertexArray(null);
+    }
+
+    /**
+     * Connects one vertex buffer to its attribute location in the current VAO.
+     *
+     * @param {WebGLBuffer} buffer    - Attribute buffer.
+     * @param {number} location       - Shader attribute location.
+     * @param {number} componentCount - Components per vertex.
+     * @private
+     */
+    #configureAttribute(buffer, location, componentCount) {
+        const webglContext = this.#webglContext;
+        webglContext.bindBuffer(webglContext.ARRAY_BUFFER, buffer);
+        webglContext.enableVertexAttribArray(location);
+        webglContext.vertexAttribPointer(
+            location,
+            componentCount,
+            webglContext.FLOAT,
+            GEOMETRY_BUFFER_LAYOUT.ATTRIBUTE_NORMALIZED,
+            GEOMETRY_BUFFER_LAYOUT.ATTRIBUTE_NO_STRIDE,
+            GEOMETRY_BUFFER_LAYOUT.ATTRIBUTE_NO_OFFSET
+        );
     }
 
     /**

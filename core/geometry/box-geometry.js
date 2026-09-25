@@ -1,101 +1,23 @@
-import { Geometry } from './geometry.js';
+import { GeometryUtils }                            from './geometry-utils.js';
+import { GeneratedGeometry }                        from './generated-geometry.js';
+import { MATH_COMMON_VALUES, MATH_VECTOR3_INDEXES } from '../constants/math.js';
+import { ECMASCRIPT_TYPEOF_RESULTS }                from '../constants/ecmascript-types.js';
+
 import {
     DEFAULT_VERTEX_COLOR,
-    createColorsFromSpec,
-    createIndexArray,
-    createWireframeIndicesFromSolidIndices
-} from './geometry-utils.js';
+    GEOMETRY_SIZES,
+    GEOMETRY_GRID,
+    GEOMETRY_UV,
+    GEOMETRY_LAYOUT,
+    GEOMETRY_COLOR_INDEXES
+} from '../constants/geometry.js';
 
-/**
- * Default box edge size.
- *
- * @type {number}
- */
-const DEFAULT_BOX_SIZE = 1.0;
-
-/**
- * Default segment count for each box axis.
- *
- * @type {number}
- */
-const DEFAULT_SEGMENT_COUNT = 1;
-
-/**
- * Divisor used to compute the half-size from the full size.
- *
- * @type {number}
- */
-const HALF_SIZE_DIVISOR = 2.0;
-
-/**
- * Number of float components per `vec3` (position/normal).
- *
- * @type {number}
- */
-const VEC3_COMPONENT_COUNT = 3;
-
-/**
- * Number of box faces.
- *
- * @type {number}
- */
-const BOX_FACE_COUNT = 6;
-
-/**
- * Expected length for per-face RGB colors (6 faces * 3).
- *
- * @type {number}
- */
-const COLORS_PER_FACE_LENGTH = BOX_FACE_COUNT * VEC3_COMPONENT_COUNT;
-
-/**
- * Minimum segment count supported by segmented geometries.
- *
- * @type {number}
- */
-const MIN_SEGMENT_COUNT = 1;
-
-/**
- * Adds one vertex per grid intersection, so vertex count along an axis is `segments + 1`.
- *
- * @type {number}
- */
-const VERTICES_PER_SEGMENT_INCREMENT = 1;
-
-/**
- * Used to center face coordinates around the origin: `(t - 0.5) * size`.
- *
- * @type {number}
- */
-const CENTER_T_OFFSET = 0.5;
-
-/**
- * UV/V coordinate is flipped to keep (0, 0) at top-left.
- *
- * @type {number}
- */
-const UV_V_FLIP_BASE = 1.0;
-
-/**
- * When segments are positive, the divisor is never 0. This value is used as fallback.
- *
- * @type {number}
- */
-const DEFAULT_T_VALUE = 0.0;
-
-/**
- * Sentinel segment count that would cause division by zero in normalization.
- *
- * @type {number}
- */
-const ZERO_SEGMENT_COUNT = 0;
-
-/**
- * Offset to move from a vertex to the next vertex in the same row.
- *
- * @type {number}
- */
-const NEXT_VERTEX_OFFSET = 1;
+import {
+    BOX_FACES,
+    BOX_DEFAULTS,
+    BOX_LAYOUT,
+    BOX_LIMITS
+} from '../constants/box-geometry.js';
 
 /**
  * Options used by `BoxGeometry` constructor.
@@ -108,7 +30,7 @@ const NEXT_VERTEX_OFFSET = 1;
  * Segment parameters must be `integers >= 1`.
  *
  * @typedef {Object} BoxGeometryOptions
- * @property {number} [size = 1.0]         - Convenience cube size (applies to `width/height/depth`).
+ * @property {number} [size = 1.0]         - Convenience cube size (applies to width, height or depth).
  * @property {number} [width = size]       - Box width along the X axis.
  * @property {number} [height = size]      - Box height along the Y axis.
  * @property {number} [depth = size]       - Box depth along the Z axis.
@@ -134,40 +56,21 @@ const NEXT_VERTEX_OFFSET = 1;
  * Internal face grid definition for `BoxGeometry`.
  *
  * @typedef {Object} BoxFaceDefinition
- * @property {number[]} axisU    - U axis direction.
- * @property {number[]} axisV    - V axis direction.
- * @property {number[]} normal   - Face normal.
- * @property {number} fixed      - Fixed coordinate value for the remaining axis.
- * @property {number} sizeU      - Face size along U.
- * @property {number} sizeV      - Face size along V.
- * @property {number} segmentsU  - Segment count along U `>= 1`.
- * @property {number} segmentsV  - Segment count along V `>= 1`.
+ * @property {number[]} axisU   - U axis direction.
+ * @property {number[]} axisV   - V axis direction.
+ * @property {number[]} normal  - Face normal.
+ * @property {number} fixed     - Fixed coordinate value for the remaining axis.
+ * @property {number} sizeU     - Face size along U.
+ * @property {number} sizeV     - Face size along V.
+ * @property {number} segmentsU - Segment count along U `>= 1`.
+ * @property {number} segmentsV - Segment count along V `>= 1`.
  */
 
 /**
  * Segmented box geometry (cube, when `width = height = depth`).
  * Generates positions, normals, UVs and both solid and wireframe indices.
  */
-export class BoxGeometry extends Geometry {
-
-    /**
-     * @param {WebGL2RenderingContext} webglContext         - WebGL2 rendering context.
-     * @param {BoxGeometryOptions | number} [optionsOrSize] - Options object or numeric size.
-     */
-    constructor(webglContext, optionsOrSize = {}) {
-        const options = BoxGeometry.#normalizeOptions(optionsOrSize);
-        const data    = BoxGeometry.#createGeometryData(options);
-
-        super(
-            webglContext,
-            data.positions,
-            data.colors,
-            data.indicesSolid,
-            data.indicesWireframe,
-            data.uvs,
-            data.normals
-        );
-    }
+export class BoxGeometry extends GeneratedGeometry {
 
     /**
      * Normalizes constructor input to a `BoxGeometryOptions` object.
@@ -177,44 +80,46 @@ export class BoxGeometry extends Geometry {
      * @private
      */
     static #normalizeOptions(optionsOrSize) {
-        if (typeof optionsOrSize === 'number') {
+        if (typeof optionsOrSize === ECMASCRIPT_TYPEOF_RESULTS.NUMBER) {
             return {
                 size           : optionsOrSize,
                 width          : optionsOrSize,
                 height         : optionsOrSize,
                 depth          : optionsOrSize,
-                widthSegments  : DEFAULT_SEGMENT_COUNT,
-                heightSegments : DEFAULT_SEGMENT_COUNT,
-                depthSegments  : DEFAULT_SEGMENT_COUNT,
+                widthSegments  : BOX_DEFAULTS.SEGMENT_COUNT,
+                heightSegments : BOX_DEFAULTS.SEGMENT_COUNT,
+                depthSegments  : BOX_DEFAULTS.SEGMENT_COUNT,
                 colors         : DEFAULT_VERTEX_COLOR
             };
         }
 
-        if (optionsOrSize === null || typeof optionsOrSize !== 'object') {
-            throw new TypeError('`BoxGeometry` expects options as an object or a number.');
+        if (optionsOrSize === null || typeof optionsOrSize !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT) {
+            throw new TypeError('BoxGeometry expects options as an object or a number.');
         }
 
         const {
-            size           = DEFAULT_BOX_SIZE,
+            size           = BOX_DEFAULTS.SIZE,
             width          = size,
             height         = size,
             depth          = size,
-            widthSegments  = DEFAULT_SEGMENT_COUNT,
-            heightSegments = DEFAULT_SEGMENT_COUNT,
-            depthSegments  = DEFAULT_SEGMENT_COUNT,
+            widthSegments  = BOX_DEFAULTS.SEGMENT_COUNT,
+            heightSegments = BOX_DEFAULTS.SEGMENT_COUNT,
+            depthSegments  = BOX_DEFAULTS.SEGMENT_COUNT,
             colors         = DEFAULT_VERTEX_COLOR
         } = optionsOrSize;
 
-        if (typeof width !== 'number' || typeof height !== 'number' || typeof depth !== 'number') {
-            throw new TypeError('`BoxGeometry` expects `width/height/depth` as numbers.');
+        if (typeof width  !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER ||
+            typeof height !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER ||
+            typeof depth  !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER) {
+            throw new TypeError('BoxGeometry expects width, height or depth as numbers.');
         }
 
         if (!Number.isFinite(width) || !Number.isFinite(height) || !Number.isFinite(depth)) {
-            throw new RangeError('`BoxGeometry` expects finite `width/height/depth`.');
+            throw new RangeError('BoxGeometry expects finite width, height or depth.');
         }
 
         if (!(colors instanceof Float32Array)) {
-            throw new TypeError('`BoxGeometry` expects colors as a `Float32Array`.');
+            throw new TypeError('BoxGeometry expects colors as a Float32Array.');
         }
 
         return {
@@ -222,137 +127,31 @@ export class BoxGeometry extends Geometry {
             width,
             height,
             depth,
-            widthSegments  : BoxGeometry.#normalizeSegmentCount(widthSegments  , 'widthSegments'),
-            heightSegments : BoxGeometry.#normalizeSegmentCount(heightSegments , 'heightSegments'),
-            depthSegments  : BoxGeometry.#normalizeSegmentCount(depthSegments  , 'depthSegments'),
+            widthSegments  : GeometryUtils.normalizeSegmentCount(widthSegments, 'widthSegments', BOX_LIMITS.MIN_SEGMENT_COUNT, 'BoxGeometry'),
+            heightSegments : GeometryUtils.normalizeSegmentCount(heightSegments, 'heightSegments', BOX_LIMITS.MIN_SEGMENT_COUNT, 'BoxGeometry'),
+            depthSegments  : GeometryUtils.normalizeSegmentCount(depthSegments, 'depthSegments', BOX_LIMITS.MIN_SEGMENT_COUNT, 'BoxGeometry'),
             colors
         };
     }
 
     /**
-     * Normalizes and validates a segment count parameter.
+     * Generates vertex and index buffers from construction options.
      *
-     * @param {number} value      - Segment count value.
-     * @param {string} optionName - Name of the option for error messages.
-     * @returns {number}          - Normalized integer `>= 1`.
-     * @private
+     * @param {BoxGeometryOptions | number} [options] - Geometry options.
+     * @returns {BoxGeometryData}                     - Generated CPU buffers.
+     * @protected
      */
-    static #normalizeSegmentCount(value, optionName) {
-        if (typeof value !== 'number' || !Number.isFinite(value)) {
-            throw new TypeError('`BoxGeometry` expects `{name}` as a finite number.'.replace('{name}', optionName));
-        }
-
-        const intValue = Math.floor(value);
-
-        if (intValue < MIN_SEGMENT_COUNT) {
-            /* eslint-disable indent */
-            throw new RangeError(
-                '`BoxGeometry` expects `{name}` to be `>= {min}`.'
-                .replace('{name}', optionName)
-                .replace('{min}', String(MIN_SEGMENT_COUNT))
-            );
-            /* eslint-enable indent */
-        }
-
-        return intValue;
-    }
-
-    /**
-     * Creates full geometry data for a segmented box.
-     *
-     * @param {Required<BoxGeometryOptions>} options - Normalized options.
-     * @returns {BoxGeometryData}                    - Geometry buffers.
-     *
-     * @private
-     */
-    static #createGeometryData(options) {
-        const halfWidth  = options.width  / HALF_SIZE_DIVISOR;
-        const halfHeight = options.height / HALF_SIZE_DIVISOR;
-        const halfDepth  = options.depth  / HALF_SIZE_DIVISOR;
-
+    static createGeometryData(options = {}) {
+        const normalized       = BoxGeometry.#normalizeOptions(options);
+        const faces            = BoxGeometry.#createFaces(normalized);
         const positions        = [];
         const normals          = [];
         const uvs              = [];
         const faceVertexCounts = [];
         const indicesSolid     = [];
-        let vertexOffset = 0;
+        let vertexOffset       = MATH_COMMON_VALUES.ZERO;
 
-        // Face definitions ensure `normal === normalize(cross(axisU, axisV))`.
-        const faces = [
-            // Front (+Z)
-            {
-                axisU      : [ 1, 0, 0],
-                axisV      : [ 0, 1, 0],
-                normal     : [ 0, 0, 1],
-                fixed      : halfDepth,
-                sizeU      : options.width,
-                sizeV      : options.height,
-                segmentsU  : options.widthSegments,
-                segmentsV  : options.heightSegments
-            },
-
-            // Back (-Z)
-            {
-                axisU      : [-1, 0, 0],
-                axisV      : [ 0, 1, 0],
-                normal     : [ 0, 0,-1],
-                fixed      : halfDepth,
-                sizeU      : options.width,
-                sizeV      : options.height,
-                segmentsU  : options.widthSegments,
-                segmentsV  : options.heightSegments
-            },
-
-            // Top (+Y)
-            {
-                axisU      : [ 1, 0, 0],
-                axisV      : [ 0, 0,-1],
-                normal     : [ 0, 1, 0],
-                fixed      : halfHeight,
-                sizeU      : options.width,
-                sizeV      : options.depth,
-                segmentsU  : options.widthSegments,
-                segmentsV  : options.depthSegments
-            },
-
-            // Bottom (-Y)
-            {
-                axisU      : [ 1, 0, 0],
-                axisV      : [ 0, 0, 1],
-                normal     : [ 0,-1, 0],
-                fixed      : halfHeight,
-                sizeU      : options.width,
-                sizeV      : options.depth,
-                segmentsU  : options.widthSegments,
-                segmentsV  : options.depthSegments
-            },
-
-            // Right (+X)
-            {
-                axisU      : [ 0, 0,-1],
-                axisV      : [ 0, 1, 0],
-                normal     : [ 1, 0, 0],
-                fixed      : halfWidth,
-                sizeU      : options.depth,
-                sizeV      : options.height,
-                segmentsU  : options.depthSegments,
-                segmentsV  : options.heightSegments
-            },
-
-            // Left (-X)
-            {
-                axisU      : [ 0, 0, 1],
-                axisV      : [ 0, 1, 0],
-                normal     : [-1, 0, 0],
-                fixed      : halfWidth,
-                sizeU      : options.depth,
-                sizeV      : options.height,
-                segmentsU  : options.depthSegments,
-                segmentsV  : options.heightSegments
-            }
-        ];
-
-        for (let faceIndex = 0; faceIndex < faces.length; faceIndex += 1) {
+        for (let faceIndex = MATH_COMMON_VALUES.ZERO; faceIndex < faces.length; faceIndex += MATH_COMMON_VALUES.UNIT) {
             const face = faces[faceIndex];
             const localVertexCount = BoxGeometry.#appendFaceGrid(
                 positions,
@@ -368,9 +167,9 @@ export class BoxGeometry extends Geometry {
         }
 
         const vertexCount       = vertexOffset;
-        const colors            = BoxGeometry.#createColors(options.colors, vertexCount, faceVertexCounts);
-        const indicesSolidTyped = createIndexArray(vertexCount, indicesSolid);
-        const indicesWireframe  = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolidTyped);
+        const colors            = BoxGeometry.#createColors(normalized.colors, vertexCount, faceVertexCounts);
+        const indicesSolidTyped = GeometryUtils.createIndexArray(vertexCount, indicesSolid);
+        const indicesWireframe  = GeometryUtils.createWireframeIndicesFromSolidIndices(vertexCount, indicesSolidTyped);
 
         return {
             positions        : new Float32Array(positions),
@@ -395,54 +194,45 @@ export class BoxGeometry extends Geometry {
      * @private
      */
     static #appendFaceGrid(positions, normals, uvs, indicesSolid, vertexOffset, face) {
-        const segmentsU    = face.segmentsU;
-        const segmentsV    = face.segmentsV;
-        const uVertexCount = segmentsU + VERTICES_PER_SEGMENT_INCREMENT;
-        const vVertexCount = segmentsV + VERTICES_PER_SEGMENT_INCREMENT;
+        const centerOffset    = GEOMETRY_GRID.CENTER_OFFSET;
+        const xComponentIndex = MATH_VECTOR3_INDEXES.X;
+        const yComponentIndex = MATH_VECTOR3_INDEXES.Y;
+        const zComponentIndex = MATH_VECTOR3_INDEXES.Z;
+        const segmentsU       = face.segmentsU;
+        const segmentsV       = face.segmentsV;
+        const uVertexCount    = segmentsU + GEOMETRY_GRID.VERTEX_INCREMENT;
+        const vVertexCount    = segmentsV + GEOMETRY_GRID.VERTEX_INCREMENT;
 
-        for (let vIndex = 0; vIndex < vVertexCount; vIndex += 1) {
-            const vNormalized  = (segmentsV === ZERO_SEGMENT_COUNT) ? DEFAULT_T_VALUE : (vIndex / segmentsV);
-            const vLocalOffset = (vNormalized - CENTER_T_OFFSET) * face.sizeV;
+        for (let vIndex = MATH_COMMON_VALUES.ZERO; vIndex < vVertexCount; vIndex += MATH_COMMON_VALUES.UNIT) {
+            const vNormalized  = vIndex / segmentsV;
+            const vLocalOffset = (vNormalized - centerOffset) * face.sizeV;
 
-            for (let uIndex = 0; uIndex < uVertexCount; uIndex += 1) {
-                const uNormalized  = (segmentsU === ZERO_SEGMENT_COUNT) ? DEFAULT_T_VALUE : (uIndex / segmentsU);
-                const uLocalOffset = (uNormalized - CENTER_T_OFFSET) * face.sizeU;
+            for (let uIndex = MATH_COMMON_VALUES.ZERO; uIndex < uVertexCount; uIndex += MATH_COMMON_VALUES.UNIT) {
+                const uNormalized  = uIndex / segmentsU;
+                const uLocalOffset = (uNormalized - centerOffset) * face.sizeU;
 
                 const positionX =
-                    (face.axisU[0]  * uLocalOffset) +
-                    (face.axisV[0]  * vLocalOffset) +
-                    (face.normal[0] * face.fixed);
+                    (face.axisU[xComponentIndex]  * uLocalOffset) +
+                    (face.axisV[xComponentIndex]  * vLocalOffset) +
+                    (face.normal[xComponentIndex] * face.fixed);
 
                 const positionY =
-                    (face.axisU[1]  * uLocalOffset) +
-                    (face.axisV[1]  * vLocalOffset) +
-                    (face.normal[1] * face.fixed);
+                    (face.axisU[yComponentIndex]  * uLocalOffset) +
+                    (face.axisV[yComponentIndex]  * vLocalOffset) +
+                    (face.normal[yComponentIndex] * face.fixed);
 
                 const positionZ =
-                    (face.axisU[2]  * uLocalOffset) +
-                    (face.axisV[2]  * vLocalOffset) +
-                    (face.normal[2] * face.fixed);
+                    (face.axisU[zComponentIndex]  * uLocalOffset) +
+                    (face.axisV[zComponentIndex]  * vLocalOffset) +
+                    (face.normal[zComponentIndex] * face.fixed);
 
                 positions.push(positionX, positionY, positionZ);
-                normals.push(face.normal[0], face.normal[1], face.normal[2]);
-                uvs.push(uNormalized, UV_V_FLIP_BASE - vNormalized);
+                normals.push(face.normal[xComponentIndex], face.normal[yComponentIndex], face.normal[zComponentIndex]);
+                uvs.push(uNormalized, GEOMETRY_UV.V_FLIP_BASE - vNormalized);
             }
         }
 
-        // Indices:
-        for (let vIndex = 0; vIndex < segmentsV; vIndex += 1) {
-            for (let uIndex = 0; uIndex < segmentsU; uIndex += 1) {
-                const topLeftVertexIndex     = vertexOffset + (vIndex * uVertexCount) + uIndex;
-                const topRightVertexIndex    = topLeftVertexIndex    + NEXT_VERTEX_OFFSET;
-                const bottomLeftVertexIndex  = topLeftVertexIndex    + uVertexCount;
-                const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET;
-                // indicesSolid.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
-                // indicesSolid.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
-                indicesSolid.push(topLeftVertexIndex, topRightVertexIndex, bottomLeftVertexIndex);
-                indicesSolid.push(topRightVertexIndex, bottomRightVertexIndex, bottomLeftVertexIndex);
-            }
-        }
-
+        GeometryUtils.appendGridTriangleIndices(indicesSolid, segmentsU, segmentsV, vertexOffset, true);
         return uVertexCount * vVertexCount;
     }
 
@@ -456,23 +246,28 @@ export class BoxGeometry extends Geometry {
      * @private
      */
     static #createColors(colorsSpec, vertexCount, faceVertexCounts) {
-        // Per-face colors:
-        if (colorsSpec.length === COLORS_PER_FACE_LENGTH) {
-            const colorBuffer = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT);
-            let vertexBase = 0;
+        const colorComponentCount = GEOMETRY_LAYOUT.COLOR_COMPONENT_COUNT;
+        const redIndex            = GEOMETRY_COLOR_INDEXES.RED;
+        const greenIndex          = GEOMETRY_COLOR_INDEXES.GREEN;
+        const blueIndex           = GEOMETRY_COLOR_INDEXES.BLUE;
 
-            for (let faceIndex = 0; faceIndex < BOX_FACE_COUNT; faceIndex += 1) {
+        // Repeat each face color for all vertices belonging to that face
+        if (colorsSpec.length === BOX_LAYOUT.COLORS_PER_FACE_LENGTH) {
+            const colorBuffer = new Float32Array(vertexCount * colorComponentCount);
+            let vertexBase    = MATH_COMMON_VALUES.ZERO;
+
+            for (let faceIndex = MATH_COMMON_VALUES.ZERO; faceIndex < BOX_LAYOUT.FACE_COUNT; faceIndex += MATH_COMMON_VALUES.UNIT) {
                 const faceVertexCount = faceVertexCounts[faceIndex];
-                const faceColorBase   = faceIndex * VEC3_COMPONENT_COUNT;
-                const red             = colorsSpec[faceColorBase + 0];
-                const green           = colorsSpec[faceColorBase + 1];
-                const blue            = colorsSpec[faceColorBase + 2];
+                const faceColorBase   = faceIndex * colorComponentCount;
+                const red             = colorsSpec[faceColorBase + redIndex];
+                const green           = colorsSpec[faceColorBase + greenIndex];
+                const blue            = colorsSpec[faceColorBase + blueIndex];
 
-                for (let i = 0; i < faceVertexCount; i += 1) {
-                    const destinationComponentOffset = (vertexBase + i) * VEC3_COMPONENT_COUNT;
-                    colorBuffer[destinationComponentOffset + 0] = red;
-                    colorBuffer[destinationComponentOffset + 1] = green;
-                    colorBuffer[destinationComponentOffset + 2] = blue;
+                for (let i = MATH_COMMON_VALUES.ZERO; i < faceVertexCount; i += MATH_COMMON_VALUES.UNIT) {
+                    const destinationComponentOffset = (vertexBase + i) * colorComponentCount;
+                    colorBuffer[destinationComponentOffset + redIndex]   = red;
+                    colorBuffer[destinationComponentOffset + greenIndex] = green;
+                    colorBuffer[destinationComponentOffset + blueIndex]  = blue;
                 }
 
                 vertexBase += faceVertexCount;
@@ -481,7 +276,33 @@ export class BoxGeometry extends Geometry {
             return colorBuffer;
         }
 
-        // Uniform or per-vertex:
-        return createColorsFromSpec(vertexCount, colorsSpec);
+        // Expand a uniform color or reuse the supplied per-vertex colors
+        return GeometryUtils.createColorsFromSpec(vertexCount, colorsSpec);
+    }
+
+    /**
+     * Describes the six outward-facing box grids in their existing face order.
+     *
+     * @param {Required<BoxGeometryOptions>} normalized - Normalized geometry options.
+     * @returns {BoxFaceDefinition[]}
+     * @private
+     */
+    static #createFaces(normalized) {
+        const faces = [];
+
+        for (const definition of BOX_FACES) {
+            faces.push({
+                axisU     : definition.axisU,
+                axisV     : definition.axisV,
+                normal    : definition.normal,
+                fixed     : normalized[definition.fixedDimension] / GEOMETRY_SIZES.HALF_SIZE_DIVISOR,
+                sizeU     : normalized[definition.sizeU],
+                sizeV     : normalized[definition.sizeV],
+                segmentsU : normalized[definition.segmentsU],
+                segmentsV : normalized[definition.segmentsV]
+            });
+        }
+
+        return faces;
     }
 }

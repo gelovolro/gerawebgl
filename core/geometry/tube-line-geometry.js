@@ -1,209 +1,25 @@
-import { Vector3 } from '../math/vector3.js';
-import { Geometry, PRIMITIVE_LINES, PRIMITIVE_TRIANGLES }           from './geometry.js';
-import { createIndexArray, createWireframeIndicesFromSolidIndices } from './geometry-utils.js';
+import { GeneratedGeometry }                        from './generated-geometry.js';
+import { Vector3 }                                  from '../math/vector3.js';
+import { GeometryUtils }                            from './geometry-utils.js';
+import { MATH_COMMON_VALUES, MATH_VECTOR3_INDEXES } from '../constants/math.js';
+import { ECMASCRIPT_TYPEOF_RESULTS }                from '../constants/ecmascript-types.js';
 
-/**
- * Number of components per position.
- *
- * @type {number}
- */
-const POSITION_COMPONENT_COUNT = 3;
+import {
+    TUBE_LINE_LIMITS,
+    TUBE_LINE_DEFAULTS,
+    TUBE_LINE_CAP_TYPES,
+    TUBE_LINE_ERRORS,
+    TUBE_LINE_LAYOUT,
+    TUBE_LINE_NORMALS
+} from '../constants/tube-line-geometry.js';
 
-/**
- * Offset for X component in position triplet.
- *
- * @type {number}
- */
-const POSITION_X_OFFSET = 0;
-
-/**
- * Offset for Y component in position triplet.
- *
- * @type {number}
- */
-const POSITION_Y_OFFSET = 1;
-
-/**
- * Offset for Z component in position triplet.
- *
- * @type {number}
- */
-const POSITION_Z_OFFSET = 2;
-
-/**
- * Minimum point count for a tube line.
- *
- * @type {number}
- */
-const MIN_POINT_COUNT = 2;
-
-/**
- * Default radius for the tube line.
- *
- * @type {number}
- */
-const DEFAULT_RADIUS = 0.05;
-
-/**
- * Default tube width (when specified, overrides the radius).
- *
- * @type {null}
- */
-const DEFAULT_WIDTH = null;
-
-/**
- * Default radial segments.
- *
- * @type {number}
- */
-const DEFAULT_RADIAL_SEGMENTS = 8;
-
-/**
- * Minimum radial segments for a tube.
- *
- * @type {number}
- */
-const MIN_RADIAL_SEGMENTS = 3;
-
-/**
- * Default closed flag.
- *
- * @type {boolean}
- */
-const DEFAULT_CLOSED = false;
-
-/**
- * Cap type: no caps.
- *
- * @type {string}
- */
-const CAP_TYPE_NONE = 'none';
-
-/**
- * Cap type: flat caps.
- *
- * @type {string}
- */
-const CAP_TYPE_FLAT = 'flat';
-
-/**
- * Default cap type.
- *
- * @type {string}
- */
-const DEFAULT_CAP_TYPE = CAP_TYPE_NONE;
-
-/**
- * Error message for invalid cap type.
- *
- * @type {string}
- */
-const ERROR_INVALID_CAP_TYPE = `\`TubeLineGeometry\` expects \`capType\` to be "${CAP_TYPE_NONE}" or "${CAP_TYPE_FLAT}".`;
-
-/**
- * Offset used to compute radius from width.
- *
- * @type {number}
- */
-const WIDTH_TO_RADIUS_DIVISOR = 2;
-
-/**
- * Two PI constant.
- *
- * @type {number}
- */
-const TWO_PI = Math.PI * 2;
-
-/**
- * Small epsilon used for vector normalization.
- *
- * @type {number}
- */
-const NORMALIZE_EPSILON = 1e-8;
-
-/**
- * Up axis used for frame generation.
- *
- * @type {number}
- */
-const UP_AXIS_X = 0;
-
-/**
- * Up axis used for frame generation.
- *
- * @type {number}
- */
-const UP_AXIS_Y = 1;
-
-/**
- * Up axis used for frame generation.
- *
- * @type {number}
- */
-const UP_AXIS_Z = 0;
-
-/**
- * Fallback axis X component used, when tangent is parallel to up axis.
- *
- * @type {number}
- */
-const FALLBACK_AXIS_X = 1;
-
-/**
- * Fallback axis Y component used, when tangent is parallel to up axis.
- *
- * @type {number}
- */
-const FALLBACK_AXIS_Y = 0;
-
-/**
- * Fallback axis Z component used, when tangent is parallel to up axis.
- *
- * @type {number}
- */
-const FALLBACK_AXIS_Z = 0;
-
-/**
- * Secondary fallback axis X component.
- *
- * @type {number}
- */
-const SECOND_FALLBACK_AXIS_X = 0;
-
-/**
- * Secondary fallback axis Y component.
- *
- * @type {number}
- */
-const SECOND_FALLBACK_AXIS_Y = 0;
-
-/**
- * Secondary fallback axis Z component.
- *
- * @type {number}
- */
-const SECOND_FALLBACK_AXIS_Z = 1;
-
-/**
- * Default zero value.
- *
- * @type {number}
- */
-const ZERO_VALUE = 0;
-
-/**
- * One value.
- *
- * @type {number}
- */
-const ONE_VALUE = 1;
-
-/**
- * Two value.
- *
- * @type {number}
- */
-const TWO_VALUE = 2;
+import {
+    GEOMETRY_SIZES,
+    GEOMETRY_LAYOUT,
+    GEOMETRY_ANGLES,
+    PRIMITIVE_LINES,
+    PRIMITIVE_TRIANGLES
+} from '../constants/geometry.js';
 
 /**
  * Options used by `TubeLineGeometry`.
@@ -220,68 +36,24 @@ const TWO_VALUE = 2;
 /**
  * Geometry for thick debug lines (tube around the polyline).
  */
-export class TubeLineGeometry extends Geometry {
+export class TubeLineGeometry extends GeneratedGeometry {
 
     /**
-     * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
-     * @param {TubeLineGeometryOptions} options     - Tube geometry options.
-     * @throws {TypeError}  When inputs are invalid.
-     * @throws {RangeError} When numeric inputs are out of range.
+     * @param {TubeLineGeometryOptions} options - Tube geometry options.
+     * @throws {TypeError}                        When inputs are invalid.
+     * @throws {RangeError}                       When numeric inputs are out of range.
+     * @returns {GeneratedGeometryData}         - Generated CPU buffers.
+     * @protected
      */
-    constructor(webglContext, options = {}) {
-        if (options === null || typeof options !== 'object' || Array.isArray(options)) {
-            throw new TypeError('`TubeLineGeometry` expects options as a plain object.');
-        }
-
-        const {
-            positions,
-            radius         = DEFAULT_RADIUS,
-            width          = DEFAULT_WIDTH,
-            radialSegments = DEFAULT_RADIAL_SEGMENTS,
-            closed         = DEFAULT_CLOSED,
-            capType        = DEFAULT_CAP_TYPE
-        } = options;
-
-        if (!Array.isArray(positions)) {
-            throw new TypeError('`TubeLineGeometry` expects `positions` as an array of `Vector3`.');
-        }
-
-        if (positions.length < MIN_POINT_COUNT) {
-            throw new RangeError('`TubeLineGeometry` expects at least the 2 points.');
-        }
-
-        for (const point of positions) {
-            if (!(point instanceof Vector3)) {
-                throw new TypeError('`TubeLineGeometry` expects all positions to be the `Vector3` instances.');
-            }
-        }
-
-        if (typeof radius !== 'number' || !Number.isFinite(radius) || radius <= ZERO_VALUE) {
-            throw new RangeError('`TubeLineGeometry` expects `radius` as a positive number.');
-        }
-
-        if (width !== null && (typeof width !== 'number' || !Number.isFinite(width) || width <= ZERO_VALUE)) {
-            throw new RangeError('`TubeLineGeometry` expects `width` as a positive number or null.');
-        }
-
-        if (!Number.isInteger(radialSegments) || radialSegments < MIN_RADIAL_SEGMENTS) {
-            throw new RangeError('`TubeLineGeometry` expects `radialSegments` as an `integer >= 3`.');
-        }
-
-        if (typeof closed !== 'boolean') {
-            throw new TypeError('`TubeLineGeometry` expects `closed` as a boolean.');
-        }
-
-        if (capType !== CAP_TYPE_NONE && capType !== CAP_TYPE_FLAT) {
-            throw new RangeError(ERROR_INVALID_CAP_TYPE);
-        }
-
-        const resolvedRadius   = width !== null ? (width / WIDTH_TO_RADIUS_DIVISOR) : radius;
+    static createGeometryData(options = {}) {
+        const normalized = TubeLineGeometry.#normalizeOptions(options);
+        const { positions, radius, width, radialSegments, closed, capType } = normalized;
+        const resolvedRadius   = width !== null ? (width / GEOMETRY_SIZES.HALF_SIZE_DIVISOR) : radius;
         const baseVertexCount  = positions.length * radialSegments;
-        const addCaps          = capType === CAP_TYPE_FLAT && !closed;
-        const extraCapVertices = addCaps ? TWO_VALUE : ZERO_VALUE;
+        const addCaps          = capType === TUBE_LINE_CAP_TYPES.FLAT && !closed;
+        const extraCapVertices = addCaps ? TUBE_LINE_LAYOUT.CAP_CENTER_COUNT : MATH_COMMON_VALUES.ZERO;
         const totalVertexCount = baseVertexCount + extraCapVertices;
-        const positionsBuffer  = new Float32Array(totalVertexCount * POSITION_COMPONENT_COUNT);
+        const positionsBuffer  = new Float32Array(totalVertexCount * GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT);
 
         TubeLineGeometry.#writeRingPositions(positionsBuffer, positions, radialSegments, resolvedRadius, closed);
 
@@ -290,21 +62,20 @@ export class TubeLineGeometry extends Geometry {
         }
 
         const indices          = TubeLineGeometry.#buildIndices(positions.length, radialSegments, closed, addCaps, baseVertexCount);
-        const wireframeIndices = createWireframeIndicesFromSolidIndices(totalVertexCount, indices);
+        const wireframeIndices = GeometryUtils.createWireframeIndicesFromSolidIndices(totalVertexCount, indices);
 
-        super(
-            webglContext,
-            positionsBuffer,
-            null,
-            indices,
-            wireframeIndices,
-            null,
-            null,
-            {
+        return {
+            positions        : positionsBuffer,
+            colors           : null,
+            indicesSolid     : indices,
+            indicesWireframe : wireframeIndices,
+            uvs              : null,
+            normals          : null,
+            primitiveOptions : {
                 solidPrimitive     : PRIMITIVE_TRIANGLES,
                 wireframePrimitive : PRIMITIVE_LINES
             }
-        );
+        };
     }
 
     /**
@@ -318,7 +89,7 @@ export class TubeLineGeometry extends Geometry {
     static #writeRingPositions(buffer, positions, radialSegments, radius, closed) {
         const pointCount = positions.length;
 
-        for (let index = ZERO_VALUE; index < pointCount; index += ONE_VALUE) {
+        for (let index = MATH_COMMON_VALUES.ZERO; index < pointCount; index += MATH_COMMON_VALUES.UNIT) {
             const previousIndex = TubeLineGeometry.#getPreviousIndex(index, pointCount, closed);
             const nextIndex     = TubeLineGeometry.#getNextIndex(index, pointCount, closed);
             const tangent       = TubeLineGeometry.#computeTangent(positions[previousIndex], positions[nextIndex]);
@@ -327,18 +98,18 @@ export class TubeLineGeometry extends Geometry {
             const ringBase      = index * radialSegments;
             const point         = positions[index];
 
-            for (let segmentIndex = ZERO_VALUE; segmentIndex < radialSegments; segmentIndex += ONE_VALUE) {
-                const angle       = TWO_PI * (segmentIndex / radialSegments);
+            for (let segmentIndex = MATH_COMMON_VALUES.ZERO; segmentIndex < radialSegments; segmentIndex += MATH_COMMON_VALUES.UNIT) {
+                const angle       = GEOMETRY_ANGLES.FULL_TURN * (segmentIndex / radialSegments);
                 const cosAngle    = Math.cos(angle);
                 const sinAngle    = Math.sin(angle);
                 const offsetX     = (normal.x * cosAngle + binormal.x * sinAngle) * radius;
                 const offsetY     = (normal.y * cosAngle + binormal.y * sinAngle) * radius;
                 const offsetZ     = (normal.z * cosAngle + binormal.z * sinAngle) * radius;
                 const vertexIndex = ringBase + segmentIndex;
-                const baseIndex   = vertexIndex * POSITION_COMPONENT_COUNT;
-                buffer[baseIndex + POSITION_X_OFFSET] = point.x + offsetX;
-                buffer[baseIndex + POSITION_Y_OFFSET] = point.y + offsetY;
-                buffer[baseIndex + POSITION_Z_OFFSET] = point.z + offsetZ;
+                const baseIndex   = vertexIndex * GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+                buffer[baseIndex + MATH_VECTOR3_INDEXES.X] = point.x + offsetX;
+                buffer[baseIndex + MATH_VECTOR3_INDEXES.Y] = point.y + offsetY;
+                buffer[baseIndex + MATH_VECTOR3_INDEXES.Z] = point.z + offsetZ;
             }
         }
     }
@@ -350,17 +121,16 @@ export class TubeLineGeometry extends Geometry {
      * @private
      */
     static #writeCapCenters(buffer, positions, baseVertexCount) {
-        const startBaseIndex = baseVertexCount * POSITION_COMPONENT_COUNT;
-        const endBaseIndex   = (baseVertexCount + ONE_VALUE) * POSITION_COMPONENT_COUNT;
-        const startPoint     = positions[ZERO_VALUE];
-        const endPoint       = positions[positions.length - ONE_VALUE];
-
-        buffer[startBaseIndex + POSITION_X_OFFSET] = startPoint.x;
-        buffer[startBaseIndex + POSITION_Y_OFFSET] = startPoint.y;
-        buffer[startBaseIndex + POSITION_Z_OFFSET] = startPoint.z;
-        buffer[endBaseIndex + POSITION_X_OFFSET]   = endPoint.x;
-        buffer[endBaseIndex + POSITION_Y_OFFSET]   = endPoint.y;
-        buffer[endBaseIndex + POSITION_Z_OFFSET]   = endPoint.z;
+        const startBaseIndex = baseVertexCount * GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+        const endBaseIndex   = (baseVertexCount + MATH_COMMON_VALUES.UNIT) * GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+        const startPoint     = positions[MATH_COMMON_VALUES.ZERO];
+        const endPoint       = positions[positions.length - MATH_COMMON_VALUES.UNIT];
+        buffer[startBaseIndex + MATH_VECTOR3_INDEXES.X] = startPoint.x;
+        buffer[startBaseIndex + MATH_VECTOR3_INDEXES.Y] = startPoint.y;
+        buffer[startBaseIndex + MATH_VECTOR3_INDEXES.Z] = startPoint.z;
+        buffer[endBaseIndex + MATH_VECTOR3_INDEXES.X]   = endPoint.x;
+        buffer[endBaseIndex + MATH_VECTOR3_INDEXES.Y]   = endPoint.y;
+        buffer[endBaseIndex + MATH_VECTOR3_INDEXES.Z]   = endPoint.z;
     }
 
     /**
@@ -373,15 +143,15 @@ export class TubeLineGeometry extends Geometry {
      * @private
      */
     static #buildIndices(pointCount, radialSegments, closed, addCaps, baseVertexCount) {
-        const segmentCount = closed ? pointCount : (pointCount - ONE_VALUE);
+        const segmentCount = closed ? pointCount : (pointCount - MATH_COMMON_VALUES.UNIT);
         const indices      = [];
 
-        for (let segmentIndex = ZERO_VALUE; segmentIndex < segmentCount; segmentIndex += ONE_VALUE) {
+        for (let segmentIndex = MATH_COMMON_VALUES.ZERO; segmentIndex < segmentCount; segmentIndex += MATH_COMMON_VALUES.UNIT) {
             const ringStart     = segmentIndex * radialSegments;
-            const nextRingStart = ((segmentIndex + ONE_VALUE) % pointCount) * radialSegments;
+            const nextRingStart = ((segmentIndex + MATH_COMMON_VALUES.UNIT) % pointCount) * radialSegments;
 
-            for (let radialIndex = ZERO_VALUE; radialIndex < radialSegments; radialIndex += ONE_VALUE) {
-                const nextRadialIndex = (radialIndex + ONE_VALUE) % radialSegments;
+            for (let radialIndex = MATH_COMMON_VALUES.ZERO; radialIndex < radialSegments; radialIndex += MATH_COMMON_VALUES.UNIT) {
+                const nextRadialIndex = (radialIndex + MATH_COMMON_VALUES.UNIT) % radialSegments;
                 const groupA          = ringStart + radialIndex;
                 const groupB          = ringStart + nextRadialIndex;
                 const groupC          = nextRingStart + radialIndex;
@@ -393,12 +163,12 @@ export class TubeLineGeometry extends Geometry {
 
         if (addCaps) {
             const startCenterIndex = baseVertexCount;
-            const endCenterIndex   = baseVertexCount + ONE_VALUE;
-            const startRingStart   = ZERO_VALUE;
-            const endRingStart     = (pointCount - ONE_VALUE) * radialSegments;
+            const endCenterIndex   = baseVertexCount + MATH_COMMON_VALUES.UNIT;
+            const startRingStart   = MATH_COMMON_VALUES.ZERO;
+            const endRingStart     = (pointCount - MATH_COMMON_VALUES.UNIT) * radialSegments;
 
-            for (let radialIndex = ZERO_VALUE; radialIndex < radialSegments; radialIndex += ONE_VALUE) {
-                const nextRadialIndex = (radialIndex + ONE_VALUE) % radialSegments;
+            for (let radialIndex = MATH_COMMON_VALUES.ZERO; radialIndex < radialSegments; radialIndex += MATH_COMMON_VALUES.UNIT) {
+                const nextRadialIndex = (radialIndex + MATH_COMMON_VALUES.UNIT) % radialSegments;
                 const startA          = startRingStart + radialIndex;
                 const startB          = startRingStart + nextRadialIndex;
                 indices.push(startCenterIndex, startB, startA);
@@ -409,7 +179,7 @@ export class TubeLineGeometry extends Geometry {
             }
         }
 
-        return createIndexArray(baseVertexCount + (addCaps ? TWO_VALUE : ZERO_VALUE), indices);
+        return GeometryUtils.createIndexArray(baseVertexCount + (addCaps ? TUBE_LINE_LAYOUT.CAP_CENTER_COUNT : MATH_COMMON_VALUES.ZERO), indices);
     }
 
     /**
@@ -420,11 +190,11 @@ export class TubeLineGeometry extends Geometry {
      * @private
      */
     static #getPreviousIndex(index, count, closed) {
-        if (index > ZERO_VALUE) {
-            return index - ONE_VALUE;
+        if (index > MATH_COMMON_VALUES.ZERO) {
+            return index - MATH_COMMON_VALUES.UNIT;
         }
 
-        return closed ? (count - ONE_VALUE) : index;
+        return closed ? (count - MATH_COMMON_VALUES.UNIT) : index;
     }
 
     /**
@@ -435,11 +205,11 @@ export class TubeLineGeometry extends Geometry {
      * @private
      */
     static #getNextIndex(index, count, closed) {
-        if (index < count - ONE_VALUE) {
-            return index + ONE_VALUE;
+        if (index < count - MATH_COMMON_VALUES.UNIT) {
+            return index + MATH_COMMON_VALUES.UNIT;
         }
 
-        return closed ? ZERO_VALUE : index;
+        return closed ? MATH_COMMON_VALUES.ZERO : index;
     }
 
     /**
@@ -454,8 +224,12 @@ export class TubeLineGeometry extends Geometry {
         const deltaZ = pointB.z - pointA.z;
         const length = Math.sqrt((deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ));
 
-        if (length <= NORMALIZE_EPSILON) {
-            return new Vector3(ZERO_VALUE, ONE_VALUE, ZERO_VALUE);
+        if (length <= TUBE_LINE_LAYOUT.NORMALIZE_EPSILON) {
+            return new Vector3(
+                MATH_COMMON_VALUES.ZERO,
+                MATH_COMMON_VALUES.UNIT,
+                MATH_COMMON_VALUES.ZERO
+            );
         }
 
         return new Vector3(deltaX / length, deltaY / length, deltaZ / length);
@@ -467,27 +241,27 @@ export class TubeLineGeometry extends Geometry {
      * @private
      */
     static #computeNormal(tangent) {
-        let normalX = (tangent.y * UP_AXIS_Z) - (tangent.z * UP_AXIS_Y);
-        let normalY = (tangent.z * UP_AXIS_X) - (tangent.x * UP_AXIS_Z);
-        let normalZ = (tangent.x * UP_AXIS_Y) - (tangent.y * UP_AXIS_X);
-        let length = Math.sqrt((normalX * normalX) + (normalY * normalY) + (normalZ * normalZ));
+        let normalX = (tangent.y * TUBE_LINE_NORMALS.UP_AXIS_Z) - (tangent.z * TUBE_LINE_NORMALS.UP_AXIS_Y);
+        let normalY = (tangent.z * TUBE_LINE_NORMALS.UP_AXIS_X) - (tangent.x * TUBE_LINE_NORMALS.UP_AXIS_Z);
+        let normalZ = (tangent.x * TUBE_LINE_NORMALS.UP_AXIS_Y) - (tangent.y * TUBE_LINE_NORMALS.UP_AXIS_X);
+        let length  = Math.sqrt((normalX * normalX) + (normalY * normalY) + (normalZ * normalZ));
 
-        if (length <= NORMALIZE_EPSILON) {
-            normalX = (tangent.y * FALLBACK_AXIS_Z) - (tangent.z * FALLBACK_AXIS_Y);
-            normalY = (tangent.z * FALLBACK_AXIS_X) - (tangent.x * FALLBACK_AXIS_Z);
-            normalZ = (tangent.x * FALLBACK_AXIS_Y) - (tangent.y * FALLBACK_AXIS_X);
+        if (length <= TUBE_LINE_LAYOUT.NORMALIZE_EPSILON) {
+            normalX = (tangent.y * TUBE_LINE_NORMALS.FALLBACK_AXIS_Z) - (tangent.z * TUBE_LINE_NORMALS.FALLBACK_AXIS_Y);
+            normalY = (tangent.z * TUBE_LINE_NORMALS.FALLBACK_AXIS_X) - (tangent.x * TUBE_LINE_NORMALS.FALLBACK_AXIS_Z);
+            normalZ = (tangent.x * TUBE_LINE_NORMALS.FALLBACK_AXIS_Y) - (tangent.y * TUBE_LINE_NORMALS.FALLBACK_AXIS_X);
             length  = Math.sqrt((normalX * normalX) + (normalY * normalY) + (normalZ * normalZ));
         }
 
-        if (length <= NORMALIZE_EPSILON) {
-            normalX = (tangent.y * SECOND_FALLBACK_AXIS_Z) - (tangent.z * SECOND_FALLBACK_AXIS_Y);
-            normalY = (tangent.z * SECOND_FALLBACK_AXIS_X) - (tangent.x * SECOND_FALLBACK_AXIS_Z);
-            normalZ = (tangent.x * SECOND_FALLBACK_AXIS_Y) - (tangent.y * SECOND_FALLBACK_AXIS_X);
+        if (length <= TUBE_LINE_LAYOUT.NORMALIZE_EPSILON) {
+            normalX = (tangent.y * TUBE_LINE_NORMALS.SECOND_FALLBACK_AXIS_Z) - (tangent.z * TUBE_LINE_NORMALS.SECOND_FALLBACK_AXIS_Y);
+            normalY = (tangent.z * TUBE_LINE_NORMALS.SECOND_FALLBACK_AXIS_X) - (tangent.x * TUBE_LINE_NORMALS.SECOND_FALLBACK_AXIS_Z);
+            normalZ = (tangent.x * TUBE_LINE_NORMALS.SECOND_FALLBACK_AXIS_Y) - (tangent.y * TUBE_LINE_NORMALS.SECOND_FALLBACK_AXIS_X);
             length  = Math.sqrt((normalX * normalX) + (normalY * normalY) + (normalZ * normalZ));
         }
 
-        if (length <= NORMALIZE_EPSILON) {
-            return new Vector3(ONE_VALUE, ZERO_VALUE, ZERO_VALUE);
+        if (length <= TUBE_LINE_LAYOUT.NORMALIZE_EPSILON) {
+            return new Vector3(MATH_COMMON_VALUES.UNIT, MATH_COMMON_VALUES.ZERO, MATH_COMMON_VALUES.ZERO);
         }
 
         return new Vector3(normalX / length, normalY / length, normalZ / length);
@@ -505,10 +279,72 @@ export class TubeLineGeometry extends Geometry {
         const binormalZ = (tangent.x * normal.y) - (tangent.y * normal.x);
         const length    = Math.sqrt((binormalX * binormalX) + (binormalY * binormalY) + (binormalZ * binormalZ));
 
-        if (length <= NORMALIZE_EPSILON) {
-            return new Vector3(ZERO_VALUE, ZERO_VALUE, ZERO_VALUE);
+        if (length <= TUBE_LINE_LAYOUT.NORMALIZE_EPSILON) {
+            return new Vector3(
+                MATH_COMMON_VALUES.ZERO,
+                MATH_COMMON_VALUES.ZERO,
+                MATH_COMMON_VALUES.ZERO
+            );
         }
 
         return new Vector3(binormalX / length, binormalY / length, binormalZ / length);
+    }
+
+    /**
+     * Validates the path and tube options before allocating geometry buffers.
+     *
+     * @param {TubeLineGeometryOptions} options - Normalized geometry options.
+     * @returns {Required<TubeLineGeometryOptions>}
+     * @private
+     */
+    static #normalizeOptions(options) {
+        if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
+            throw new TypeError('TubeLineGeometry expects options as a plain object.');
+        }
+
+        const {
+            positions,
+            radius         = TUBE_LINE_DEFAULTS.RADIUS,
+            width          = TUBE_LINE_DEFAULTS.WIDTH,
+            radialSegments = TUBE_LINE_DEFAULTS.RADIAL_SEGMENTS,
+            closed         = TUBE_LINE_DEFAULTS.CLOSED,
+            capType        = TUBE_LINE_DEFAULTS.CAP_TYPE
+        } = options;
+
+        if (!Array.isArray(positions)) {
+            throw new TypeError('TubeLineGeometry expects positions as an array of Vector3.');
+        }
+
+        if (positions.length < TUBE_LINE_LIMITS.MIN_POINT_COUNT) {
+            throw new RangeError('TubeLineGeometry expects at least the 2 points.');
+        }
+
+        for (const point of positions) {
+            if (!(point instanceof Vector3)) {
+                throw new TypeError('TubeLineGeometry expects all positions to be the Vector3 instances.');
+            }
+        }
+
+        if (typeof radius !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(radius) || radius <= MATH_COMMON_VALUES.ZERO) {
+            throw new RangeError('TubeLineGeometry expects radius as a positive number.');
+        }
+
+        if (width !== null && (typeof width !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(width) || width <= MATH_COMMON_VALUES.ZERO)) {
+            throw new RangeError('TubeLineGeometry expects width as a positive number or null.');
+        }
+
+        if (!Number.isInteger(radialSegments) || radialSegments < TUBE_LINE_LIMITS.MIN_RADIAL_SEGMENTS) {
+            throw new RangeError('TubeLineGeometry expects radialSegments as an integer >= 3.');
+        }
+
+        if (typeof closed !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+            throw new TypeError('TubeLineGeometry expects closed as a boolean.');
+        }
+
+        if (capType !== TUBE_LINE_CAP_TYPES.NONE && capType !== TUBE_LINE_CAP_TYPES.FLAT) {
+            throw new RangeError(TUBE_LINE_ERRORS.INVALID_CAP_TYPE);
+        }
+
+        return { positions, radius, width, radialSegments, closed, capType };
     }
 }
