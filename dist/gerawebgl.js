@@ -5194,6 +5194,55 @@ var TubeLineGeometry = class _TubeLineGeometry extends GeneratedGeometry {
   }
 };
 
+// core/exception-messages/shader-program.js
+var SHADER_PROGRAM_EXCEPTION_MESSAGES = Object.freeze({
+  CONTEXT_TYPE: "`ShaderProgram` expects a `WebGL2RenderingContext`.",
+  SOURCE_TYPE: "`ShaderProgram` expects vertex and fragment source as strings.",
+  ATTRIBUTE_NAME_TYPE: "`ShaderProgram.getAttribLocation` expects attribute name as a string.",
+  UNIFORM_NAME_TYPE: "`ShaderProgram.#getUniformLocation` expects a string name.",
+  FLOAT_NAME_TYPE: "`ShaderProgram.setFloat` expects uniform name as a string.",
+  FLOAT_VALUE_TYPE: "`ShaderProgram.setFloat` expects value as a number.",
+  INT_NAME_TYPE: "`ShaderProgram.setInt` expects uniform name as a string.",
+  INT_VALUE_TYPE: "`ShaderProgram.setInt` expects an integer value.",
+  TEXTURE_NAME_TYPE: "`ShaderProgram.setTexture2D` expects uniform name as a string.",
+  TEXTURE_TYPE: "`ShaderProgram.setTexture2D` expects texture as Texture2D.",
+  TEXTURE_UNIT_INDEX: "`ShaderProgram.setTexture2D` expects textureUnitIndex as a non-negative integer.",
+  VECTOR2_NAME_TYPE: "`ShaderProgram.setVector2` expects uniform name as a string.",
+  VECTOR2_TYPE: "`ShaderProgram.setVector2` expects a number[] or Float32Array.",
+  VECTOR2_LENGTH: "`ShaderProgram.setVector2` expects exactly 2 components.",
+  VECTOR3_NAME_TYPE: "`ShaderProgram.setVector3` expects uniform name as a string.",
+  VECTOR3_TYPE: "`ShaderProgram.setVector3` expects a number[] or Float32Array.",
+  VECTOR3_LENGTH: "`ShaderProgram.setVector3` expects exactly 3 components.",
+  VECTOR4_NAME_TYPE: "`ShaderProgram.setVector4` expects uniform name as a string.",
+  VECTOR4_TYPE: "`ShaderProgram.setVector4` expects a number[] or `Float32Array`.",
+  VECTOR4_LENGTH: "`ShaderProgram.setVector4` expects exactly 4 components.",
+  MATRIX4_NAME_TYPE: "`ShaderProgram.setMatrix4` expects uniform name as a string.",
+  MATRIX4_TYPE: "`ShaderProgram.setMatrix4` expects a 4x4 Float32Array.",
+  DISPOSED: "`ShaderProgram` has been disposed and can no longer be used.",
+  PROGRAM_CREATION: "Failed to create WebGL program.",
+  SHADER_CREATION: "Failed to create the WebGL shader.",
+  UNKNOWN_LINK_ERROR: "Unknown program link error",
+  UNKNOWN_COMPILE_ERROR: "Unknown shader compilation error",
+  ATTRIBUTE_NOT_FOUND: (name) => `Attribute "${name}" not found in shader program.`,
+  UNIFORM_NOT_FOUND: (name) => `Uniform "${name}" not found in shader program.`,
+  PROGRAM_LINK: (infoLog) => `Failed to link program: ${infoLog}`,
+  SHADER_COMPILE: (infoLog) => `Failed to compile shader: ${infoLog}`
+});
+
+// core/constants/shader-program.js
+var SHADER_PROGRAM_LAYOUT = Object.freeze({
+  VECTOR2_ELEMENT_COUNT: 2,
+  VECTOR4_ELEMENT_COUNT: 4
+});
+var SHADER_PROGRAM_DEFAULTS = Object.freeze({
+  TEXTURE_UNIT_INDEX: 0,
+  MATRIX_TRANSPOSE: false
+});
+var SHADER_PROGRAM_LIMITS = Object.freeze({
+  ATTRIBUTE_LOCATION_NOT_FOUND: -1,
+  MIN_TEXTURE_UNIT_INDEX: 0
+});
+
 // core/texture/texture2d.js
 var DEFAULT_FLIP_Y = true;
 var MIPMAP_POLICY_NONE = 0;
@@ -5757,14 +5806,7 @@ var Texture2D = class {
 };
 
 // core/shader/shader-program.js
-var MATRIX_4x4_ELEMENT_COUNT = 16;
-var VECTOR_2_ELEMENT_COUNT = 2;
-var VECTOR_3_ELEMENT_COUNT = 3;
-var VECTOR_4_ELEMENT_COUNT = 4;
-var ATTRIBUTE_LOCATION_NOT_FOUND_VALUE = -1;
-var MIN_TEXTURE_UNIT_INDEX2 = 0;
-var DEFAULT_TEXTURE_UNIT_INDEX = 0;
-var ShaderProgram = class {
+var ShaderProgram = class _ShaderProgram {
   /**
    * Raw WebGL2 rendering context.
    * Used for all shader program operations (e.g.: compile/link/use, uniforms, attributes).
@@ -5801,37 +5843,10 @@ var ShaderProgram = class {
    * @param {string} fragmentSource                        - GLSL source code of the fragment shader.
    */
   constructor(webglRenderingContext, vertexSource, fragmentSource) {
-    if (!(webglRenderingContext instanceof WebGL2RenderingContext)) {
-      throw new TypeError("`ShaderProgram` expects a `WebGL2RenderingContext`.");
-    }
-    if (typeof vertexSource !== "string" || typeof fragmentSource !== "string") {
-      throw new TypeError("`ShaderProgram` expects vertex and fragment source as strings.");
-    }
+    _ShaderProgram.#assertConstructorArguments(webglRenderingContext, vertexSource, fragmentSource);
     this.#webglRenderingContext = webglRenderingContext;
     this.#uniformLocations = /* @__PURE__ */ new Map();
-    const vertexShader = this.#compileShader(this.#webglRenderingContext.VERTEX_SHADER, vertexSource);
-    const fragmentShader = this.#compileShader(this.#webglRenderingContext.FRAGMENT_SHADER, fragmentSource);
-    const program = this.#webglRenderingContext.createProgram();
-    if (!program) {
-      this.#webglRenderingContext.deleteShader(vertexShader);
-      this.#webglRenderingContext.deleteShader(fragmentShader);
-      throw new Error("Failed to create WebGL program.");
-    }
-    this.#webglRenderingContext.attachShader(program, vertexShader);
-    this.#webglRenderingContext.attachShader(program, fragmentShader);
-    this.#webglRenderingContext.linkProgram(program);
-    const linkStatus = this.#webglRenderingContext.getProgramParameter(
-      program,
-      this.#webglRenderingContext.LINK_STATUS
-    );
-    this.#webglRenderingContext.deleteShader(vertexShader);
-    this.#webglRenderingContext.deleteShader(fragmentShader);
-    if (!linkStatus) {
-      const infoLog = this.#webglRenderingContext.getProgramInfoLog(program) || "Unknown program link error";
-      this.#webglRenderingContext.deleteProgram(program);
-      throw new Error(`Failed to link program: ${infoLog}`);
-    }
-    this.#program = program;
+    this.#program = this.#createProgram(vertexSource, fragmentSource);
   }
   /**
    * Returns the underlying WebGL program object.
@@ -5858,12 +5873,12 @@ var ShaderProgram = class {
    */
   getAttribLocation(name) {
     this.#assertNotDisposed();
-    if (typeof name !== "string") {
-      throw new TypeError("`ShaderProgram.getAttribLocation` expects attribute name as a string.");
+    if (typeof name !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
+      throw new TypeError(SHADER_PROGRAM_EXCEPTION_MESSAGES.ATTRIBUTE_NAME_TYPE);
     }
     const location = this.#webglRenderingContext.getAttribLocation(this.#program, name);
-    if (location === ATTRIBUTE_LOCATION_NOT_FOUND_VALUE) {
-      throw new Error(`Attribute "${name}" not found in shader program.`);
+    if (location === SHADER_PROGRAM_LIMITS.ATTRIBUTE_LOCATION_NOT_FOUND) {
+      throw new Error(SHADER_PROGRAM_EXCEPTION_MESSAGES.ATTRIBUTE_NOT_FOUND(name));
     }
     return location;
   }
@@ -5875,6 +5890,7 @@ var ShaderProgram = class {
    * @returns {WebGLUniformLocation}
    */
   getUniformLocation(name) {
+    this.#assertUniformName(name, SHADER_PROGRAM_EXCEPTION_MESSAGES.UNIFORM_NAME_TYPE);
     return this.#getUniformLocation(name);
   }
   /**
@@ -5884,12 +5900,9 @@ var ShaderProgram = class {
    * @param {number} value - Float value to upload.
    */
   setFloat(name, value) {
-    this.#assertNotDisposed();
-    if (typeof name !== "string") {
-      throw new TypeError("`ShaderProgram.setFloat` expects uniform name as a string.");
-    }
-    if (typeof value !== "number") {
-      throw new TypeError("`ShaderProgram.setFloat` expects value as a number.");
+    this.#assertUniformName(name, SHADER_PROGRAM_EXCEPTION_MESSAGES.FLOAT_NAME_TYPE);
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER) {
+      throw new TypeError(SHADER_PROGRAM_EXCEPTION_MESSAGES.FLOAT_VALUE_TYPE);
     }
     const location = this.#getUniformLocation(name);
     this.#webglRenderingContext.uniform1f(location, value);
@@ -5901,12 +5914,9 @@ var ShaderProgram = class {
    * @param {number} value - Integer value to upload.
    */
   setInt(name, value) {
-    this.#assertNotDisposed();
-    if (typeof name !== "string") {
-      throw new TypeError("`ShaderProgram.setInt` expects uniform name as a string.");
-    }
-    if (typeof value !== "number" || !Number.isInteger(value)) {
-      throw new TypeError("`ShaderProgram.setInt` expects an integer value.");
+    this.#assertUniformName(name, SHADER_PROGRAM_EXCEPTION_MESSAGES.INT_NAME_TYPE);
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isInteger(value)) {
+      throw new TypeError(SHADER_PROGRAM_EXCEPTION_MESSAGES.INT_VALUE_TYPE);
     }
     const location = this.#getUniformLocation(name);
     this.#webglRenderingContext.uniform1i(location, value);
@@ -5918,16 +5928,13 @@ var ShaderProgram = class {
    * @param {Texture2D} texture             - `Texture2D` instance to bind.
    * @param {number} [textureUnitIndex = 0] - Texture unit index (0 => N).
    */
-  setTexture2D(name, texture, textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX) {
-    this.#assertNotDisposed();
-    if (typeof name !== "string") {
-      throw new TypeError("`ShaderProgram.setTexture2D` expects uniform name as a string.");
-    }
+  setTexture2D(name, texture, textureUnitIndex = SHADER_PROGRAM_DEFAULTS.TEXTURE_UNIT_INDEX) {
+    this.#assertUniformName(name, SHADER_PROGRAM_EXCEPTION_MESSAGES.TEXTURE_NAME_TYPE);
     if (!(texture instanceof Texture2D)) {
-      throw new TypeError("`ShaderProgram.setTexture2D` expects texture as Texture2D.");
+      throw new TypeError(SHADER_PROGRAM_EXCEPTION_MESSAGES.TEXTURE_TYPE);
     }
-    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < MIN_TEXTURE_UNIT_INDEX2) {
-      throw new TypeError("`ShaderProgram.setTexture2D` expects textureUnitIndex as a non-negative integer.");
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < SHADER_PROGRAM_LIMITS.MIN_TEXTURE_UNIT_INDEX) {
+      throw new TypeError(SHADER_PROGRAM_EXCEPTION_MESSAGES.TEXTURE_UNIT_INDEX);
     }
     texture.bind(textureUnitIndex);
     const location = this.#getUniformLocation(name);
@@ -5940,16 +5947,13 @@ var ShaderProgram = class {
    * @param {Float32Array | number[]} value - Two numeric components.
    */
   setVector2(name, value) {
-    this.#assertNotDisposed();
-    if (typeof name !== "string") {
-      throw new TypeError("`ShaderProgram.setVector2` expects uniform name as a string.");
-    }
-    if (!Array.isArray(value) && !(value instanceof Float32Array)) {
-      throw new TypeError("`ShaderProgram.setVector2` expects a number[] or Float32Array.");
-    }
-    if (value.length !== VECTOR_2_ELEMENT_COUNT) {
-      throw new TypeError("`ShaderProgram.setVector2` expects exactly 2 components.");
-    }
+    this.#assertUniformName(name, SHADER_PROGRAM_EXCEPTION_MESSAGES.VECTOR2_NAME_TYPE);
+    _ShaderProgram.#assertVector(
+      value,
+      SHADER_PROGRAM_LAYOUT.VECTOR2_ELEMENT_COUNT,
+      SHADER_PROGRAM_EXCEPTION_MESSAGES.VECTOR2_TYPE,
+      SHADER_PROGRAM_EXCEPTION_MESSAGES.VECTOR2_LENGTH
+    );
     const location = this.#getUniformLocation(name);
     this.#webglRenderingContext.uniform2fv(location, value);
   }
@@ -5960,16 +5964,13 @@ var ShaderProgram = class {
    * @param {Float32Array | number[]} value - Three numeric components.
    */
   setVector3(name, value) {
-    this.#assertNotDisposed();
-    if (typeof name !== "string") {
-      throw new TypeError("`ShaderProgram.setVector3` expects uniform name as a string.");
-    }
-    if (!Array.isArray(value) && !(value instanceof Float32Array)) {
-      throw new TypeError("`ShaderProgram.setVector3` expects a number[] or Float32Array.");
-    }
-    if (value.length !== VECTOR_3_ELEMENT_COUNT) {
-      throw new TypeError("`ShaderProgram.setVector3` expects exactly 3 components.");
-    }
+    this.#assertUniformName(name, SHADER_PROGRAM_EXCEPTION_MESSAGES.VECTOR3_NAME_TYPE);
+    _ShaderProgram.#assertVector(
+      value,
+      MATH_LAYOUT.VECTOR3_ELEMENT_COUNT,
+      SHADER_PROGRAM_EXCEPTION_MESSAGES.VECTOR3_TYPE,
+      SHADER_PROGRAM_EXCEPTION_MESSAGES.VECTOR3_LENGTH
+    );
     const location = this.#getUniformLocation(name);
     this.#webglRenderingContext.uniform3fv(location, value);
   }
@@ -5980,16 +5981,13 @@ var ShaderProgram = class {
    * @param {Float32Array | number[]} value - Four numeric components.
    */
   setVector4(name, value) {
-    this.#assertNotDisposed();
-    if (typeof name !== "string") {
-      throw new TypeError("`ShaderProgram.setVector4` expects uniform name as a string.");
-    }
-    if (!Array.isArray(value) && !(value instanceof Float32Array)) {
-      throw new TypeError("`ShaderProgram.setVector4` expects a number[] or `Float32Array`.");
-    }
-    if (value.length !== VECTOR_4_ELEMENT_COUNT) {
-      throw new TypeError("`ShaderProgram.setVector4` expects exactly 4 components.");
-    }
+    this.#assertUniformName(name, SHADER_PROGRAM_EXCEPTION_MESSAGES.VECTOR4_NAME_TYPE);
+    _ShaderProgram.#assertVector(
+      value,
+      SHADER_PROGRAM_LAYOUT.VECTOR4_ELEMENT_COUNT,
+      SHADER_PROGRAM_EXCEPTION_MESSAGES.VECTOR4_TYPE,
+      SHADER_PROGRAM_EXCEPTION_MESSAGES.VECTOR4_LENGTH
+    );
     const location = this.#getUniformLocation(name);
     this.#webglRenderingContext.uniform4fv(location, value);
   }
@@ -6000,15 +5998,16 @@ var ShaderProgram = class {
    * @param {Float32Array} matrix - 4x4 matrix in column-major order to upload to the uniform.
    */
   setMatrix4(name, matrix) {
-    this.#assertNotDisposed();
-    if (typeof name !== "string") {
-      throw new TypeError("`ShaderProgram.setMatrix4` expects uniform name as a string.");
-    }
-    if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
-      throw new TypeError("`ShaderProgram.setMatrix4` expects a 4x4 Float32Array.");
+    this.#assertUniformName(name, SHADER_PROGRAM_EXCEPTION_MESSAGES.MATRIX4_NAME_TYPE);
+    if (!(matrix instanceof Float32Array) || matrix.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
+      throw new TypeError(SHADER_PROGRAM_EXCEPTION_MESSAGES.MATRIX4_TYPE);
     }
     const location = this.#getUniformLocation(name);
-    this.#webglRenderingContext.uniformMatrix4fv(location, false, matrix);
+    this.#webglRenderingContext.uniformMatrix4fv(
+      location,
+      SHADER_PROGRAM_DEFAULTS.MATRIX_TRANSPOSE,
+      matrix
+    );
   }
   /**
    * Releases the underlying WebGL program. After calling dispose, this instance must not be used.
@@ -6017,23 +6016,69 @@ var ShaderProgram = class {
     if (this.#isDisposed) {
       return;
     }
-    if (this.#program) {
-      this.#webglRenderingContext.deleteProgram(this.#program);
-    }
+    this.#webglRenderingContext.deleteProgram(this.#program);
     this.#uniformLocations.clear();
     this.#program = null;
     this.#isDisposed = true;
   }
   /**
+   * Validates constructor arguments before allocating WebGL resources.
+   *
+   * @param {WebGL2RenderingContext} webglRenderingContext - Rendering context to validate.
+   * @param {string} vertexSource                          - Vertex shader source.
+   * @param {string} fragmentSource                        - Fragment shader source.
    * @private
    */
-  #assertNotDisposed() {
-    if (this.#isDisposed || this.#program === null) {
-      throw new Error("`ShaderProgram` has been disposed and can no longer be used.");
+  static #assertConstructorArguments(webglRenderingContext, vertexSource, fragmentSource) {
+    if (!(webglRenderingContext instanceof WebGL2RenderingContext)) {
+      throw new TypeError(SHADER_PROGRAM_EXCEPTION_MESSAGES.CONTEXT_TYPE);
+    }
+    if (typeof vertexSource !== ECMASCRIPT_TYPEOF_RESULTS.STRING || typeof fragmentSource !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
+      throw new TypeError(SHADER_PROGRAM_EXCEPTION_MESSAGES.SOURCE_TYPE);
     }
   }
   /**
-   * Looks up a uniform location with caching.
+   * Rejects operations after the program has been released.
+   *
+   * @private
+   */
+  #assertNotDisposed() {
+    if (this.#isDisposed) {
+      throw new Error(SHADER_PROGRAM_EXCEPTION_MESSAGES.DISPOSED);
+    }
+  }
+  /**
+   * Validates a uniform name while preserving each public method's error message.
+   *
+   * @param {string} name    - Uniform name to validate.
+   * @param {string} message - Error message for the calling method.
+   * @private
+   */
+  #assertUniformName(name, message) {
+    this.#assertNotDisposed();
+    if (typeof name !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
+      throw new TypeError(message);
+    }
+  }
+  /**
+   * Checks vector storage and length without copying its components.
+   *
+   * @param {Float32Array | number[]} value - Vector to validate.
+   * @param {number} elementCount           - Required component count.
+   * @param {string} typeMessage            - Error message for unsupported storage.
+   * @param {string} lengthMessage          - Error message for an incorrect length.
+   * @private
+   */
+  static #assertVector(value, elementCount, typeMessage, lengthMessage) {
+    if (!Array.isArray(value) && !(value instanceof Float32Array)) {
+      throw new TypeError(typeMessage);
+    }
+    if (value.length !== elementCount) {
+      throw new TypeError(lengthMessage);
+    }
+  }
+  /**
+   * Looks up a validated uniform name and caches successful results.
    *
    * @param {string} name - Name of the uniform variable in the linked shader program.
    * @returns {WebGLUniformLocation}
@@ -6041,48 +6086,91 @@ var ShaderProgram = class {
    */
   #getUniformLocation(name) {
     this.#assertNotDisposed();
-    if (typeof name !== "string") {
-      throw new TypeError("`ShaderProgram.#getUniformLocation` expects a string name.");
-    }
     if (this.#uniformLocations.has(name)) {
-      const cachedLocation = this.#uniformLocations.get(name);
-      return cachedLocation;
+      return this.#uniformLocations.get(name);
     }
     const location = this.#webglRenderingContext.getUniformLocation(this.#program, name);
     if (location === null) {
-      throw new Error(`Uniform "${name}" not found in shader program.`);
+      throw new Error(SHADER_PROGRAM_EXCEPTION_MESSAGES.UNIFORM_NOT_FOUND(name));
     }
     this.#uniformLocations.set(name, location);
     return location;
   }
   /**
-   * Compiles a shader of the given type.
+   * Compiles both shaders and releases them after linking or a failure.
    *
-   * @param {number} type   - Shader type constant (e.g. gl.VERTEX_SHADER or gl.FRAGMENT_SHADER).
-   * @param {string} source - GLSL source code for the shader.
+   * @param {string} vertexSource   - Vertex shader source.
+   * @param {string} fragmentSource - Fragment shader source.
+   * @returns {WebGLProgram}
+   * @private
+   */
+  #createProgram(vertexSource, fragmentSource) {
+    const vertexShader = this.#compileShader(this.#webglRenderingContext.VERTEX_SHADER, vertexSource);
+    let fragmentShader = null;
+    try {
+      fragmentShader = this.#compileShader(this.#webglRenderingContext.FRAGMENT_SHADER, fragmentSource);
+      return this.#linkProgram(vertexShader, fragmentShader);
+    } finally {
+      this.#webglRenderingContext.deleteShader(vertexShader);
+      if (fragmentShader !== null) {
+        this.#webglRenderingContext.deleteShader(fragmentShader);
+      }
+    }
+  }
+  /**
+   * Links compiled shaders and deletes the program if linking fails.
+   *
+   * @param {WebGLShader} vertexShader   - Compiled vertex shader.
+   * @param {WebGLShader} fragmentShader - Compiled fragment shader.
+   * @returns {WebGLProgram}
+   * @private
+   */
+  #linkProgram(vertexShader, fragmentShader) {
+    const context = this.#webglRenderingContext;
+    const program = context.createProgram();
+    if (!program) {
+      throw new Error(SHADER_PROGRAM_EXCEPTION_MESSAGES.PROGRAM_CREATION);
+    }
+    try {
+      context.attachShader(program, vertexShader);
+      context.attachShader(program, fragmentShader);
+      context.linkProgram(program);
+      if (!context.getProgramParameter(program, context.LINK_STATUS)) {
+        const infoLog = context.getProgramInfoLog(program) || SHADER_PROGRAM_EXCEPTION_MESSAGES.UNKNOWN_LINK_ERROR;
+        throw new Error(SHADER_PROGRAM_EXCEPTION_MESSAGES.PROGRAM_LINK(infoLog));
+      }
+      return program;
+    } catch (error) {
+      context.deleteProgram(program);
+      throw error;
+    }
+  }
+  /**
+   * Compiles a shader and deletes it if compilation fails.
+   *
+   * @param {number} type   - WebGL shader type.
+   * @param {string} source - Shader source validated by the constructor.
    * @returns {WebGLShader}
    * @private
    */
   #compileShader(type, source) {
-    if (typeof type !== "number") {
-      throw new TypeError("`ShaderProgram.#compileShader` expects a numeric shader type.");
-    }
-    if (typeof source !== "string") {
-      throw new TypeError("`ShaderProgram.#compileShader` expects shader source as a string.");
-    }
-    const shader = this.#webglRenderingContext.createShader(type);
+    const context = this.#webglRenderingContext;
+    const shader = context.createShader(type);
     if (!shader) {
-      throw new Error("Failed to create the WebGL shader.");
+      throw new Error(SHADER_PROGRAM_EXCEPTION_MESSAGES.SHADER_CREATION);
     }
-    this.#webglRenderingContext.shaderSource(shader, source);
-    this.#webglRenderingContext.compileShader(shader);
-    const compileStatus = this.#webglRenderingContext.getShaderParameter(shader, this.#webglRenderingContext.COMPILE_STATUS);
-    if (!compileStatus) {
-      const infoLog = this.#webglRenderingContext.getShaderInfoLog(shader) || "Unknown shader compilation error";
-      this.#webglRenderingContext.deleteShader(shader);
-      throw new Error(`Failed to compile shader: ${infoLog}`);
+    try {
+      context.shaderSource(shader, source);
+      context.compileShader(shader);
+      if (!context.getShaderParameter(shader, context.COMPILE_STATUS)) {
+        const infoLog = context.getShaderInfoLog(shader) || SHADER_PROGRAM_EXCEPTION_MESSAGES.UNKNOWN_COMPILE_ERROR;
+        throw new Error(SHADER_PROGRAM_EXCEPTION_MESSAGES.SHADER_COMPILE(infoLog));
+      }
+      return shader;
+    } catch (error) {
+      context.deleteShader(shader);
+      throw error;
     }
-    return shader;
   }
 };
 
@@ -6397,8 +6485,8 @@ var SolidColorMaterial = class extends Material {
 // core/material/textured-material.js
 var POSITION_ATTRIBUTE_LOCATION3 = 0;
 var UV_ATTRIBUTE_LOCATION = 2;
-var DEFAULT_TEXTURE_UNIT_INDEX2 = 0;
-var MIN_TEXTURE_UNIT_INDEX3 = 0;
+var DEFAULT_TEXTURE_UNIT_INDEX = 0;
+var MIN_TEXTURE_UNIT_INDEX2 = 0;
 var MATRIX_UNIFORM_NAME3 = "u_matrix";
 var DIFFUSE_TEXTURE_UNIFORM_NAME = "u_diffuseTexture";
 var OPACITY_UNIFORM_NAME3 = "u_opacity";
@@ -6459,14 +6547,14 @@ var TexturedMaterial = class extends Material {
     }
     const {
       texture,
-      textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX2,
+      textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX,
       ownsTexture = false,
       ownsShaderProgram = true
     } = options;
     if (texture !== void 0 && !(texture instanceof Texture2D)) {
       throw new TypeError("`TexturedMaterial` expects `options.texture` as `Texture2D`.");
     }
-    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < MIN_TEXTURE_UNIT_INDEX3) {
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < MIN_TEXTURE_UNIT_INDEX2) {
       throw new TypeError("`TexturedMaterial` expects `options.textureUnitIndex` as a non-negative integer.");
     }
     if (typeof ownsTexture !== "boolean") {
@@ -11973,7 +12061,7 @@ var MtlTextureCache = class _MtlTextureCache {
 };
 
 // core/loaders/obj-mtl/obj-material-factory.js
-var DEFAULT_TEXTURE_UNIT_INDEX3 = 0;
+var DEFAULT_TEXTURE_UNIT_INDEX2 = 0;
 var DEFAULT_OPACITY2 = 1;
 var DEFAULT_AMBIENT_STRENGTH = 0.2;
 var COLOR_COMPONENT_COUNT4 = 3;
@@ -12046,7 +12134,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
       throw new TypeError(ERROR_OPTIONS_TYPE3);
     }
     const {
-      textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX3,
+      textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX2,
       defaultColor,
       textureCache
     } = options;
@@ -13553,7 +13641,7 @@ var MtlParser = class _MtlParser {
 };
 
 // core/loaders/obj-mtl/obj-mtl-loader.js
-var DEFAULT_TEXTURE_UNIT_INDEX4 = 0;
+var DEFAULT_TEXTURE_UNIT_INDEX3 = 0;
 var DEFAULT_DIFFUSE_COLOR4 = new Float32Array([1, 1, 1]);
 var DEFAULT_OPACITY4 = 1;
 var EMPTY_STRING4 = "";
@@ -13671,7 +13759,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
       throw new TypeError(ERROR_OPTIONS_TYPE4);
     }
     const {
-      textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX4,
+      textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX3,
       defaultColor
     } = options;
     if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE10) {
