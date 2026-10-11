@@ -1,127 +1,10 @@
-import * as MaterialConstants       from '../constants/directional-light-material.js';
-import { ShaderProgram }            from '../shader/shader-program.js';
-import { DirectionalLightMaterial } from './directional-light-material.js';
-
-/**
- * Specular color uniform name.
- *
- * @type {string}
- */
-const SPECULAR_COLOR_UNIFORM_NAME = 'u_specularColor';
-
-/**
- * Specular strength uniform name.
- *
- * @type {string}
- */
-const SPECULAR_STRENGTH_UNIFORM_NAME = 'u_specularStrength';
-
-/**
- * Shininess uniform name (specular exponent).
- *
- * @type {string}
- */
-const SHININESS_UNIFORM_NAME = 'u_shininess';
-
-/**
- * Default specular color (RGB).
- *
- * @type {Float32Array}
- */
-const DEFAULT_SPECULAR_COLOR = new Float32Array([1.0, 1.0, 1.0]);
-
-/**
- * Default specular strength multiplier.
- *
- * @type {number}
- */
-const DEFAULT_SPECULAR_STRENGTH = 1.0;
-
-/**
- * Default shininess exponent.
- *
- * @type {number}
- */
-const DEFAULT_SHININESS = 16.0;
-
-/**
- * GLSL vertex shader source code.
- *
- * Requires:
- * - position attribute at location 0
- * - normal attribute at location 3
- *
- * @type {string}
- */
-const VERTEX_SHADER_SOURCE = `#version 300 es
-precision mediump float;
-layout(location = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.POSITION_LOCATION}) in vec3 a_position;
-layout(location = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.NORMAL_LOCATION}) in vec3 a_normal;
-uniform mat4 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX};
-uniform mat4 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX};
-uniform mat4 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX};
-out vec3 v_worldPosition;
-out vec3 v_normal;
-
-void main() {
-    gl_Position     = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX} * vec4(a_position, 1.0);
-    v_worldPosition = (${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX} * vec4(a_position, 1.0)).xyz;
-    v_normal        = (${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX} * vec4(a_normal, 0.0)).xyz;
-}
-`;
-
-/**
- * GLSL fragment shader source code.
- *
- * Implements classic Phong lighting: `ambient + diffuse + specular`.
- *
- * @type {string}
- */
-const FRAGMENT_SHADER_SOURCE = `#version 300 es
-precision mediump float;
-in vec3 v_worldPosition;
-in vec3 v_normal;
-uniform vec3  ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR};
-uniform vec3  ${SPECULAR_COLOR_UNIFORM_NAME};
-uniform vec3  ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION};
-uniform vec3  ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION};
-uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH};
-uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH};
-uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED};
-uniform float ${SPECULAR_STRENGTH_UNIFORM_NAME};
-uniform float ${SHININESS_UNIFORM_NAME};
-uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY};
-out vec4 outColor;
-
-void main() {
-    vec3 surface_normal = normalize(v_normal);
-
-    if (!gl_FrontFacing) {
-        surface_normal = -surface_normal;
-    }
-
-    vec3 light_direction     = normalize(${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION});
-    vec3 view_direction      = normalize(${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION} - v_worldPosition);
-    float lighting_enabled   = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED};
-    float diffuse_intensity  = max(dot(surface_normal, light_direction), 0.0) * ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH};
-    float specular_intensity = 0.0;
-
-    if (diffuse_intensity > 0.0) {
-        vec3 reflection_direction = reflect(-light_direction, surface_normal);
-        float specular_base       = max(dot(view_direction, reflection_direction), 0.0);
-        specular_intensity        = pow(specular_base, ${SHININESS_UNIFORM_NAME});
-    }
-
-    vec3 ambient  = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR} * ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH};
-    vec3 diffuse  = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR} * (diffuse_intensity * lighting_enabled);
-    vec3 specular = ${SPECULAR_COLOR_UNIFORM_NAME}
-        * (specular_intensity * ${SPECULAR_STRENGTH_UNIFORM_NAME}
-        * ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH} * lighting_enabled);
-
-    vec3 rgb = ambient + diffuse + specular;
-    outColor = vec4(rgb, ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY});
-}
-`;
+import * as SharedMaterialConstants          from '../constants/material.js';
+import * as DirectionalMaterialConstants     from '../constants/directional-light-material.js';
+import * as MaterialConstants                from '../constants/phong-material.js';
+import { ECMASCRIPT_TYPEOF_RESULTS }         from '../constants/ecmascript-types.js';
+import { PHONG_MATERIAL_EXCEPTION_MESSAGES } from '../exception-messages/phong-material.js';
+import { DirectionalLightMaterial }          from './directional-light-material.js';
+import { ShaderProgram }                     from '../shader/shader-program.js';
 
 /**
  * Options used by `PhongMaterial`.
@@ -148,7 +31,7 @@ export class PhongMaterial extends DirectionalLightMaterial {
      * @type {Float32Array}
      * @private
      */
-    #specularColor = new Float32Array(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_VECTOR3_ELEMENT_COUNT);
+    #specularColor = new Float32Array(DirectionalMaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_VECTOR3_ELEMENT_COUNT);
 
     /**
      * Specular strength multiplier.
@@ -156,7 +39,7 @@ export class PhongMaterial extends DirectionalLightMaterial {
      * @type {number}
      * @private
      */
-    #specularStrength = DEFAULT_SPECULAR_STRENGTH;
+    #specularStrength = SharedMaterialConstants.MATERIAL_SPECULAR_DEFAULTS.STRENGTH;
 
     /**
      * Shininess exponent (specular power).
@@ -164,7 +47,7 @@ export class PhongMaterial extends DirectionalLightMaterial {
      * @type {number}
      * @private
      */
-    #shininess = DEFAULT_SHININESS;
+    #shininess = SharedMaterialConstants.MATERIAL_SPECULAR_DEFAULTS.SHININESS;
 
     /**
      * Creates a new `PhongMaterial`.
@@ -173,28 +56,22 @@ export class PhongMaterial extends DirectionalLightMaterial {
      * @param {PhongMaterialOptions} [options]      - Material options.
      */
     constructor(webglContext, options = {}) {
-        if (options === null || typeof options !== 'object' || Array.isArray(options)) {
-            throw new TypeError('`PhongMaterial` expects an options object (plain object).');
+        if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
+            throw new TypeError(PHONG_MATERIAL_EXCEPTION_MESSAGES.OPTIONS_OBJECT);
         }
 
-        const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
-        super(webglContext, shaderProgram, options, { ownsShaderProgram: true });
-        this.#specularColor.set(DEFAULT_SPECULAR_COLOR);
-        this.#specularStrength = DEFAULT_SPECULAR_STRENGTH;
-        this.#shininess        = DEFAULT_SHININESS;
+        const sources       = MaterialConstants.PHONG_MATERIAL_SHADERS;
+        const shaderProgram = new ShaderProgram(webglContext, sources.VERTEX, sources.FRAGMENT);
 
-        const { specularColor, specularStrength, shininess } = options;
+        super(webglContext, shaderProgram, options, {
+            ownsShaderProgram: SharedMaterialConstants.MATERIAL_DEFAULTS.OWNS_GENERATED_SHADER_PROGRAM
+        });
 
-        if (specularColor !== undefined) {
-            this.setSpecularColor(specularColor);
-        }
-
-        if (specularStrength !== undefined) {
-            this.setSpecularStrength(specularStrength);
-        }
-
-        if (shininess !== undefined) {
-            this.setShininess(shininess);
+        try {
+            this.#initialize(options);
+        } catch (error) {
+            shaderProgram.dispose();
+            throw error;
         }
     }
 
@@ -206,11 +83,15 @@ export class PhongMaterial extends DirectionalLightMaterial {
      * @protected
      */
     applyAdditionalUniforms(worldMatrix, cameraPosition) {
-        this.shaderProgram.setMatrix4(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX    , worldMatrix);
-        this.shaderProgram.setVector3(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION , cameraPosition);
-        this.shaderProgram.setVector3(SPECULAR_COLOR_UNIFORM_NAME  , this.#specularColor);
-        this.shaderProgram.setFloat(SPECULAR_STRENGTH_UNIFORM_NAME , this.#specularStrength);
-        this.shaderProgram.setFloat(SHININESS_UNIFORM_NAME         , this.#shininess);
+        const shaderProgram  = this.shaderProgram;
+        const lightUniforms  = DirectionalMaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS;
+        const sharedUniforms = SharedMaterialConstants.MATERIAL_UNIFORMS;
+
+        shaderProgram.setMatrix4(lightUniforms.WORLD_MATRIX, worldMatrix);
+        shaderProgram.setVector3(lightUniforms.CAMERA_POSITION, cameraPosition);
+        shaderProgram.setVector3(sharedUniforms.SPECULAR_COLOR, this.#specularColor);
+        shaderProgram.setFloat(sharedUniforms.SPECULAR_STRENGTH, this.#specularStrength);
+        shaderProgram.setFloat(sharedUniforms.SHININESS, this.#shininess);
     }
 
     /**
@@ -219,10 +100,8 @@ export class PhongMaterial extends DirectionalLightMaterial {
      * @param {Float32Array | number[]} color - [red, green, blue] in [0..1] range.
      */
     setSpecularColor(color) {
-        DirectionalLightMaterial.assertVector3('`PhongMaterial.setSpecularColor`', color);
-        this.#specularColor[0] = color[0];
-        this.#specularColor[1] = color[1];
-        this.#specularColor[2] = color[2];
+        DirectionalLightMaterial.assertVector3(MaterialConstants.PHONG_MATERIAL_COLOR_CONTEXT, color);
+        this.#specularColor.set(color);
     }
 
     /**
@@ -231,8 +110,8 @@ export class PhongMaterial extends DirectionalLightMaterial {
      * @param {number} value - Specular multiplier.
      */
     setSpecularStrength(value) {
-        if (typeof value !== 'number' || !Number.isFinite(value)) {
-            throw new TypeError('`PhongMaterial.setSpecularStrength` expects a finite number.');
+        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+            throw new TypeError(PHONG_MATERIAL_EXCEPTION_MESSAGES.SPECULAR_STRENGTH_TYPE);
         }
 
         this.#specularStrength = value;
@@ -244,8 +123,8 @@ export class PhongMaterial extends DirectionalLightMaterial {
      * @param {number} value - Shininess exponent.
      */
     setShininess(value) {
-        if (typeof value !== 'number' || !Number.isFinite(value)) {
-            throw new TypeError('`PhongMaterial.setShininess` expects a finite number.');
+        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+            throw new TypeError(PHONG_MATERIAL_EXCEPTION_MESSAGES.SHININESS_TYPE);
         }
 
         this.#shininess = value;
@@ -272,5 +151,29 @@ export class PhongMaterial extends DirectionalLightMaterial {
      */
     get shininess() {
         return this.#shininess;
+    }
+
+    /**
+     * Applies the initial settings after the shader program has been created.
+     *
+     * @param {PhongMaterialOptions} options - Initial material settings.
+     * @private
+     */
+    #initialize(options) {
+        this.#specularColor.set(SharedMaterialConstants.MATERIAL_DEFAULT_COLOR);
+
+        const { specularColor, specularStrength, shininess } = options;
+
+        if (specularColor !== undefined) {
+            this.setSpecularColor(specularColor);
+        }
+
+        if (specularStrength !== undefined) {
+            this.setSpecularStrength(specularStrength);
+        }
+
+        if (shininess !== undefined) {
+            this.setShininess(shininess);
+        }
     }
 }

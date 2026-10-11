@@ -1,25 +1,7 @@
-import { ShaderProgram } from '../shader/shader-program.js';
-
-/**
- * Minimum allowed opacity value.
- *
- * @type {number}
- */
-const MIN_OPACITY = 0.0;
-
-/**
- * Maximum allowed opacity value.
- *
- * @type {number}
- */
-const MAX_OPACITY = 1.0;
-
-/**
- * Default opacity value.
- *
- * @type {number}
- */
-const DEFAULT_OPACITY = 1.0;
+import * as SharedMaterialConstants    from '../constants/material.js';
+import { ECMASCRIPT_TYPEOF_RESULTS }   from '../constants/ecmascript-types.js';
+import { MATERIAL_EXCEPTION_MESSAGES } from '../exception-messages/material.js';
+import { ShaderProgram }               from '../shader/shader-program.js';
 
 /**
  * Options used by Material.
@@ -55,7 +37,7 @@ export class Material {
      * @type {number}
      * @private
      */
-    #opacity = DEFAULT_OPACITY;
+    #opacity = SharedMaterialConstants.MATERIAL_OPACITY.DEFAULT;
 
     /**
      * When enabled, the renderer should draw geometry using wireframe indices (lines) instead of solid triangles.
@@ -63,7 +45,7 @@ export class Material {
      * @type {boolean}
      * @private
      */
-    #wireframeEnabled = false;
+    #wireframeEnabled = SharedMaterialConstants.MATERIAL_DEFAULTS.WIREFRAME_ENABLED;
 
     /**
      * Ownership flag. When true, this material is responsible for disposing the shader program.
@@ -71,7 +53,7 @@ export class Material {
      * @type {boolean}
      * @private
      */
-    #ownsShaderProgram = false;
+    #ownsShaderProgram = SharedMaterialConstants.MATERIAL_DEFAULTS.OWNS_SHADER_PROGRAM;
 
     /**
      * Indicates whether the material has been disposed and can no longer be used.
@@ -88,21 +70,21 @@ export class Material {
      */
     constructor(webglContext, shaderProgram, options = {}) {
         if (!(webglContext instanceof WebGL2RenderingContext)) {
-            throw new TypeError('Material expects a WebGL2RenderingContext.');
+            throw new TypeError(MATERIAL_EXCEPTION_MESSAGES.WEBGL_CONTEXT_TYPE);
         }
 
-        if (options === null || typeof options !== 'object' || Array.isArray(options)) {
-            throw new TypeError('Material expects an options object (plain object).');
+        if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
+            throw new TypeError(MATERIAL_EXCEPTION_MESSAGES.OPTIONS_OBJECT);
         }
 
-        const { ownsShaderProgram = false } = options;
+        const { ownsShaderProgram = SharedMaterialConstants.MATERIAL_DEFAULTS.OWNS_SHADER_PROGRAM } = options;
 
-        if (typeof ownsShaderProgram !== 'boolean') {
-            throw new TypeError('Material option "ownsShaderProgram" must be a boolean.');
+        if (typeof ownsShaderProgram !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+            throw new TypeError(MATERIAL_EXCEPTION_MESSAGES.OWNERSHIP_TYPE);
         }
 
         if (!(shaderProgram instanceof ShaderProgram)) {
-            throw new TypeError('Material expects a ShaderProgram instance.');
+            throw new TypeError(MATERIAL_EXCEPTION_MESSAGES.SHADER_PROGRAM_TYPE);
         }
 
         this.#webglContext      = webglContext;
@@ -144,12 +126,12 @@ export class Material {
     setOpacity(value) {
         this.#assertNotDisposed();
 
-        if (typeof value !== 'number' || !Number.isFinite(value)) {
-            throw new TypeError('`Material.setOpacity` expects a finite number.');
+        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+            throw new TypeError(MATERIAL_EXCEPTION_MESSAGES.OPACITY_TYPE);
         }
 
-        if (value < MIN_OPACITY || value > MAX_OPACITY) {
-            throw new RangeError(`Material.setOpacity expects a value in [${MIN_OPACITY}..${MAX_OPACITY}].`);
+        if (value < SharedMaterialConstants.MATERIAL_OPACITY.MIN || value > SharedMaterialConstants.MATERIAL_OPACITY.MAX) {
+            throw new RangeError(MATERIAL_EXCEPTION_MESSAGES.OPACITY_RANGE);
         }
 
         this.#opacity = value;
@@ -160,7 +142,7 @@ export class Material {
      */
     isTransparent() {
         this.#assertNotDisposed();
-        return this.#opacity < MAX_OPACITY;
+        return this.#opacity < SharedMaterialConstants.MATERIAL_OPACITY.MAX;
     }
 
     /**
@@ -227,7 +209,7 @@ export class Material {
      */
     #assertNotDisposed() {
         if (this.#isDisposed) {
-            throw new Error('Material has been disposed and can no longer be used.');
+            throw new Error(MATERIAL_EXCEPTION_MESSAGES.INSTANCE_DISPOSED);
         }
     }
 }

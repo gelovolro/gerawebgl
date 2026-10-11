@@ -1,92 +1,10 @@
-import { Material }      from './material.js';
-import { ShaderProgram } from '../shader/shader-program.js';
-import { Texture2D }     from '../texture/texture2d.js';
-
-/**
- * Attribute location used by vec3 position.
- *
- * @type {number}
- */
-const POSITION_ATTRIBUTE_LOCATION = 0;
-
-/**
- * Attribute location used by vec2 UV coordinates.
- *
- * @type {number}
- */
-const UV_ATTRIBUTE_LOCATION = 2;
-
-/**
- * Default texture unit index used for binding the diffuse texture.
- *
- * @type {number}
- */
-const DEFAULT_TEXTURE_UNIT_INDEX = 0;
-
-/**
- * Minimal allowed texture unit index.
- * Zero corresponds to `TEXTURE0`.
- *
- * @type {number}
- */
-const MIN_TEXTURE_UNIT_INDEX = 0;
-
-/**
- * Name of the matrix uniform in the shader.
- *
- * @type {string}
- */
-const MATRIX_UNIFORM_NAME = 'u_matrix';
-
-/**
- * Name of the `sampler2D` uniform in the shader.
- *
- * @type {string}
- */
-const DIFFUSE_TEXTURE_UNIFORM_NAME = 'u_diffuseTexture';
-
-/**
- * Opacity uniform name.
- *
- * @type {string}
- */
-const OPACITY_UNIFORM_NAME = 'u_opacity';
-
-/**
- * GLSL vertex shader source code.
- *
- * @type {string}
- */
-const VERTEX_SHADER_SOURCE = `#version 300 es
-precision mediump float;
-layout(location = ${POSITION_ATTRIBUTE_LOCATION}) in vec3 a_position;
-layout(location = ${UV_ATTRIBUTE_LOCATION}) in vec2 a_uv;
-uniform mat4 ${MATRIX_UNIFORM_NAME};
-out vec2 v_uv;
-
-void main() {
-    gl_Position = ${MATRIX_UNIFORM_NAME} * vec4(a_position, 1.0);
-    v_uv = a_uv;
-}
-`;
-
-/**
- * GLSL fragment shader source code.
- *
- * @type {string}
- */
-const FRAGMENT_SHADER_SOURCE = `#version 300 es
-precision mediump float;
-in vec2 v_uv;
-uniform sampler2D ${DIFFUSE_TEXTURE_UNIFORM_NAME};
-uniform float ${OPACITY_UNIFORM_NAME};
-out vec4 outColor;
-
-void main() {
-    vec4 sampledColor = texture(${DIFFUSE_TEXTURE_UNIFORM_NAME}, v_uv);
-    outColor = vec4(sampledColor.rgb, sampledColor.a * ${OPACITY_UNIFORM_NAME});
-}
-`;
+import * as SharedMaterialConstants             from '../constants/material.js';
+import * as MaterialConstants                   from '../constants/textured-material.js';
+import { ECMASCRIPT_TYPEOF_RESULTS }            from '../constants/ecmascript-types.js';
+import { TEXTURED_MATERIAL_EXCEPTION_MESSAGES } from '../exception-messages/textured-material.js';
+import { ShaderProgram }                        from '../shader/shader-program.js';
+import { Texture2D }                            from '../texture/texture2d.js';
+import { Material }                             from './material.js';
 
 /**
  * Options used by `TexturedMaterial` constructor.
@@ -126,58 +44,47 @@ export class TexturedMaterial extends Material {
      * @type {boolean}
      * @private
      */
-    #ownsDiffuseTexture = false;
+    #ownsDiffuseTexture = SharedMaterialConstants.MATERIAL_DEFAULTS.OWNS_TEXTURE;
 
     /**
      * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create shaders and upload uniforms.
      * @param {TexturedMaterialOptions} [options]   - Optional configuration for the material.
      */
     constructor(webglContext, options = {}) {
-        if (options === null || typeof options !== 'object') {
-            throw new TypeError('TexturedMaterial expects options as an object.');
+        if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT) {
+            throw new TypeError(TEXTURED_MATERIAL_EXCEPTION_MESSAGES.OPTIONS_OBJECT);
         }
 
-        const {
-            texture,
-            textureUnitIndex  = DEFAULT_TEXTURE_UNIT_INDEX,
-            ownsTexture       = false,
-            ownsShaderProgram = true
-        } = options;
+        const sources       = MaterialConstants.TEXTURED_MATERIAL_SHADERS;
+        const settings      = TexturedMaterial.#resolveOptions(options);
+        const shaderProgram = new ShaderProgram(webglContext, sources.VERTEX, sources.FRAGMENT);
+        const { texture, textureUnitIndex, ownsTexture, ownsShaderProgram } = settings;
 
-        if (texture !== undefined && !(texture instanceof Texture2D)) {
-            throw new TypeError('`TexturedMaterial` expects `options.texture` as `Texture2D`.');
-        }
-
-        if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < MIN_TEXTURE_UNIT_INDEX) {
-            throw new TypeError('`TexturedMaterial` expects `options.textureUnitIndex` as a non-negative integer.');
-        }
-
-        if (typeof ownsTexture !== 'boolean') {
-            throw new TypeError('`TexturedMaterial` expects `options.ownsTexture` as boolean.');
-        }
-
-        if (typeof ownsShaderProgram !== 'boolean') {
-            throw new TypeError('`TexturedMaterial` expects `options.ownsShaderProgram` as boolean.');
-        }
-
-        const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
         super(webglContext, shaderProgram, { ownsShaderProgram });
 
-        this.#diffuseTexture     = texture || new Texture2D(webglContext);
-        this.#textureUnitIndex   = textureUnitIndex;
-        this.#ownsDiffuseTexture = ownsTexture || !texture;
+        try {
+            this.#diffuseTexture     = texture || new Texture2D(webglContext);
+            this.#textureUnitIndex   = textureUnitIndex;
+            this.#ownsDiffuseTexture = ownsTexture || !texture;
+        } catch (error) {
+            // Construction failed, so even a non-owning material cannot return this program.
+            shaderProgram.dispose();
+            throw error;
+        }
     }
 
     /**
      * Uploads uniforms and binds the texture for a draw call.
      *
-     * @param {Float32Array} matrix4 - Model-View-Projection matrix (4x4).
+     * @param {Float32Array} matrix4 - 'Model-View-Projection' matrix (4x4).
      */
     apply(matrix4) {
         this.use();
-        this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME, matrix4);
-        this.shaderProgram.setTexture2D(DIFFUSE_TEXTURE_UNIFORM_NAME, this.#diffuseTexture, this.#textureUnitIndex);
-        this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME, this.opacity);
+        const shaderProgram = this.shaderProgram;
+        const uniforms      = SharedMaterialConstants.MATERIAL_UNIFORMS;
+        shaderProgram.setMatrix4(uniforms.MATRIX, matrix4);
+        shaderProgram.setTexture2D(MaterialConstants.TEXTURED_MATERIAL_UNIFORMS.DIFFUSE_TEXTURE, this.#diffuseTexture, this.#textureUnitIndex);
+        shaderProgram.setFloat(uniforms.OPACITY, this.opacity);
     }
 
     /**
@@ -198,20 +105,20 @@ export class TexturedMaterial extends Material {
      */
     setDiffuseTexture(texture, options = {}) {
         if (!(texture instanceof Texture2D)) {
-            throw new TypeError('`TexturedMaterial.setDiffuseTexture` expects texture as `Texture2D`.');
+            throw new TypeError(TEXTURED_MATERIAL_EXCEPTION_MESSAGES.REPLACEMENT_TEXTURE_TYPE);
         }
 
-        if (options === null || typeof options !== 'object') {
-            throw new TypeError('`TexturedMaterial.setDiffuseTexture` expects options as an object.');
+        if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT) {
+            throw new TypeError(TEXTURED_MATERIAL_EXCEPTION_MESSAGES.REPLACEMENT_OPTIONS_OBJECT);
         }
 
-        const { ownsTexture = false } = options;
+        const { ownsTexture = SharedMaterialConstants.MATERIAL_DEFAULTS.OWNS_TEXTURE } = options;
 
-        if (typeof ownsTexture !== 'boolean') {
-            throw new TypeError('`TexturedMaterial.setDiffuseTexture` expects options.ownsTexture as boolean.');
+        if (typeof ownsTexture !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+            throw new TypeError(TEXTURED_MATERIAL_EXCEPTION_MESSAGES.REPLACEMENT_OWNERSHIP_TYPE);
         }
 
-        if (this.#ownsDiffuseTexture) {
+        if (this.#ownsDiffuseTexture && texture !== this.#diffuseTexture) {
             this.#diffuseTexture.dispose();
         }
 
@@ -233,5 +140,39 @@ export class TexturedMaterial extends Material {
         }
 
         super.dispose();
+    }
+
+    /**
+     * Resolves and validates ownership and texture options before allocation.
+     *
+     * @param {TexturedMaterialOptions} options - Material options.
+     * @returns {TexturedMaterialOptions}       - Resolved settings.
+     * @private
+     */
+    static #resolveOptions(options) {
+        const {
+            texture,
+            textureUnitIndex  = SharedMaterialConstants.MATERIAL_TEXTURE_UNITS.DEFAULT,
+            ownsTexture       = SharedMaterialConstants.MATERIAL_DEFAULTS.OWNS_TEXTURE,
+            ownsShaderProgram = SharedMaterialConstants.MATERIAL_DEFAULTS.OWNS_GENERATED_SHADER_PROGRAM
+        } = options;
+
+        if (texture !== undefined && !(texture instanceof Texture2D)) {
+            throw new TypeError(TEXTURED_MATERIAL_EXCEPTION_MESSAGES.TEXTURE_TYPE);
+        }
+
+        if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < SharedMaterialConstants.MATERIAL_TEXTURE_UNITS.MIN) {
+            throw new TypeError(TEXTURED_MATERIAL_EXCEPTION_MESSAGES.TEXTURE_UNIT_TYPE);
+        }
+
+        if (typeof ownsTexture !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+            throw new TypeError(TEXTURED_MATERIAL_EXCEPTION_MESSAGES.TEXTURE_OWNERSHIP_TYPE);
+        }
+
+        if (typeof ownsShaderProgram !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+            throw new TypeError(TEXTURED_MATERIAL_EXCEPTION_MESSAGES.PROGRAM_OWNERSHIP_TYPE);
+        }
+
+        return { texture, textureUnitIndex, ownsTexture, ownsShaderProgram };
     }
 }

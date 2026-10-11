@@ -1,84 +1,16 @@
-import { Material }      from './material.js';
-import { ShaderProgram } from '../shader/shader-program.js';
-
-/**
- * Attribute location used by vec3 position.
- *
- * @type {number}
- */
-const POSITION_ATTRIBUTE_LOCATION = 0;
-
-/**
- * Name of the matrix uniform in the shader.
- *
- * @type {string}
- */
-const MATRIX_UNIFORM_NAME = 'u_matrix';
-
-/**
- * Name of the color uniform in the shader.
- *
- * @type {string}
- */
-const COLOR_UNIFORM_NAME = 'u_color';
-
-/**
- * Opacity uniform name.
- *
- * @type {string}
- */
-const OPACITY_UNIFORM_NAME = 'u_opacity';
-
-/**
- * Number of components in a RGB color.
- *
- * @type {number}
- */
-const COLOR_COMPONENT_COUNT = 3;
-
-/**
- * Default solid color (white).
- *
- * @type {Float32Array}
- */
-const DEFAULT_COLOR = new Float32Array([1.0, 1.0, 1.0]);
-
-/**
- * GLSL vertex shader source code.
- *
- * @type {string}
- */
-const VERTEX_SHADER_SOURCE = `#version 300 es
-precision mediump float;
-layout(location = ${POSITION_ATTRIBUTE_LOCATION}) in vec3 a_position;
-uniform mat4 ${MATRIX_UNIFORM_NAME};
-
-void main() {
-    gl_Position = ${MATRIX_UNIFORM_NAME} * vec4(a_position, 1.0);
-}
-`;
-
-/**
- * GLSL fragment shader source code.
- *
- * @type {string}
- */
-const FRAGMENT_SHADER_SOURCE = `#version 300 es
-precision mediump float;
-uniform vec3  ${COLOR_UNIFORM_NAME};
-uniform float ${OPACITY_UNIFORM_NAME};
-out vec4 outColor;
-
-void main() {
-    outColor = vec4(${COLOR_UNIFORM_NAME}, ${OPACITY_UNIFORM_NAME});
-}
-`;
+import * as SharedMaterialConstants                from '../constants/material.js';
+import * as MaterialConstants                      from '../constants/solid-color-material.js';
+import { ECMASCRIPT_TYPEOF_RESULTS }               from '../constants/ecmascript-types.js';
+import { MATH_LAYOUT }                             from '../constants/math.js';
+import { SOLID_COLOR_MATERIAL_EXCEPTION_MESSAGES } from '../exception-messages/solid-color-material.js';
+import { ShaderProgram }                           from '../shader/shader-program.js';
+import { Material }                                from './material.js';
 
 /**
  * Options used by SolidColorMaterial.
  *
  * @typedef {Object} SolidColorMaterialOptions
- * @property {Float32Array | number[]} [color] - RGB color [r,g,b] in 0..1 range.
+ * @property {Float32Array | number[]} [color] - RGB color [red, green, blue] in [0..1] range.
  */
 
 /**
@@ -86,28 +18,34 @@ void main() {
  */
 export class SolidColorMaterial extends Material {
     /**
-     * Current RGB color stored as Float32Array([r, g, b]).
+     * Current RGB color stored as Float32Array([red, green, blue]).
      *
      * @type {Float32Array}
      * @private
      */
-    #color = new Float32Array(DEFAULT_COLOR);
+    #color = new Float32Array(SharedMaterialConstants.MATERIAL_DEFAULT_COLOR);
 
     /**
-     * @param {WebGL2RenderingContext} webglContext         - WebGL2 rendering context used to compile shaders.
-     * @param {SolidColorMaterialOptions} [options]         - Material options.
+     * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to compile shaders.
+     * @param {SolidColorMaterialOptions} [options] - Material options.
      */
     constructor(webglContext, options = {}) {
-        if (options === null || typeof options !== 'object' || Array.isArray(options)) {
-            throw new TypeError('SolidColorMaterial expects an options object (plain object).');
+        if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
+            throw new TypeError(SOLID_COLOR_MATERIAL_EXCEPTION_MESSAGES.OPTIONS_OBJECT);
         }
 
-        const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
-        super(webglContext, shaderProgram, { ownsShaderProgram: true });
-        const { color } = options;
+        const sources       = MaterialConstants.SOLID_COLOR_MATERIAL_SHADERS;
+        const shaderProgram = new ShaderProgram(webglContext, sources.VERTEX, sources.FRAGMENT);
 
-        if (color !== undefined) {
-            this.setColor(color);
+        super(webglContext, shaderProgram, {
+            ownsShaderProgram: SharedMaterialConstants.MATERIAL_DEFAULTS.OWNS_GENERATED_SHADER_PROGRAM
+        });
+
+        try {
+            this.#initialize(options);
+        } catch (error) {
+            shaderProgram.dispose();
+            throw error;
         }
     }
 
@@ -117,28 +55,29 @@ export class SolidColorMaterial extends Material {
      * @param {Float32Array} matrix4 - Transformation matrix passed as u_matrix.
      */
     apply(matrix4) {
-        this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME, matrix4);
-        this.shaderProgram.setVector3(COLOR_UNIFORM_NAME, this.#color);
-        this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME, this.opacity);
+        const shaderProgram = this.shaderProgram;
+        const uniforms      = SharedMaterialConstants.MATERIAL_UNIFORMS;
+
+        shaderProgram.setMatrix4(uniforms.MATRIX, matrix4);
+        shaderProgram.setVector3(uniforms.COLOR, this.#color);
+        shaderProgram.setFloat(uniforms.OPACITY, this.opacity);
     }
 
     /**
      * Sets the RGB color.
      *
-     * @param {Float32Array | number[]} color - [r, g, b] in 0..1 range.
+     * @param {Float32Array | number[]} color - [red, green, blue] in [0..1] range.
      */
     setColor(color) {
         if (!Array.isArray(color) && !(color instanceof Float32Array)) {
-            throw new TypeError('SolidColorMaterial.setColor expects a number[] or Float32Array.');
+            throw new TypeError(SOLID_COLOR_MATERIAL_EXCEPTION_MESSAGES.COLOR_TYPE);
         }
 
-        if (color.length !== COLOR_COMPONENT_COUNT) {
-            throw new TypeError('SolidColorMaterial.setColor expects exactly 3 components [r, g, b].');
+        if (color.length !== MATH_LAYOUT.VECTOR3_ELEMENT_COUNT) {
+            throw new TypeError(SOLID_COLOR_MATERIAL_EXCEPTION_MESSAGES.COLOR_LENGTH);
         }
 
-        this.#color[0] = color[0];
-        this.#color[1] = color[1];
-        this.#color[2] = color[2];
+        this.#color.set(color);
     }
 
     /**
@@ -149,5 +88,19 @@ export class SolidColorMaterial extends Material {
      */
     get color() {
         return this.#color;
+    }
+
+    /**
+     * Applies the initial settings after the shader program has been created.
+     *
+     * @param {SolidColorMaterialOptions} options - Initial material settings.
+     * @private
+     */
+    #initialize(options) {
+        const { color } = options;
+
+        if (color !== undefined) {
+            this.setColor(color);
+        }
     }
 }

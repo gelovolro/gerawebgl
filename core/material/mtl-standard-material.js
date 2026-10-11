@@ -1,732 +1,20 @@
-import { ECMASCRIPT_TYPEOF_RESULTS } from '../constants/ecmascript-types.js';
-import * as MaterialConstants        from '../constants/directional-light-material.js';
-import { ShaderProgram }             from '../shader/shader-program.js';
-import { Texture2D }                 from '../texture/texture2d.js';
-import { DirectionalLightMaterial }  from './directional-light-material.js';
-
-/**
- * Attribute location used by `vec2` UV-coordinates.
- *
- * @type {number}
- */
-const UV_ATTRIBUTE_LOCATION = 2;
-
-/**
- * Diffuse map sampler uniform name.
- *
- * @type {string}
- */
-const DIFFUSE_MAP_UNIFORM_NAME = 'u_diffuseMap';
-
-/**
- * Ambient map sampler uniform name.
- *
- * @type {string}
- */
-const AMBIENT_MAP_UNIFORM_NAME = 'u_ambientMap';
-
-/**
- * Specular map sampler uniform name.
- *
- * @type {string}
- */
-const SPECULAR_MAP_UNIFORM_NAME = 'u_specularMap';
-
-/**
- * Alpha map sampler uniform name.
- *
- * @type {string}
- */
-const ALPHA_MAP_UNIFORM_NAME = 'u_alphaMap';
-
-/**
- * Bump map sampler uniform name.
- *
- * @type {string}
- */
-const BUMP_MAP_UNIFORM_NAME = 'u_bumpMap';
-
-/**
- * Displacement map sampler uniform name.
- *
- * @type {string}
- */
-const DISPLACEMENT_MAP_UNIFORM_NAME = 'u_displacementMap';
-
-/**
- * Reflection map sampler uniform name.
- *
- * @type {string}
- */
-const REFLECTION_MAP_UNIFORM_NAME = 'u_reflectionMap';
-
-/**
- * Ambient color uniform name.
- *
- * @type {string}
- */
-const AMBIENT_COLOR_UNIFORM_NAME = 'u_ambientColor';
-
-/**
- * Specular color uniform name.
- *
- * @type {string}
- */
-const SPECULAR_COLOR_UNIFORM_NAME = 'u_specularColor';
-
-/**
- * Emissive color uniform name.
- *
- * @type {string}
- */
-const EMISSIVE_COLOR_UNIFORM_NAME = 'u_emissiveColor';
-
-/**
- * Specular strength uniform name.
- *
- * @type {string}
- */
-const SPECULAR_STRENGTH_UNIFORM_NAME = 'u_specularStrength';
-
-/**
- * Shininess uniform name.
- *
- * @type {string}
- */
-const SHININESS_UNIFORM_NAME = 'u_shininess';
-
-/**
- * Specular enable uniform name.
- *
- * @type {string}
- */
-const SPECULAR_ENABLED_UNIFORM_NAME = 'u_useSpecular';
-
-/**
- * Optical density uniform name.
- *
- * @type {string}
- */
-const OPTICAL_DENSITY_UNIFORM_NAME = 'u_opticalDensity';
-
-/**
- * Bump multiplier uniform name.
- *
- * @type {string}
- */
-const BUMP_MULTIPLIER_UNIFORM_NAME = 'u_bumpMultiplier';
-
-/**
- * Displacement scale uniform name.
- *
- * @type {string}
- */
-const DISPLACEMENT_SCALE_UNIFORM_NAME = 'u_displacementScale';
-
-/**
- * Diffuse UV-offset uniform name.
- *
- * @type {string}
- */
-const DIFFUSE_UV_OFFSET_UNIFORM_NAME = 'u_diffuseUvOffset';
-
-/**
- * Diffuse UV-scale uniform name.
- *
- * @type {string}
- */
-const DIFFUSE_UV_SCALE_UNIFORM_NAME = 'u_diffuseUvScale';
-
-/**
- * Ambient UV-offset uniform name.
- *
- * @type {string}
- */
-const AMBIENT_UV_OFFSET_UNIFORM_NAME = 'u_ambientUvOffset';
-
-/**
- * Ambient UV-scale uniform name.
- *
- * @type {string}
- */
-const AMBIENT_UV_SCALE_UNIFORM_NAME = 'u_ambientUvScale';
-
-/**
- * Specular UV-offset uniform name.
- *
- * @type {string}
- */
-const SPECULAR_UV_OFFSET_UNIFORM_NAME = 'u_specularUvOffset';
-
-/**
- * Specular UV-scale uniform name.
- *
- * @type {string}
- */
-const SPECULAR_UV_SCALE_UNIFORM_NAME = 'u_specularUvScale';
-
-/**
- * Alpha UV-offset uniform name.
- *
- * @type {string}
- */
-const ALPHA_UV_OFFSET_UNIFORM_NAME = 'u_alphaUvOffset';
-
-/**
- * Alpha UV-scale uniform name.
- *
- * @type {string}
- */
-const ALPHA_UV_SCALE_UNIFORM_NAME = 'u_alphaUvScale';
-
-/**
- * Bump UV-offset uniform name.
- *
- * @type {string}
- */
-const BUMP_UV_OFFSET_UNIFORM_NAME = 'u_bumpUvOffset';
-
-/**
- * Bump UV-scale uniform name.
- *
- * @type {string}
- */
-const BUMP_UV_SCALE_UNIFORM_NAME = 'u_bumpUvScale';
-
-/**
- * Displacement UV-offset uniform name.
- *
- * @type {string}
- */
-const DISPLACEMENT_UV_OFFSET_UNIFORM_NAME = 'u_displacementUvOffset';
-
-/**
- * Displacement UV-scale uniform name.
- *
- * @type {string}
- */
-const DISPLACEMENT_UV_SCALE_UNIFORM_NAME = 'u_displacementUvScale';
-
-/**
- * Reflection UV-offset uniform name.
- *
- * @type {string}
- */
-const REFLECTION_UV_OFFSET_UNIFORM_NAME = 'u_reflectionUvOffset';
-
-/**
- * Reflection UV-scale uniform name.
- *
- * @type {string}
- */
-const REFLECTION_UV_SCALE_UNIFORM_NAME = 'u_reflectionUvScale';
-
-/**
- * Diffuse map usage uniform name.
- *
- * @type {string}
- */
-const USE_DIFFUSE_MAP_UNIFORM_NAME = 'u_useDiffuseMap';
-
-/**
- * Ambient map usage uniform name.
- *
- * @type {string}
- */
-const USE_AMBIENT_MAP_UNIFORM_NAME = 'u_useAmbientMap';
-
-/**
- * Specular map usage uniform name.
- *
- * @type {string}
- */
-const USE_SPECULAR_MAP_UNIFORM_NAME = 'u_useSpecularMap';
-
-/**
- * Alpha map usage uniform name.
- *
- * @type {string}
- */
-const USE_ALPHA_MAP_UNIFORM_NAME = 'u_useAlphaMap';
-
-/**
- * Bump map usage uniform name.
- *
- * @type {string}
- */
-const USE_BUMP_MAP_UNIFORM_NAME = 'u_useBumpMap';
-
-/**
- * Displacement map usage uniform name.
- *
- * @type {string}
- */
-const USE_DISPLACEMENT_MAP_UNIFORM_NAME = 'u_useDisplacementMap';
-
-/**
- * Reflection map usage uniform name.
- *
- * @type {string}
- */
-const USE_REFLECTION_MAP_UNIFORM_NAME = 'u_useReflectionMap';
-
-/**
- * Threshold used to interpret lighting enabled values in shaders.
- *
- * @type {number}
- */
-const LIGHTING_ENABLED_THRESHOLD = 0.5;
-
-/**
- * Default diffuse color.
- *
- * @type {Float32Array}
- */
-const DEFAULT_DIFFUSE_COLOR = new Float32Array([1.0, 1.0, 1.0]);
-
-/**
- * Default ambient color.
- *
- * @type {Float32Array}
- */
-const DEFAULT_AMBIENT_COLOR = new Float32Array([1.0, 1.0, 1.0]);
-
-/**
- * Default specular color.
- *
- * @type {Float32Array}
- */
-const DEFAULT_SPECULAR_COLOR = new Float32Array([1.0, 1.0, 1.0]);
-
-/**
- * Default emissive color.
- *
- * @type {Float32Array}
- */
-const DEFAULT_EMISSIVE_COLOR = new Float32Array([0.0, 0.0, 0.0]);
-
-/**
- * Default shininess value.
- *
- * @type {number}
- */
-const DEFAULT_SHININESS = 16.0;
-
-/**
- * Default specular strength multiplier.
- *
- * @type {number}
- */
-const DEFAULT_SPECULAR_STRENGTH = 1.0;
-
-/**
- * Default optical density value.
- *
- * @type {number}
- */
-const DEFAULT_OPTICAL_DENSITY = 1.0;
-
-/**
- * Default bump multiplier.
- *
- * @type {number}
- */
-const DEFAULT_BUMP_MULTIPLIER = 1.0;
-
-/**
- * Default displacement scale factor.
- *
- * @type {number}
- */
-const DEFAULT_DISPLACEMENT_SCALE = 0.1;
-
-/**
- * Default UV offset.
- *
- * @type {Float32Array}
- */
-const DEFAULT_UV_OFFSET = new Float32Array([0.0, 0.0]);
-
-/**
- * Default UV scale.
- *
- * @type {Float32Array}
- */
-const DEFAULT_UV_SCALE = new Float32Array([1.0, 1.0]);
-
-/**
- * Boolean-as-float value for false.
- *
- * @type {number}
- */
-const FLOAT_FALSE = 0.0;
-
-/**
- * Boolean-as-float value for true.
- *
- * @type {number}
- */
-const FLOAT_TRUE = 1.0;
-
-/**
- * Default texture unit for diffuse map.
- *
- * @type {number}
- */
-const DEFAULT_DIFFUSE_TEXTURE_UNIT = 0;
-
-/**
- * Default texture unit for ambient map.
- *
- * @type {number}
- */
-const DEFAULT_AMBIENT_TEXTURE_UNIT = 1;
-
-/**
- * Default texture unit for specular map.
- *
- * @type {number}
- */
-const DEFAULT_SPECULAR_TEXTURE_UNIT = 2;
-
-/**
- * Default texture unit for alpha map.
- *
- * @type {number}
- */
-const DEFAULT_ALPHA_TEXTURE_UNIT = 3;
-
-/**
- * Default texture unit for bump map.
- *
- * @type {number}
- */
-const DEFAULT_BUMP_TEXTURE_UNIT = 4;
-
-/**
- * Default texture unit for displacement map.
- *
- * @type {number}
- */
-const DEFAULT_DISPLACEMENT_TEXTURE_UNIT = 5;
-
-/**
- * Default texture unit for reflection map.
- *
- * @type {number}
- */
-const DEFAULT_REFLECTION_TEXTURE_UNIT = 6;
-
-/**
- * Zero value used for comparisons.
- *
- * @type {number}
- */
-const ZERO_VALUE = 0.0;
-
-/**
- * Error message for invalid material options.
- *
- * @type {string}
- */
-const ERROR_OPTIONS_OBJECT = '`MtlStandardMaterial` expects an options object (plain object).';
-
-/**
- * Error message for invalid shininess value.
- *
- * @type {string}
- */
-const ERROR_SHININESS_TYPE = '`MtlStandardMaterial.setShininess` expects a finite number.';
-
-/**
- * Error message for invalid specular strength value.
- *
- * @type {string}
- */
-const ERROR_SPECULAR_STRENGTH_TYPE = '`MtlStandardMaterial.setSpecularStrength` expects a finite number.';
-
-/**
- * Error message for invalid specular enabled flag.
- *
- * @type {string}
- */
-const ERROR_SPECULAR_ENABLED_TYPE = '`MtlStandardMaterial.setSpecularEnabled` expects a boolean.';
-
-/**
- * Error message for invalid optical density value.
- *
- * @type {string}
- */
-const ERROR_OPTICAL_DENSITY_TYPE = '`MtlStandardMaterial.setOpticalDensity` expects a finite number.';
-
-/**
- * Error message for invalid bump multiplier value.
- *
- * @type {string}
- */
-const ERROR_BUMP_MULTIPLIER_TYPE = '`MtlStandardMaterial.setBumpMultiplier` expects a finite number.';
-
-/**
- * Error message for invalid displacement scale value.
- *
- * @type {string}
- */
-const ERROR_DISPLACEMENT_SCALE_TYPE = '`MtlStandardMaterial.setDisplacementScale` expects a finite number.';
-
-/**
- * Error suffix for texture type validation.
- *
- * @type {string}
- */
-const ERROR_EXPECTS_TEXTURE_SUFFIX = ' expects texture as Texture2D.';
-
-/**
- * Error suffix for options object validation.
- *
- * @type {string}
- */
-const ERROR_EXPECTS_OPTIONS_OBJECT_SUFFIX = ' expects options as a plain object.';
-
-/**
- * Error suffix for texture unit index validation.
- *
- * @type {string}
- */
-const ERROR_EXPECTS_TEXTURE_UNIT_INDEX_SUFFIX = ' expects options.textureUnitIndex as a non-negative integer.';
-
-/**
- * Error suffix for vector2 type validation.
- *
- * @type {string}
- */
-const ERROR_EXPECTS_VECTOR2_TYPE_SUFFIX = ' expects a number[] or Float32Array.';
-
-/**
- * Error suffix for vector2 component validation.
- *
- * @type {string}
- */
-const ERROR_EXPECTS_VECTOR2_COMPONENTS_SUFFIX = ' expects exactly 2 components.';
-
-/**
- * Error suffix for vector3 component validation.
- *
- * @type {string}
- */
-const ERROR_EXPECTS_VECTOR3_COMPONENTS_SUFFIX = ' expects exactly 3 components.';
-
-/**
- * GLSL vertex shader source code.
- *
- * @type {string}
- */
-const VERTEX_SHADER_SOURCE = `#version 300 es
-precision mediump float;
-layout(location = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.POSITION_LOCATION}) in vec3 a_position;
-layout(location = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.NORMAL_LOCATION}) in vec3 a_normal;
-layout(location = ${UV_ATTRIBUTE_LOCATION}) in vec2 a_uv;
-uniform mat4 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX};
-uniform mat4 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX};
-uniform mat4 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX};
-uniform sampler2D ${DISPLACEMENT_MAP_UNIFORM_NAME};
-uniform float ${USE_DISPLACEMENT_MAP_UNIFORM_NAME};
-uniform float ${DISPLACEMENT_SCALE_UNIFORM_NAME};
-uniform vec2 ${DISPLACEMENT_UV_OFFSET_UNIFORM_NAME};
-uniform vec2 ${DISPLACEMENT_UV_SCALE_UNIFORM_NAME};
-out vec3 v_worldPosition;
-out vec3 v_normal;
-out vec2 v_uv;
-
-void main() {
-    vec2 disp_uv = (a_uv * ${DISPLACEMENT_UV_SCALE_UNIFORM_NAME}) + ${DISPLACEMENT_UV_OFFSET_UNIFORM_NAME};
-    float displacement = 0.0;
-
-    if (${USE_DISPLACEMENT_MAP_UNIFORM_NAME} > 0.5) {
-        displacement = texture(${DISPLACEMENT_MAP_UNIFORM_NAME}, disp_uv).r * ${DISPLACEMENT_SCALE_UNIFORM_NAME};
-    }
-
-    vec3 displaced_position = a_position + (a_normal * displacement);
-    gl_Position     = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX} * vec4(displaced_position, 1.0);
-    v_worldPosition = (${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX} * vec4(displaced_position, 1.0)).xyz;
-    v_normal        = (${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX} * vec4(a_normal, 0.0)).xyz;
-    v_uv = a_uv;
-}
-`;
-
-/**
- * GLSL fragment shader source code.
- *
- * @type {string}
- */
-const FRAGMENT_SHADER_SOURCE = `#version 300 es
-precision mediump float;
-in vec3 v_worldPosition;
-in vec3 v_normal;
-in vec2 v_uv;
-uniform vec3 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR};
-uniform vec3 ${AMBIENT_COLOR_UNIFORM_NAME};
-uniform vec3 ${SPECULAR_COLOR_UNIFORM_NAME};
-uniform vec3 ${EMISSIVE_COLOR_UNIFORM_NAME};
-uniform vec3 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION};
-uniform vec3 ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION};
-uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH};
-uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH};
-uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED};
-uniform float ${SPECULAR_STRENGTH_UNIFORM_NAME};
-uniform float ${SHININESS_UNIFORM_NAME};
-uniform float ${SPECULAR_ENABLED_UNIFORM_NAME};
-uniform float ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY};
-uniform float ${OPTICAL_DENSITY_UNIFORM_NAME};
-uniform float ${BUMP_MULTIPLIER_UNIFORM_NAME};
-uniform sampler2D ${DIFFUSE_MAP_UNIFORM_NAME};
-uniform sampler2D ${AMBIENT_MAP_UNIFORM_NAME};
-uniform sampler2D ${SPECULAR_MAP_UNIFORM_NAME};
-uniform sampler2D ${ALPHA_MAP_UNIFORM_NAME};
-uniform sampler2D ${BUMP_MAP_UNIFORM_NAME};
-uniform sampler2D ${REFLECTION_MAP_UNIFORM_NAME};
-uniform vec2 ${DIFFUSE_UV_OFFSET_UNIFORM_NAME};
-uniform vec2 ${DIFFUSE_UV_SCALE_UNIFORM_NAME};
-uniform vec2 ${AMBIENT_UV_OFFSET_UNIFORM_NAME};
-uniform vec2 ${AMBIENT_UV_SCALE_UNIFORM_NAME};
-uniform vec2 ${SPECULAR_UV_OFFSET_UNIFORM_NAME};
-uniform vec2 ${SPECULAR_UV_SCALE_UNIFORM_NAME};
-uniform vec2 ${ALPHA_UV_OFFSET_UNIFORM_NAME};
-uniform vec2 ${ALPHA_UV_SCALE_UNIFORM_NAME};
-uniform vec2 ${BUMP_UV_OFFSET_UNIFORM_NAME};
-uniform vec2 ${BUMP_UV_SCALE_UNIFORM_NAME};
-uniform vec2 ${REFLECTION_UV_OFFSET_UNIFORM_NAME};
-uniform vec2 ${REFLECTION_UV_SCALE_UNIFORM_NAME};
-uniform float ${USE_DIFFUSE_MAP_UNIFORM_NAME};
-uniform float ${USE_AMBIENT_MAP_UNIFORM_NAME};
-uniform float ${USE_SPECULAR_MAP_UNIFORM_NAME};
-uniform float ${USE_ALPHA_MAP_UNIFORM_NAME};
-uniform float ${USE_BUMP_MAP_UNIFORM_NAME};
-uniform float ${USE_REFLECTION_MAP_UNIFORM_NAME};
-out vec4 outColor;
-
-vec2 apply_uv(vec2 base_uv, vec2 offset, vec2 scale) {
-    return (base_uv * scale) + offset;
-}
-
-vec3 compute_bump_normal(vec3 normal, vec2 uv) {
-    vec3 tangent_normal = texture(${BUMP_MAP_UNIFORM_NAME}, uv).xyz * 2.0 - 1.0;
-    tangent_normal.xy  *= ${BUMP_MULTIPLIER_UNIFORM_NAME};
-    tangent_normal      = normalize(tangent_normal);
-
-    vec3 dp1       = dFdx(v_worldPosition);
-    vec3 dp2       = dFdy(v_worldPosition);
-    vec2 duv1      = dFdx(uv);
-    vec2 duv2      = dFdy(uv);
-    vec3 tangent   = normalize(dp1 * duv2.y - dp2 * duv1.y);
-    vec3 bitangent = normalize(-dp1 * duv2.x + dp2 * duv1.x);
-
-    mat3 tbn = mat3(tangent, bitangent, normal);
-    return normalize(tbn * tangent_normal);
-}
-
-vec2 compute_reflection_uv(vec3 normal, vec3 view_dir) {
-    vec3 reflect_dir = reflect(-view_dir, normal);
-    float uv_scale   = 2.0 * sqrt(
-          reflect_dir.x * reflect_dir.x
-        + reflect_dir.y * reflect_dir.y
-        + (reflect_dir.z + 1.0) * (reflect_dir.z + 1.0)
-    );
-
-    return (reflect_dir.xy / uv_scale) + vec2(0.5, 0.5);
-}
-
-void main() {
-    vec3 diffuse_color     = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR};
-    vec3 diffuse_map_color = vec3(1.0);
-
-    if (${USE_DIFFUSE_MAP_UNIFORM_NAME} > 0.5) {
-        vec2 diff_uv = apply_uv(v_uv, ${DIFFUSE_UV_OFFSET_UNIFORM_NAME}, ${DIFFUSE_UV_SCALE_UNIFORM_NAME});
-        diffuse_map_color = texture(${DIFFUSE_MAP_UNIFORM_NAME}, diff_uv).rgb;
-        diffuse_color *= diffuse_map_color;
-    }
-
-    float alpha = ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY};
-
-    if (${USE_ALPHA_MAP_UNIFORM_NAME} > 0.5) {
-        vec2 alpha_uv = apply_uv(v_uv, ${ALPHA_UV_OFFSET_UNIFORM_NAME}, ${ALPHA_UV_SCALE_UNIFORM_NAME});
-        alpha *= texture(${ALPHA_MAP_UNIFORM_NAME}, alpha_uv).r;
-    }
-
-    if (${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED} <= ${LIGHTING_ENABLED_THRESHOLD}) {
-        vec3 unlit_color = diffuse_color;
-
-        if (${USE_DIFFUSE_MAP_UNIFORM_NAME} > 0.5) {
-            unlit_color = diffuse_map_color;
-        }
-
-        vec3 rgb = unlit_color + ${EMISSIVE_COLOR_UNIFORM_NAME};
-        outColor = vec4(rgb, alpha);
-        return;
-    }
-
-    vec3 normal         = normalize(v_normal);
-    vec3 view_dir       = normalize(${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION} - v_worldPosition);
-    vec3 ambient_tint   = ${AMBIENT_COLOR_UNIFORM_NAME};
-    vec3 specular_color = ${SPECULAR_COLOR_UNIFORM_NAME};
-
-    if (${USE_BUMP_MAP_UNIFORM_NAME} > 0.5) {
-        vec2 bump_uv = apply_uv(v_uv, ${BUMP_UV_OFFSET_UNIFORM_NAME}, ${BUMP_UV_SCALE_UNIFORM_NAME});
-        normal = compute_bump_normal(normal, bump_uv);
-    }
-
-    if (!gl_FrontFacing) {
-        normal = -normal;
-    }
-
-    if (${USE_AMBIENT_MAP_UNIFORM_NAME} > 0.5) {
-        vec2 amb_uv   = apply_uv(v_uv, ${AMBIENT_UV_OFFSET_UNIFORM_NAME}, ${AMBIENT_UV_SCALE_UNIFORM_NAME});
-        ambient_tint *= texture(${AMBIENT_MAP_UNIFORM_NAME}, amb_uv).rgb;
-    }
-
-    if (${USE_SPECULAR_MAP_UNIFORM_NAME} > 0.5) {
-        vec2 spec_uv    = apply_uv(v_uv, ${SPECULAR_UV_OFFSET_UNIFORM_NAME}, ${SPECULAR_UV_SCALE_UNIFORM_NAME});
-        specular_color *= texture(${SPECULAR_MAP_UNIFORM_NAME}, spec_uv).rgb;
-    }
-
-    float specular_intensity = 0.0;
-    vec3 light_direction     = normalize(${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION});
-    float diffuse_intensity  = max(dot(normal, light_direction), 0.0);
-
-    vec3 ambient = diffuse_color * ambient_tint * ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH};
-    vec3 diffuse = diffuse_color * (diffuse_intensity * ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH});
-
-    if (${SPECULAR_ENABLED_UNIFORM_NAME} > 0.5 && diffuse_intensity > 0.0) {
-        vec3 reflection_direction = reflect(-light_direction, normal);
-        float specular_base = max(dot(view_dir, reflection_direction), 0.0);
-        specular_intensity = pow(specular_base, ${SHININESS_UNIFORM_NAME});
-    }
-
-    vec3 specular = specular_color * (specular_intensity * ${SPECULAR_STRENGTH_UNIFORM_NAME}
-        * ${MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH});
-
-    vec3 emissive = ${EMISSIVE_COLOR_UNIFORM_NAME};
-    vec3 rgb      = ambient + diffuse + specular + emissive;
-
-    if (${USE_REFLECTION_MAP_UNIFORM_NAME} > 0.5) {
-        vec2 refl_uv        = compute_reflection_uv(normal, view_dir);
-        vec2 refl_uv_scaled = apply_uv(refl_uv, ${REFLECTION_UV_OFFSET_UNIFORM_NAME}, ${REFLECTION_UV_SCALE_UNIFORM_NAME});
-        vec3 refl_color     = texture(${REFLECTION_MAP_UNIFORM_NAME}, refl_uv_scaled).rgb;
-        float refl_strength = clamp(${OPTICAL_DENSITY_UNIFORM_NAME} - 1.0, 0.0, 1.0);
-        rgb                 = mix(rgb, refl_color, refl_strength);
-    }
-
-    outColor = vec4(rgb, alpha);
-}
-`;
+import * as SharedMaterialConstants                 from '../constants/material.js';
+import * as DirectionalMaterialConstants            from '../constants/directional-light-material.js';
+import * as MaterialConstants                       from '../constants/mtl-standard-material.js';
+import { ECMASCRIPT_TYPEOF_RESULTS }                from '../constants/ecmascript-types.js';
+import { MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES } from '../exception-messages/mtl-standard-material.js';
+import { ShaderProgram }                            from '../shader/shader-program.js';
+import { Texture2D }                                from '../texture/texture2d.js';
+import { DirectionalLightMaterial }                 from './directional-light-material.js';
 
 /**
  * Options used by `MtlStandardMaterial`.
  *
  * @typedef {Object} MtlStandardMaterialOptions
- * @property {Float32Array | number[]} [diffuseColor]   - Diffuse RGB color in 0..1 range.
- * @property {Float32Array | number[]} [ambientColor]   - Ambient RGB color in 0..1 range.
- * @property {Float32Array | number[]} [specularColor]  - Specular RGB color in 0..1 range.
- * @property {Float32Array | number[]} [emissiveColor]  - Emissive RGB color in 0..1 range.
+ * @property {Float32Array | number[]} [diffuseColor]   - Diffuse RGB color in [0..1] range.
+ * @property {Float32Array | number[]} [ambientColor]   - Ambient RGB color in [0..1] range.
+ * @property {Float32Array | number[]} [specularColor]  - Specular RGB color in [0..1] range.
+ * @property {Float32Array | number[]} [emissiveColor]  - Emissive RGB color in [0..1] range.
  * @property {Float32Array | number[]} [lightDirection] - Directional light direction (world space).
  * @property {number} [ambientStrength]                 - Ambient strength multiplier.
  * @property {number} [shininess]                       - Specular exponent.
@@ -749,7 +37,8 @@ void main() {
 export class MtlStandardMaterial extends DirectionalLightMaterial {
 
     /**
-     * Fallback texture used, when a map is not assigned.
+     * Placeholder texture shared by map slots until a texture is assigned.
+     * External map textures remain owned by the caller.
      *
      * @type {Texture2D}
      * @private
@@ -757,116 +46,13 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
     #fallbackTexture;
 
     /**
-     * Diffuse texture.
+     * Per-instance texture references, UV buffers and map usage flags.
+     * The descriptors are shared, but mutable map state is never shared.
      *
-     * @type {Texture2D}
+     * @type {Object[]}
      * @private
      */
-    #diffuseTexture;
-
-    /**
-     * Ambient texture.
-     *
-     * @type {Texture2D}
-     * @private
-     */
-    #ambientTexture;
-
-    /**
-     * Specular texture.
-     *
-     * @type {Texture2D}
-     * @private
-     */
-    #specularTexture;
-
-    /**
-     * Alpha texture.
-     *
-     * @type {Texture2D}
-     * @private
-     */
-    #alphaTexture;
-
-    /**
-     * Bump texture.
-     *
-     * @type {Texture2D}
-     * @private
-     */
-    #bumpTexture;
-
-    /**
-     * Displacement texture.
-     *
-     * @type {Texture2D}
-     * @private
-     */
-    #displacementTexture;
-
-    /**
-     * Reflection texture.
-     *
-     * @type {Texture2D}
-     * @private
-     */
-    #reflectionTexture;
-
-    /**
-     * Diffuse texture unit index.
-     *
-     * @type {number}
-     * @private
-     */
-    #diffuseTextureUnit = DEFAULT_DIFFUSE_TEXTURE_UNIT;
-
-    /**
-     * Ambient texture unit index.
-     *
-     * @type {number}
-     * @private
-     */
-    #ambientTextureUnit = DEFAULT_AMBIENT_TEXTURE_UNIT;
-
-    /**
-     * Specular texture unit index.
-     *
-     * @type {number}
-     * @private
-     */
-    #specularTextureUnit = DEFAULT_SPECULAR_TEXTURE_UNIT;
-
-    /**
-     * Alpha texture unit index.
-     *
-     * @type {number}
-     * @private
-     */
-    #alphaTextureUnit = DEFAULT_ALPHA_TEXTURE_UNIT;
-
-    /**
-     * Bump texture unit index.
-     *
-     * @type {number}
-     * @private
-     */
-    #bumpTextureUnit = DEFAULT_BUMP_TEXTURE_UNIT;
-
-    /**
-     * Displacement texture unit index.
-     *
-     * @type {number}
-     * @private
-     */
-    #displacementTextureUnit = DEFAULT_DISPLACEMENT_TEXTURE_UNIT;
-
-    /**
-     * Reflection texture unit index.
-     *
-     * @type {number}
-     * @private
-     */
-    #reflectionTextureUnit = DEFAULT_REFLECTION_TEXTURE_UNIT;
+    #maps;
 
     /**
      * Ambient color.
@@ -874,7 +60,7 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
      * @type {Float32Array}
      * @private
      */
-    #ambientColor = new Float32Array(DEFAULT_AMBIENT_COLOR);
+    #ambientColor = new Float32Array(SharedMaterialConstants.MATERIAL_DEFAULT_COLOR);
 
     /**
      * Specular color.
@@ -882,7 +68,7 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
      * @type {Float32Array}
      * @private
      */
-    #specularColor = new Float32Array(DEFAULT_SPECULAR_COLOR);
+    #specularColor = new Float32Array(SharedMaterialConstants.MATERIAL_DEFAULT_COLOR);
 
     /**
      * Emissive color.
@@ -890,7 +76,7 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
      * @type {Float32Array}
      * @private
      */
-    #emissiveColor = new Float32Array(DEFAULT_EMISSIVE_COLOR);
+    #emissiveColor = new Float32Array(MaterialConstants.MTL_STANDARD_MATERIAL_DEFAULTS.EMISSIVE_COLOR);
 
     /**
      * Shininess exponent.
@@ -898,7 +84,7 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
      * @type {number}
      * @private
      */
-    #shininess = DEFAULT_SHININESS;
+    #shininess = SharedMaterialConstants.MATERIAL_SPECULAR_DEFAULTS.SHININESS;
 
     /**
      * Specular strength multiplier.
@@ -906,31 +92,7 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
      * @type {number}
      * @private
      */
-    #specularStrength = DEFAULT_SPECULAR_STRENGTH;
-
-    /**
-     * Optical density value.
-     *
-     * @type {number}
-     * @private
-     */
-    #opticalDensity = DEFAULT_OPTICAL_DENSITY;
-
-    /**
-     * Bump multiplier.
-     *
-     * @type {number}
-     * @private
-     */
-    #bumpMultiplier = DEFAULT_BUMP_MULTIPLIER;
-
-    /**
-     * Displacement scale factor.
-     *
-     * @type {number}
-     * @private
-     */
-    #displacementScale = DEFAULT_DISPLACEMENT_SCALE;
+    #specularStrength = SharedMaterialConstants.MATERIAL_SPECULAR_DEFAULTS.STRENGTH;
 
     /**
      * Flag, controlling the specular lighting.
@@ -941,218 +103,307 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
     #specularEnabled = true;
 
     /**
-     * Diffuse UV-offset.
+     * Optical density value.
      *
-     * @type {Float32Array}
+     * @type {number}
      * @private
      */
-    #diffuseUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
+    #opticalDensity = MaterialConstants.MTL_STANDARD_MATERIAL_DEFAULTS.OPTICAL_DENSITY;
 
     /**
-     * Diffuse UV-scale.
+     * Bump multiplier.
      *
-     * @type {Float32Array}
+     * @type {number}
      * @private
      */
-    #diffuseUvScale = new Float32Array(DEFAULT_UV_SCALE);
+    #bumpMultiplier = MaterialConstants.MTL_STANDARD_MATERIAL_DEFAULTS.BUMP_MULTIPLIER;
 
     /**
-     * Ambient UV-offset.
+     * Displacement scale factor.
      *
-     * @type {Float32Array}
+     * @type {number}
      * @private
      */
-    #ambientUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
+    #displacementScale = MaterialConstants.MTL_STANDARD_MATERIAL_DEFAULTS.DISPLACEMENT_SCALE;
 
     /**
-     * Ambient UV-scale.
+     * Creates a material with its own program and fallback texture.
      *
-     * @type {Float32Array}
-     * @private
-     */
-    #ambientUvScale = new Float32Array(DEFAULT_UV_SCALE);
-
-    /**
-     * Specular UV-offset.
-     *
-     * @type {Float32Array}
-     * @private
-     */
-    #specularUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
-
-    /**
-     * Specular UV-scale.
-     *
-     * @type {Float32Array}
-     * @private
-     */
-    #specularUvScale = new Float32Array(DEFAULT_UV_SCALE);
-
-    /**
-     * Alpha UV-offset.
-     *
-     * @type {Float32Array}
-     * @private
-     */
-    #alphaUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
-
-    /**
-     * Alpha UV-scale.
-     *
-     * @type {Float32Array}
-     * @private
-     */
-    #alphaUvScale = new Float32Array(DEFAULT_UV_SCALE);
-
-    /**
-     * Bump UV-offset.
-     *
-     * @type {Float32Array}
-     * @private
-     */
-    #bumpUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
-
-    /**
-     * Bump UV-scale.
-     *
-     * @type {Float32Array}
-     * @private
-     */
-    #bumpUvScale = new Float32Array(DEFAULT_UV_SCALE);
-
-    /**
-     * Displacement UV-offset.
-     *
-     * @type {Float32Array}
-     * @private
-     */
-    #displacementUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
-
-    /**
-     * Displacement UV-scale.
-     *
-     * @type {Float32Array}
-     * @private
-     */
-    #displacementUvScale = new Float32Array(DEFAULT_UV_SCALE);
-
-    /**
-     * Reflection UV-offset.
-     *
-     * @type {Float32Array}
-     * @private
-     */
-    #reflectionUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
-
-    /**
-     * Reflection UV-scale.
-     *
-     * @type {Float32Array}
-     * @private
-     */
-    #reflectionUvScale = new Float32Array(DEFAULT_UV_SCALE);
-
-    /**
-     * Flag, indicating the diffuse map usage.
-     *
-     * @type {boolean}
-     * @private
-     */
-    #useDiffuseMap = false;
-
-    /**
-     * Flag, indicating the ambient map usage.
-     *
-     * @type {boolean}
-     * @private
-     */
-    #useAmbientMap = false;
-
-    /**
-     * Flag, indicating the specular map usage.
-     *
-     * @type {boolean}
-     * @private
-     */
-    #useSpecularMap = false;
-
-    /**
-     * Flag, indicating the alpha map usage.
-     *
-     * @type {boolean}
-     * @private
-     */
-    #useAlphaMap = false;
-
-    /**
-     * Flag, indicating the bump map usage.
-     *
-     * @type {boolean}
-     * @private
-     */
-    #useBumpMap = false;
-
-    /**
-     * Flag, indicating the displacement map usage.
-     *
-     * @type {boolean}
-     * @private
-     */
-    #useDisplacementMap = false;
-
-    /**
-     * Flag, indicating the reflection map usage.
-     *
-     * @type {boolean}
-     * @private
-     */
-    #useReflectionMap = false;
-
-    /**
-     * Creates a new MTL standard material.
-     *
-     * @param {WebGL2RenderingContext} webglContext  - WebGL2 rendering context, used to compile the shaders.
-     * @param {MtlStandardMaterialOptions} [options] - Material options.
+     * @param {WebGL2RenderingContext} webglContext  - WebGL2 rendering context.
+     * @param {MtlStandardMaterialOptions} [options] - Material settings.
      */
     constructor(webglContext, options = {}) {
         if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
-            throw new TypeError(ERROR_OPTIONS_OBJECT);
+            throw new TypeError(MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.OPTIONS_OBJECT);
         }
 
-        const {
-            diffuseColor,
-            ambientColor,
-            specularColor,
-            emissiveColor,
+        const { diffuseColor, lightDirection, ambientStrength } = options;
+
+        const sources       = MaterialConstants.MTL_STANDARD_MATERIAL_SHADERS;
+        const shaderProgram = new ShaderProgram(webglContext, sources.VERTEX, sources.FRAGMENT);
+        const lightOptions  = {
+            color : diffuseColor || SharedMaterialConstants.MATERIAL_DEFAULT_COLOR,
             lightDirection,
-            ambientStrength,
-            shininess,
-            specularStrength,
-            opticalDensity
-        } = options;
+            ambientStrength
+        };
 
-        super(
-            webglContext,
-            new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE),
-            {
-                color           : diffuseColor || DEFAULT_DIFFUSE_COLOR,
-                lightDirection  : lightDirection,
-                ambientStrength : ambientStrength
-            },
-            { ownsShaderProgram: true }
-        );
+        super(webglContext, shaderProgram, lightOptions, {
+            ownsShaderProgram: SharedMaterialConstants.MATERIAL_DEFAULTS.OWNS_GENERATED_SHADER_PROGRAM
+        });
 
-        this.#fallbackTexture     = new Texture2D(webglContext);
-        this.#diffuseTexture      = this.#fallbackTexture;
-        this.#ambientTexture      = this.#fallbackTexture;
-        this.#specularTexture     = this.#fallbackTexture;
-        this.#alphaTexture        = this.#fallbackTexture;
-        this.#bumpTexture         = this.#fallbackTexture;
-        this.#displacementTexture = this.#fallbackTexture;
-        this.#reflectionTexture   = this.#fallbackTexture;
-        this.setAmbientColor(ambientColor   || DEFAULT_AMBIENT_COLOR);
-        this.setSpecularColor(specularColor || DEFAULT_SPECULAR_COLOR);
-        this.setEmissiveColor(emissiveColor || DEFAULT_EMISSIVE_COLOR);
+        try {
+            this.#initialize(webglContext, options);
+        } catch (error) {
+            this.#fallbackTexture?.dispose();
+            super.dispose();
+            throw error;
+        }
+    }
+
+    /**
+     * Uploads the material-specific uniforms in the existing order.
+     *
+     * @param {Float32Array} worldMatrix    - World matrix.
+     * @param {Float32Array} cameraPosition - Camera position.
+     * @protected
+     */
+    applyAdditionalUniforms(worldMatrix, cameraPosition) {
+        const shaderProgram = this.shaderProgram;
+        const uniforms      = DirectionalMaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS;
+        shaderProgram.setMatrix4(uniforms.WORLD_MATRIX, worldMatrix);
+        shaderProgram.setVector3(uniforms.CAMERA_POSITION, cameraPosition);
+
+        this.#applyShadingUniforms(shaderProgram);
+        this.#applySurfaceUniforms(shaderProgram);
+        this.#applyUvTransforms(shaderProgram);
+        this.#applyMapFlags(shaderProgram);
+        this.#applyTextures(shaderProgram);
+    }
+
+    /**
+     * Sets the ambient color.
+     *
+     * @param {Float32Array | number[]} color - RGB color in [0..1] range.
+     */
+    setAmbientColor(color) {
+        MtlStandardMaterial.#assertVector3(MaterialConstants.MTL_STANDARD_MATERIAL_CONTEXTS.AMBIENT_COLOR, color);
+        this.#ambientColor.set(color);
+    }
+
+    /**
+     * Sets the specular color.
+     *
+     * @param {Float32Array | number[]} color - RGB color in [0..1] range.
+     */
+    setSpecularColor(color) {
+        MtlStandardMaterial.#assertVector3(MaterialConstants.MTL_STANDARD_MATERIAL_CONTEXTS.SPECULAR_COLOR, color);
+        this.#specularColor.set(color);
+    }
+
+    /**
+     * Sets the emissive color.
+     *
+     * @param {Float32Array | number[]} color - RGB color in [0..1] range.
+     */
+    setEmissiveColor(color) {
+        MtlStandardMaterial.#assertVector3(MaterialConstants.MTL_STANDARD_MATERIAL_CONTEXTS.EMISSIVE_COLOR, color);
+        this.#emissiveColor.set(color);
+    }
+
+    /**
+     * Sets the shininess exponent.
+     *
+     * @param {number} value - Shininess exponent.
+     */
+    setShininess(value) {
+        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+            throw new TypeError(MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.SHININESS_TYPE);
+        }
+
+        this.#shininess = value;
+    }
+
+    /**
+     * Sets the specular strength multiplier.
+     *
+     * @param {number} value - Specular strength.
+     */
+    setSpecularStrength(value) {
+        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+            throw new TypeError(MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.SPECULAR_STRENGTH_TYPE);
+        }
+
+        this.#specularStrength = value;
+    }
+
+    /**
+     * Enables or disables specular term.
+     *
+     * @param {boolean} enabled - Specular usage flag.
+     */
+    setSpecularEnabled(enabled) {
+        if (typeof enabled !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+            throw new TypeError(MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.SPECULAR_ENABLED_TYPE);
+        }
+
+        this.#specularEnabled = enabled;
+    }
+
+    /**
+     * Sets optical density value.
+     *
+     * @param {number} value - Optical density.
+     */
+    setOpticalDensity(value) {
+        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+            throw new TypeError(MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.OPTICAL_DENSITY_TYPE);
+        }
+
+        this.#opticalDensity = value;
+    }
+
+    /**
+     * Sets bump multiplier value.
+     *
+     * @param {number} value - Bump multiplier.
+     */
+    setBumpMultiplier(value) {
+        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+            throw new TypeError(MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.BUMP_MULTIPLIER_TYPE);
+        }
+
+        this.#bumpMultiplier = value;
+    }
+
+    /**
+     * Sets displacement scale.
+     *
+     * @param {number} value - Displacement scale factor.
+     */
+    setDisplacementScale(value) {
+        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+            throw new TypeError(MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.DISPLACEMENT_SCALE_TYPE);
+        }
+
+        this.#displacementScale = value;
+    }
+
+    /**
+     * Sets a diffuse texture and its UV-transform.
+     *
+     * @param {Texture2D} texture                       - Diffuse texture.
+     * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+     */
+    setDiffuseMap(texture, options = {}) {
+        this.#setMap(MaterialConstants.MTL_STANDARD_MATERIAL_MAP_INDEXES.DIFFUSE, texture, options);
+    }
+
+    /**
+     * Sets an ambient texture and its UV-transform.
+     *
+     * @param {Texture2D} texture                       - Ambient texture.
+     * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+     */
+    setAmbientMap(texture, options = {}) {
+        this.#setMap(MaterialConstants.MTL_STANDARD_MATERIAL_MAP_INDEXES.AMBIENT, texture, options);
+    }
+
+    /**
+     * Sets a specular texture and its UV-transform.
+     *
+     * @param {Texture2D} texture                       - Specular texture.
+     * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+     */
+    setSpecularMap(texture, options = {}) {
+        this.#setMap(MaterialConstants.MTL_STANDARD_MATERIAL_MAP_INDEXES.SPECULAR, texture, options);
+    }
+
+    /**
+     * Sets an alpha texture and its UV-transform.
+     *
+     * @param {Texture2D} texture                       - Alpha texture.
+     * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+     */
+    setAlphaMap(texture, options = {}) {
+        this.#setMap(MaterialConstants.MTL_STANDARD_MATERIAL_MAP_INDEXES.ALPHA, texture, options);
+    }
+
+    /**
+     * Sets a bump texture and its UV-transform.
+     *
+     * @param {Texture2D} texture                       - Bump texture.
+     * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+     */
+    setBumpMap(texture, options = {}) {
+        this.#setMap(MaterialConstants.MTL_STANDARD_MATERIAL_MAP_INDEXES.BUMP, texture, options);
+    }
+
+    /**
+     * Sets a displacement texture and its UV-transform.
+     *
+     * @param {Texture2D} texture                       - Displacement texture.
+     * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+     */
+    setDisplacementMap(texture, options = {}) {
+        this.#setMap(MaterialConstants.MTL_STANDARD_MATERIAL_MAP_INDEXES.DISPLACEMENT, texture, options);
+    }
+
+    /**
+     * Sets a reflection texture and its UV-transform.
+     *
+     * @param {Texture2D} texture                       - Reflection texture.
+     * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+     */
+    setReflectionMap(texture, options = {}) {
+        this.#setMap(MaterialConstants.MTL_STANDARD_MATERIAL_MAP_INDEXES.REFLECTION, texture, options);
+    }
+
+    /**
+     * Releases the fallback texture and program, leaving external maps intact.
+     */
+    dispose() {
+        if (this.isDisposed) {
+            return;
+        }
+
+        this.#fallbackTexture.dispose();
+        super.dispose();
+    }
+
+    /**
+     * Allocates per-map state and applies the initial shading options.
+     *
+     * @param {WebGL2RenderingContext} webglContext - Texture allocation context.
+     * @param {MtlStandardMaterialOptions} options  - Initial material settings.
+     * @private
+     */
+    #initialize(webglContext, options) {
+        this.#fallbackTexture = new Texture2D(webglContext);
+
+        this.#maps = MaterialConstants.MTL_STANDARD_MATERIAL_MAPS.map((descriptor) => ({
+            descriptor,
+            texture          : this.#fallbackTexture,
+            textureUnitIndex : descriptor.TEXTURE_UNIT,
+            uvOffset         : new Float32Array(MaterialConstants.MTL_STANDARD_MATERIAL_DEFAULTS.UV_OFFSET),
+            uvScale          : new Float32Array(MaterialConstants.MTL_STANDARD_MATERIAL_DEFAULTS.UV_SCALE),
+            enabled          : false
+        }));
+
+        this.#applyOptions(options);
+    }
+
+    /**
+     * Applies initial colors and optional specular settings.
+     *
+     * @param {MtlStandardMaterialOptions} options - Initial material settings.
+     * @private
+     */
+    #applyOptions(options) {
+        const { ambientColor, specularColor, emissiveColor, shininess, specularStrength, opticalDensity } = options;
+
+        this.setAmbientColor(ambientColor   || SharedMaterialConstants.MATERIAL_DEFAULT_COLOR);
+        this.setSpecularColor(specularColor || SharedMaterialConstants.MATERIAL_DEFAULT_COLOR);
+        this.setEmissiveColor(emissiveColor || MaterialConstants.MTL_STANDARD_MATERIAL_DEFAULTS.EMISSIVE_COLOR);
 
         if (shininess !== undefined) {
             this.setShininess(shininess);
@@ -1168,373 +419,129 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
     }
 
     /**
-     * Uploads per-object uniforms specific to the standard material.
+     * Uploads colors and specular settings without creating temporary buffers.
      *
-     * @param {Float32Array} worldMatrix    - World matrix.
-     * @param {Float32Array} cameraPosition - Camera position.
-     * @protected
-     */
-    applyAdditionalUniforms(worldMatrix, cameraPosition) {
-        // Transform & camera uniforms:
-        this.shaderProgram.setMatrix4(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX, worldMatrix);
-        this.shaderProgram.setVector3(MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION, cameraPosition);
-
-        // Material colors & shading parameters:
-        this.shaderProgram.setVector3(AMBIENT_COLOR_UNIFORM_NAME, this.#ambientColor);
-        this.shaderProgram.setVector3(SPECULAR_COLOR_UNIFORM_NAME, this.#specularColor);
-        this.shaderProgram.setVector3(EMISSIVE_COLOR_UNIFORM_NAME, this.#emissiveColor);
-        this.shaderProgram.setFloat(SPECULAR_STRENGTH_UNIFORM_NAME, this.#specularStrength);
-        this.shaderProgram.setFloat(SHININESS_UNIFORM_NAME, this.#shininess);
-        this.shaderProgram.setFloat(SPECULAR_ENABLED_UNIFORM_NAME, this.#specularEnabled ? FLOAT_TRUE : FLOAT_FALSE);
-
-        // Optical & surface detail parameters:
-        this.shaderProgram.setFloat(OPTICAL_DENSITY_UNIFORM_NAME, this.#opticalDensity);
-        this.shaderProgram.setFloat(BUMP_MULTIPLIER_UNIFORM_NAME, this.#bumpMultiplier);
-        this.shaderProgram.setFloat(DISPLACEMENT_SCALE_UNIFORM_NAME, this.#displacementScale);
-
-        // Per-map UV transforms (offset/scale):
-        this.shaderProgram.setVector2(DIFFUSE_UV_OFFSET_UNIFORM_NAME, this.#diffuseUvOffset);
-        this.shaderProgram.setVector2(DIFFUSE_UV_SCALE_UNIFORM_NAME, this.#diffuseUvScale);
-        this.shaderProgram.setVector2(AMBIENT_UV_OFFSET_UNIFORM_NAME, this.#ambientUvOffset);
-        this.shaderProgram.setVector2(AMBIENT_UV_SCALE_UNIFORM_NAME, this.#ambientUvScale);
-        this.shaderProgram.setVector2(SPECULAR_UV_OFFSET_UNIFORM_NAME, this.#specularUvOffset);
-        this.shaderProgram.setVector2(SPECULAR_UV_SCALE_UNIFORM_NAME, this.#specularUvScale);
-        this.shaderProgram.setVector2(ALPHA_UV_OFFSET_UNIFORM_NAME, this.#alphaUvOffset);
-        this.shaderProgram.setVector2(ALPHA_UV_SCALE_UNIFORM_NAME, this.#alphaUvScale);
-        this.shaderProgram.setVector2(BUMP_UV_OFFSET_UNIFORM_NAME, this.#bumpUvOffset);
-        this.shaderProgram.setVector2(BUMP_UV_SCALE_UNIFORM_NAME, this.#bumpUvScale);
-        this.shaderProgram.setVector2(DISPLACEMENT_UV_OFFSET_UNIFORM_NAME, this.#displacementUvOffset);
-        this.shaderProgram.setVector2(DISPLACEMENT_UV_SCALE_UNIFORM_NAME, this.#displacementUvScale);
-        this.shaderProgram.setVector2(REFLECTION_UV_OFFSET_UNIFORM_NAME, this.#reflectionUvOffset);
-        this.shaderProgram.setVector2(REFLECTION_UV_SCALE_UNIFORM_NAME, this.#reflectionUvScale);
-
-        // Per-map usage flags (as float booleans for GLSL):
-        this.shaderProgram.setFloat(USE_DIFFUSE_MAP_UNIFORM_NAME, this.#useDiffuseMap ? FLOAT_TRUE : FLOAT_FALSE);
-        this.shaderProgram.setFloat(USE_AMBIENT_MAP_UNIFORM_NAME, this.#useAmbientMap ? FLOAT_TRUE : FLOAT_FALSE);
-        this.shaderProgram.setFloat(USE_SPECULAR_MAP_UNIFORM_NAME, this.#useSpecularMap ? FLOAT_TRUE : FLOAT_FALSE);
-        this.shaderProgram.setFloat(USE_ALPHA_MAP_UNIFORM_NAME, this.#useAlphaMap ? FLOAT_TRUE : FLOAT_FALSE);
-        this.shaderProgram.setFloat(USE_BUMP_MAP_UNIFORM_NAME, this.#useBumpMap ? FLOAT_TRUE : FLOAT_FALSE);
-        this.shaderProgram.setFloat(USE_DISPLACEMENT_MAP_UNIFORM_NAME, this.#useDisplacementMap ? FLOAT_TRUE : FLOAT_FALSE);
-        this.shaderProgram.setFloat(USE_REFLECTION_MAP_UNIFORM_NAME, this.#useReflectionMap ? FLOAT_TRUE : FLOAT_FALSE);
-
-        // Texture bindings (samplers + texture units):
-        this.shaderProgram.setTexture2D(DIFFUSE_MAP_UNIFORM_NAME, this.#diffuseTexture, this.#diffuseTextureUnit);
-        this.shaderProgram.setTexture2D(AMBIENT_MAP_UNIFORM_NAME, this.#ambientTexture, this.#ambientTextureUnit);
-        this.shaderProgram.setTexture2D(SPECULAR_MAP_UNIFORM_NAME, this.#specularTexture, this.#specularTextureUnit);
-        this.shaderProgram.setTexture2D(ALPHA_MAP_UNIFORM_NAME, this.#alphaTexture, this.#alphaTextureUnit);
-        this.shaderProgram.setTexture2D(BUMP_MAP_UNIFORM_NAME, this.#bumpTexture, this.#bumpTextureUnit);
-        this.shaderProgram.setTexture2D(DISPLACEMENT_MAP_UNIFORM_NAME, this.#displacementTexture, this.#displacementTextureUnit);
-        this.shaderProgram.setTexture2D(REFLECTION_MAP_UNIFORM_NAME, this.#reflectionTexture, this.#reflectionTextureUnit);
-    }
-
-    /**
-     * Sets the ambient color.
-     *
-     * @param {Float32Array | number[]} color - RGB color in [0..1] range.
-     */
-    setAmbientColor(color) {
-        MtlStandardMaterial.#assertVector3('`MtlStandardMaterial.setAmbientColor`', color);
-        this.#ambientColor.set(color);
-    }
-
-    /**
-     * Sets the specular color.
-     *
-     * @param {Float32Array | number[]} color - RGB color in [0..1] range.
-     */
-    setSpecularColor(color) {
-        MtlStandardMaterial.#assertVector3('`MtlStandardMaterial.setSpecularColor`', color);
-        this.#specularColor.set(color);
-    }
-
-    /**
-     * Sets the emissive color.
-     *
-     * @param {Float32Array | number[]} color - RGB color in [0..1] range.
-     */
-    setEmissiveColor(color) {
-        MtlStandardMaterial.#assertVector3('`MtlStandardMaterial.setEmissiveColor`', color);
-        this.#emissiveColor.set(color);
-    }
-
-    /**
-     * Sets the shininess exponent.
-     *
-     * @param {number} value - Shininess exponent.
-     */
-    setShininess(value) {
-        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
-            throw new TypeError(ERROR_SHININESS_TYPE);
-        }
-
-        this.#shininess = value;
-    }
-
-    /**
-     * Sets the specular strength multiplier.
-     *
-     * @param {number} value - Specular strength.
-     */
-    setSpecularStrength(value) {
-        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
-            throw new TypeError(ERROR_SPECULAR_STRENGTH_TYPE);
-        }
-
-        this.#specularStrength = value;
-    }
-
-    /**
-     * Enables or disables specular term.
-     *
-     * @param {boolean} enabled - Specular usage flag.
-     */
-    setSpecularEnabled(enabled) {
-        if (typeof enabled !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
-            throw new TypeError(ERROR_SPECULAR_ENABLED_TYPE);
-        }
-
-        this.#specularEnabled = enabled;
-    }
-
-    /**
-     * Sets optical density value.
-     *
-     * @param {number} value - Optical density.
-     */
-    setOpticalDensity(value) {
-        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
-            throw new TypeError(ERROR_OPTICAL_DENSITY_TYPE);
-        }
-
-        this.#opticalDensity = value;
-    }
-
-    /**
-     * Sets bump multiplier value.
-     *
-     * @param {number} value - Bump multiplier.
-     */
-    setBumpMultiplier(value) {
-        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
-            throw new TypeError(ERROR_BUMP_MULTIPLIER_TYPE);
-        }
-
-        this.#bumpMultiplier = value;
-    }
-
-    /**
-     * Sets displacement scale.
-     *
-     * @param {number} value - Displacement scale factor.
-     */
-    setDisplacementScale(value) {
-        if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
-            throw new TypeError(ERROR_DISPLACEMENT_SCALE_TYPE);
-        }
-
-        this.#displacementScale = value;
-    }
-
-    /**
-     * Sets a diffuse texture and its UV-transform.
-     *
-     * @param {Texture2D} texture                       - Diffuse texture.
-     * @param {MtlStandardMaterialMapOptions} [options] - Map options.
-     */
-    setDiffuseMap(texture, options = {}) {
-        this.#setMap(
-            '`MtlStandardMaterial.setDiffuseMap`',
-            texture,
-            options,
-            (map) => {
-                this.#diffuseTexture     = map.texture;
-                this.#diffuseTextureUnit = map.textureUnitIndex;
-                this.#useDiffuseMap      = true;
-                this.#diffuseUvOffset.set(map.uvOffset);
-                this.#diffuseUvScale.set(map.uvScale);
-            }
-        );
-    }
-
-    /**
-     * Sets an ambient texture and its UV-transform.
-     *
-     * @param {Texture2D} texture                       - Ambient texture.
-     * @param {MtlStandardMaterialMapOptions} [options] - Map options.
-     */
-    setAmbientMap(texture, options = {}) {
-        this.#setMap(
-            '`MtlStandardMaterial.setAmbientMap`',
-            texture,
-            options,
-            (map) => {
-                this.#ambientTexture     = map.texture;
-                this.#ambientTextureUnit = map.textureUnitIndex;
-                this.#useAmbientMap      = true;
-                this.#ambientUvOffset.set(map.uvOffset);
-                this.#ambientUvScale.set(map.uvScale);
-            }
-        );
-    }
-
-    /**
-     * Sets a specular texture and its UV-transform.
-     *
-     * @param {Texture2D} texture                       - Specular texture.
-     * @param {MtlStandardMaterialMapOptions} [options] - Map options.
-     */
-    setSpecularMap(texture, options = {}) {
-        this.#setMap(
-            '`MtlStandardMaterial.setSpecularMap`',
-            texture,
-            options,
-            (map) => {
-                this.#specularTexture     = map.texture;
-                this.#specularTextureUnit = map.textureUnitIndex;
-                this.#useSpecularMap      = true;
-                this.#specularUvOffset.set(map.uvOffset);
-                this.#specularUvScale.set(map.uvScale);
-            }
-        );
-    }
-
-    /**
-     * Sets an alpha texture and its UV-transform.
-     *
-     * @param {Texture2D} texture                       - Alpha texture.
-     * @param {MtlStandardMaterialMapOptions} [options] - Map options.
-     */
-    setAlphaMap(texture, options = {}) {
-        this.#setMap(
-            '`MtlStandardMaterial.setAlphaMap`',
-            texture,
-            options,
-            (map) => {
-                this.#alphaTexture     = map.texture;
-                this.#alphaTextureUnit = map.textureUnitIndex;
-                this.#useAlphaMap      = true;
-                this.#alphaUvOffset.set(map.uvOffset);
-                this.#alphaUvScale.set(map.uvScale);
-            }
-        );
-    }
-
-    /**
-     * Sets a bump texture and its UV-transform.
-     *
-     * @param {Texture2D} texture                       - Bump texture.
-     * @param {MtlStandardMaterialMapOptions} [options] - Map options.
-     */
-    setBumpMap(texture, options = {}) {
-        this.#setMap(
-            '`MtlStandardMaterial.setBumpMap`',
-            texture,
-            options,
-            (map) => {
-                this.#bumpTexture     = map.texture;
-                this.#bumpTextureUnit = map.textureUnitIndex;
-                this.#useBumpMap      = true;
-                this.#bumpUvOffset.set(map.uvOffset);
-                this.#bumpUvScale.set(map.uvScale);
-            }
-        );
-    }
-
-    /**
-     * Sets a displacement texture and its UV-transform.
-     *
-     * @param {Texture2D} texture                       - Displacement texture.
-     * @param {MtlStandardMaterialMapOptions} [options] - Map options.
-     */
-    setDisplacementMap(texture, options = {}) {
-        this.#setMap(
-            '`MtlStandardMaterial.setDisplacementMap`',
-            texture,
-            options,
-            (map) => {
-                this.#displacementTexture     = map.texture;
-                this.#displacementTextureUnit = map.textureUnitIndex;
-                this.#useDisplacementMap      = true;
-                this.#displacementUvOffset.set(map.uvOffset);
-                this.#displacementUvScale.set(map.uvScale);
-            }
-        );
-    }
-
-    /**
-     * Sets a reflection texture and its UV-transform.
-     *
-     * @param {Texture2D} texture                       - Reflection texture.
-     * @param {MtlStandardMaterialMapOptions} [options] - Map options.
-     */
-    setReflectionMap(texture, options = {}) {
-        this.#setMap(
-            '`MtlStandardMaterial.setReflectionMap`',
-            texture,
-            options,
-            (map) => {
-                this.#reflectionTexture     = map.texture;
-                this.#reflectionTextureUnit = map.textureUnitIndex;
-                this.#useReflectionMap      = true;
-                this.#reflectionUvOffset.set(map.uvOffset);
-                this.#reflectionUvScale.set(map.uvScale);
-            }
-        );
-    }
-
-    /**
-     * Disposes resources, owned by this material.
-     */
-    dispose() {
-        if (this.isDisposed) {
-            return;
-        }
-
-        if (this.#fallbackTexture) {
-            this.#fallbackTexture.dispose();
-        }
-
-        super.dispose();
-    }
-
-    /**
-     * Validates and applies the map options for a texture assignment.
-     *
-     * @param {string} context                        - Error context.
-     * @param {Texture2D} texture                     - Map texture.
-     * @param {MtlStandardMaterialMapOptions} options - Map options.
-     * @param {function(Object): void} apply          - Apply callback.
-     * @returns {void}
+     * @param {ShaderProgram} shaderProgram - Active material program.
      * @private
      */
-    #setMap(context, texture, options, apply) {
+    #applyShadingUniforms(shaderProgram) {
+        const uniforms       = MaterialConstants.MTL_STANDARD_MATERIAL_UNIFORMS;
+        const sharedUniforms = SharedMaterialConstants.MATERIAL_UNIFORMS;
+        const floatFlags     = SharedMaterialConstants.MATERIAL_BOOLEAN_FLOATS;
+        shaderProgram.setVector3(uniforms.AMBIENT_COLOR, this.#ambientColor);
+        shaderProgram.setVector3(sharedUniforms.SPECULAR_COLOR, this.#specularColor);
+        shaderProgram.setVector3(uniforms.EMISSIVE_COLOR, this.#emissiveColor);
+        shaderProgram.setFloat(sharedUniforms.SPECULAR_STRENGTH, this.#specularStrength);
+        shaderProgram.setFloat(sharedUniforms.SHININESS, this.#shininess);
+        shaderProgram.setFloat(uniforms.SPECULAR_ENABLED, this.#specularEnabled ? floatFlags.TRUE : floatFlags.FALSE);
+    }
+
+    /**
+     * Uploads optical and surface detail settings.
+     *
+     * @param {ShaderProgram} shaderProgram - Active material program.
+     * @private
+     */
+    #applySurfaceUniforms(shaderProgram) {
+        const uniforms = MaterialConstants.MTL_STANDARD_MATERIAL_UNIFORMS;
+        shaderProgram.setFloat(uniforms.OPTICAL_DENSITY, this.#opticalDensity);
+        shaderProgram.setFloat(uniforms.BUMP_MULTIPLIER, this.#bumpMultiplier);
+        shaderProgram.setFloat(uniforms.DISPLACEMENT_SCALE, this.#displacementScale);
+    }
+
+    /**
+     * Uploads each map's independent UV buffers.
+     *
+     * @param {ShaderProgram} shaderProgram - Active material program.
+     * @private
+     */
+    #applyUvTransforms(shaderProgram) {
+        for (const map of this.#maps) {
+            shaderProgram.setVector2(map.descriptor.UV_OFFSET, map.uvOffset);
+            shaderProgram.setVector2(map.descriptor.UV_SCALE, map.uvScale);
+        }
+    }
+
+    /**
+     * Uploads the enabled flag for every texture map.
+     *
+     * @param {ShaderProgram} shaderProgram - Active material program.
+     * @private
+     */
+    #applyMapFlags(shaderProgram) {
+        const floatFlags = SharedMaterialConstants.MATERIAL_BOOLEAN_FLOATS;
+
+        for (const map of this.#maps) {
+            shaderProgram.setFloat(map.descriptor.ENABLED, map.enabled ? floatFlags.TRUE : floatFlags.FALSE);
+        }
+    }
+
+    /**
+     * Binds all map textures in their established sampler order.
+     *
+     * @param {ShaderProgram} shaderProgram - Active material program.
+     * @private
+     */
+    #applyTextures(shaderProgram) {
+        for (const map of this.#maps) {
+            shaderProgram.setTexture2D(map.descriptor.SAMPLER, map.texture, map.textureUnitIndex);
+        }
+    }
+
+    /**
+     * Validates a replacement before changing any map state.
+     * Omitted texture units preserve the slot's current assignment.
+     *
+     * @param {number} index                          - Map slot index.
+     * @param {Texture2D} texture                     - Externally owned texture.
+     * @param {MtlStandardMaterialMapOptions} options - Map settings.
+     * @private
+     */
+    #setMap(index, texture, options) {
+        const map     = this.#maps[index];
+        const context = map.descriptor.CONTEXT;
+
         if (!(texture instanceof Texture2D)) {
-            throw new TypeError(context + ERROR_EXPECTS_TEXTURE_SUFFIX);
+            throw new TypeError(context + MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.EXPECTS_TEXTURE_SUFFIX);
         }
 
         if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
-            throw new TypeError(context + ERROR_EXPECTS_OPTIONS_OBJECT_SUFFIX);
+            throw new TypeError(context + MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.EXPECTS_OPTIONS_OBJECT_SUFFIX);
         }
 
+        const settings = MtlStandardMaterial.#resolveMapOptions(context, options, map.textureUnitIndex);
+
+        map.texture          = texture;
+        map.textureUnitIndex = settings.textureUnitIndex;
+        map.enabled          = true;
+        map.uvOffset.set(settings.uvOffset);
+        map.uvScale.set(settings.uvScale);
+    }
+
+    /**
+     * Resolves a map's texture unit and UV transforms.
+     *
+     * @param {string} context                        - Method name for errors.
+     * @param {MtlStandardMaterialMapOptions} options - Map settings.
+     * @param {number} defaultTextureUnit             - Current texture unit.
+     * @returns {MtlStandardMaterialMapOptions}       - Validated map settings.
+     * @private
+     */
+    static #resolveMapOptions(context, options, defaultTextureUnit) {
         const {
-            textureUnitIndex = DEFAULT_DIFFUSE_TEXTURE_UNIT,
-            uvOffset         = DEFAULT_UV_OFFSET,
-            uvScale          = DEFAULT_UV_SCALE
+            textureUnitIndex = defaultTextureUnit,
+            uvOffset         = MaterialConstants.MTL_STANDARD_MATERIAL_DEFAULTS.UV_OFFSET,
+            uvScale          = MaterialConstants.MTL_STANDARD_MATERIAL_DEFAULTS.UV_SCALE
         } = options;
 
-        if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE) {
-            throw new TypeError(context + ERROR_EXPECTS_TEXTURE_UNIT_INDEX_SUFFIX);
+        if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < SharedMaterialConstants.MATERIAL_TEXTURE_UNITS.MIN) {
+            throw new TypeError(context + MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.EXPECTS_TEXTURE_UNIT_INDEX_SUFFIX);
         }
 
-        MtlStandardMaterial.#assertVector2(`${context} options.uvOffset` , uvOffset);
-        MtlStandardMaterial.#assertVector2(`${context} options.uvScale`  ,  uvScale);
-
-        apply({
-            texture,
-            textureUnitIndex,
-            uvOffset,
-            uvScale
-        });
+        const contexts = MaterialConstants.MTL_STANDARD_MATERIAL_CONTEXTS;
+        MtlStandardMaterial.#assertVector2(context + contexts.UV_OFFSET, uvOffset);
+        MtlStandardMaterial.#assertVector2(context + contexts.UV_SCALE, uvScale);
+        return { textureUnitIndex, uvOffset, uvScale };
     }
 
     /**
@@ -1547,11 +554,11 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
      */
     static #assertVector2(context, value) {
         if (!Array.isArray(value) && !(value instanceof Float32Array)) {
-            throw new TypeError(context + ERROR_EXPECTS_VECTOR2_TYPE_SUFFIX);
+            throw new TypeError(context + MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.EXPECTS_VECTOR2_TYPE_SUFFIX);
         }
 
-        if (value.length !== DEFAULT_UV_OFFSET.length) {
-            throw new TypeError(context + ERROR_EXPECTS_VECTOR2_COMPONENTS_SUFFIX);
+        if (value.length !== MaterialConstants.MTL_STANDARD_MATERIAL_DEFAULTS.UV_OFFSET.length) {
+            throw new TypeError(context + MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.EXPECTS_VECTOR2_COMPONENTS_SUFFIX);
         }
     }
 
@@ -1565,11 +572,11 @@ export class MtlStandardMaterial extends DirectionalLightMaterial {
      */
     static #assertVector3(context, value) {
         if (!Array.isArray(value) && !(value instanceof Float32Array)) {
-            throw new TypeError(context + ERROR_EXPECTS_VECTOR2_TYPE_SUFFIX);
+            throw new TypeError(context + MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.EXPECTS_VECTOR2_TYPE_SUFFIX);
         }
 
-        if (value.length !== MaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_VECTOR3_ELEMENT_COUNT) {
-            throw new TypeError(context + ERROR_EXPECTS_VECTOR3_COMPONENTS_SUFFIX);
+        if (value.length !== DirectionalMaterialConstants.DIRECTIONAL_LIGHT_MATERIAL_VECTOR3_ELEMENT_COUNT) {
+            throw new TypeError(context + MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.EXPECTS_VECTOR3_COMPONENTS_SUFFIX);
         }
     }
 }
