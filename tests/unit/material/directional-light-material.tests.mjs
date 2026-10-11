@@ -116,13 +116,16 @@ test("'DirectionalLightMaterial' should release only owned programs when initial
             const expectedError           = { name: 'TypeError', message: '`DirectionalLightMaterial.setColor` expects exactly 3 components [x, y, z].' };
 
             // Act & Assert
+
+            /* eslint-disable indent */
             assert.throws(() => new DirectionalLightMaterial(
-                fixture.renderingContext,
-                shaderProgram,
-                options,
-                { ownsShaderProgram }),
-                expectedError
+                    fixture.renderingContext,
+                    shaderProgram,
+                    options,
+                    { ownsShaderProgram }
+                ), expectedError
             );
+            /* eslint-enable indent */
 
             assert.deepEqual(fixture.calls.deleteProgram, expectedDeletedPrograms);
         });
