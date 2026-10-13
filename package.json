@@ -55,6 +55,9 @@
     "package-version:rollback": "node update-package-version.mjs --action=rollback",
     "package-version:update:preparation": "npm run build:lib:all && npm run docs:build:jsdoc-only"
   },
+  "allowScripts": {
+    "esbuild": true
+  },
   "keywords": [
     "gera",
     "gerawebgl",
