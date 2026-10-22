@@ -787,3 +787,23 @@ test("'ShaderProgram' should reject every operation after disposal, including ca
         assert.deepEqual(fixture.events, eventsBefore);
     });
 });
+
+test("'ShaderProgram' should trim the leading whitespace in GLSL sources", () => {
+    withFakeBrowserWebGLEnvironment((environment) => {
+        const fixture = ShaderProgramTestFixtures.createFixture(environment);
+
+        ShaderProgramTestFixtures.createProgram(
+            fixture,
+            `${TestConstants.NEWLINE_CHAR}${ShaderProgramTestFixtures.VERTEX_SOURCE}`,
+            `${TestConstants.NEWLINE_CHAR}${ShaderProgramTestFixtures.FRAGMENT_SOURCE}`
+        );
+
+        assert.deepEqual(
+            fixture.calls.shaderSource.map(([, source]) => source),
+            [
+                ShaderProgramTestFixtures.VERTEX_SOURCE,
+                ShaderProgramTestFixtures.FRAGMENT_SOURCE
+            ]
+        );
+    });
+});
