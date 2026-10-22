@@ -6245,7 +6245,7 @@ var ShaderProgram = class _ShaderProgram {
       throw new Error(SHADER_PROGRAM_EXCEPTION_MESSAGES.SHADER_CREATION);
     }
     try {
-      context.shaderSource(shader, source);
+      context.shaderSource(shader, source.trim());
       context.compileShader(shader);
       if (!context.getShaderParameter(shader, context.COMPILE_STATUS)) {
         const infoLog = context.getShaderInfoLog(shader) || SHADER_PROGRAM_EXCEPTION_MESSAGES.UNKNOWN_COMPILE_ERROR;

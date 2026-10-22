@@ -426,7 +426,7 @@ export class ShaderProgram {
         }
 
         try {
-            context.shaderSource(shader, source);
+            context.shaderSource(shader, source.trim());
             context.compileShader(shader);
 
             if (!context.getShaderParameter(shader, context.COMPILE_STATUS)) {
