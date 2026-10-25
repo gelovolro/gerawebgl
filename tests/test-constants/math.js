@@ -15,3 +15,6 @@ export const PERSPECTIVE_INVALID_FIELD_OF_VIEW_VALUES = Object.freeze([
     Math.PI,
     Math.PI + 1
 ]);
+
+// Default segment count, expected by 'Curve3' tests
+export const CURVE3_EXPECTED_DEFAULT_SEGMENT_COUNT = 32;
