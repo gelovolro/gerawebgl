@@ -1,46 +1,5 @@
-import { Vector3 } from './vector3.js';
-
-/**
- * Default segment count for curve sampling.
- *
- * @type {number}
- */
-const DEFAULT_SAMPLE_SEGMENTS = 32;
-
-/**
- * Minimum allowed segment count.
- *
- * @type {number}
- */
-const MIN_SAMPLE_SEGMENTS = 1;
-
-/**
- * Start value for the sampling loop.
- *
- * @type {number}
- */
-const SAMPLE_START_INDEX = 0;
-
-/**
- * Step to increment the sample index.
- *
- * @type {number}
- */
-const SAMPLE_INDEX_INCREMENT = 1;
-
-/**
- * First sample value.
- *
- * @type {number}
- */
-const SAMPLE_START_PARAMETER = 0;
-
-/**
- * End sample value.
- *
- * @type {number}
- */
-const SAMPLE_END_PARAMETER = 1;
+import { CURVE3_SAMPLING } from '../constants/curve3.js';
+import { Vector3 }         from './vector3.js';
 
 /**
  * Base class for 3D curves.
@@ -118,21 +77,23 @@ export class Curve3 {
      * @throws {TypeError}  When segments is not a finite number.
      * @throws {RangeError} When segments is not an `integer >= 1`.
      */
-    getPoints(segments = DEFAULT_SAMPLE_SEGMENTS) {
+    getPoints(segments = CURVE3_SAMPLING.DEFAULT_SEGMENTS) {
         if (typeof segments !== 'number' || !Number.isFinite(segments)) {
             throw new TypeError('`Curve3.getPoints` expects `segments` as a finite number.');
         }
 
-        if (!Number.isInteger(segments) || segments < MIN_SAMPLE_SEGMENTS) {
-            throw new RangeError('`Curve3.getPoints` expects `segments` as an integer >= 1.');
+        if (!Number.isInteger(segments) || segments < CURVE3_SAMPLING.MIN_SEGMENTS) {
+            throw new RangeError('Curve3.getPoints: `segments` must be a positive integer.');
         }
 
-        const points       = [];
-        const segmentCount = segments;
-        const maxIndex     = segmentCount;
+        const points = [];
 
-        for (let index = SAMPLE_START_INDEX; index <= maxIndex; index += SAMPLE_INDEX_INCREMENT) {
-            const sampleParameter = SAMPLE_START_PARAMETER + (SAMPLE_END_PARAMETER - SAMPLE_START_PARAMETER) * (index / segmentCount);
+        for (let index = CURVE3_SAMPLING.START_INDEX; index <= segments; index += CURVE3_SAMPLING.INDEX_INCREMENT) {
+            const sampleParameter =
+                CURVE3_SAMPLING.START_PARAMETER +
+                (CURVE3_SAMPLING.END_PARAMETER - CURVE3_SAMPLING.START_PARAMETER) *
+                (index / segments);
+
             points.push(this.getPoint(sampleParameter, new Vector3()));
         }
 
