@@ -1434,13 +1434,17 @@ var Vector3Math = class _Vector3Math {
   }
 };
 
+// core/constants/curve3.js
+var CURVE3_SAMPLING = Object.freeze({
+  DEFAULT_SEGMENTS: 32,
+  MIN_SEGMENTS: MATH_COMMON_VALUES.UNIT,
+  START_INDEX: MATH_COMMON_VALUES.ZERO,
+  INDEX_INCREMENT: MATH_COMMON_VALUES.UNIT,
+  START_PARAMETER: MATH_COMMON_VALUES.ZERO,
+  END_PARAMETER: MATH_COMMON_VALUES.UNIT
+});
+
 // core/math/curve3.js
-var DEFAULT_SAMPLE_SEGMENTS = 32;
-var MIN_SAMPLE_SEGMENTS = 1;
-var SAMPLE_START_INDEX = 0;
-var SAMPLE_INDEX_INCREMENT = 1;
-var SAMPLE_START_PARAMETER = 0;
-var SAMPLE_END_PARAMETER = 1;
 var Curve3 = class _Curve3 {
   /**
    * Abstract curve base.
@@ -1506,38 +1510,39 @@ var Curve3 = class _Curve3 {
    * @throws {TypeError}  When segments is not a finite number.
    * @throws {RangeError} When segments is not an `integer >= 1`.
    */
-  getPoints(segments = DEFAULT_SAMPLE_SEGMENTS) {
+  getPoints(segments = CURVE3_SAMPLING.DEFAULT_SEGMENTS) {
     if (typeof segments !== "number" || !Number.isFinite(segments)) {
       throw new TypeError("`Curve3.getPoints` expects `segments` as a finite number.");
     }
-    if (!Number.isInteger(segments) || segments < MIN_SAMPLE_SEGMENTS) {
-      throw new RangeError("`Curve3.getPoints` expects `segments` as an integer >= 1.");
+    if (!Number.isInteger(segments) || segments < CURVE3_SAMPLING.MIN_SEGMENTS) {
+      throw new RangeError("Curve3.getPoints: `segments` must be a positive integer.");
     }
     const points = [];
-    const segmentCount = segments;
-    const maxIndex = segmentCount;
-    for (let index = SAMPLE_START_INDEX; index <= maxIndex; index += SAMPLE_INDEX_INCREMENT) {
-      const sampleParameter = SAMPLE_START_PARAMETER + (SAMPLE_END_PARAMETER - SAMPLE_START_PARAMETER) * (index / segmentCount);
+    for (let index = CURVE3_SAMPLING.START_INDEX; index <= segments; index += CURVE3_SAMPLING.INDEX_INCREMENT) {
+      const sampleParameter = CURVE3_SAMPLING.START_PARAMETER + (CURVE3_SAMPLING.END_PARAMETER - CURVE3_SAMPLING.START_PARAMETER) * (index / segments);
       points.push(this.getPoint(sampleParameter, new Vector3()));
     }
     return points;
   }
 };
 
+// core/constants/catmull-rom-curve3.js
+var CATMULL_ROM_DEFAULTS = Object.freeze({
+  MIN_CONTROL_POINTS: 2,
+  CLOSED: false
+});
+var CATMULL_ROM_VALUES = Object.freeze({
+  ZERO: MATH_COMMON_VALUES.ZERO,
+  ONE: MATH_COMMON_VALUES.UNIT,
+  TWO: 2,
+  THREE: 3,
+  FOUR: 4,
+  FIVE: 5,
+  TENSION: 0.5
+});
+var CATMULL_ROM_TANGENT = Object.freeze({ EPSILON: 1e-8 });
+
 // core/math/catmull-rom-curve3.js
-var MIN_CONTROL_POINT_COUNT = 2;
-var DEFAULT_CLOSED = false;
-var CURVE_PARAMETER_MIN = 0;
-var CURVE_PARAMETER_MAX = 1;
-var ZERO_VALUE2 = 0;
-var OPEN_CURVE_LAST_SEGMENT_OFFSET = 1;
-var ONE_VALUE2 = 1;
-var TWO_VALUE = 2;
-var THREE_VALUE = 3;
-var FOUR_VALUE = 4;
-var FIVE_VALUE = 5;
-var CATMULL_ROM_TENSION = 0.5;
-var TANGENT_EPSILON = 1e-8;
 var CatmullRomCurve3 = class _CatmullRomCurve3 extends Curve3 {
   /**
    * Control points used to build the curve.
@@ -1554,19 +1559,26 @@ var CatmullRomCurve3 = class _CatmullRomCurve3 extends Curve3 {
    */
   #closed;
   /**
+   * Reusable segment data, avoiding allocations during animation updates.
+   *
+   * @type {CatmullRomSegment}
+   * @private
+   */
+  #segment;
+  /**
    * @param {Vector3[]} points               - Control points.
    * @param {Object} [options]               - Optional options.
    * @param {boolean} [options.closed=false] - Whether the curve is closed.
-   * @throws {TypeError}  When inputs are invalid.
-   * @throws {RangeError} When points are insufficient.
+   * @throws {TypeError}                       When inputs are invalid.
+   * @throws {RangeError}                      When points are insufficient.
    */
   constructor(points, options = {}) {
     super();
     if (!Array.isArray(points)) {
       throw new TypeError("`CatmullRomCurve3` expects `points` as an array of `Vector3`.");
     }
-    if (points.length < MIN_CONTROL_POINT_COUNT) {
-      throw new RangeError("`CatmullRomCurve3` expects at least 2 control points.");
+    if (points.length < CATMULL_ROM_DEFAULTS.MIN_CONTROL_POINTS) {
+      throw new RangeError("`CatmullRomCurve3` expects at least two control points.");
     }
     for (const point of points) {
       if (!(point instanceof Vector3)) {
@@ -1576,30 +1588,39 @@ var CatmullRomCurve3 = class _CatmullRomCurve3 extends Curve3 {
     if (options === null || typeof options !== "object" || Array.isArray(options)) {
       throw new TypeError("`CatmullRomCurve3` expects options as a plain object.");
     }
-    const { closed = DEFAULT_CLOSED } = options;
+    const { closed = CATMULL_ROM_DEFAULTS.CLOSED } = options;
     if (typeof closed !== "boolean") {
       throw new TypeError("`CatmullRomCurve3` option `closed` must be a boolean.");
     }
     this.#points = points.slice();
     this.#closed = closed;
+    this.#segment = {
+      previous: this.#points[CATMULL_ROM_VALUES.ZERO],
+      start: this.#points[CATMULL_ROM_VALUES.ZERO],
+      end: this.#points[CATMULL_ROM_VALUES.ZERO],
+      next: this.#points[CATMULL_ROM_VALUES.ZERO],
+      parameter: CATMULL_ROM_VALUES.ZERO
+    };
   }
   /**
-   * @returns {Vector3[]}
+   * @returns {Vector3[]} - Control points defining the curve.
    */
   get points() {
     return this.#points;
   }
   /**
-   * @returns {boolean}
+   * @returns {boolean} - Whether the curve is closed.
    */
   get closed() {
     return this.#closed;
   }
   /**
+   * Returns an interpolated point on the curve.
+   *
    * @param {number} curveParameter - Parameter in [0..1].
    * @param {Vector3} [out]         - Optional output vector.
-   * @returns {Vector3}
-   * @throws {TypeError} When inputs are invalid.
+   * @returns {Vector3}             - Interpolated point written to `out`.
+   * @throws {TypeError}              When inputs are invalid.
    */
   getPoint(curveParameter, out = new Vector3()) {
     if (typeof curveParameter !== "number" || !Number.isFinite(curveParameter)) {
@@ -1608,27 +1629,19 @@ var CatmullRomCurve3 = class _CatmullRomCurve3 extends Curve3 {
     if (!(out instanceof Vector3)) {
       throw new TypeError("`CatmullRomCurve3.getPoint` expects `out` as a Vector3.");
     }
-    const clampedCurveParameter = _CatmullRomCurve3.#clampCurveParameter(curveParameter);
-    const segmentCount = this.#closed ? this.#points.length : this.#points.length - OPEN_CURVE_LAST_SEGMENT_OFFSET;
-    const scaledCurveParameter = clampedCurveParameter * segmentCount;
-    const segmentIndex = Math.min(Math.floor(scaledCurveParameter), segmentCount - OPEN_CURVE_LAST_SEGMENT_OFFSET);
-    const segmentParameter = scaledCurveParameter - segmentIndex;
-    const previousControlPoint = this.#getPointForSegment(segmentIndex - ONE_VALUE2);
-    const startControlPoint = this.#getPointForSegment(segmentIndex);
-    const endControlPoint = this.#getPointForSegment(segmentIndex + ONE_VALUE2);
-    const nextControlPoint = this.#getPointForSegment(segmentIndex + TWO_VALUE);
-    const segmentParameterSquared = segmentParameter * segmentParameter;
-    const segmentParameterCubed = segmentParameterSquared * segmentParameter;
-    const x = CATMULL_ROM_TENSION * (TWO_VALUE * startControlPoint.x + (-previousControlPoint.x + endControlPoint.x) * segmentParameter + (TWO_VALUE * previousControlPoint.x - FIVE_VALUE * startControlPoint.x + FOUR_VALUE * endControlPoint.x - nextControlPoint.x) * segmentParameterSquared + (-previousControlPoint.x + THREE_VALUE * startControlPoint.x - THREE_VALUE * endControlPoint.x + nextControlPoint.x) * segmentParameterCubed);
-    const y = CATMULL_ROM_TENSION * (TWO_VALUE * startControlPoint.y + (-previousControlPoint.y + endControlPoint.y) * segmentParameter + (TWO_VALUE * previousControlPoint.y - FIVE_VALUE * startControlPoint.y + FOUR_VALUE * endControlPoint.y - nextControlPoint.y) * segmentParameterSquared + (-previousControlPoint.y + THREE_VALUE * startControlPoint.y - THREE_VALUE * endControlPoint.y + nextControlPoint.y) * segmentParameterCubed);
-    const z = CATMULL_ROM_TENSION * (TWO_VALUE * startControlPoint.z + (-previousControlPoint.z + endControlPoint.z) * segmentParameter + (TWO_VALUE * previousControlPoint.z - FIVE_VALUE * startControlPoint.z + FOUR_VALUE * endControlPoint.z - nextControlPoint.z) * segmentParameterSquared + (-previousControlPoint.z + THREE_VALUE * startControlPoint.z - THREE_VALUE * endControlPoint.z + nextControlPoint.z) * segmentParameterCubed);
+    const { previous, start, end, next, parameter } = this.#resolveSegment(curveParameter);
+    const x = _CatmullRomCurve3.#interpolateCoordinate(previous.x, start.x, end.x, next.x, parameter);
+    const y = _CatmullRomCurve3.#interpolateCoordinate(previous.y, start.y, end.y, next.y, parameter);
+    const z = _CatmullRomCurve3.#interpolateCoordinate(previous.z, start.z, end.z, next.z, parameter);
     return out.set(x, y, z);
   }
   /**
+   * Returns a normalized tangent direction at the given curve parameter.
+   *
    * @param {number} curveParameter - Parameter in [0..1].
    * @param {Vector3} [out]         - Optional output vector.
-   * @returns {Vector3}
-   * @throws {TypeError} When inputs are invalid.
+   * @returns {Vector3}             - Normalized tangent written to `out`, or a zero vector for a degenerate tangent.
+   * @throws {TypeError}              When inputs are invalid.
    */
   getTangent(curveParameter, out = new Vector3()) {
     if (typeof curveParameter !== "number" || !Number.isFinite(curveParameter)) {
@@ -1637,28 +1650,79 @@ var CatmullRomCurve3 = class _CatmullRomCurve3 extends Curve3 {
     if (!(out instanceof Vector3)) {
       throw new TypeError("`CatmullRomCurve3.getTangent` expects `out` as a Vector3.");
     }
-    const clampedCurveParameter = _CatmullRomCurve3.#clampCurveParameter(curveParameter);
-    const segmentCount = this.#closed ? this.#points.length : this.#points.length - OPEN_CURVE_LAST_SEGMENT_OFFSET;
-    const scaledCurveParameter = clampedCurveParameter * segmentCount;
-    const segmentIndex = Math.min(Math.floor(scaledCurveParameter), segmentCount - OPEN_CURVE_LAST_SEGMENT_OFFSET);
-    const segmentParameter = scaledCurveParameter - segmentIndex;
-    const previousControlPoint = this.#getPointForSegment(segmentIndex - ONE_VALUE2);
-    const startControlPoint = this.#getPointForSegment(segmentIndex);
-    const endControlPoint = this.#getPointForSegment(segmentIndex + ONE_VALUE2);
-    const nextControlPoint = this.#getPointForSegment(segmentIndex + TWO_VALUE);
-    const segmentParameterSquared = segmentParameter * segmentParameter;
-    const x = CATMULL_ROM_TENSION * (-previousControlPoint.x + endControlPoint.x + TWO_VALUE * (TWO_VALUE * previousControlPoint.x - FIVE_VALUE * startControlPoint.x + FOUR_VALUE * endControlPoint.x - nextControlPoint.x) * segmentParameter + THREE_VALUE * (-previousControlPoint.x + THREE_VALUE * startControlPoint.x - THREE_VALUE * endControlPoint.x + nextControlPoint.x) * segmentParameterSquared);
-    const y = CATMULL_ROM_TENSION * (-previousControlPoint.y + endControlPoint.y + TWO_VALUE * (TWO_VALUE * previousControlPoint.y - FIVE_VALUE * startControlPoint.y + FOUR_VALUE * endControlPoint.y - nextControlPoint.y) * segmentParameter + THREE_VALUE * (-previousControlPoint.y + THREE_VALUE * startControlPoint.y - THREE_VALUE * endControlPoint.y + nextControlPoint.y) * segmentParameterSquared);
-    const z = CATMULL_ROM_TENSION * (-previousControlPoint.z + endControlPoint.z + TWO_VALUE * (TWO_VALUE * previousControlPoint.z - FIVE_VALUE * startControlPoint.z + FOUR_VALUE * endControlPoint.z - nextControlPoint.z) * segmentParameter + THREE_VALUE * (-previousControlPoint.z + THREE_VALUE * startControlPoint.z - THREE_VALUE * endControlPoint.z + nextControlPoint.z) * segmentParameterSquared);
+    const { previous, start, end, next, parameter } = this.#resolveSegment(curveParameter);
+    const x = _CatmullRomCurve3.#calculateTangentCoordinate(previous.x, start.x, end.x, next.x, parameter);
+    const y = _CatmullRomCurve3.#calculateTangentCoordinate(previous.y, start.y, end.y, next.y, parameter);
+    const z = _CatmullRomCurve3.#calculateTangentCoordinate(previous.z, start.z, end.z, next.z, parameter);
     const length = Math.sqrt(x * x + y * y + z * z);
-    if (length <= TANGENT_EPSILON) {
-      return out.set(ZERO_VALUE2, ZERO_VALUE2, ZERO_VALUE2);
+    if (length <= CATMULL_ROM_TANGENT.EPSILON) {
+      return out.set(
+        CATMULL_ROM_VALUES.ZERO,
+        CATMULL_ROM_VALUES.ZERO,
+        CATMULL_ROM_VALUES.ZERO
+      );
     }
     return out.set(x / length, y / length, z / length);
   }
   /**
-   * @param {number} index - Segment index.
-   * @returns {Vector3}
+   * Resolves the segment and reuses its four control point references.
+   *
+   * @param {number} curveParameter - Finite curve parameter.
+   * @returns {CatmullRomSegment}   - Resolved segment data.
+   * @private
+   */
+  #resolveSegment(curveParameter) {
+    const clampedCurveParameter = _CatmullRomCurve3.#clampCurveParameter(curveParameter);
+    const segmentCount = this.#closed ? this.#points.length : this.#points.length - CATMULL_ROM_VALUES.ONE;
+    const scaledCurveParameter = clampedCurveParameter * segmentCount;
+    const segmentIndex = Math.min(Math.floor(scaledCurveParameter), segmentCount - CATMULL_ROM_VALUES.ONE);
+    const parameter = scaledCurveParameter - segmentIndex;
+    const segment = this.#segment;
+    segment.previous = this.#getPointForSegment(segmentIndex - CATMULL_ROM_VALUES.ONE);
+    segment.start = this.#getPointForSegment(segmentIndex);
+    segment.end = this.#getPointForSegment(segmentIndex + CATMULL_ROM_VALUES.ONE);
+    segment.next = this.#getPointForSegment(segmentIndex + CATMULL_ROM_VALUES.TWO);
+    segment.parameter = parameter;
+    return segment;
+  }
+  /**
+   * Interpolates one coordinate using the Catmull-Rom polynomial.
+   *
+   * @param {number} previous  - Previous control point coordinate.
+   * @param {number} start     - Segment start coordinate.
+   * @param {number} end       - Segment end coordinate.
+   * @param {number} next      - Next control point coordinate.
+   * @param {number} parameter - Local segment parameter.
+   * @returns {number}         - Interpolated coordinate value.
+   * @private
+   */
+  static #interpolateCoordinate(previous, start, end, next, parameter) {
+    const polynomial = CATMULL_ROM_VALUES;
+    const squared = parameter * parameter;
+    const cubed = squared * parameter;
+    return polynomial.TENSION * (polynomial.TWO * start + (-previous + end) * parameter + (polynomial.TWO * previous - polynomial.FIVE * start + polynomial.FOUR * end - next) * squared + (-previous + polynomial.THREE * start - polynomial.THREE * end + next) * cubed);
+  }
+  /**
+   * Evaluates the derivative of one Catmull-Rom coordinate.
+   *
+   * @param {number} previous  - Previous control point coordinate.
+   * @param {number} start     - Segment start coordinate.
+   * @param {number} end       - Segment end coordinate.
+   * @param {number} next      - Next control point coordinate.
+   * @param {number} parameter - Local segment parameter.
+   * @returns {number}         - Unnormalized tangent coordinate.
+   * @private
+   */
+  static #calculateTangentCoordinate(previous, start, end, next, parameter) {
+    const polynomial = CATMULL_ROM_VALUES;
+    const squared = parameter * parameter;
+    return polynomial.TENSION * (-previous + end + polynomial.TWO * (polynomial.TWO * previous - polynomial.FIVE * start + polynomial.FOUR * end - next) * parameter + polynomial.THREE * (-previous + polynomial.THREE * start - polynomial.THREE * end + next) * squared);
+  }
+  /**
+   * Resolves a control point index for open or closed curves.
+   *
+   * @param {number} index - Control point index.
+   * @returns {Vector3}    - Control point at the clamped or wrapped index.
    * @private
    */
   #getPointForSegment(index) {
@@ -1667,25 +1731,27 @@ var CatmullRomCurve3 = class _CatmullRomCurve3 extends Curve3 {
       const wrappedIndex = (index % pointCount + pointCount) % pointCount;
       return this.#points[wrappedIndex];
     }
-    if (index < ZERO_VALUE2) {
-      return this.#points[ZERO_VALUE2];
+    if (index < CATMULL_ROM_VALUES.ZERO) {
+      return this.#points[CATMULL_ROM_VALUES.ZERO];
     }
     if (index >= pointCount) {
-      return this.#points[pointCount - ONE_VALUE2];
+      return this.#points[pointCount - CATMULL_ROM_VALUES.ONE];
     }
     return this.#points[index];
   }
   /**
-   * @param {number} curveParameter - Parameter value.
-   * @returns {number}
+   * Clamps a curve parameter to the valid interval.
+   *
+   * @param {number} curveParameter - Curve parameter.
+   * @returns {number}              - Parameter clamped to [0..1].
    * @private
    */
   static #clampCurveParameter(curveParameter) {
-    if (curveParameter <= CURVE_PARAMETER_MIN) {
-      return CURVE_PARAMETER_MIN;
+    if (curveParameter <= CATMULL_ROM_VALUES.ZERO) {
+      return CATMULL_ROM_VALUES.ZERO;
     }
-    if (curveParameter >= CURVE_PARAMETER_MAX) {
-      return CURVE_PARAMETER_MAX;
+    if (curveParameter >= CATMULL_ROM_VALUES.ONE) {
+      return CATMULL_ROM_VALUES.ONE;
     }
     return curveParameter;
   }
@@ -1696,8 +1762,8 @@ var MIN_POINT_COUNT = 2;
 var DEFAULT_LOOP = false;
 var SEGMENT_START_INDEX = 0;
 var SEGMENT_INDEX_INCREMENT = 1;
-var ZERO_VALUE3 = 0;
-var ONE_VALUE3 = 1;
+var ZERO_VALUE2 = 0;
+var ONE_VALUE2 = 1;
 var NORMALIZE_EPSILON = 1e-8;
 var Path3D = class _Path3D {
   /**
@@ -1764,8 +1830,8 @@ var Path3D = class _Path3D {
     this.#points = points.slice();
     this.#loop = loop;
     this.#segmentLengths = new Float32Array(this.#getSegmentCount());
-    this.#cumulativeLengths = new Float32Array(this.#segmentLengths.length + ONE_VALUE3);
-    this.#totalLength = ZERO_VALUE3;
+    this.#cumulativeLengths = new Float32Array(this.#segmentLengths.length + ONE_VALUE2);
+    this.#totalLength = ZERO_VALUE2;
     this.#recalculateLengths();
   }
   /**
@@ -1801,15 +1867,15 @@ var Path3D = class _Path3D {
     if (!(out instanceof Vector3)) {
       throw new TypeError("`Path3D.getPointAt` expects `out` as a `Vector3`.");
     }
-    if (this.#totalLength <= ZERO_VALUE3) {
-      return out.copyFrom(this.#points[ZERO_VALUE3]);
+    if (this.#totalLength <= ZERO_VALUE2) {
+      return out.copyFrom(this.#points[ZERO_VALUE2]);
     }
     const normalizedPathParameter = this.#normalizePathParameter(pathParameter);
     const targetLength = normalizedPathParameter * this.#totalLength;
     const segmentData = this.#findSegmentAtLength(targetLength);
     const pointA = this.#points[segmentData.index];
     const pointB = this.#getNextPoint(segmentData.index);
-    const segmentParameter = segmentData.length <= ZERO_VALUE3 ? ZERO_VALUE3 : (targetLength - segmentData.cumulativeLength) / segmentData.length;
+    const segmentParameter = segmentData.length <= ZERO_VALUE2 ? ZERO_VALUE2 : (targetLength - segmentData.cumulativeLength) / segmentData.length;
     const x = pointA.x + (pointB.x - pointA.x) * segmentParameter;
     const y = pointA.y + (pointB.y - pointA.y) * segmentParameter;
     const z = pointA.z + (pointB.z - pointA.z) * segmentParameter;
@@ -1840,7 +1906,7 @@ var Path3D = class _Path3D {
     const deltaZ = pointB.z - pointA.z;
     const tangentLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
     if (tangentLength <= NORMALIZE_EPSILON) {
-      return out.set(ZERO_VALUE3, ZERO_VALUE3, ZERO_VALUE3);
+      return out.set(ZERO_VALUE2, ZERO_VALUE2, ZERO_VALUE2);
     }
     return out.set(deltaX / tangentLength, deltaY / tangentLength, deltaZ / tangentLength);
   }
@@ -1849,7 +1915,7 @@ var Path3D = class _Path3D {
    * @private
    */
   #getSegmentCount() {
-    return this.#loop ? this.#points.length : this.#points.length - ONE_VALUE3;
+    return this.#loop ? this.#points.length : this.#points.length - ONE_VALUE2;
   }
   /**
    * @param {number} length - Target length along the path.
@@ -1869,7 +1935,7 @@ var Path3D = class _Path3D {
         };
       }
     }
-    const lastIndex = segmentCount - ONE_VALUE3;
+    const lastIndex = segmentCount - ONE_VALUE2;
     return {
       index: lastIndex,
       length: this.#segmentLengths[lastIndex],
@@ -1883,10 +1949,10 @@ var Path3D = class _Path3D {
    */
   #getNextPoint(index) {
     if (this.#loop) {
-      const nextIndex = (index + ONE_VALUE3) % this.#points.length;
+      const nextIndex = (index + ONE_VALUE2) % this.#points.length;
       return this.#points[nextIndex];
     }
-    return this.#points[Math.min(index + ONE_VALUE3, this.#points.length - ONE_VALUE3)];
+    return this.#points[Math.min(index + ONE_VALUE2, this.#points.length - ONE_VALUE2)];
   }
   /**
    * @param {number} pathParameter - Path parameter to normalize.
@@ -1896,13 +1962,13 @@ var Path3D = class _Path3D {
   #normalizePathParameter(pathParameter) {
     if (this.#loop) {
       const wrapped = pathParameter - Math.floor(pathParameter);
-      return wrapped < ZERO_VALUE3 ? wrapped + ONE_VALUE3 : wrapped;
+      return wrapped < ZERO_VALUE2 ? wrapped + ONE_VALUE2 : wrapped;
     }
-    if (pathParameter <= ZERO_VALUE3) {
-      return ZERO_VALUE3;
+    if (pathParameter <= ZERO_VALUE2) {
+      return ZERO_VALUE2;
     }
-    if (pathParameter >= ONE_VALUE3) {
-      return ONE_VALUE3;
+    if (pathParameter >= ONE_VALUE2) {
+      return ONE_VALUE2;
     }
     return pathParameter;
   }
@@ -1911,15 +1977,15 @@ var Path3D = class _Path3D {
    */
   #recalculateLengths() {
     const segmentCount = this.#segmentLengths.length;
-    let cumulativeLength = ZERO_VALUE3;
-    this.#cumulativeLengths[ZERO_VALUE3] = cumulativeLength;
+    let cumulativeLength = ZERO_VALUE2;
+    this.#cumulativeLengths[ZERO_VALUE2] = cumulativeLength;
     for (let index = SEGMENT_START_INDEX; index < segmentCount; index += SEGMENT_INDEX_INCREMENT) {
       const pointA = this.#points[index];
       const pointB = this.#getNextPoint(index);
       const length = _Path3D.#distance(pointA, pointB);
       this.#segmentLengths[index] = length;
       cumulativeLength += length;
-      this.#cumulativeLengths[index + ONE_VALUE3] = cumulativeLength;
+      this.#cumulativeLengths[index + ONE_VALUE2] = cumulativeLength;
     }
     this.#totalLength = cumulativeLength;
   }
@@ -11109,7 +11175,7 @@ var FpsCounter = class _FpsCounter {
 
 // core/debug/light-gizmo.js
 var DEFAULT_VISIBLE = true;
-var ZERO_VALUE4 = 0;
+var ZERO_VALUE3 = 0;
 var VISIBLE_OPACITY = 1;
 var HIDDEN_OPACITY = 0;
 var MARKER_HALF_SIZE = 0.4;
@@ -11198,14 +11264,14 @@ var LightGizmo = class extends Object3D {
   #buildMarker(webglContext) {
     const markerMaterial = new SolidColorMaterial(webglContext, { color: MARKER_COLOR });
     this.#materials.push(markerMaterial);
-    const xStart = new Vector3(-MARKER_HALF_SIZE, ZERO_VALUE4, ZERO_VALUE4);
-    const xEnd = new Vector3(MARKER_HALF_SIZE, ZERO_VALUE4, ZERO_VALUE4);
+    const xStart = new Vector3(-MARKER_HALF_SIZE, ZERO_VALUE3, ZERO_VALUE3);
+    const xEnd = new Vector3(MARKER_HALF_SIZE, ZERO_VALUE3, ZERO_VALUE3);
     this.add(this.#createLine(webglContext, markerMaterial, [xStart, xEnd]));
-    const yStart = new Vector3(ZERO_VALUE4, -MARKER_HALF_SIZE, ZERO_VALUE4);
-    const yEnd = new Vector3(ZERO_VALUE4, MARKER_HALF_SIZE, ZERO_VALUE4);
+    const yStart = new Vector3(ZERO_VALUE3, -MARKER_HALF_SIZE, ZERO_VALUE3);
+    const yEnd = new Vector3(ZERO_VALUE3, MARKER_HALF_SIZE, ZERO_VALUE3);
     this.add(this.#createLine(webglContext, markerMaterial, [yStart, yEnd]));
-    const zStart = new Vector3(ZERO_VALUE4, ZERO_VALUE4, -MARKER_HALF_SIZE);
-    const zEnd = new Vector3(ZERO_VALUE4, ZERO_VALUE4, MARKER_HALF_SIZE);
+    const zStart = new Vector3(ZERO_VALUE3, ZERO_VALUE3, -MARKER_HALF_SIZE);
+    const zEnd = new Vector3(ZERO_VALUE3, ZERO_VALUE3, MARKER_HALF_SIZE);
     this.add(this.#createLine(webglContext, markerMaterial, [zStart, zEnd]));
   }
   /**
@@ -11220,13 +11286,13 @@ var LightGizmo = class extends Object3D {
   #buildArrow(webglContext) {
     const arrowMaterial = new SolidColorMaterial(webglContext, { color: ARROW_COLOR });
     this.#materials.push(arrowMaterial);
-    const shaftStart = new Vector3(ZERO_VALUE4, ZERO_VALUE4, ZERO_VALUE4);
-    const shaftEnd = new Vector3(ZERO_VALUE4, ZERO_VALUE4, -ARROW_LENGTH);
+    const shaftStart = new Vector3(ZERO_VALUE3, ZERO_VALUE3, ZERO_VALUE3);
+    const shaftEnd = new Vector3(ZERO_VALUE3, ZERO_VALUE3, -ARROW_LENGTH);
     this.add(this.#createLine(webglContext, arrowMaterial, [shaftStart, shaftEnd]));
     const headBaseZ = -ARROW_LENGTH + ARROW_HEAD_LENGTH;
-    const headLeft = new Vector3(-ARROW_HEAD_HALF_WIDTH, ZERO_VALUE4, headBaseZ);
-    const headTip = new Vector3(ZERO_VALUE4, ZERO_VALUE4, -ARROW_LENGTH);
-    const headRight = new Vector3(ARROW_HEAD_HALF_WIDTH, ZERO_VALUE4, headBaseZ);
+    const headLeft = new Vector3(-ARROW_HEAD_HALF_WIDTH, ZERO_VALUE3, headBaseZ);
+    const headTip = new Vector3(ZERO_VALUE3, ZERO_VALUE3, -ARROW_LENGTH);
+    const headRight = new Vector3(ARROW_HEAD_HALF_WIDTH, ZERO_VALUE3, headBaseZ);
     this.add(this.#createLine(webglContext, arrowMaterial, [headLeft, headTip, headRight]));
   }
   /**
@@ -11259,7 +11325,7 @@ var AXIS_HEAD_HALF_WIDTH = 0.25;
 var AXIS_PICK_THICKNESS = 0.35;
 var AXIS_PICK_LENGTH = AXIS_LENGTH;
 var AXIS_PICK_CENTER_DIVISOR = 2;
-var ZERO_VALUE5 = 0;
+var ZERO_VALUE4 = 0;
 var AXIS_X = "x";
 var AXIS_Y = "y";
 var AXIS_Z = "z";
@@ -11528,7 +11594,7 @@ var TransformGizmo = class extends Object3D {
   #buildAxis(webglContext, axis, color, dir, headOrtho) {
     const material = new SolidColorMaterial(webglContext, { color });
     this.#axisMaterials.set(axis, material);
-    const start = new Vector3(ZERO_VALUE5, ZERO_VALUE5, ZERO_VALUE5);
+    const start = new Vector3(ZERO_VALUE4, ZERO_VALUE4, ZERO_VALUE4);
     const end = new Vector3(
       dir[0] * AXIS_LENGTH,
       dir[1] * AXIS_LENGTH,
@@ -11649,7 +11715,7 @@ var COLOR_COMPONENT_COUNT = 3;
 var DEFAULT_UV = [0, 0];
 var DEFAULT_NORMAL = [0, 0, 1];
 var OBJ_INDEX_NOT_PROVIDED = -1;
-var ZERO_VALUE6 = 0;
+var ZERO_VALUE5 = 0;
 var FIRST_INDEX = 0;
 var SECOND_INDEX = 1;
 var THIRD_INDEX = 2;
@@ -11763,7 +11829,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
     const normals = [];
     const colors = parsedData.hasVertexColors ? [] : null;
     const indices = [];
-    if (chunk.smoothingGroup === ZERO_VALUE6) {
+    if (chunk.smoothingGroup === ZERO_VALUE5) {
       this.#appendFlatGeometry(chunk, parsedData, positions, uvs, normals, colors, indices);
     } else {
       this.#appendSmoothGeometry(chunk, parsedData, positions, uvs, normals, colors, indices);
@@ -11824,7 +11890,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
     const uvs = parsedData.uvs;
     const normals = parsedData.normals;
     const colors = parsedData.colors;
-    let vertexIndex = ZERO_VALUE6;
+    let vertexIndex = ZERO_VALUE5;
     for (const triangle of chunk.triangles) {
       const faceNormal = this.#computeFaceNormal(triangle, positions);
       for (const vertex of triangle) {
@@ -11918,7 +11984,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
           continue;
         }
         const key = _ObjGeometryBuilder.#buildVertexKey(vertex);
-        const current = accumulators.get(key) || [ZERO_VALUE6, ZERO_VALUE6, ZERO_VALUE6];
+        const current = accumulators.get(key) || [ZERO_VALUE5, ZERO_VALUE5, ZERO_VALUE5];
         current[COMPONENT_INDEX_X] += faceNormal[COMPONENT_INDEX_X];
         current[COMPONENT_INDEX_Y] += faceNormal[COMPONENT_INDEX_Y];
         current[COMPONENT_INDEX_Z] += faceNormal[COMPONENT_INDEX_Z];
@@ -11927,7 +11993,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
     }
     for (const [key, normal] of accumulators.entries()) {
       const length = Math.hypot(normal[COMPONENT_INDEX_X], normal[COMPONENT_INDEX_Y], normal[COMPONENT_INDEX_Z]);
-      if (length > ZERO_VALUE6) {
+      if (length > ZERO_VALUE5) {
         normal[COMPONENT_INDEX_X] /= length;
         normal[COMPONENT_INDEX_Y] /= length;
         normal[COMPONENT_INDEX_Z] /= length;
@@ -11967,7 +12033,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
     const ny = abz * acx - abx * acz;
     const nz = abx * acy - aby * acx;
     const length = Math.hypot(nx, ny, nz);
-    if (length > ZERO_VALUE6) {
+    if (length > ZERO_VALUE5) {
       return [nx / length, ny / length, nz / length];
     }
     return DEFAULT_NORMAL;
@@ -11999,7 +12065,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
    * @private
    */
   static #appendUv(sourceUvs, index, target) {
-    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE6 && index * UV_COMPONENT_COUNT < sourceUvs.length) {
+    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE5 && index * UV_COMPONENT_COUNT < sourceUvs.length) {
       const baseIndex = index * UV_COMPONENT_COUNT;
       target.push(sourceUvs[baseIndex + COMPONENT_INDEX_X], sourceUvs[baseIndex + COMPONENT_INDEX_Y]);
       return;
@@ -12016,7 +12082,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
    * @private
    */
   static #appendNormal(sourceNormals, index, target) {
-    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE6 && index * NORMAL_COMPONENT_COUNT < sourceNormals.length) {
+    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE5 && index * NORMAL_COMPONENT_COUNT < sourceNormals.length) {
       const baseIndex = index * NORMAL_COMPONENT_COUNT;
       target.push(
         sourceNormals[baseIndex + COMPONENT_INDEX_X],
@@ -12197,7 +12263,7 @@ var DEFAULT_SPECULAR_STRENGTH = 1;
 var DEFAULT_OPTICAL_DENSITY = 1;
 var MIN_SHININESS = 1;
 var MAX_SHININESS = 128;
-var ZERO_VALUE7 = 0;
+var ZERO_VALUE6 = 0;
 var AMBIENT_COLOR_EPSILON = 1e-4;
 var FIRST_INDEX2 = 0;
 var SECOND_INDEX2 = 1;
@@ -12264,7 +12330,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
       defaultColor,
       textureCache
     } = options;
-    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE7) {
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE6) {
       throw new TypeError(ERROR_TEXTURE_UNIT_INDEX_TYPE);
     }
     if (defaultColor !== void 0) {
@@ -12427,7 +12493,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
       return true;
     }
     const specular = definition.specularColor;
-    return Boolean(specular && (specular[FIRST_INDEX2] > ZERO_VALUE7 || specular[SECOND_INDEX2] > ZERO_VALUE7 || specular[THIRD_INDEX2] > ZERO_VALUE7));
+    return Boolean(specular && (specular[FIRST_INDEX2] > ZERO_VALUE6 || specular[SECOND_INDEX2] > ZERO_VALUE6 || specular[THIRD_INDEX2] > ZERO_VALUE6));
   }
   /**
    * Resolves the ambient color, applying fallback to diffuse the color, when needed.
@@ -12518,7 +12584,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
    */
   #assertTextureUnitsAvailable(definition, textureUrls) {
     const maxUnits = this.#webglContext.getParameter(this.#webglContext.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
-    if (!Number.isInteger(maxUnits) || maxUnits <= ZERO_VALUE7) {
+    if (!Number.isInteger(maxUnits) || maxUnits <= ZERO_VALUE6) {
       throw new Error(ERROR_TEXTURE_UNITS_LIMIT);
     }
     const usesDiffuse = Boolean(textureUrls && definition.diffuseMap && textureUrls.diffuse);
@@ -12528,7 +12594,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
     const usesBump = Boolean(textureUrls && definition.bumpMap && textureUrls.bump);
     const usesDisplacement = Boolean(textureUrls && definition.displacementMap && textureUrls.displacement);
     const usesReflection = Boolean(textureUrls && definition.reflectionMap && textureUrls.reflection);
-    let maxOffset = ZERO_VALUE7;
+    let maxOffset = ZERO_VALUE6;
     if (usesDiffuse) {
       maxOffset = Math.max(maxOffset, TEXTURE_UNIT_DIFFUSE);
     }
@@ -13306,7 +13372,7 @@ var DEFAULT_DIFFUSE_COLOR2 = new Float32Array([1, 1, 1]);
 var DEFAULT_SPECULAR_COLOR = new Float32Array([0, 0, 0]);
 var DEFAULT_AMBIENT_COLOR = new Float32Array([0, 0, 0]);
 var DEFAULT_EMISSIVE_COLOR = new Float32Array([0, 0, 0]);
-var ZERO_VALUE8 = 0;
+var ZERO_VALUE7 = 0;
 var EMPTY_STRING3 = "";
 var SPACE_SEPARATOR3 = " ";
 var LINE_SPLIT_REGEX2 = /\s+/u;
@@ -13520,7 +13586,7 @@ var MtlParser = class _MtlParser {
    */
   static #parseFloatTriplet(parts, expected) {
     if (parts.length <= expected) {
-      return [ZERO_VALUE8, ZERO_VALUE8, ZERO_VALUE8];
+      return [ZERO_VALUE7, ZERO_VALUE7, ZERO_VALUE7];
     }
     return [
       Number.parseFloat(parts[SECOND_INDEX5]),
@@ -13782,7 +13848,7 @@ var QUOTE_TOKEN4 = '"';
 var NOT_FOUND_INDEX3 = -1;
 var SECOND_INDEX6 = 1;
 var BASE_PATH_SLICE_OFFSET = 1;
-var ZERO_VALUE9 = 0;
+var ZERO_VALUE8 = 0;
 var COLOR_COMPONENT_COUNT5 = 3;
 var ENTRY_TYPE_MESH2 = "mesh";
 var ENTRY_TYPE_POINTS2 = "points";
@@ -13888,7 +13954,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
       textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX2,
       defaultColor
     } = options;
-    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE9) {
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE8) {
       throw new TypeError(ERROR_TEXTURE_UNIT_INDEX_TYPE2);
     }
     if (defaultColor !== void 0) {
@@ -13959,7 +14025,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
         console.warn(`${WARNING_MTL_LOAD_FAILED_PREFIX}${resolvedMtlUrl}${WARNING_MTL_LOAD_FAILED_REASON_PREFIX}${errorMessage}`);
       }
     }
-    if (!mtlUrl && objData.materialLibraries.length > ZERO_VALUE9) {
+    if (!mtlUrl && objData.materialLibraries.length > ZERO_VALUE8) {
       for (const library of objData.materialLibraries) {
         if (!library) {
           continue;
@@ -14066,7 +14132,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
     const missingMaterialWarnings = /* @__PURE__ */ new Set();
     const missingDiffuseWarnings = /* @__PURE__ */ new Set();
     const availableMaterials = Array.from(mtlData.keys());
-    const availablePreview = availableMaterials.slice(ZERO_VALUE9, WARNING_MTL_AVAILABLE_LIMIT);
+    const availablePreview = availableMaterials.slice(ZERO_VALUE8, WARNING_MTL_AVAILABLE_LIMIT);
     for (const entry of buildResult.entries) {
       const materialDefinition = mtlData.get(entry.materialName) || null;
       const textureUrls = _ObjMtlLoader.#resolveTextureUrls(materialDefinition, textureBaseUrl, assetUrlMap);
@@ -14182,7 +14248,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
     if (lastSlashIndex === NOT_FOUND_INDEX3) {
       return DEFAULT_BASE_URL;
     }
-    return url.slice(ZERO_VALUE9, lastSlashIndex + BASE_PATH_SLICE_OFFSET);
+    return url.slice(ZERO_VALUE8, lastSlashIndex + BASE_PATH_SLICE_OFFSET);
   }
   /**
    * Resolves a relative path against a base URL.

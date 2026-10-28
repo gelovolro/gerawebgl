@@ -1,22 +1,68 @@
+// core/constants/webgl-context.js
+var WEBGL_CONTEXT_DEFAULTS = Object.freeze({
+  CONTEXT_TYPE: "webgl2",
+  DEVICE_PIXEL_RATIO: 1,
+  ENABLE_DEPTH_TEST: true
+});
+var WEBGL_CONTEXT_VIEWPORT_ORIGIN = Object.freeze({
+  X: 0,
+  Y: 0
+});
+var WEBGL_CONTEXT_DRAWING_BUFFER = Object.freeze({ MIN_DIMENSION: 1 });
+var WEBGL_CONTEXT_COLOR_LIMITS = Object.freeze({
+  MIN_COMPONENT: 0,
+  MAX_COMPONENT: 1
+});
+var WEBGL_CONTEXT_DEFAULT_CLEAR_COLOR = Object.freeze([0, 0, 0, 1]);
+
+// core/constants/ecmascript-types.js
+var ECMASCRIPT_TYPEOF_RESULTS = Object.freeze({
+  UNDEFINED: "undefined",
+  OBJECT: "object",
+  BOOLEAN: "boolean",
+  NUMBER: "number",
+  BIGINT: "bigint",
+  STRING: "string",
+  SYMBOL: "symbol",
+  FUNCTION: "function"
+});
+
 // core/webgl-context.js
-var WEBGL2_CONTEXT_TYPE = "webgl2";
-var DEFAULT_DEVICE_PIXEL_RATIO = 1;
-var VIEWPORT_ORIGIN_X = 0;
-var VIEWPORT_ORIGIN_Y = 0;
-var MIN_DRAWING_BUFFER_DIMENSION = 1;
-var MIN_COLOR_COMPONENT = 0;
-var MAX_COLOR_COMPONENT = 1;
 var WebGLContext = class _WebGLContext {
-  /** @type {HTMLCanvasElement} */
-  #canvas;
-  /** @type {WebGL2RenderingContext} */
-  #webglContext;
-  /** @type {RGBAColor} */
-  static #DEFAULT_CLEAR_COLOR = [0, 0, 0, 1];
-  /** @type {boolean} */
-  static #ENABLE_DEPTH_TEST = true;
   /**
-   * Creates a new WebGLContext bound to the provided canvas element.
+   * Canvas element used by this context.
+   * Its drawing buffer dimensions are updated by `resizeToDisplaySize()`.
+   *
+   * @type {HTMLCanvasElement}
+   * @private
+   */
+  #canvas;
+  /**
+   * Underlying WebGL2 context used to manage rendering state.
+   * Used for updating the viewport and clearing the buffers.
+   *
+   * @type {WebGL2RenderingContext}
+   * @private
+   */
+  #webglContext;
+  /**
+   * Default clear color for new context instances.
+   * Can be changed through `setDefaultClearColor()`.
+   *
+   * @type {RGBAColor}
+   * @private
+   */
+  static #DEFAULT_CLEAR_COLOR = WEBGL_CONTEXT_DEFAULT_CLEAR_COLOR;
+  /**
+   * Indicates whether depth testing is enabled for new context instances.
+   * Can be changed through `setDepthTestEnabled()`.
+   *
+   * @type {boolean}
+   * @private
+   */
+  static #ENABLE_DEPTH_TEST = WEBGL_CONTEXT_DEFAULTS.ENABLE_DEPTH_TEST;
+  /**
+   * Creates a new webgl context, bound to the provided canvas element.
    *
    * @param {HTMLCanvasElement} canvas - Target canvas element used for WebGL rendering.
    * @throws {TypeError} If the provided value is not an HTMLCanvasElement.
@@ -27,7 +73,7 @@ var WebGLContext = class _WebGLContext {
       throw new TypeError("WebGLContext constructor expects an HTMLCanvasElement.");
     }
     this.#canvas = canvas;
-    const webglContext = this.#canvas.getContext(WEBGL2_CONTEXT_TYPE);
+    const webglContext = this.#canvas.getContext(WEBGL_CONTEXT_DEFAULTS.CONTEXT_TYPE);
     if (!webglContext) {
       throw new Error("WebGL2 is not supported in this browser.");
     }
@@ -63,25 +109,25 @@ var WebGLContext = class _WebGLContext {
    * @returns {boolean}                            - True if the canvas was resized, false otherwise.
    */
   resizeToDisplaySize(options) {
-    if (options !== void 0 && (options === null || typeof options !== "object" || Array.isArray(options))) {
+    if (options !== void 0 && (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options))) {
       throw new TypeError("WebGLContext.resizeToDisplaySize expects an options object or undefined.");
     }
     const fitToWindow = options !== void 0 && options.fitToWindow === true;
-    if (options !== void 0 && "fitToWindow" in options && typeof options.fitToWindow !== "boolean") {
+    if (options !== void 0 && "fitToWindow" in options && typeof options.fitToWindow !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
       throw new TypeError("WebGLContext.resizeToDisplaySize option `fitToWindow` must be a boolean.");
     }
-    const pixelRatio = window.devicePixelRatio || DEFAULT_DEVICE_PIXEL_RATIO;
+    const pixelRatio = window.devicePixelRatio || WEBGL_CONTEXT_DEFAULTS.DEVICE_PIXEL_RATIO;
     const cssWidth = fitToWindow ? window.innerWidth : this.#canvas.clientWidth;
     const cssHeight = fitToWindow ? window.innerHeight : this.#canvas.clientHeight;
-    const targetWidth = Math.max(MIN_DRAWING_BUFFER_DIMENSION, Math.floor(cssWidth * pixelRatio));
-    const targetHeight = Math.max(MIN_DRAWING_BUFFER_DIMENSION, Math.floor(cssHeight * pixelRatio));
+    const targetWidth = Math.max(WEBGL_CONTEXT_DRAWING_BUFFER.MIN_DIMENSION, Math.floor(cssWidth * pixelRatio));
+    const targetHeight = Math.max(WEBGL_CONTEXT_DRAWING_BUFFER.MIN_DIMENSION, Math.floor(cssHeight * pixelRatio));
     const isResized = this.#canvas.width !== targetWidth || this.#canvas.height !== targetHeight;
     if (isResized === true) {
       this.#canvas.width = targetWidth;
       this.#canvas.height = targetHeight;
       this.#webglContext.viewport(
-        VIEWPORT_ORIGIN_X,
-        VIEWPORT_ORIGIN_Y,
+        WEBGL_CONTEXT_VIEWPORT_ORIGIN.X,
+        WEBGL_CONTEXT_VIEWPORT_ORIGIN.Y,
         this.#canvas.width,
         this.#canvas.height
       );
@@ -120,7 +166,7 @@ var WebGLContext = class _WebGLContext {
    * @throws {TypeError} If the provided value is not a boolean.
    */
   static setDepthTestEnabled(enabled) {
-    if (typeof enabled !== "boolean") {
+    if (typeof enabled !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
       throw new TypeError("setDepthTestEnabled expects a boolean value.");
     }
     _WebGLContext.#ENABLE_DEPTH_TEST = enabled;
@@ -135,10 +181,10 @@ var WebGLContext = class _WebGLContext {
    * @private
    */
   static #validateColorComponent(componentName, value) {
-    if (typeof value !== "number" || Number.isNaN(value)) {
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || Number.isNaN(value)) {
       throw new TypeError(`Color component "${componentName}" must be a valid number.`);
     }
-    if (value < MIN_COLOR_COMPONENT || value > MAX_COLOR_COMPONENT) {
+    if (value < WEBGL_CONTEXT_COLOR_LIMITS.MIN_COMPONENT || value > WEBGL_CONTEXT_COLOR_LIMITS.MAX_COMPONENT) {
       throw new RangeError(`Color component "${componentName}" must be in the range [0, 1].`);
     }
   }
@@ -183,6 +229,8 @@ var MATH_PERSPECTIVE = Object.freeze({
 });
 var MATH_ORTHOGRAPHIC = Object.freeze({ SCALE_NUMERATOR: 2 });
 var MATH_CAMERA_LIMITS = Object.freeze({
+  MINIMUM_FIELD_OF_VIEW_RADIANS: 0,
+  MAXIMUM_FIELD_OF_VIEW_RADIANS: Math.PI,
   MINIMUM_ASPECT_RATIO: 0,
   MINIMUM_NEAR_CLIP_DISTANCE: 0
 });
@@ -291,10 +339,15 @@ var Matrix4 = class _Matrix4 {
    * @param {number} near               - Near clipping plane, must be '> 0'.
    * @param {number} far                - Far clipping plane, must be '> near'.
    * @returns {Float32Array}            - A new perspective projection matrix.
+   * @throws {TypeError}                - If any argument is not a finite number.
+   * @throws {RangeError}               - If the projection parameters are invalid or produce non-finite matrix values.
    */
   static createPerspective(fieldOfViewRadians, aspectRatio, near, far) {
-    if (typeof fieldOfViewRadians !== "number" || typeof aspectRatio !== "number" || typeof near !== "number" || typeof far !== "number") {
-      throw new TypeError("`Matrix4.createPerspective` expects numeric arguments.");
+    if (!Number.isFinite(fieldOfViewRadians) || !Number.isFinite(aspectRatio) || !Number.isFinite(near) || !Number.isFinite(far)) {
+      throw new TypeError("`Matrix4.createPerspective` expects finite numeric arguments.");
+    }
+    if (fieldOfViewRadians <= MATH_CAMERA_LIMITS.MINIMUM_FIELD_OF_VIEW_RADIANS || fieldOfViewRadians >= MATH_CAMERA_LIMITS.MAXIMUM_FIELD_OF_VIEW_RADIANS) {
+      throw new RangeError("`Matrix4.createPerspective` expects `0 < fieldOfViewRadians < Math.PI`.");
     }
     if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
       throw new RangeError("`Matrix4.createPerspective` expects a positive aspect ratio.");
@@ -321,15 +374,18 @@ var Matrix4 = class _Matrix4 {
    * @param {number}       near               - Near clipping distance.
    * @param {number}       far                - Far clipping distance.
    * @returns {Float32Array}                  - The provided output buffer.
-   * @throws {TypeError}                      - If the output buffer or arguments are invalid.
-   * @throws {RangeError}                     - If the aspect ratio or clipping distances are invalid.
+   * @throws {TypeError}                      - If the output buffer is invalid or any argument is not a finite number.
+   * @throws {RangeError}                     - If the projection parameters are invalid or produce non-finite matrix values.
    */
   static writePerspectiveTo(out, fieldOfViewRadians, aspectRatio, near, far) {
     if (!(out instanceof Float32Array) || out.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
       throw new TypeError("`Matrix4.writePerspectiveTo` expects out to be `Float32Array(16)`.");
     }
-    if (typeof fieldOfViewRadians !== "number" || typeof aspectRatio !== "number" || typeof near !== "number" || typeof far !== "number") {
-      throw new TypeError("`Matrix4.writePerspectiveTo` expects numeric arguments.");
+    if (!Number.isFinite(fieldOfViewRadians) || !Number.isFinite(aspectRatio) || !Number.isFinite(near) || !Number.isFinite(far)) {
+      throw new TypeError("`Matrix4.writePerspectiveTo` expects finite numeric arguments.");
+    }
+    if (fieldOfViewRadians <= MATH_CAMERA_LIMITS.MINIMUM_FIELD_OF_VIEW_RADIANS || fieldOfViewRadians >= MATH_CAMERA_LIMITS.MAXIMUM_FIELD_OF_VIEW_RADIANS) {
+      throw new RangeError("`Matrix4.writePerspectiveTo` expects `0 < fieldOfViewRadians < Math.PI`.");
     }
     if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
       throw new RangeError("`Matrix4.writePerspectiveTo` expects a positive aspect ratio.");
@@ -530,6 +586,106 @@ var Matrix4 = class _Matrix4 {
     return out;
   }
   /**
+   * Writes a transformation matrix combining translation, Euler rotation and scale.
+   *
+   * The transformation is calculated as:
+   * 'M = T * Rz * Ry * Rx * S'
+   *
+   * Where:
+   * M  - final transformation matrix
+   * T  - translation matrix
+   * Rx - rotation matrix around the X axis
+   * Ry - rotation matrix around the Y axis
+   * Rz - rotation matrix around the Z axis
+   * S  - scale matrix
+   *
+   * For a point, the transformations are applied in reverse order:
+   * 'S -> Rx -> Ry -> Rz -> T'
+   *
+   * This happens because 'Matrix4' uses column vectors and applies the rightmost transformation first.
+   *
+   * This means that a point is transformed in the following sequence:
+   * 1). scaled along its local X, Y and Z axes
+   * 2). rotated around X
+   * 3). rotated around Y
+   * 4). rotated around Z
+   * 5). translated to its final position
+   *
+   * The combined Euler rotation is 'R = Rz * Ry * Rx' using the following abbreviations:
+   * 'cx, sx' - cosine and sine of rotation X
+   * 'cy, sy' - cosine and sine of rotation Y
+   * 'cz, sz' - cosine and sine of rotation Z
+   *
+   * The resulting 3x3 rotation part is:
+   *
+   * [ cz*cy   cz*sy*sx - sz*cx   cz*sy*cx + sz*sx ]
+   * [ sz*cy   sz*sy*sx + cz*cx   sz*sy*cx - cz*sx ]
+   * [ -sy     cy*sx              cy*cx            ]
+   *
+   * Each rotation column is multiplied by the corresponding scale value and
+   * translation is stored in the last column, producing this affine 4x4 matrix:
+   *
+   * column 0: [ (rotation00 * scaleX), (rotation10 * scaleX), (rotation20 * scaleX) , 0 ]
+   * column 1: [ (rotation01 * scaleY), (rotation11 * scaleY), (rotation21 * scaleY) , 0 ]
+   * column 2: [ (rotation02 * scaleZ), (rotation12 * scaleZ), (rotation22 * scaleZ) , 0 ]
+   * column 3: [ translateX,            translateY,            translateZ,             1 ]
+   *
+   * Writes directly to the output buffer without intermediate matrix allocations.
+   *
+   * @param {Float32Array} out        - Output 4x4 matrix buffer.
+   * @param {number}       translateX - Translation along X axis.
+   * @param {number}       translateY - Translation along Y axis.
+   * @param {number}       translateZ - Translation along Z axis.
+   * @param {number}       rotationX  - Rotation around X axis in radians.
+   * @param {number}       rotationY  - Rotation around Y axis in radians.
+   * @param {number}       rotationZ  - Rotation around Z axis in radians.
+   * @param {number}       scaleX     - Scale along X axis.
+   * @param {number}       scaleY     - Scale along Y axis.
+   * @param {number}       scaleZ     - Scale along Z axis.
+   * @returns {Float32Array}          - The provided output buffer.
+   * @throws {TypeError}              - If the output buffer or arguments are invalid.
+   */
+  static writeTransformationTo(out, translateX, translateY, translateZ, rotationX, rotationY, rotationZ, scaleX, scaleY, scaleZ) {
+    if (!(out instanceof Float32Array) || out.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
+      throw new TypeError("`Matrix4.writeTransformationTo` expects out to be `Float32Array(16)`.");
+    }
+    if (typeof translateX !== "number" || typeof translateY !== "number" || typeof translateZ !== "number" || typeof rotationX !== "number" || typeof rotationY !== "number" || typeof rotationZ !== "number" || typeof scaleX !== "number" || typeof scaleY !== "number" || typeof scaleZ !== "number") {
+      throw new TypeError("`Matrix4.writeTransformationTo` expects numeric arguments.");
+    }
+    const cosX = Math.cos(rotationX);
+    const sinX = Math.sin(rotationX);
+    const cosY = Math.cos(rotationY);
+    const sinY = Math.sin(rotationY);
+    const cosZ = Math.cos(rotationZ);
+    const sinZ = Math.sin(rotationZ);
+    const rotation00 = cosZ * cosY;
+    const rotation01 = cosZ * sinY * sinX - sinZ * cosX;
+    const rotation02 = cosZ * sinY * cosX + sinZ * sinX;
+    const rotation10 = sinZ * cosY;
+    const rotation11 = sinZ * sinY * sinX + cosZ * cosX;
+    const rotation12 = sinZ * sinY * cosX - cosZ * sinX;
+    const rotation20 = -sinY;
+    const rotation21 = cosY * sinX;
+    const rotation22 = cosY * cosX;
+    out[0] = rotation00 * scaleX;
+    out[1] = rotation10 * scaleX;
+    out[2] = rotation20 * scaleX;
+    out[3] = MATH_MATRIX_VALUES.ZERO;
+    out[4] = rotation01 * scaleY;
+    out[5] = rotation11 * scaleY;
+    out[6] = rotation21 * scaleY;
+    out[7] = MATH_MATRIX_VALUES.ZERO;
+    out[8] = rotation02 * scaleZ;
+    out[9] = rotation12 * scaleZ;
+    out[10] = rotation22 * scaleZ;
+    out[11] = MATH_MATRIX_VALUES.ZERO;
+    out[12] = translateX;
+    out[13] = translateY;
+    out[14] = translateZ;
+    out[15] = MATH_MATRIX_VALUES.UNIT;
+    return out;
+  }
+  /**
    * Multiplies two 4x4 matrices: 'result = leftMatrix * rightMatrix'.
    *
    * Order matters. With column-vector style, right matrix is applied first.
@@ -693,21 +849,30 @@ var Matrix4 = class _Matrix4 {
     const inverseDepthRange = MATH_PERSPECTIVE.DEPTH_RANGE_NUMERATOR / (near - far);
     const halfFieldOfViewRadians = fieldOfViewRadians / MATH_PERSPECTIVE.HALF_FIELD_OF_VIEW_DIVISOR;
     const projectionScale = MATH_PERSPECTIVE.PROJECTION_SCALE_NUMERATOR / Math.tan(halfFieldOfViewRadians);
-    out[0] = projectionScale / aspectRatio;
+    const horizontalProjectionScale = Math.fround(projectionScale / aspectRatio);
+    const verticalProjectionScale = Math.fround(projectionScale);
+    const depthScale = Math.fround((far + near) * inverseDepthRange);
+    const depthOffset = Math.fround(
+      MATH_PERSPECTIVE.Z_RANGE_MULTIPLIER * far * near * inverseDepthRange
+    );
+    if (!Number.isFinite(horizontalProjectionScale) || !Number.isFinite(verticalProjectionScale) || !Number.isFinite(depthScale) || !Number.isFinite(depthOffset)) {
+      throw new RangeError("Perspective projection values must remain finite after conversion to `Float32Array`.");
+    }
+    out[0] = horizontalProjectionScale;
     out[1] = MATH_MATRIX_VALUES.ZERO;
     out[2] = MATH_MATRIX_VALUES.ZERO;
     out[3] = MATH_MATRIX_VALUES.ZERO;
     out[4] = MATH_MATRIX_VALUES.ZERO;
-    out[5] = projectionScale;
+    out[5] = verticalProjectionScale;
     out[6] = MATH_MATRIX_VALUES.ZERO;
     out[7] = MATH_MATRIX_VALUES.ZERO;
     out[8] = MATH_MATRIX_VALUES.ZERO;
     out[9] = MATH_MATRIX_VALUES.ZERO;
-    out[10] = (far + near) * inverseDepthRange;
+    out[10] = depthScale;
     out[11] = MATH_PERSPECTIVE.W_COMPONENT_SCALE;
     out[12] = MATH_MATRIX_VALUES.ZERO;
     out[13] = MATH_MATRIX_VALUES.ZERO;
-    out[14] = MATH_PERSPECTIVE.Z_RANGE_MULTIPLIER * far * near * inverseDepthRange;
+    out[14] = depthOffset;
     out[15] = MATH_MATRIX_VALUES.ZERO;
     return out;
   }
@@ -1269,13 +1434,17 @@ var Vector3Math = class _Vector3Math {
   }
 };
 
+// core/constants/curve3.js
+var CURVE3_SAMPLING = Object.freeze({
+  DEFAULT_SEGMENTS: 32,
+  MIN_SEGMENTS: MATH_COMMON_VALUES.UNIT,
+  START_INDEX: MATH_COMMON_VALUES.ZERO,
+  INDEX_INCREMENT: MATH_COMMON_VALUES.UNIT,
+  START_PARAMETER: MATH_COMMON_VALUES.ZERO,
+  END_PARAMETER: MATH_COMMON_VALUES.UNIT
+});
+
 // core/math/curve3.js
-var DEFAULT_SAMPLE_SEGMENTS = 32;
-var MIN_SAMPLE_SEGMENTS = 1;
-var SAMPLE_START_INDEX = 0;
-var SAMPLE_INDEX_INCREMENT = 1;
-var SAMPLE_START_PARAMETER = 0;
-var SAMPLE_END_PARAMETER = 1;
 var Curve3 = class _Curve3 {
   /**
    * Abstract curve base.
@@ -1341,38 +1510,39 @@ var Curve3 = class _Curve3 {
    * @throws {TypeError}  When segments is not a finite number.
    * @throws {RangeError} When segments is not an `integer >= 1`.
    */
-  getPoints(segments = DEFAULT_SAMPLE_SEGMENTS) {
+  getPoints(segments = CURVE3_SAMPLING.DEFAULT_SEGMENTS) {
     if (typeof segments !== "number" || !Number.isFinite(segments)) {
       throw new TypeError("`Curve3.getPoints` expects `segments` as a finite number.");
     }
-    if (!Number.isInteger(segments) || segments < MIN_SAMPLE_SEGMENTS) {
-      throw new RangeError("`Curve3.getPoints` expects `segments` as an integer >= 1.");
+    if (!Number.isInteger(segments) || segments < CURVE3_SAMPLING.MIN_SEGMENTS) {
+      throw new RangeError("Curve3.getPoints: `segments` must be a positive integer.");
     }
     const points = [];
-    const segmentCount = segments;
-    const maxIndex = segmentCount;
-    for (let index = SAMPLE_START_INDEX; index <= maxIndex; index += SAMPLE_INDEX_INCREMENT) {
-      const sampleParameter = SAMPLE_START_PARAMETER + (SAMPLE_END_PARAMETER - SAMPLE_START_PARAMETER) * (index / segmentCount);
+    for (let index = CURVE3_SAMPLING.START_INDEX; index <= segments; index += CURVE3_SAMPLING.INDEX_INCREMENT) {
+      const sampleParameter = CURVE3_SAMPLING.START_PARAMETER + (CURVE3_SAMPLING.END_PARAMETER - CURVE3_SAMPLING.START_PARAMETER) * (index / segments);
       points.push(this.getPoint(sampleParameter, new Vector3()));
     }
     return points;
   }
 };
 
+// core/constants/catmull-rom-curve3.js
+var CATMULL_ROM_DEFAULTS = Object.freeze({
+  MIN_CONTROL_POINTS: 2,
+  CLOSED: false
+});
+var CATMULL_ROM_VALUES = Object.freeze({
+  ZERO: MATH_COMMON_VALUES.ZERO,
+  ONE: MATH_COMMON_VALUES.UNIT,
+  TWO: 2,
+  THREE: 3,
+  FOUR: 4,
+  FIVE: 5,
+  TENSION: 0.5
+});
+var CATMULL_ROM_TANGENT = Object.freeze({ EPSILON: 1e-8 });
+
 // core/math/catmull-rom-curve3.js
-var MIN_CONTROL_POINT_COUNT = 2;
-var DEFAULT_CLOSED = false;
-var CURVE_PARAMETER_MIN = 0;
-var CURVE_PARAMETER_MAX = 1;
-var ZERO_VALUE2 = 0;
-var OPEN_CURVE_LAST_SEGMENT_OFFSET = 1;
-var ONE_VALUE2 = 1;
-var TWO_VALUE = 2;
-var THREE_VALUE = 3;
-var FOUR_VALUE = 4;
-var FIVE_VALUE = 5;
-var CATMULL_ROM_TENSION = 0.5;
-var TANGENT_EPSILON = 1e-8;
 var CatmullRomCurve3 = class _CatmullRomCurve3 extends Curve3 {
   /**
    * Control points used to build the curve.
@@ -1389,19 +1559,26 @@ var CatmullRomCurve3 = class _CatmullRomCurve3 extends Curve3 {
    */
   #closed;
   /**
+   * Reusable segment data, avoiding allocations during animation updates.
+   *
+   * @type {CatmullRomSegment}
+   * @private
+   */
+  #segment;
+  /**
    * @param {Vector3[]} points               - Control points.
    * @param {Object} [options]               - Optional options.
    * @param {boolean} [options.closed=false] - Whether the curve is closed.
-   * @throws {TypeError}  When inputs are invalid.
-   * @throws {RangeError} When points are insufficient.
+   * @throws {TypeError}                       When inputs are invalid.
+   * @throws {RangeError}                      When points are insufficient.
    */
   constructor(points, options = {}) {
     super();
     if (!Array.isArray(points)) {
       throw new TypeError("`CatmullRomCurve3` expects `points` as an array of `Vector3`.");
     }
-    if (points.length < MIN_CONTROL_POINT_COUNT) {
-      throw new RangeError("`CatmullRomCurve3` expects at least 2 control points.");
+    if (points.length < CATMULL_ROM_DEFAULTS.MIN_CONTROL_POINTS) {
+      throw new RangeError("`CatmullRomCurve3` expects at least two control points.");
     }
     for (const point of points) {
       if (!(point instanceof Vector3)) {
@@ -1411,30 +1588,39 @@ var CatmullRomCurve3 = class _CatmullRomCurve3 extends Curve3 {
     if (options === null || typeof options !== "object" || Array.isArray(options)) {
       throw new TypeError("`CatmullRomCurve3` expects options as a plain object.");
     }
-    const { closed = DEFAULT_CLOSED } = options;
+    const { closed = CATMULL_ROM_DEFAULTS.CLOSED } = options;
     if (typeof closed !== "boolean") {
       throw new TypeError("`CatmullRomCurve3` option `closed` must be a boolean.");
     }
     this.#points = points.slice();
     this.#closed = closed;
+    this.#segment = {
+      previous: this.#points[CATMULL_ROM_VALUES.ZERO],
+      start: this.#points[CATMULL_ROM_VALUES.ZERO],
+      end: this.#points[CATMULL_ROM_VALUES.ZERO],
+      next: this.#points[CATMULL_ROM_VALUES.ZERO],
+      parameter: CATMULL_ROM_VALUES.ZERO
+    };
   }
   /**
-   * @returns {Vector3[]}
+   * @returns {Vector3[]} - Control points defining the curve.
    */
   get points() {
     return this.#points;
   }
   /**
-   * @returns {boolean}
+   * @returns {boolean} - Whether the curve is closed.
    */
   get closed() {
     return this.#closed;
   }
   /**
+   * Returns an interpolated point on the curve.
+   *
    * @param {number} curveParameter - Parameter in [0..1].
    * @param {Vector3} [out]         - Optional output vector.
-   * @returns {Vector3}
-   * @throws {TypeError} When inputs are invalid.
+   * @returns {Vector3}             - Interpolated point written to `out`.
+   * @throws {TypeError}              When inputs are invalid.
    */
   getPoint(curveParameter, out = new Vector3()) {
     if (typeof curveParameter !== "number" || !Number.isFinite(curveParameter)) {
@@ -1443,27 +1629,19 @@ var CatmullRomCurve3 = class _CatmullRomCurve3 extends Curve3 {
     if (!(out instanceof Vector3)) {
       throw new TypeError("`CatmullRomCurve3.getPoint` expects `out` as a Vector3.");
     }
-    const clampedCurveParameter = _CatmullRomCurve3.#clampCurveParameter(curveParameter);
-    const segmentCount = this.#closed ? this.#points.length : this.#points.length - OPEN_CURVE_LAST_SEGMENT_OFFSET;
-    const scaledCurveParameter = clampedCurveParameter * segmentCount;
-    const segmentIndex = Math.min(Math.floor(scaledCurveParameter), segmentCount - OPEN_CURVE_LAST_SEGMENT_OFFSET);
-    const segmentParameter = scaledCurveParameter - segmentIndex;
-    const previousControlPoint = this.#getPointForSegment(segmentIndex - ONE_VALUE2);
-    const startControlPoint = this.#getPointForSegment(segmentIndex);
-    const endControlPoint = this.#getPointForSegment(segmentIndex + ONE_VALUE2);
-    const nextControlPoint = this.#getPointForSegment(segmentIndex + TWO_VALUE);
-    const segmentParameterSquared = segmentParameter * segmentParameter;
-    const segmentParameterCubed = segmentParameterSquared * segmentParameter;
-    const x = CATMULL_ROM_TENSION * (TWO_VALUE * startControlPoint.x + (-previousControlPoint.x + endControlPoint.x) * segmentParameter + (TWO_VALUE * previousControlPoint.x - FIVE_VALUE * startControlPoint.x + FOUR_VALUE * endControlPoint.x - nextControlPoint.x) * segmentParameterSquared + (-previousControlPoint.x + THREE_VALUE * startControlPoint.x - THREE_VALUE * endControlPoint.x + nextControlPoint.x) * segmentParameterCubed);
-    const y = CATMULL_ROM_TENSION * (TWO_VALUE * startControlPoint.y + (-previousControlPoint.y + endControlPoint.y) * segmentParameter + (TWO_VALUE * previousControlPoint.y - FIVE_VALUE * startControlPoint.y + FOUR_VALUE * endControlPoint.y - nextControlPoint.y) * segmentParameterSquared + (-previousControlPoint.y + THREE_VALUE * startControlPoint.y - THREE_VALUE * endControlPoint.y + nextControlPoint.y) * segmentParameterCubed);
-    const z = CATMULL_ROM_TENSION * (TWO_VALUE * startControlPoint.z + (-previousControlPoint.z + endControlPoint.z) * segmentParameter + (TWO_VALUE * previousControlPoint.z - FIVE_VALUE * startControlPoint.z + FOUR_VALUE * endControlPoint.z - nextControlPoint.z) * segmentParameterSquared + (-previousControlPoint.z + THREE_VALUE * startControlPoint.z - THREE_VALUE * endControlPoint.z + nextControlPoint.z) * segmentParameterCubed);
+    const { previous, start, end, next, parameter } = this.#resolveSegment(curveParameter);
+    const x = _CatmullRomCurve3.#interpolateCoordinate(previous.x, start.x, end.x, next.x, parameter);
+    const y = _CatmullRomCurve3.#interpolateCoordinate(previous.y, start.y, end.y, next.y, parameter);
+    const z = _CatmullRomCurve3.#interpolateCoordinate(previous.z, start.z, end.z, next.z, parameter);
     return out.set(x, y, z);
   }
   /**
+   * Returns a normalized tangent direction at the given curve parameter.
+   *
    * @param {number} curveParameter - Parameter in [0..1].
    * @param {Vector3} [out]         - Optional output vector.
-   * @returns {Vector3}
-   * @throws {TypeError} When inputs are invalid.
+   * @returns {Vector3}             - Normalized tangent written to `out`, or a zero vector for a degenerate tangent.
+   * @throws {TypeError}              When inputs are invalid.
    */
   getTangent(curveParameter, out = new Vector3()) {
     if (typeof curveParameter !== "number" || !Number.isFinite(curveParameter)) {
@@ -1472,28 +1650,79 @@ var CatmullRomCurve3 = class _CatmullRomCurve3 extends Curve3 {
     if (!(out instanceof Vector3)) {
       throw new TypeError("`CatmullRomCurve3.getTangent` expects `out` as a Vector3.");
     }
-    const clampedCurveParameter = _CatmullRomCurve3.#clampCurveParameter(curveParameter);
-    const segmentCount = this.#closed ? this.#points.length : this.#points.length - OPEN_CURVE_LAST_SEGMENT_OFFSET;
-    const scaledCurveParameter = clampedCurveParameter * segmentCount;
-    const segmentIndex = Math.min(Math.floor(scaledCurveParameter), segmentCount - OPEN_CURVE_LAST_SEGMENT_OFFSET);
-    const segmentParameter = scaledCurveParameter - segmentIndex;
-    const previousControlPoint = this.#getPointForSegment(segmentIndex - ONE_VALUE2);
-    const startControlPoint = this.#getPointForSegment(segmentIndex);
-    const endControlPoint = this.#getPointForSegment(segmentIndex + ONE_VALUE2);
-    const nextControlPoint = this.#getPointForSegment(segmentIndex + TWO_VALUE);
-    const segmentParameterSquared = segmentParameter * segmentParameter;
-    const x = CATMULL_ROM_TENSION * (-previousControlPoint.x + endControlPoint.x + TWO_VALUE * (TWO_VALUE * previousControlPoint.x - FIVE_VALUE * startControlPoint.x + FOUR_VALUE * endControlPoint.x - nextControlPoint.x) * segmentParameter + THREE_VALUE * (-previousControlPoint.x + THREE_VALUE * startControlPoint.x - THREE_VALUE * endControlPoint.x + nextControlPoint.x) * segmentParameterSquared);
-    const y = CATMULL_ROM_TENSION * (-previousControlPoint.y + endControlPoint.y + TWO_VALUE * (TWO_VALUE * previousControlPoint.y - FIVE_VALUE * startControlPoint.y + FOUR_VALUE * endControlPoint.y - nextControlPoint.y) * segmentParameter + THREE_VALUE * (-previousControlPoint.y + THREE_VALUE * startControlPoint.y - THREE_VALUE * endControlPoint.y + nextControlPoint.y) * segmentParameterSquared);
-    const z = CATMULL_ROM_TENSION * (-previousControlPoint.z + endControlPoint.z + TWO_VALUE * (TWO_VALUE * previousControlPoint.z - FIVE_VALUE * startControlPoint.z + FOUR_VALUE * endControlPoint.z - nextControlPoint.z) * segmentParameter + THREE_VALUE * (-previousControlPoint.z + THREE_VALUE * startControlPoint.z - THREE_VALUE * endControlPoint.z + nextControlPoint.z) * segmentParameterSquared);
+    const { previous, start, end, next, parameter } = this.#resolveSegment(curveParameter);
+    const x = _CatmullRomCurve3.#calculateTangentCoordinate(previous.x, start.x, end.x, next.x, parameter);
+    const y = _CatmullRomCurve3.#calculateTangentCoordinate(previous.y, start.y, end.y, next.y, parameter);
+    const z = _CatmullRomCurve3.#calculateTangentCoordinate(previous.z, start.z, end.z, next.z, parameter);
     const length = Math.sqrt(x * x + y * y + z * z);
-    if (length <= TANGENT_EPSILON) {
-      return out.set(ZERO_VALUE2, ZERO_VALUE2, ZERO_VALUE2);
+    if (length <= CATMULL_ROM_TANGENT.EPSILON) {
+      return out.set(
+        CATMULL_ROM_VALUES.ZERO,
+        CATMULL_ROM_VALUES.ZERO,
+        CATMULL_ROM_VALUES.ZERO
+      );
     }
     return out.set(x / length, y / length, z / length);
   }
   /**
-   * @param {number} index - Segment index.
-   * @returns {Vector3}
+   * Resolves the segment and reuses its four control point references.
+   *
+   * @param {number} curveParameter - Finite curve parameter.
+   * @returns {CatmullRomSegment}   - Resolved segment data.
+   * @private
+   */
+  #resolveSegment(curveParameter) {
+    const clampedCurveParameter = _CatmullRomCurve3.#clampCurveParameter(curveParameter);
+    const segmentCount = this.#closed ? this.#points.length : this.#points.length - CATMULL_ROM_VALUES.ONE;
+    const scaledCurveParameter = clampedCurveParameter * segmentCount;
+    const segmentIndex = Math.min(Math.floor(scaledCurveParameter), segmentCount - CATMULL_ROM_VALUES.ONE);
+    const parameter = scaledCurveParameter - segmentIndex;
+    const segment = this.#segment;
+    segment.previous = this.#getPointForSegment(segmentIndex - CATMULL_ROM_VALUES.ONE);
+    segment.start = this.#getPointForSegment(segmentIndex);
+    segment.end = this.#getPointForSegment(segmentIndex + CATMULL_ROM_VALUES.ONE);
+    segment.next = this.#getPointForSegment(segmentIndex + CATMULL_ROM_VALUES.TWO);
+    segment.parameter = parameter;
+    return segment;
+  }
+  /**
+   * Interpolates one coordinate using the Catmull-Rom polynomial.
+   *
+   * @param {number} previous  - Previous control point coordinate.
+   * @param {number} start     - Segment start coordinate.
+   * @param {number} end       - Segment end coordinate.
+   * @param {number} next      - Next control point coordinate.
+   * @param {number} parameter - Local segment parameter.
+   * @returns {number}         - Interpolated coordinate value.
+   * @private
+   */
+  static #interpolateCoordinate(previous, start, end, next, parameter) {
+    const polynomial = CATMULL_ROM_VALUES;
+    const squared = parameter * parameter;
+    const cubed = squared * parameter;
+    return polynomial.TENSION * (polynomial.TWO * start + (-previous + end) * parameter + (polynomial.TWO * previous - polynomial.FIVE * start + polynomial.FOUR * end - next) * squared + (-previous + polynomial.THREE * start - polynomial.THREE * end + next) * cubed);
+  }
+  /**
+   * Evaluates the derivative of one Catmull-Rom coordinate.
+   *
+   * @param {number} previous  - Previous control point coordinate.
+   * @param {number} start     - Segment start coordinate.
+   * @param {number} end       - Segment end coordinate.
+   * @param {number} next      - Next control point coordinate.
+   * @param {number} parameter - Local segment parameter.
+   * @returns {number}         - Unnormalized tangent coordinate.
+   * @private
+   */
+  static #calculateTangentCoordinate(previous, start, end, next, parameter) {
+    const polynomial = CATMULL_ROM_VALUES;
+    const squared = parameter * parameter;
+    return polynomial.TENSION * (-previous + end + polynomial.TWO * (polynomial.TWO * previous - polynomial.FIVE * start + polynomial.FOUR * end - next) * parameter + polynomial.THREE * (-previous + polynomial.THREE * start - polynomial.THREE * end + next) * squared);
+  }
+  /**
+   * Resolves a control point index for open or closed curves.
+   *
+   * @param {number} index - Control point index.
+   * @returns {Vector3}    - Control point at the clamped or wrapped index.
    * @private
    */
   #getPointForSegment(index) {
@@ -1502,25 +1731,27 @@ var CatmullRomCurve3 = class _CatmullRomCurve3 extends Curve3 {
       const wrappedIndex = (index % pointCount + pointCount) % pointCount;
       return this.#points[wrappedIndex];
     }
-    if (index < ZERO_VALUE2) {
-      return this.#points[ZERO_VALUE2];
+    if (index < CATMULL_ROM_VALUES.ZERO) {
+      return this.#points[CATMULL_ROM_VALUES.ZERO];
     }
     if (index >= pointCount) {
-      return this.#points[pointCount - ONE_VALUE2];
+      return this.#points[pointCount - CATMULL_ROM_VALUES.ONE];
     }
     return this.#points[index];
   }
   /**
-   * @param {number} curveParameter - Parameter value.
-   * @returns {number}
+   * Clamps a curve parameter to the valid interval.
+   *
+   * @param {number} curveParameter - Curve parameter.
+   * @returns {number}              - Parameter clamped to [0..1].
    * @private
    */
   static #clampCurveParameter(curveParameter) {
-    if (curveParameter <= CURVE_PARAMETER_MIN) {
-      return CURVE_PARAMETER_MIN;
+    if (curveParameter <= CATMULL_ROM_VALUES.ZERO) {
+      return CATMULL_ROM_VALUES.ZERO;
     }
-    if (curveParameter >= CURVE_PARAMETER_MAX) {
-      return CURVE_PARAMETER_MAX;
+    if (curveParameter >= CATMULL_ROM_VALUES.ONE) {
+      return CATMULL_ROM_VALUES.ONE;
     }
     return curveParameter;
   }
@@ -1531,8 +1762,8 @@ var MIN_POINT_COUNT = 2;
 var DEFAULT_LOOP = false;
 var SEGMENT_START_INDEX = 0;
 var SEGMENT_INDEX_INCREMENT = 1;
-var ZERO_VALUE3 = 0;
-var ONE_VALUE3 = 1;
+var ZERO_VALUE2 = 0;
+var ONE_VALUE2 = 1;
 var NORMALIZE_EPSILON = 1e-8;
 var Path3D = class _Path3D {
   /**
@@ -1599,8 +1830,8 @@ var Path3D = class _Path3D {
     this.#points = points.slice();
     this.#loop = loop;
     this.#segmentLengths = new Float32Array(this.#getSegmentCount());
-    this.#cumulativeLengths = new Float32Array(this.#segmentLengths.length + ONE_VALUE3);
-    this.#totalLength = ZERO_VALUE3;
+    this.#cumulativeLengths = new Float32Array(this.#segmentLengths.length + ONE_VALUE2);
+    this.#totalLength = ZERO_VALUE2;
     this.#recalculateLengths();
   }
   /**
@@ -1636,15 +1867,15 @@ var Path3D = class _Path3D {
     if (!(out instanceof Vector3)) {
       throw new TypeError("`Path3D.getPointAt` expects `out` as a `Vector3`.");
     }
-    if (this.#totalLength <= ZERO_VALUE3) {
-      return out.copyFrom(this.#points[ZERO_VALUE3]);
+    if (this.#totalLength <= ZERO_VALUE2) {
+      return out.copyFrom(this.#points[ZERO_VALUE2]);
     }
     const normalizedPathParameter = this.#normalizePathParameter(pathParameter);
     const targetLength = normalizedPathParameter * this.#totalLength;
     const segmentData = this.#findSegmentAtLength(targetLength);
     const pointA = this.#points[segmentData.index];
     const pointB = this.#getNextPoint(segmentData.index);
-    const segmentParameter = segmentData.length <= ZERO_VALUE3 ? ZERO_VALUE3 : (targetLength - segmentData.cumulativeLength) / segmentData.length;
+    const segmentParameter = segmentData.length <= ZERO_VALUE2 ? ZERO_VALUE2 : (targetLength - segmentData.cumulativeLength) / segmentData.length;
     const x = pointA.x + (pointB.x - pointA.x) * segmentParameter;
     const y = pointA.y + (pointB.y - pointA.y) * segmentParameter;
     const z = pointA.z + (pointB.z - pointA.z) * segmentParameter;
@@ -1675,7 +1906,7 @@ var Path3D = class _Path3D {
     const deltaZ = pointB.z - pointA.z;
     const tangentLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
     if (tangentLength <= NORMALIZE_EPSILON) {
-      return out.set(ZERO_VALUE3, ZERO_VALUE3, ZERO_VALUE3);
+      return out.set(ZERO_VALUE2, ZERO_VALUE2, ZERO_VALUE2);
     }
     return out.set(deltaX / tangentLength, deltaY / tangentLength, deltaZ / tangentLength);
   }
@@ -1684,7 +1915,7 @@ var Path3D = class _Path3D {
    * @private
    */
   #getSegmentCount() {
-    return this.#loop ? this.#points.length : this.#points.length - ONE_VALUE3;
+    return this.#loop ? this.#points.length : this.#points.length - ONE_VALUE2;
   }
   /**
    * @param {number} length - Target length along the path.
@@ -1704,7 +1935,7 @@ var Path3D = class _Path3D {
         };
       }
     }
-    const lastIndex = segmentCount - ONE_VALUE3;
+    const lastIndex = segmentCount - ONE_VALUE2;
     return {
       index: lastIndex,
       length: this.#segmentLengths[lastIndex],
@@ -1718,10 +1949,10 @@ var Path3D = class _Path3D {
    */
   #getNextPoint(index) {
     if (this.#loop) {
-      const nextIndex = (index + ONE_VALUE3) % this.#points.length;
+      const nextIndex = (index + ONE_VALUE2) % this.#points.length;
       return this.#points[nextIndex];
     }
-    return this.#points[Math.min(index + ONE_VALUE3, this.#points.length - ONE_VALUE3)];
+    return this.#points[Math.min(index + ONE_VALUE2, this.#points.length - ONE_VALUE2)];
   }
   /**
    * @param {number} pathParameter - Path parameter to normalize.
@@ -1731,13 +1962,13 @@ var Path3D = class _Path3D {
   #normalizePathParameter(pathParameter) {
     if (this.#loop) {
       const wrapped = pathParameter - Math.floor(pathParameter);
-      return wrapped < ZERO_VALUE3 ? wrapped + ONE_VALUE3 : wrapped;
+      return wrapped < ZERO_VALUE2 ? wrapped + ONE_VALUE2 : wrapped;
     }
-    if (pathParameter <= ZERO_VALUE3) {
-      return ZERO_VALUE3;
+    if (pathParameter <= ZERO_VALUE2) {
+      return ZERO_VALUE2;
     }
-    if (pathParameter >= ONE_VALUE3) {
-      return ONE_VALUE3;
+    if (pathParameter >= ONE_VALUE2) {
+      return ONE_VALUE2;
     }
     return pathParameter;
   }
@@ -1746,15 +1977,15 @@ var Path3D = class _Path3D {
    */
   #recalculateLengths() {
     const segmentCount = this.#segmentLengths.length;
-    let cumulativeLength = ZERO_VALUE3;
-    this.#cumulativeLengths[ZERO_VALUE3] = cumulativeLength;
+    let cumulativeLength = ZERO_VALUE2;
+    this.#cumulativeLengths[ZERO_VALUE2] = cumulativeLength;
     for (let index = SEGMENT_START_INDEX; index < segmentCount; index += SEGMENT_INDEX_INCREMENT) {
       const pointA = this.#points[index];
       const pointB = this.#getNextPoint(index);
       const length = _Path3D.#distance(pointA, pointB);
       this.#segmentLengths[index] = length;
       cumulativeLength += length;
-      this.#cumulativeLengths[index + ONE_VALUE3] = cumulativeLength;
+      this.#cumulativeLengths[index + ONE_VALUE2] = cumulativeLength;
     }
     this.#totalLength = cumulativeLength;
   }
@@ -1772,40 +2003,81 @@ var Path3D = class _Path3D {
   }
 };
 
-// core/geometry/geometry.js
-var POSITION_ATTRIBUTE_LOCATION = 0;
-var POSITION_COMPONENT_COUNT = 3;
-var COLOR_ATTRIBUTE_LOCATION = 1;
-var COLOR_COMPONENT_COUNT = 3;
-var UV_ATTRIBUTE_LOCATION = 2;
-var UV_COMPONENT_COUNT = 2;
-var NORMAL_ATTRIBUTE_LOCATION = 3;
-var NORMAL_COMPONENT_COUNT = 3;
-var ATTRIBUTE_NORMALIZED = false;
-var ATTRIBUTE_NO_STRIDE = 0;
-var ATTRIBUTE_NO_OFFSET = 0;
-var MODULO_ALIGNED_VALUE = 0;
-var BOUNDING_BOX_COMPONENT_COUNT = 3;
-var POSITION_START_INDEX = 0;
-var POSITION_X_OFFSET = 0;
-var POSITION_Y_OFFSET = 1;
-var POSITION_Z_OFFSET = 2;
-var EMPTY_BOUND_COMPONENT = 0;
-var BOUND_MIN_INIT = Number.POSITIVE_INFINITY;
-var BOUND_MAX_INIT = Number.NEGATIVE_INFINITY;
-var ERROR_BOUNDING_BOX_POSITIONS_TYPE = "`Geometry.#writeBoundingBox` expects positions as `Float32Array`.";
-var ERROR_BOUNDING_BOX_MIN_TYPE = "`Geometry.#writeBoundingBox` expects `outMin` as `Float32Array(3)`.";
-var ERROR_BOUNDING_BOX_MAX_TYPE = "`Geometry.#writeBoundingBox` expects `outMax` as `Float32Array(3)`.";
-var TRIANGLE_INDEX_COMPONENT_COUNT = 3;
-var LINE_INDEX_COMPONENT_COUNT = 2;
+// core/constants/geometry.js
+var GEOMETRY_DIRECTIONS = Object.freeze({
+  POSITIVE_X: Object.freeze([1, 0, 0]),
+  NEGATIVE_X: Object.freeze([-1, 0, 0]),
+  POSITIVE_Y: Object.freeze([0, 1, 0]),
+  NEGATIVE_Y: Object.freeze([0, -1, 0]),
+  POSITIVE_Z: Object.freeze([0, 0, 1]),
+  NEGATIVE_Z: Object.freeze([0, 0, -1])
+});
+var GEOMETRY_LAYOUT = Object.freeze({
+  POSITION_COMPONENT_COUNT: MATH_LAYOUT.VECTOR3_ELEMENT_COUNT,
+  NORMAL_COMPONENT_COUNT: MATH_LAYOUT.VECTOR3_ELEMENT_COUNT,
+  COLOR_COMPONENT_COUNT: 3,
+  UV_COMPONENT_COUNT: 2,
+  TRIANGLE_INDEX_COUNT: 3,
+  LINE_INDEX_COUNT: 2
+});
+var GEOMETRY_COLOR_INDEXES = Object.freeze({
+  RED: 0,
+  GREEN: 1,
+  BLUE: 2
+});
+var GEOMETRY_UV_INDEXES = Object.freeze({ U: 0, V: 1 });
+var GEOMETRY_TRIANGLE_INDEXES = Object.freeze({
+  FIRST: 0,
+  SECOND: 1,
+  THIRD: 2
+});
+var GEOMETRY_GRID = Object.freeze({
+  VERTEX_INCREMENT: 1,
+  NEXT_VERTEX_OFFSET: 1,
+  CENTER_OFFSET: 0.5
+});
+var GEOMETRY_UV = Object.freeze({ CENTER: 0.5, V_FLIP_BASE: 1 });
+var GEOMETRY_SIZES = Object.freeze({
+  HALF_SIZE_DIVISOR: 2,
+  DOUBLE_SIZE_MULTIPLIER: 2
+});
+var GEOMETRY_ANGLES = Object.freeze({ FULL_TURN: Math.PI * 2 });
+var GEOMETRY_DEFAULTS = Object.freeze({
+  COLORS: null,
+  UVS: null,
+  NORMALS: null,
+  WIREFRAME_INDICES: null,
+  CAPPED: true
+});
+var GEOMETRY_DEFAULT_VERTEX_COLOR = Object.freeze([1, 1, 1]);
+var DEFAULT_VERTEX_COLOR = new Float32Array(GEOMETRY_DEFAULT_VERTEX_COLOR);
+var GEOMETRY_BUFFER_LAYOUT = Object.freeze({
+  POSITION_ATTRIBUTE_LOCATION: 0,
+  COLOR_ATTRIBUTE_LOCATION: 1,
+  UV_ATTRIBUTE_LOCATION: 2,
+  ATTRIBUTE_NORMALIZED: false,
+  ATTRIBUTE_NO_STRIDE: 0,
+  ATTRIBUTE_NO_OFFSET: 0,
+  NORMAL_ATTRIBUTE_LOCATION: 3,
+  MODULO_ALIGNED_VALUE: 0,
+  POSITION_START_INDEX: 0,
+  EMPTY_BOUND_COMPONENT: 0,
+  BOUND_MIN_INIT: Number.POSITIVE_INFINITY,
+  BOUND_MAX_INIT: Number.NEGATIVE_INFINITY
+});
+var GEOMETRY_ERRORS = Object.freeze({
+  INVALID_PRIMITIVE: "Geometry expects the primitive options to use known primitive constants."
+});
 var PRIMITIVE_TRIANGLES = "triangles";
 var PRIMITIVE_LINES = "lines";
 var PRIMITIVE_LINE_STRIP = "line_strip";
 var PRIMITIVE_LINE_LOOP = "line_loop";
 var PRIMITIVE_POINTS = "points";
-var DEFAULT_SOLID_PRIMITIVE = PRIMITIVE_TRIANGLES;
-var DEFAULT_WIREFRAME_PRIMITIVE = PRIMITIVE_LINES;
-var MIN_LINE_STRIP_INDEX_COUNT = 2;
+var GEOMETRY_PRIMITIVE_DEFAULTS = Object.freeze({
+  SOLID_PRIMITIVE: PRIMITIVE_TRIANGLES,
+  WIREFRAME_PRIMITIVE: PRIMITIVE_LINES
+});
+var GEOMETRY_LIMITS = Object.freeze({ MIN_LINE_STRIP_INDEX_COUNT: 2 });
 var SUPPORTED_PRIMITIVES = /* @__PURE__ */ new Set([
   PRIMITIVE_TRIANGLES,
   PRIMITIVE_LINES,
@@ -1813,7 +2085,8 @@ var SUPPORTED_PRIMITIVES = /* @__PURE__ */ new Set([
   PRIMITIVE_LINE_LOOP,
   PRIMITIVE_POINTS
 ]);
-var ERROR_INVALID_PRIMITIVE = "`Geometry` expects the primitive options to use known primitive constants.";
+
+// core/geometry/geometry.js
 var Geometry = class _Geometry {
   /**
    * WebGL2 rendering context used to create and manage GPU resources.
@@ -1950,29 +2223,29 @@ var Geometry = class _Geometry {
    */
   constructor(webglContext, positions, colors, indicesSolid, indicesWireframe, uvs = null, normals = null, options = null) {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
-      throw new TypeError("`Geometry` expects a `WebGL2RenderingContext`.");
+      throw new TypeError("Geometry expects a WebGL2RenderingContext.");
     }
     if (!(positions instanceof Float32Array)) {
-      throw new TypeError("`Geometry` expects positions as `Float32Array`.");
+      throw new TypeError("Geometry expects positions as Float32Array.");
     }
     if (colors !== null && !(colors instanceof Float32Array)) {
-      throw new TypeError("`Geometry` expects colors as `Float32Array` or null.");
+      throw new TypeError("Geometry expects colors as Float32Array or null.");
     }
     if (uvs !== null && !(uvs instanceof Float32Array)) {
-      throw new TypeError("`Geometry` expects uvs as `Float32Array` or null.");
+      throw new TypeError("Geometry expects uvs as Float32Array or null.");
     }
     if (normals !== null && !(normals instanceof Float32Array)) {
-      throw new TypeError("`Geometry` expects normals as `Float32Array` or null.");
+      throw new TypeError("Geometry expects normals as Float32Array or null.");
     }
     if (!_Geometry.#isSupportedIndexArray(indicesSolid) || !_Geometry.#isSupportedIndexArray(indicesWireframe)) {
-      throw new TypeError("`Geometry` expects indices as `Uint16Array` or `Uint32Array`.");
+      throw new TypeError("Geometry expects indices as Uint16Array or Uint32Array.");
     }
-    if (options !== null && (typeof options !== "object" || Array.isArray(options))) {
-      throw new TypeError("`Geometry` expects `options` as a plain object or null.");
+    if (options !== null && (typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options))) {
+      throw new TypeError("Geometry expects options as a plain object or null.");
     }
     const {
-      solidPrimitive = DEFAULT_SOLID_PRIMITIVE,
-      wireframePrimitive = DEFAULT_WIREFRAME_PRIMITIVE
+      solidPrimitive = GEOMETRY_PRIMITIVE_DEFAULTS.SOLID_PRIMITIVE,
+      wireframePrimitive = GEOMETRY_PRIMITIVE_DEFAULTS.WIREFRAME_PRIMITIVE
     } = options || {};
     _Geometry.#assertPrimitiveName(solidPrimitive);
     _Geometry.#assertPrimitiveName(wireframePrimitive);
@@ -1990,8 +2263,8 @@ var Geometry = class _Geometry {
     this.#normalBuffer = normals ? this.#createStaticArrayBuffer(normals) : null;
     this.#indexBufferSolid = this.#createIndexBuffer(indicesSolid);
     this.#indexBufferWireframe = this.#createIndexBuffer(indicesWireframe);
-    this.#boundingBoxMin = new Float32Array(BOUNDING_BOX_COMPONENT_COUNT);
-    this.#boundingBoxMax = new Float32Array(BOUNDING_BOX_COMPONENT_COUNT);
+    this.#boundingBoxMin = new Float32Array(GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT);
+    this.#boundingBoxMax = new Float32Array(GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT);
     this.#solidPrimitive = solidPrimitive;
     this.#wireframePrimitive = wireframePrimitive;
     _Geometry.#writeBoundingBox(positions, this.#boundingBoxMin, this.#boundingBoxMax);
@@ -2113,7 +2386,7 @@ var Geometry = class _Geometry {
   #createStaticArrayBuffer(data) {
     const buffer = this.#webglContext.createBuffer();
     if (!buffer) {
-      throw new Error("Failed to create `ARRAY_BUFFER`.");
+      throw new Error("Failed to create ARRAY_BUFFER.");
     }
     this.#webglContext.bindBuffer(this.#webglContext.ARRAY_BUFFER, buffer);
     this.#webglContext.bufferData(this.#webglContext.ARRAY_BUFFER, data, this.#webglContext.STATIC_DRAW);
@@ -2129,10 +2402,7 @@ var Geometry = class _Geometry {
   #createIndexBuffer(indices) {
     const buffer = this.#webglContext.createBuffer();
     if (!buffer) {
-      throw new Error("Failed to create `ELEMENT_ARRAY_BUFFER`.");
-    }
-    if (!_Geometry.#isSupportedIndexArray(indices)) {
-      throw new TypeError("`Geometry` expects indices as `Uint16Array` or `Uint32Array`.");
+      throw new Error("Failed to create ELEMENT_ARRAY_BUFFER.");
     }
     this.#webglContext.bindBuffer(this.#webglContext.ELEMENT_ARRAY_BUFFER, buffer);
     this.#webglContext.bufferData(this.#webglContext.ELEMENT_ARRAY_BUFFER, indices, this.#webglContext.STATIC_DRAW);
@@ -2169,33 +2439,33 @@ var Geometry = class _Geometry {
    * @private
    */
   #validateAttributeSizes(positions, colors, uvs, normals) {
-    if (positions.length % POSITION_COMPONENT_COUNT !== MODULO_ALIGNED_VALUE) {
-      throw new Error("Geometry positions length must be a multiple of `POSITION_COMPONENT_COUNT`.");
+    if (positions.length % GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT !== GEOMETRY_BUFFER_LAYOUT.MODULO_ALIGNED_VALUE) {
+      throw new Error("Geometry positions length must be a multiple of POSITION_COMPONENT_COUNT.");
     }
-    const vertexCount = positions.length / POSITION_COMPONENT_COUNT;
+    const vertexCount = positions.length / GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
     if (colors !== null) {
-      if (colors.length % COLOR_COMPONENT_COUNT !== MODULO_ALIGNED_VALUE) {
-        throw new Error("Geometry colors length must be a multiple of `COLOR_COMPONENT_COUNT`.");
+      if (colors.length % GEOMETRY_LAYOUT.COLOR_COMPONENT_COUNT !== GEOMETRY_BUFFER_LAYOUT.MODULO_ALIGNED_VALUE) {
+        throw new Error("Geometry colors length must be a multiple of COLOR_COMPONENT_COUNT.");
       }
-      const colorVertexCount = colors.length / COLOR_COMPONENT_COUNT;
+      const colorVertexCount = colors.length / GEOMETRY_LAYOUT.COLOR_COMPONENT_COUNT;
       if (colorVertexCount !== vertexCount) {
         throw new Error("Geometry colors vertex count must match positions vertex count.");
       }
     }
     if (uvs !== null) {
-      if (uvs.length % UV_COMPONENT_COUNT !== MODULO_ALIGNED_VALUE) {
-        throw new Error("Geometry uvs length must be a multiple of `UV_COMPONENT_COUNT`.");
+      if (uvs.length % GEOMETRY_LAYOUT.UV_COMPONENT_COUNT !== GEOMETRY_BUFFER_LAYOUT.MODULO_ALIGNED_VALUE) {
+        throw new Error("Geometry uvs length must be a multiple of UV_COMPONENT_COUNT.");
       }
-      const uvVertexCount = uvs.length / UV_COMPONENT_COUNT;
+      const uvVertexCount = uvs.length / GEOMETRY_LAYOUT.UV_COMPONENT_COUNT;
       if (uvVertexCount !== vertexCount) {
         throw new Error("Geometry uvs vertex count must match positions vertex count.");
       }
     }
     if (normals !== null) {
-      if (normals.length % NORMAL_COMPONENT_COUNT !== MODULO_ALIGNED_VALUE) {
-        throw new Error("Geometry normals length must be a multiple of `NORMAL_COMPONENT_COUNT`.");
+      if (normals.length % GEOMETRY_LAYOUT.NORMAL_COMPONENT_COUNT !== GEOMETRY_BUFFER_LAYOUT.MODULO_ALIGNED_VALUE) {
+        throw new Error("Geometry normals length must be a multiple of NORMAL_COMPONENT_COUNT.");
       }
-      const normalVertexCount = normals.length / NORMAL_COMPONENT_COUNT;
+      const normalVertexCount = normals.length / GEOMETRY_LAYOUT.NORMAL_COMPONENT_COUNT;
       if (normalVertexCount !== vertexCount) {
         throw new Error("Geometry normals vertex count must match positions vertex count.");
       }
@@ -2223,25 +2493,25 @@ var Geometry = class _Geometry {
   static #validateIndexSizeForPrimitive(indices, primitive, label) {
     switch (primitive) {
       case PRIMITIVE_TRIANGLES:
-        if (indices.length % TRIANGLE_INDEX_COMPONENT_COUNT !== MODULO_ALIGNED_VALUE) {
+        if (indices.length % GEOMETRY_LAYOUT.TRIANGLE_INDEX_COUNT !== GEOMETRY_BUFFER_LAYOUT.MODULO_ALIGNED_VALUE) {
           throw new Error(`Geometry ${label} indices length must be a multiple of TRIANGLE_INDEX_COMPONENT_COUNT.`);
         }
         return;
       case PRIMITIVE_LINES:
-        if (indices.length % LINE_INDEX_COMPONENT_COUNT !== MODULO_ALIGNED_VALUE) {
+        if (indices.length % GEOMETRY_LAYOUT.LINE_INDEX_COUNT !== GEOMETRY_BUFFER_LAYOUT.MODULO_ALIGNED_VALUE) {
           throw new Error(`Geometry ${label} indices length must be a multiple of LINE_INDEX_COMPONENT_COUNT.`);
         }
         return;
       case PRIMITIVE_LINE_STRIP:
       case PRIMITIVE_LINE_LOOP:
-        if (indices.length < MIN_LINE_STRIP_INDEX_COUNT) {
-          throw new Error(`Geometry ${label} indices length must be at least ${MIN_LINE_STRIP_INDEX_COUNT}.`);
+        if (indices.length < GEOMETRY_LIMITS.MIN_LINE_STRIP_INDEX_COUNT) {
+          throw new Error(`Geometry ${label} indices length must be at least ${GEOMETRY_LIMITS.MIN_LINE_STRIP_INDEX_COUNT}.`);
         }
         return;
       case PRIMITIVE_POINTS:
         return;
       default:
-        throw new Error(ERROR_INVALID_PRIMITIVE);
+        throw new Error(GEOMETRY_ERRORS.INVALID_PRIMITIVE);
     }
   }
   /**
@@ -2251,8 +2521,8 @@ var Geometry = class _Geometry {
    * @private
    */
   static #assertPrimitiveName(value) {
-    if (typeof value !== "string" || !SUPPORTED_PRIMITIVES.has(value)) {
-      throw new TypeError(ERROR_INVALID_PRIMITIVE);
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.STRING || !SUPPORTED_PRIMITIVES.has(value)) {
+      throw new TypeError(GEOMETRY_ERRORS.INVALID_PRIMITIVE);
     }
   }
   /**
@@ -2264,34 +2534,25 @@ var Geometry = class _Geometry {
    * @private
    */
   static #writeBoundingBox(positions, outMin, outMax) {
-    if (!(positions instanceof Float32Array)) {
-      throw new TypeError(ERROR_BOUNDING_BOX_POSITIONS_TYPE);
-    }
-    if (!(outMin instanceof Float32Array) || outMin.length !== BOUNDING_BOX_COMPONENT_COUNT) {
-      throw new TypeError(ERROR_BOUNDING_BOX_MIN_TYPE);
-    }
-    if (!(outMax instanceof Float32Array) || outMax.length !== BOUNDING_BOX_COMPONENT_COUNT) {
-      throw new TypeError(ERROR_BOUNDING_BOX_MAX_TYPE);
-    }
-    if (positions.length === POSITION_START_INDEX) {
-      outMin[POSITION_X_OFFSET] = EMPTY_BOUND_COMPONENT;
-      outMin[POSITION_Y_OFFSET] = EMPTY_BOUND_COMPONENT;
-      outMin[POSITION_Z_OFFSET] = EMPTY_BOUND_COMPONENT;
-      outMax[POSITION_X_OFFSET] = EMPTY_BOUND_COMPONENT;
-      outMax[POSITION_Y_OFFSET] = EMPTY_BOUND_COMPONENT;
-      outMax[POSITION_Z_OFFSET] = EMPTY_BOUND_COMPONENT;
+    if (positions.length === GEOMETRY_BUFFER_LAYOUT.POSITION_START_INDEX) {
+      outMin[MATH_VECTOR3_INDEXES.X] = GEOMETRY_BUFFER_LAYOUT.EMPTY_BOUND_COMPONENT;
+      outMin[MATH_VECTOR3_INDEXES.Y] = GEOMETRY_BUFFER_LAYOUT.EMPTY_BOUND_COMPONENT;
+      outMin[MATH_VECTOR3_INDEXES.Z] = GEOMETRY_BUFFER_LAYOUT.EMPTY_BOUND_COMPONENT;
+      outMax[MATH_VECTOR3_INDEXES.X] = GEOMETRY_BUFFER_LAYOUT.EMPTY_BOUND_COMPONENT;
+      outMax[MATH_VECTOR3_INDEXES.Y] = GEOMETRY_BUFFER_LAYOUT.EMPTY_BOUND_COMPONENT;
+      outMax[MATH_VECTOR3_INDEXES.Z] = GEOMETRY_BUFFER_LAYOUT.EMPTY_BOUND_COMPONENT;
       return;
     }
-    let minX = BOUND_MIN_INIT;
-    let minY = BOUND_MIN_INIT;
-    let minZ = BOUND_MIN_INIT;
-    let maxX = BOUND_MAX_INIT;
-    let maxY = BOUND_MAX_INIT;
-    let maxZ = BOUND_MAX_INIT;
-    for (let index = POSITION_START_INDEX; index < positions.length; index += POSITION_COMPONENT_COUNT) {
-      const x = positions[index + POSITION_X_OFFSET];
-      const y = positions[index + POSITION_Y_OFFSET];
-      const z = positions[index + POSITION_Z_OFFSET];
+    let minX = GEOMETRY_BUFFER_LAYOUT.BOUND_MIN_INIT;
+    let minY = GEOMETRY_BUFFER_LAYOUT.BOUND_MIN_INIT;
+    let minZ = GEOMETRY_BUFFER_LAYOUT.BOUND_MIN_INIT;
+    let maxX = GEOMETRY_BUFFER_LAYOUT.BOUND_MAX_INIT;
+    let maxY = GEOMETRY_BUFFER_LAYOUT.BOUND_MAX_INIT;
+    let maxZ = GEOMETRY_BUFFER_LAYOUT.BOUND_MAX_INIT;
+    for (let index = GEOMETRY_BUFFER_LAYOUT.POSITION_START_INDEX; index < positions.length; index += GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT) {
+      const x = positions[index + MATH_VECTOR3_INDEXES.X];
+      const y = positions[index + MATH_VECTOR3_INDEXES.Y];
+      const z = positions[index + MATH_VECTOR3_INDEXES.Z];
       if (x < minX) {
         minX = x;
       }
@@ -2311,12 +2572,12 @@ var Geometry = class _Geometry {
         maxZ = z;
       }
     }
-    outMin[POSITION_X_OFFSET] = minX;
-    outMin[POSITION_Y_OFFSET] = minY;
-    outMin[POSITION_Z_OFFSET] = minZ;
-    outMax[POSITION_X_OFFSET] = maxX;
-    outMax[POSITION_Y_OFFSET] = maxY;
-    outMax[POSITION_Z_OFFSET] = maxZ;
+    outMin[MATH_VECTOR3_INDEXES.X] = minX;
+    outMin[MATH_VECTOR3_INDEXES.Y] = minY;
+    outMin[MATH_VECTOR3_INDEXES.Z] = minZ;
+    outMax[MATH_VECTOR3_INDEXES.X] = maxX;
+    outMax[MATH_VECTOR3_INDEXES.Y] = maxY;
+    outMax[MATH_VECTOR3_INDEXES.Z] = maxZ;
   }
   /**
    * Configures the VAO with position (and optional color/uv) attribute pointers.
@@ -2326,54 +2587,55 @@ var Geometry = class _Geometry {
   #configureVertexArray() {
     const webglContext = this.#webglContext;
     webglContext.bindVertexArray(this.#vertexArrayObject);
-    webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#positionBuffer);
-    webglContext.enableVertexAttribArray(POSITION_ATTRIBUTE_LOCATION);
-    webglContext.vertexAttribPointer(
-      POSITION_ATTRIBUTE_LOCATION,
-      POSITION_COMPONENT_COUNT,
-      webglContext.FLOAT,
-      ATTRIBUTE_NORMALIZED,
-      ATTRIBUTE_NO_STRIDE,
-      ATTRIBUTE_NO_OFFSET
+    this.#configureAttribute(
+      this.#positionBuffer,
+      GEOMETRY_BUFFER_LAYOUT.POSITION_ATTRIBUTE_LOCATION,
+      GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT
     );
     if (this.#colorBuffer) {
-      webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#colorBuffer);
-      webglContext.enableVertexAttribArray(COLOR_ATTRIBUTE_LOCATION);
-      webglContext.vertexAttribPointer(
-        COLOR_ATTRIBUTE_LOCATION,
-        COLOR_COMPONENT_COUNT,
-        webglContext.FLOAT,
-        ATTRIBUTE_NORMALIZED,
-        ATTRIBUTE_NO_STRIDE,
-        ATTRIBUTE_NO_OFFSET
+      this.#configureAttribute(
+        this.#colorBuffer,
+        GEOMETRY_BUFFER_LAYOUT.COLOR_ATTRIBUTE_LOCATION,
+        GEOMETRY_LAYOUT.COLOR_COMPONENT_COUNT
       );
     }
     if (this.#uvBuffer) {
-      webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#uvBuffer);
-      webglContext.enableVertexAttribArray(UV_ATTRIBUTE_LOCATION);
-      webglContext.vertexAttribPointer(
-        UV_ATTRIBUTE_LOCATION,
-        UV_COMPONENT_COUNT,
-        webglContext.FLOAT,
-        ATTRIBUTE_NORMALIZED,
-        ATTRIBUTE_NO_STRIDE,
-        ATTRIBUTE_NO_OFFSET
+      this.#configureAttribute(
+        this.#uvBuffer,
+        GEOMETRY_BUFFER_LAYOUT.UV_ATTRIBUTE_LOCATION,
+        GEOMETRY_LAYOUT.UV_COMPONENT_COUNT
       );
     }
     if (this.#normalBuffer) {
-      webglContext.bindBuffer(webglContext.ARRAY_BUFFER, this.#normalBuffer);
-      webglContext.enableVertexAttribArray(NORMAL_ATTRIBUTE_LOCATION);
-      webglContext.vertexAttribPointer(
-        NORMAL_ATTRIBUTE_LOCATION,
-        NORMAL_COMPONENT_COUNT,
-        webglContext.FLOAT,
-        ATTRIBUTE_NORMALIZED,
-        ATTRIBUTE_NO_STRIDE,
-        ATTRIBUTE_NO_OFFSET
+      this.#configureAttribute(
+        this.#normalBuffer,
+        GEOMETRY_BUFFER_LAYOUT.NORMAL_ATTRIBUTE_LOCATION,
+        GEOMETRY_LAYOUT.NORMAL_COMPONENT_COUNT
       );
     }
     webglContext.bindBuffer(webglContext.ELEMENT_ARRAY_BUFFER, this.#indexBufferSolid);
     webglContext.bindVertexArray(null);
+  }
+  /**
+   * Connects one vertex buffer to its attribute location in the current VAO.
+   *
+   * @param {WebGLBuffer} buffer    - Attribute buffer.
+   * @param {number} location       - Shader attribute location.
+   * @param {number} componentCount - Components per vertex.
+   * @private
+   */
+  #configureAttribute(buffer, location, componentCount) {
+    const webglContext = this.#webglContext;
+    webglContext.bindBuffer(webglContext.ARRAY_BUFFER, buffer);
+    webglContext.enableVertexAttribArray(location);
+    webglContext.vertexAttribPointer(
+      location,
+      componentCount,
+      webglContext.FLOAT,
+      GEOMETRY_BUFFER_LAYOUT.ATTRIBUTE_NORMALIZED,
+      GEOMETRY_BUFFER_LAYOUT.ATTRIBUTE_NO_STRIDE,
+      GEOMETRY_BUFFER_LAYOUT.ATTRIBUTE_NO_OFFSET
+    );
   }
   /**
    * @private
@@ -2385,139 +2647,278 @@ var Geometry = class _Geometry {
   }
 };
 
-// core/geometry/geometry-utils.js
-var DEFAULT_VERTEX_COLOR = new Float32Array([1, 1, 1]);
-var COLOR_COMPONENT_COUNT2 = 3;
-var DEFAULT_EXPECTED_PER_VERTEX_COLOR_LENGTH = 0;
-var AUTO_EXPECTED_PER_VERTEX_COLOR_LENGTH = 0;
-var MAX_UINT16_INDEX_VALUE = 65535;
-var VERTEX_COUNT_TO_MAX_INDEX_OFFSET = 1;
-var MIN_VERTEX_COUNT = 0;
-var FIRST_VERTEX_INDEX = 0;
-var SEQUENTIAL_INDEX_INCREMENT = 1;
-var TRIANGLE_INDEX_STRIDE = 3;
-var EDGE_KEY_SEPARATOR = ",";
-function createColorsFromSpec(vertexCount, colors, expectedPerVertexLength = DEFAULT_EXPECTED_PER_VERTEX_COLOR_LENGTH) {
-  if (!(colors instanceof Float32Array)) {
-    throw new TypeError("`createColorsFromSpec` expects colors as a `Float32Array`.");
-  }
-  const perVertexLength = expectedPerVertexLength > AUTO_EXPECTED_PER_VERTEX_COLOR_LENGTH ? expectedPerVertexLength : vertexCount * COLOR_COMPONENT_COUNT2;
-  if (colors.length === COLOR_COMPONENT_COUNT2) {
-    const colorBuffer = new Float32Array(perVertexLength);
-    for (let i = 0; i < vertexCount; i += 1) {
-      const baseIndex = i * COLOR_COMPONENT_COUNT2;
-      colorBuffer[baseIndex + 0] = colors[0];
-      colorBuffer[baseIndex + 1] = colors[1];
-      colorBuffer[baseIndex + 2] = colors[2];
-    }
-    return colorBuffer;
-  }
-  if (colors.length === perVertexLength) {
-    return colors;
-  }
-  throw new TypeError(
-    "`createColorsFromSpec` expects `colors` length to be `{uniform}` (uniform) or `{vertex}` (per-vertex).".replace("{uniform}", String(COLOR_COMPONENT_COUNT2)).replace("{vertex}", String(perVertexLength))
-  );
-}
-function createIndexArray(vertexCount, indices) {
-  if (!Array.isArray(indices)) {
-    throw new TypeError("`createIndexArray` expects indices as an array of numbers.");
-  }
-  const requiresUint32 = vertexCount - VERTEX_COUNT_TO_MAX_INDEX_OFFSET > MAX_UINT16_INDEX_VALUE;
-  if (requiresUint32) {
-    return new Uint32Array(indices);
-  }
-  return new Uint16Array(indices);
-}
-function createSequentialIndexArray(vertexCount) {
-  if (typeof vertexCount !== "number" || !Number.isFinite(vertexCount)) {
-    throw new TypeError("`createSequentialIndexArray` expects `vertexCount` as a finite number.");
-  }
-  if (!Number.isInteger(vertexCount) || vertexCount < MIN_VERTEX_COUNT) {
-    throw new RangeError("`createSequentialIndexArray` expects `vertexCount` as a non-negative integer.");
-  }
-  if (vertexCount === MIN_VERTEX_COUNT) {
-    return new Uint16Array(MIN_VERTEX_COUNT);
-  }
-  const requiresUint32 = vertexCount - VERTEX_COUNT_TO_MAX_INDEX_OFFSET > MAX_UINT16_INDEX_VALUE;
-  const indexArray = requiresUint32 ? new Uint32Array(vertexCount) : new Uint16Array(vertexCount);
-  for (let index = FIRST_VERTEX_INDEX; index < vertexCount; index += SEQUENTIAL_INDEX_INCREMENT) {
-    indexArray[index] = index;
-  }
-  return indexArray;
-}
-function createWireframeIndicesFromSolidIndices(vertexCount, triangleIndices) {
-  if (!(triangleIndices instanceof Uint16Array) && !(triangleIndices instanceof Uint32Array)) {
-    throw new TypeError("`createWireframeIndicesFromSolidIndices` expects indices as `Uint16Array` or `Uint32Array`.");
-  }
-  const edgeSet = /* @__PURE__ */ new Set();
-  const lines = [];
-  for (let i = 0; i < triangleIndices.length; i += TRIANGLE_INDEX_STRIDE) {
-    const firstVertexIndex = triangleIndices[i + 0];
-    const secondVertexIndex = triangleIndices[i + 1];
-    const thirdVertexIndex = triangleIndices[i + 2];
-    addEdge(edgeSet, lines, firstVertexIndex, secondVertexIndex);
-    addEdge(edgeSet, lines, secondVertexIndex, thirdVertexIndex);
-    addEdge(edgeSet, lines, thirdVertexIndex, firstVertexIndex);
-  }
-  return createIndexArray(vertexCount, lines);
-}
-function addEdge(edgeSet, lines, indexA, indexB) {
-  const minVertexIndex = Math.min(indexA, indexB);
-  const maxVertexIndex = Math.max(indexA, indexB);
-  const edgeKey = String(minVertexIndex) + EDGE_KEY_SEPARATOR + String(maxVertexIndex);
-  if (edgeSet.has(edgeKey)) {
-    return;
-  }
-  edgeSet.add(edgeKey);
-  lines.push(minVertexIndex, maxVertexIndex);
-}
-
-// core/geometry/custom-geometry.js
-var DEFAULT_WIREFRAME_INDICES = null;
-var DEFAULT_COLORS = null;
-var DEFAULT_UVS = null;
-var DEFAULT_NORMALS = null;
-var POSITION_COMPONENT_COUNT2 = 3;
-var ZERO_VALUE4 = 0;
-var CustomGeometry = class _CustomGeometry extends Geometry {
+// core/geometry/generated-geometry.js
+var GeneratedGeometry = class extends Geometry {
   /**
    * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
-   * @param {CustomGeometryOptions} options       - Geometry buffers.
+   * @param {...*} args                           - Arguments passed to the subclass generator.
    */
-  constructor(webglContext, options = {}) {
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError("`CustomGeometry` expects options as a plain object.");
+  constructor(webglContext, ...args) {
+    const data = new.target.createGeometryData(...args);
+    super(
+      webglContext,
+      data.positions,
+      data.colors,
+      data.indicesSolid,
+      data.indicesWireframe,
+      data.uvs,
+      data.normals,
+      data.primitiveOptions
+    );
+  }
+  /**
+   * Generates CPU buffers before any GPU resources are created.
+   * Subclasses define their own input arguments.
+   *
+   * @returns {GeneratedGeometryData} - Buffers passed to `Geometry`.
+   * @throws {Error} When a subclass has not implemented the generator.
+   * @abstract
+   * @protected
+   */
+  static createGeometryData() {
+    throw new Error("GeneratedGeometry.createGeometryData must be implemented by a subclass.");
+  }
+};
+
+// core/constants/geometry-utils.js
+var GEOMETRY_COLORS = Object.freeze({
+  COMPONENT_COUNT: GEOMETRY_LAYOUT.COLOR_COMPONENT_COUNT,
+  AUTO_LENGTH: 0
+});
+var GEOMETRY_INDICES = Object.freeze({
+  MAX_UINT16_INDEX_VALUE: 65535,
+  VERTEX_COUNT_TO_MAX_INDEX_OFFSET: 1,
+  MIN_VERTEX_COUNT: 0,
+  FIRST_VERTEX_INDEX: 0,
+  SEQUENTIAL_INDEX_INCREMENT: 1,
+  TRIANGLE_INDEX_STRIDE: GEOMETRY_LAYOUT.TRIANGLE_INDEX_COUNT
+});
+var GEOMETRY_EDGE_KEY_SEPARATOR = ",";
+
+// core/geometry/geometry-utils.js
+var GeometryUtils = class _GeometryUtils {
+  /**
+   * Creates a per-vertex RGB buffer from a uniform color or an existing color buffer.
+   * A positive `expectedPerVertexLength` overrides the length derived from `vertexCount`.
+   *
+   * @param {number} vertexCount                   - Total vertex count.
+   * @param {Float32Array} colors                  - Uniform RGB color or per-vertex colors.
+   * @param {number} [expectedPerVertexLength = 0] - Optional explicit expected buffer length.
+   * @returns {Float32Array}                       - A new uniform-color buffer or the supplied per-vertex buffer.
+   * @throws {TypeError}                             When colors have an unsupported type or length.
+   */
+  static createColorsFromSpec(vertexCount, colors, expectedPerVertexLength = GEOMETRY_COLORS.AUTO_LENGTH) {
+    if (!(colors instanceof Float32Array)) {
+      throw new TypeError("GeometryUtils.createColorsFromSpec expects colors as a Float32Array.");
+    }
+    const colorConstants = GEOMETRY_COLORS;
+    const colorIndexes = GEOMETRY_COLOR_INDEXES;
+    const indexConstants = GEOMETRY_INDICES;
+    const perVertexLength = expectedPerVertexLength > colorConstants.AUTO_LENGTH ? expectedPerVertexLength : vertexCount * colorConstants.COMPONENT_COUNT;
+    if (colors.length === colorConstants.COMPONENT_COUNT) {
+      const colorBuffer = new Float32Array(perVertexLength);
+      for (let index = indexConstants.FIRST_VERTEX_INDEX; index < vertexCount; index += indexConstants.SEQUENTIAL_INDEX_INCREMENT) {
+        const baseIndex = index * colorConstants.COMPONENT_COUNT;
+        colorBuffer[baseIndex + colorIndexes.RED] = colors[colorIndexes.RED];
+        colorBuffer[baseIndex + colorIndexes.GREEN] = colors[colorIndexes.GREEN];
+        colorBuffer[baseIndex + colorIndexes.BLUE] = colors[colorIndexes.BLUE];
+      }
+      return colorBuffer;
+    }
+    if (colors.length === perVertexLength) {
+      return colors;
+    }
+    throw new TypeError(
+      "GeometryUtils.createColorsFromSpec expects colors length to be {uniform} (uniform) or {vertex} (per-vertex).".replace("{uniform}", String(colorConstants.COMPONENT_COUNT)).replace("{vertex}", String(perVertexLength))
+    );
+  }
+  /**
+   * Creates an index buffer using the smallest type required by the vertex count.
+   * The largest vertex index is `vertexCount - 1`.
+   *
+   * @param {number} vertexCount          - Total vertex count.
+   * @param {number[]} indices            - Index list.
+   * @returns {Uint16Array | Uint32Array} - A new typed index buffer.
+   * @throws {TypeError}                    When indices are not an ordinary array.
+   */
+  static createIndexArray(vertexCount, indices) {
+    if (!Array.isArray(indices)) {
+      throw new TypeError("GeometryUtils.createIndexArray expects indices as an array of numbers.");
+    }
+    const indexConstants = GEOMETRY_INDICES;
+    const requiresUint32 = vertexCount - indexConstants.VERTEX_COUNT_TO_MAX_INDEX_OFFSET > indexConstants.MAX_UINT16_INDEX_VALUE;
+    if (requiresUint32) {
+      return new Uint32Array(indices);
+    }
+    return new Uint16Array(indices);
+  }
+  /**
+   * Creates a sequential index buffer without an intermediate JavaScript array.
+   * The buffer contains every vertex index, from zero through `vertexCount - 1`.
+   *
+   * @param {number} vertexCount          - Total vertex count.
+   * @returns {Uint16Array | Uint32Array} - A new sequential index buffer.
+   * @throws {TypeError}                    When `vertexCount` is not a finite number.
+   * @throws {RangeError}                   When `vertexCount` is negative or non-integer.
+   */
+  static createSequentialIndexArray(vertexCount) {
+    if (typeof vertexCount !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(vertexCount)) {
+      throw new TypeError("GeometryUtils.createSequentialIndexArray expects vertexCount as a finite number.");
+    }
+    const indexConstants = GEOMETRY_INDICES;
+    if (!Number.isInteger(vertexCount) || vertexCount < indexConstants.MIN_VERTEX_COUNT) {
+      throw new RangeError("GeometryUtils.createSequentialIndexArray expects vertexCount as a non-negative integer.");
+    }
+    if (vertexCount === indexConstants.MIN_VERTEX_COUNT) {
+      return new Uint16Array(indexConstants.MIN_VERTEX_COUNT);
+    }
+    const requiresUint32 = vertexCount - indexConstants.VERTEX_COUNT_TO_MAX_INDEX_OFFSET > indexConstants.MAX_UINT16_INDEX_VALUE;
+    const indexArray = requiresUint32 ? new Uint32Array(vertexCount) : new Uint16Array(vertexCount);
+    for (let index = indexConstants.FIRST_VERTEX_INDEX; index < vertexCount; index += indexConstants.SEQUENTIAL_INDEX_INCREMENT) {
+      indexArray[index] = index;
+    }
+    return indexArray;
+  }
+  /**
+   * Creates a wireframe line index buffer from a solid triangle index buffer.
+   * Shared edges are included once, regardless of their direction in each triangle.
+   *
+   * @param {number} vertexCount                        - Total vertex count.
+   * @param {Uint16Array | Uint32Array} triangleIndices - Solid triangle indexes.
+   * @returns {Uint16Array | Uint32Array}               - Wireframe indexes, with two indexes per edge.
+   * @throws {TypeError}                                  When triangle indices have an unsupported type.
+   */
+  static createWireframeIndicesFromSolidIndices(vertexCount, triangleIndices) {
+    if (!(triangleIndices instanceof Uint16Array) && !(triangleIndices instanceof Uint32Array)) {
+      throw new TypeError("GeometryUtils.createWireframeIndicesFromSolidIndices expects indices as Uint16Array or Uint32Array.");
+    }
+    const indexConstants = GEOMETRY_INDICES;
+    const triangleIndexes = GEOMETRY_TRIANGLE_INDEXES;
+    const edgeSet = /* @__PURE__ */ new Set();
+    const lines = [];
+    for (let index = indexConstants.FIRST_VERTEX_INDEX; index < triangleIndices.length; index += indexConstants.TRIANGLE_INDEX_STRIDE) {
+      const firstVertexIndex = triangleIndices[index + triangleIndexes.FIRST];
+      const secondVertexIndex = triangleIndices[index + triangleIndexes.SECOND];
+      const thirdVertexIndex = triangleIndices[index + triangleIndexes.THIRD];
+      _GeometryUtils.#addEdge(edgeSet, lines, firstVertexIndex, secondVertexIndex);
+      _GeometryUtils.#addEdge(edgeSet, lines, secondVertexIndex, thirdVertexIndex);
+      _GeometryUtils.#addEdge(edgeSet, lines, thirdVertexIndex, firstVertexIndex);
+    }
+    return _GeometryUtils.createIndexArray(vertexCount, lines);
+  }
+  /**
+   * Floors a finite segment count and checks the minimum required by a geometry.
+   *
+   * @param {number} value        - Requested segment count.
+   * @param {string} optionName   - Option name included in errors.
+   * @param {number} minimumValue - Minimum supported count.
+   * @param {string} geometryName - Geometry class name included in errors.
+   * @returns {number}            - Validated integer segment count.
+   * @throws {TypeError}            When the value is not a finite number.
+   * @throws {RangeError}           When the rounded count is below the minimum.
+   */
+  static normalizeSegmentCount(value, optionName, minimumValue, geometryName) {
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+      throw new TypeError(`${geometryName} expects ${optionName} as a finite number.`);
+    }
+    const segmentCount = Math.floor(value);
+    if (segmentCount < minimumValue) {
+      throw new RangeError(`${geometryName} expects ${optionName} to be >= ${minimumValue}.`);
+    }
+    return segmentCount;
+  }
+  /**
+   * Adds an undirected edge to the line list, if it has not already been added.
+   * Stores the smaller vertex index first so reversed edges have the same key.
+   *
+   * @param {Set<string>} edgeSet - Keys of edges already added to the buffer.
+   * @param {number[]} lines      - Output line index list.
+   * @param {number} indexA       - First vertex index.
+   * @param {number} indexB       - Second vertex index.
+   * @private
+   */
+  static #addEdge(edgeSet, lines, indexA, indexB) {
+    const minVertexIndex = Math.min(indexA, indexB);
+    const maxVertexIndex = Math.max(indexA, indexB);
+    const edgeKey = String(minVertexIndex) + GEOMETRY_EDGE_KEY_SEPARATOR + String(maxVertexIndex);
+    if (edgeSet.has(edgeKey)) {
+      return;
+    }
+    edgeSet.add(edgeKey);
+    lines.push(minVertexIndex, maxVertexIndex);
+  }
+  /**
+   * Appends triangles for a rectangular vertex grid in row order.
+   * Dimensions and offsets come from normalized geometry options.
+   *
+   * @param {number[]} indices          - Output triangle indexes.
+   * @param {number} columnSegments     - Number of cells per row.
+   * @param {number} rowSegments        - Number of cell rows.
+   * @param {number} [vertexOffset = 0] - First vertex in the grid.
+   * @param {boolean} [reverse = false] - Whether to reverse each triangle's winding.
+   */
+  static appendGridTriangleIndices(indices, columnSegments, rowSegments, vertexOffset = GEOMETRY_INDICES.FIRST_VERTEX_INDEX, reverse = false) {
+    const firstIndex = GEOMETRY_INDICES.FIRST_VERTEX_INDEX;
+    const increment = GEOMETRY_INDICES.SEQUENTIAL_INDEX_INCREMENT;
+    const rowVertexCount = columnSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+    const nextOffset = GEOMETRY_GRID.NEXT_VERTEX_OFFSET;
+    for (let rowIndex = firstIndex; rowIndex < rowSegments; rowIndex += increment) {
+      for (let columnIndex = firstIndex; columnIndex < columnSegments; columnIndex += increment) {
+        const topLeft = vertexOffset + rowIndex * rowVertexCount + columnIndex;
+        const topRight = topLeft + nextOffset;
+        const bottomLeft = topLeft + rowVertexCount;
+        const bottomRight = bottomLeft + nextOffset;
+        if (reverse) {
+          indices.push(topLeft, topRight, bottomLeft);
+          indices.push(topRight, bottomRight, bottomLeft);
+        } else {
+          indices.push(topLeft, bottomLeft, topRight);
+          indices.push(topRight, bottomLeft, bottomRight);
+        }
+      }
+    }
+  }
+};
+
+// core/geometry/custom-geometry.js
+var CustomGeometry = class _CustomGeometry extends GeneratedGeometry {
+  /**
+   * @param {CustomGeometryOptions} options - Geometry buffers.
+   * @returns {GeneratedGeometryData}       - Generated CPU buffers.
+   * @protected
+   */
+  static createGeometryData(options = {}) {
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
+      throw new TypeError("CustomGeometry expects options as a plain object.");
     }
     const {
       positions,
       indices,
-      wireframeIndices = DEFAULT_WIREFRAME_INDICES,
-      colors = DEFAULT_COLORS,
-      uvs = DEFAULT_UVS,
-      normals = DEFAULT_NORMALS
+      wireframeIndices = GEOMETRY_DEFAULTS.WIREFRAME_INDICES,
+      colors = GEOMETRY_DEFAULTS.COLORS,
+      uvs = GEOMETRY_DEFAULTS.UVS,
+      normals = GEOMETRY_DEFAULTS.NORMALS
     } = options;
     if (!(positions instanceof Float32Array)) {
-      throw new TypeError("`CustomGeometry` expects `positions` as `Float32Array`.");
+      throw new TypeError("CustomGeometry expects positions as Float32Array.");
     }
-    if (positions.length % POSITION_COMPONENT_COUNT2 !== ZERO_VALUE4) {
-      throw new RangeError("`CustomGeometry` expects `positions` length to be a multiple of 3.");
+    if (positions.length % GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT !== MATH_COMMON_VALUES.ZERO) {
+      throw new RangeError("CustomGeometry expects positions length to be a multiple of 3.");
     }
-    const vertexCount = positions.length / POSITION_COMPONENT_COUNT2;
+    const vertexCount = positions.length / GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
     const solidIndexBuffer = _CustomGeometry.#normalizeIndices(vertexCount, indices, "indices");
     const wireIndexBuffer = _CustomGeometry.#normalizeWireframeIndices(vertexCount, solidIndexBuffer, wireframeIndices);
     const colorBuffer = _CustomGeometry.#normalizeColors(vertexCount, colors);
     const uvBuffer = _CustomGeometry.#normalizeOptionalFloat32Array(uvs, "uvs");
     const normalBuffer = _CustomGeometry.#normalizeOptionalFloat32Array(normals, "normals");
-    super(
-      webglContext,
+    return {
       positions,
-      colorBuffer,
-      solidIndexBuffer,
-      wireIndexBuffer,
-      uvBuffer,
-      normalBuffer
-    );
+      colors: colorBuffer,
+      indicesSolid: solidIndexBuffer,
+      indicesWireframe: wireIndexBuffer,
+      uvs: uvBuffer,
+      normals: normalBuffer
+    };
   }
   /**
    * Normalizes solid indices input to a typed array.
@@ -2530,12 +2931,12 @@ var CustomGeometry = class _CustomGeometry extends Geometry {
    */
   static #normalizeIndices(vertexCount, indices, optionName) {
     if (Array.isArray(indices)) {
-      return createIndexArray(vertexCount, indices);
+      return GeometryUtils.createIndexArray(vertexCount, indices);
     }
     if (indices instanceof Uint16Array || indices instanceof Uint32Array) {
       return indices;
     }
-    throw new TypeError(`\`CustomGeometry\` expects \`${optionName}\` as an array, Uint16Array or Uint32Array.`);
+    throw new TypeError(`CustomGeometry expects ${optionName} as an array, Uint16Array or Uint32Array.`);
   }
   /**
    * Normalizes wireframe indices input.
@@ -2548,15 +2949,15 @@ var CustomGeometry = class _CustomGeometry extends Geometry {
    */
   static #normalizeWireframeIndices(vertexCount, solidIndices, wireframeIndices) {
     if (wireframeIndices === null || wireframeIndices === void 0) {
-      return createWireframeIndicesFromSolidIndices(vertexCount, solidIndices);
+      return GeometryUtils.createWireframeIndicesFromSolidIndices(vertexCount, solidIndices);
     }
     if (Array.isArray(wireframeIndices)) {
-      return createIndexArray(vertexCount, wireframeIndices);
+      return GeometryUtils.createIndexArray(vertexCount, wireframeIndices);
     }
     if (wireframeIndices instanceof Uint16Array || wireframeIndices instanceof Uint32Array) {
       return wireframeIndices;
     }
-    throw new TypeError("`CustomGeometry` expects `wireframeIndices` as an array, `Uint16Array`, `Uint32Array` or null.");
+    throw new TypeError("CustomGeometry expects wireframeIndices as an array, Uint16Array, Uint32Array or null.");
   }
   /**
    * Normalizes optional colors input.
@@ -2571,9 +2972,9 @@ var CustomGeometry = class _CustomGeometry extends Geometry {
       return null;
     }
     if (!(colors instanceof Float32Array)) {
-      throw new TypeError("`CustomGeometry` expects `colors` as `Float32Array` or null.");
+      throw new TypeError("CustomGeometry expects colors as Float32Array or null.");
     }
-    return createColorsFromSpec(vertexCount, colors);
+    return GeometryUtils.createColorsFromSpec(vertexCount, colors);
   }
   /**
    * Normalizes optional float arrays.
@@ -2588,44 +2989,93 @@ var CustomGeometry = class _CustomGeometry extends Geometry {
       return null;
     }
     if (!(value instanceof Float32Array)) {
-      throw new TypeError(`\`CustomGeometry\` expects \`${optionName}\` as \`Float32Array\` or null.`);
+      throw new TypeError(`CustomGeometry expects ${optionName} as Float32Array or null.`);
     }
     return value;
   }
 };
 
+// core/constants/box-geometry.js
+var BOX_DEFAULTS = Object.freeze({
+  SIZE: 1,
+  SEGMENT_COUNT: 1
+});
+var BOX_LAYOUT = Object.freeze({
+  FACE_COUNT: 6,
+  COLORS_PER_FACE_LENGTH: 6 * GEOMETRY_LAYOUT.COLOR_COMPONENT_COUNT
+});
+var BOX_LIMITS = Object.freeze({ MIN_SEGMENT_COUNT: 1 });
+var BOX_FACES = Object.freeze([
+  // Front (+Z)
+  Object.freeze({
+    axisU: GEOMETRY_DIRECTIONS.POSITIVE_X,
+    axisV: GEOMETRY_DIRECTIONS.POSITIVE_Y,
+    normal: GEOMETRY_DIRECTIONS.POSITIVE_Z,
+    fixedDimension: "depth",
+    sizeU: "width",
+    sizeV: "height",
+    segmentsU: "widthSegments",
+    segmentsV: "heightSegments"
+  }),
+  // Back (-Z)
+  Object.freeze({
+    axisU: GEOMETRY_DIRECTIONS.NEGATIVE_X,
+    axisV: GEOMETRY_DIRECTIONS.POSITIVE_Y,
+    normal: GEOMETRY_DIRECTIONS.NEGATIVE_Z,
+    fixedDimension: "depth",
+    sizeU: "width",
+    sizeV: "height",
+    segmentsU: "widthSegments",
+    segmentsV: "heightSegments"
+  }),
+  // Top (+Y)
+  Object.freeze({
+    axisU: GEOMETRY_DIRECTIONS.POSITIVE_X,
+    axisV: GEOMETRY_DIRECTIONS.NEGATIVE_Z,
+    normal: GEOMETRY_DIRECTIONS.POSITIVE_Y,
+    fixedDimension: "height",
+    sizeU: "width",
+    sizeV: "depth",
+    segmentsU: "widthSegments",
+    segmentsV: "depthSegments"
+  }),
+  // Bottom (-Y)
+  Object.freeze({
+    axisU: GEOMETRY_DIRECTIONS.POSITIVE_X,
+    axisV: GEOMETRY_DIRECTIONS.POSITIVE_Z,
+    normal: GEOMETRY_DIRECTIONS.NEGATIVE_Y,
+    fixedDimension: "height",
+    sizeU: "width",
+    sizeV: "depth",
+    segmentsU: "widthSegments",
+    segmentsV: "depthSegments"
+  }),
+  // Right (+X)
+  Object.freeze({
+    axisU: GEOMETRY_DIRECTIONS.NEGATIVE_Z,
+    axisV: GEOMETRY_DIRECTIONS.POSITIVE_Y,
+    normal: GEOMETRY_DIRECTIONS.POSITIVE_X,
+    fixedDimension: "width",
+    sizeU: "depth",
+    sizeV: "height",
+    segmentsU: "depthSegments",
+    segmentsV: "heightSegments"
+  }),
+  // Left (-X)
+  Object.freeze({
+    axisU: GEOMETRY_DIRECTIONS.POSITIVE_Z,
+    axisV: GEOMETRY_DIRECTIONS.POSITIVE_Y,
+    normal: GEOMETRY_DIRECTIONS.NEGATIVE_X,
+    fixedDimension: "width",
+    sizeU: "depth",
+    sizeV: "height",
+    segmentsU: "depthSegments",
+    segmentsV: "heightSegments"
+  })
+]);
+
 // core/geometry/box-geometry.js
-var DEFAULT_BOX_SIZE = 1;
-var DEFAULT_SEGMENT_COUNT = 1;
-var HALF_SIZE_DIVISOR = 2;
-var VEC3_COMPONENT_COUNT = 3;
-var BOX_FACE_COUNT = 6;
-var COLORS_PER_FACE_LENGTH = BOX_FACE_COUNT * VEC3_COMPONENT_COUNT;
-var MIN_SEGMENT_COUNT = 1;
-var VERTICES_PER_SEGMENT_INCREMENT = 1;
-var CENTER_T_OFFSET = 0.5;
-var UV_V_FLIP_BASE = 1;
-var DEFAULT_T_VALUE = 0;
-var ZERO_SEGMENT_COUNT = 0;
-var NEXT_VERTEX_OFFSET = 1;
-var BoxGeometry = class _BoxGeometry extends Geometry {
-  /**
-   * @param {WebGL2RenderingContext} webglContext         - WebGL2 rendering context.
-   * @param {BoxGeometryOptions | number} [optionsOrSize] - Options object or numeric size.
-   */
-  constructor(webglContext, optionsOrSize = {}) {
-    const options = _BoxGeometry.#normalizeOptions(optionsOrSize);
-    const data = _BoxGeometry.#createGeometryData(options);
-    super(
-      webglContext,
-      data.positions,
-      data.colors,
-      data.indicesSolid,
-      data.indicesWireframe,
-      data.uvs,
-      data.normals
-    );
-  }
+var BoxGeometry = class _BoxGeometry extends GeneratedGeometry {
   /**
    * Normalizes constructor input to a `BoxGeometryOptions` object.
    *
@@ -2634,158 +3084,68 @@ var BoxGeometry = class _BoxGeometry extends Geometry {
    * @private
    */
   static #normalizeOptions(optionsOrSize) {
-    if (typeof optionsOrSize === "number") {
+    if (typeof optionsOrSize === ECMASCRIPT_TYPEOF_RESULTS.NUMBER) {
       return {
         size: optionsOrSize,
         width: optionsOrSize,
         height: optionsOrSize,
         depth: optionsOrSize,
-        widthSegments: DEFAULT_SEGMENT_COUNT,
-        heightSegments: DEFAULT_SEGMENT_COUNT,
-        depthSegments: DEFAULT_SEGMENT_COUNT,
+        widthSegments: BOX_DEFAULTS.SEGMENT_COUNT,
+        heightSegments: BOX_DEFAULTS.SEGMENT_COUNT,
+        depthSegments: BOX_DEFAULTS.SEGMENT_COUNT,
         colors: DEFAULT_VERTEX_COLOR
       };
     }
-    if (optionsOrSize === null || typeof optionsOrSize !== "object") {
-      throw new TypeError("`BoxGeometry` expects options as an object or a number.");
+    if (optionsOrSize === null || typeof optionsOrSize !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT) {
+      throw new TypeError("BoxGeometry expects options as an object or a number.");
     }
     const {
-      size = DEFAULT_BOX_SIZE,
+      size = BOX_DEFAULTS.SIZE,
       width = size,
       height = size,
       depth = size,
-      widthSegments = DEFAULT_SEGMENT_COUNT,
-      heightSegments = DEFAULT_SEGMENT_COUNT,
-      depthSegments = DEFAULT_SEGMENT_COUNT,
+      widthSegments = BOX_DEFAULTS.SEGMENT_COUNT,
+      heightSegments = BOX_DEFAULTS.SEGMENT_COUNT,
+      depthSegments = BOX_DEFAULTS.SEGMENT_COUNT,
       colors = DEFAULT_VERTEX_COLOR
     } = optionsOrSize;
-    if (typeof width !== "number" || typeof height !== "number" || typeof depth !== "number") {
-      throw new TypeError("`BoxGeometry` expects `width/height/depth` as numbers.");
+    if (typeof width !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || typeof height !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || typeof depth !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER) {
+      throw new TypeError("BoxGeometry expects width, height or depth as numbers.");
     }
     if (!Number.isFinite(width) || !Number.isFinite(height) || !Number.isFinite(depth)) {
-      throw new RangeError("`BoxGeometry` expects finite `width/height/depth`.");
+      throw new RangeError("BoxGeometry expects finite width, height or depth.");
     }
     if (!(colors instanceof Float32Array)) {
-      throw new TypeError("`BoxGeometry` expects colors as a `Float32Array`.");
+      throw new TypeError("BoxGeometry expects colors as a Float32Array.");
     }
     return {
       size,
       width,
       height,
       depth,
-      widthSegments: _BoxGeometry.#normalizeSegmentCount(widthSegments, "widthSegments"),
-      heightSegments: _BoxGeometry.#normalizeSegmentCount(heightSegments, "heightSegments"),
-      depthSegments: _BoxGeometry.#normalizeSegmentCount(depthSegments, "depthSegments"),
+      widthSegments: GeometryUtils.normalizeSegmentCount(widthSegments, "widthSegments", BOX_LIMITS.MIN_SEGMENT_COUNT, "BoxGeometry"),
+      heightSegments: GeometryUtils.normalizeSegmentCount(heightSegments, "heightSegments", BOX_LIMITS.MIN_SEGMENT_COUNT, "BoxGeometry"),
+      depthSegments: GeometryUtils.normalizeSegmentCount(depthSegments, "depthSegments", BOX_LIMITS.MIN_SEGMENT_COUNT, "BoxGeometry"),
       colors
     };
   }
   /**
-   * Normalizes and validates a segment count parameter.
+   * Generates vertex and index buffers from construction options.
    *
-   * @param {number} value      - Segment count value.
-   * @param {string} optionName - Name of the option for error messages.
-   * @returns {number}          - Normalized integer `>= 1`.
-   * @private
+   * @param {BoxGeometryOptions | number} [options] - Geometry options.
+   * @returns {BoxGeometryData}                     - Generated CPU buffers.
+   * @protected
    */
-  static #normalizeSegmentCount(value, optionName) {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      throw new TypeError("`BoxGeometry` expects `{name}` as a finite number.".replace("{name}", optionName));
-    }
-    const intValue = Math.floor(value);
-    if (intValue < MIN_SEGMENT_COUNT) {
-      throw new RangeError(
-        "`BoxGeometry` expects `{name}` to be `>= {min}`.".replace("{name}", optionName).replace("{min}", String(MIN_SEGMENT_COUNT))
-      );
-    }
-    return intValue;
-  }
-  /**
-   * Creates full geometry data for a segmented box.
-   *
-   * @param {Required<BoxGeometryOptions>} options - Normalized options.
-   * @returns {BoxGeometryData}                    - Geometry buffers.
-   *
-   * @private
-   */
-  static #createGeometryData(options) {
-    const halfWidth = options.width / HALF_SIZE_DIVISOR;
-    const halfHeight = options.height / HALF_SIZE_DIVISOR;
-    const halfDepth = options.depth / HALF_SIZE_DIVISOR;
+  static createGeometryData(options = {}) {
+    const normalized = _BoxGeometry.#normalizeOptions(options);
+    const faces = _BoxGeometry.#createFaces(normalized);
     const positions = [];
     const normals = [];
     const uvs = [];
     const faceVertexCounts = [];
     const indicesSolid = [];
-    let vertexOffset = 0;
-    const faces = [
-      // Front (+Z)
-      {
-        axisU: [1, 0, 0],
-        axisV: [0, 1, 0],
-        normal: [0, 0, 1],
-        fixed: halfDepth,
-        sizeU: options.width,
-        sizeV: options.height,
-        segmentsU: options.widthSegments,
-        segmentsV: options.heightSegments
-      },
-      // Back (-Z)
-      {
-        axisU: [-1, 0, 0],
-        axisV: [0, 1, 0],
-        normal: [0, 0, -1],
-        fixed: halfDepth,
-        sizeU: options.width,
-        sizeV: options.height,
-        segmentsU: options.widthSegments,
-        segmentsV: options.heightSegments
-      },
-      // Top (+Y)
-      {
-        axisU: [1, 0, 0],
-        axisV: [0, 0, -1],
-        normal: [0, 1, 0],
-        fixed: halfHeight,
-        sizeU: options.width,
-        sizeV: options.depth,
-        segmentsU: options.widthSegments,
-        segmentsV: options.depthSegments
-      },
-      // Bottom (-Y)
-      {
-        axisU: [1, 0, 0],
-        axisV: [0, 0, 1],
-        normal: [0, -1, 0],
-        fixed: halfHeight,
-        sizeU: options.width,
-        sizeV: options.depth,
-        segmentsU: options.widthSegments,
-        segmentsV: options.depthSegments
-      },
-      // Right (+X)
-      {
-        axisU: [0, 0, -1],
-        axisV: [0, 1, 0],
-        normal: [1, 0, 0],
-        fixed: halfWidth,
-        sizeU: options.depth,
-        sizeV: options.height,
-        segmentsU: options.depthSegments,
-        segmentsV: options.heightSegments
-      },
-      // Left (-X)
-      {
-        axisU: [0, 0, 1],
-        axisV: [0, 1, 0],
-        normal: [-1, 0, 0],
-        fixed: halfWidth,
-        sizeU: options.depth,
-        sizeV: options.height,
-        segmentsU: options.depthSegments,
-        segmentsV: options.heightSegments
-      }
-    ];
-    for (let faceIndex = 0; faceIndex < faces.length; faceIndex += 1) {
+    let vertexOffset = MATH_COMMON_VALUES.ZERO;
+    for (let faceIndex = MATH_COMMON_VALUES.ZERO; faceIndex < faces.length; faceIndex += MATH_COMMON_VALUES.UNIT) {
       const face = faces[faceIndex];
       const localVertexCount = _BoxGeometry.#appendFaceGrid(
         positions,
@@ -2799,9 +3159,9 @@ var BoxGeometry = class _BoxGeometry extends Geometry {
       vertexOffset += localVertexCount;
     }
     const vertexCount = vertexOffset;
-    const colors = _BoxGeometry.#createColors(options.colors, vertexCount, faceVertexCounts);
-    const indicesSolidTyped = createIndexArray(vertexCount, indicesSolid);
-    const indicesWireframe = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolidTyped);
+    const colors = _BoxGeometry.#createColors(normalized.colors, vertexCount, faceVertexCounts);
+    const indicesSolidTyped = GeometryUtils.createIndexArray(vertexCount, indicesSolid);
+    const indicesWireframe = GeometryUtils.createWireframeIndicesFromSolidIndices(vertexCount, indicesSolidTyped);
     return {
       positions: new Float32Array(positions),
       normals: new Float32Array(normals),
@@ -2824,34 +3184,29 @@ var BoxGeometry = class _BoxGeometry extends Geometry {
    * @private
    */
   static #appendFaceGrid(positions, normals, uvs, indicesSolid, vertexOffset, face) {
+    const centerOffset = GEOMETRY_GRID.CENTER_OFFSET;
+    const xComponentIndex = MATH_VECTOR3_INDEXES.X;
+    const yComponentIndex = MATH_VECTOR3_INDEXES.Y;
+    const zComponentIndex = MATH_VECTOR3_INDEXES.Z;
     const segmentsU = face.segmentsU;
     const segmentsV = face.segmentsV;
-    const uVertexCount = segmentsU + VERTICES_PER_SEGMENT_INCREMENT;
-    const vVertexCount = segmentsV + VERTICES_PER_SEGMENT_INCREMENT;
-    for (let vIndex = 0; vIndex < vVertexCount; vIndex += 1) {
-      const vNormalized = segmentsV === ZERO_SEGMENT_COUNT ? DEFAULT_T_VALUE : vIndex / segmentsV;
-      const vLocalOffset = (vNormalized - CENTER_T_OFFSET) * face.sizeV;
-      for (let uIndex = 0; uIndex < uVertexCount; uIndex += 1) {
-        const uNormalized = segmentsU === ZERO_SEGMENT_COUNT ? DEFAULT_T_VALUE : uIndex / segmentsU;
-        const uLocalOffset = (uNormalized - CENTER_T_OFFSET) * face.sizeU;
-        const positionX = face.axisU[0] * uLocalOffset + face.axisV[0] * vLocalOffset + face.normal[0] * face.fixed;
-        const positionY = face.axisU[1] * uLocalOffset + face.axisV[1] * vLocalOffset + face.normal[1] * face.fixed;
-        const positionZ = face.axisU[2] * uLocalOffset + face.axisV[2] * vLocalOffset + face.normal[2] * face.fixed;
+    const uVertexCount = segmentsU + GEOMETRY_GRID.VERTEX_INCREMENT;
+    const vVertexCount = segmentsV + GEOMETRY_GRID.VERTEX_INCREMENT;
+    for (let vIndex = MATH_COMMON_VALUES.ZERO; vIndex < vVertexCount; vIndex += MATH_COMMON_VALUES.UNIT) {
+      const vNormalized = vIndex / segmentsV;
+      const vLocalOffset = (vNormalized - centerOffset) * face.sizeV;
+      for (let uIndex = MATH_COMMON_VALUES.ZERO; uIndex < uVertexCount; uIndex += MATH_COMMON_VALUES.UNIT) {
+        const uNormalized = uIndex / segmentsU;
+        const uLocalOffset = (uNormalized - centerOffset) * face.sizeU;
+        const positionX = face.axisU[xComponentIndex] * uLocalOffset + face.axisV[xComponentIndex] * vLocalOffset + face.normal[xComponentIndex] * face.fixed;
+        const positionY = face.axisU[yComponentIndex] * uLocalOffset + face.axisV[yComponentIndex] * vLocalOffset + face.normal[yComponentIndex] * face.fixed;
+        const positionZ = face.axisU[zComponentIndex] * uLocalOffset + face.axisV[zComponentIndex] * vLocalOffset + face.normal[zComponentIndex] * face.fixed;
         positions.push(positionX, positionY, positionZ);
-        normals.push(face.normal[0], face.normal[1], face.normal[2]);
-        uvs.push(uNormalized, UV_V_FLIP_BASE - vNormalized);
+        normals.push(face.normal[xComponentIndex], face.normal[yComponentIndex], face.normal[zComponentIndex]);
+        uvs.push(uNormalized, GEOMETRY_UV.V_FLIP_BASE - vNormalized);
       }
     }
-    for (let vIndex = 0; vIndex < segmentsV; vIndex += 1) {
-      for (let uIndex = 0; uIndex < segmentsU; uIndex += 1) {
-        const topLeftVertexIndex = vertexOffset + vIndex * uVertexCount + uIndex;
-        const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET;
-        const bottomLeftVertexIndex = topLeftVertexIndex + uVertexCount;
-        const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET;
-        indicesSolid.push(topLeftVertexIndex, topRightVertexIndex, bottomLeftVertexIndex);
-        indicesSolid.push(topRightVertexIndex, bottomRightVertexIndex, bottomLeftVertexIndex);
-      }
-    }
+    GeometryUtils.appendGridTriangleIndices(indicesSolid, segmentsU, segmentsV, vertexOffset, true);
     return uVertexCount * vVertexCount;
   }
   /**
@@ -2864,62 +3219,72 @@ var BoxGeometry = class _BoxGeometry extends Geometry {
    * @private
    */
   static #createColors(colorsSpec, vertexCount, faceVertexCounts) {
-    if (colorsSpec.length === COLORS_PER_FACE_LENGTH) {
-      const colorBuffer = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT);
-      let vertexBase = 0;
-      for (let faceIndex = 0; faceIndex < BOX_FACE_COUNT; faceIndex += 1) {
+    const colorComponentCount = GEOMETRY_LAYOUT.COLOR_COMPONENT_COUNT;
+    const redIndex = GEOMETRY_COLOR_INDEXES.RED;
+    const greenIndex = GEOMETRY_COLOR_INDEXES.GREEN;
+    const blueIndex = GEOMETRY_COLOR_INDEXES.BLUE;
+    if (colorsSpec.length === BOX_LAYOUT.COLORS_PER_FACE_LENGTH) {
+      const colorBuffer = new Float32Array(vertexCount * colorComponentCount);
+      let vertexBase = MATH_COMMON_VALUES.ZERO;
+      for (let faceIndex = MATH_COMMON_VALUES.ZERO; faceIndex < BOX_LAYOUT.FACE_COUNT; faceIndex += MATH_COMMON_VALUES.UNIT) {
         const faceVertexCount = faceVertexCounts[faceIndex];
-        const faceColorBase = faceIndex * VEC3_COMPONENT_COUNT;
-        const red = colorsSpec[faceColorBase + 0];
-        const green = colorsSpec[faceColorBase + 1];
-        const blue = colorsSpec[faceColorBase + 2];
-        for (let i = 0; i < faceVertexCount; i += 1) {
-          const destinationComponentOffset = (vertexBase + i) * VEC3_COMPONENT_COUNT;
-          colorBuffer[destinationComponentOffset + 0] = red;
-          colorBuffer[destinationComponentOffset + 1] = green;
-          colorBuffer[destinationComponentOffset + 2] = blue;
+        const faceColorBase = faceIndex * colorComponentCount;
+        const red = colorsSpec[faceColorBase + redIndex];
+        const green = colorsSpec[faceColorBase + greenIndex];
+        const blue = colorsSpec[faceColorBase + blueIndex];
+        for (let i = MATH_COMMON_VALUES.ZERO; i < faceVertexCount; i += MATH_COMMON_VALUES.UNIT) {
+          const destinationComponentOffset = (vertexBase + i) * colorComponentCount;
+          colorBuffer[destinationComponentOffset + redIndex] = red;
+          colorBuffer[destinationComponentOffset + greenIndex] = green;
+          colorBuffer[destinationComponentOffset + blueIndex] = blue;
         }
         vertexBase += faceVertexCount;
       }
       return colorBuffer;
     }
-    return createColorsFromSpec(vertexCount, colorsSpec);
+    return GeometryUtils.createColorsFromSpec(vertexCount, colorsSpec);
+  }
+  /**
+   * Describes the six outward-facing box grids in their existing face order.
+   *
+   * @param {Required<BoxGeometryOptions>} normalized - Normalized geometry options.
+   * @returns {BoxFaceDefinition[]}
+   * @private
+   */
+  static #createFaces(normalized) {
+    const faces = [];
+    for (const definition of BOX_FACES) {
+      faces.push({
+        axisU: definition.axisU,
+        axisV: definition.axisV,
+        normal: definition.normal,
+        fixed: normalized[definition.fixedDimension] / GEOMETRY_SIZES.HALF_SIZE_DIVISOR,
+        sizeU: normalized[definition.sizeU],
+        sizeV: normalized[definition.sizeV],
+        segmentsU: normalized[definition.segmentsU],
+        segmentsV: normalized[definition.segmentsV]
+      });
+    }
+    return faces;
   }
 };
 
+// core/constants/plane-geometry.js
+var PLANE_DEFAULTS = Object.freeze({
+  WIDTH: 1,
+  HEIGHT: 1,
+  SEGMENT_COUNT: 1
+});
+var PLANE_LIMITS = Object.freeze({ MIN_SEGMENT_COUNT: 1 });
+var PLANE_LAYOUT = Object.freeze({ Z_POSITION: 0 });
+var PLANE_NORMALS = Object.freeze({
+  X: 0,
+  Y: 0,
+  Z: 1
+});
+
 // core/geometry/plane-geometry.js
-var DEFAULT_PLANE_WIDTH = 1;
-var DEFAULT_PLANE_HEIGHT = 1;
-var DEFAULT_SEGMENT_COUNT2 = 1;
-var MIN_SEGMENT_COUNT2 = 1;
-var VERTICES_PER_SEGMENT_INCREMENT2 = 1;
-var NEXT_VERTEX_OFFSET2 = 1;
-var CENTER_T_OFFSET2 = 0.5;
-var UV_V_FLIP_BASE2 = 1;
-var PLANE_Z_POSITION = 0;
-var VEC3_COMPONENT_COUNT2 = 3;
-var VEC2_COMPONENT_COUNT = 2;
-var PLANE_NORMAL_X = 0;
-var PLANE_NORMAL_Y = 0;
-var PLANE_NORMAL_Z = 1;
-var PlaneGeometry = class _PlaneGeometry extends Geometry {
-  /**
-   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
-   * @param {PlaneGeometryOptions} [options = {}] - Geometry options.
-   */
-  constructor(webglContext, options = {}) {
-    const normalized = _PlaneGeometry.#normalizeOptions(options);
-    const data = _PlaneGeometry.#createGeometryData(normalized);
-    super(
-      webglContext,
-      data.positions,
-      data.colors,
-      data.indicesSolid,
-      data.indicesWireframe,
-      data.uvs,
-      data.normals
-    );
-  }
+var PlaneGeometry = class _PlaneGeometry extends GeneratedGeometry {
   /**
    * Normalizes constructor input to a `PlaneGeometryOptions` object.
    *
@@ -2928,103 +3293,58 @@ var PlaneGeometry = class _PlaneGeometry extends Geometry {
    * @private
    */
   static #normalizeOptions(options) {
-    if (options === null || typeof options !== "object") {
-      throw new TypeError("`PlaneGeometry` expects options as an object.");
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT) {
+      throw new TypeError("PlaneGeometry expects options as an object.");
     }
     const {
-      width = DEFAULT_PLANE_WIDTH,
-      height = DEFAULT_PLANE_HEIGHT,
-      widthSegments = DEFAULT_SEGMENT_COUNT2,
-      heightSegments = DEFAULT_SEGMENT_COUNT2,
+      width = PLANE_DEFAULTS.WIDTH,
+      height = PLANE_DEFAULTS.HEIGHT,
+      widthSegments = PLANE_DEFAULTS.SEGMENT_COUNT,
+      heightSegments = PLANE_DEFAULTS.SEGMENT_COUNT,
       colors = DEFAULT_VERTEX_COLOR
     } = options;
-    if (typeof width !== "number" || typeof height !== "number") {
-      throw new TypeError("`PlaneGeometry` expects `width/height` as numbers.");
+    if (typeof width !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || typeof height !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER) {
+      throw new TypeError("PlaneGeometry expects width/height as numbers.");
     }
     if (!Number.isFinite(width) || !Number.isFinite(height)) {
-      throw new RangeError("`PlaneGeometry` expects finite `width/height`.");
+      throw new RangeError("PlaneGeometry expects finite width/height.");
     }
     if (!(colors instanceof Float32Array)) {
-      throw new TypeError("`PlaneGeometry` expects colors as a `Float32Array`.");
+      throw new TypeError("PlaneGeometry expects colors as a Float32Array.");
     }
     return {
       width,
       height,
-      widthSegments: _PlaneGeometry.#normalizeSegmentCount(widthSegments, "widthSegments"),
-      heightSegments: _PlaneGeometry.#normalizeSegmentCount(heightSegments, "heightSegments"),
+      widthSegments: GeometryUtils.normalizeSegmentCount(widthSegments, "widthSegments", PLANE_LIMITS.MIN_SEGMENT_COUNT, "PlaneGeometry"),
+      heightSegments: GeometryUtils.normalizeSegmentCount(heightSegments, "heightSegments", PLANE_LIMITS.MIN_SEGMENT_COUNT, "PlaneGeometry"),
       colors
     };
   }
   /**
-   * Normalizes and validates a segment count parameter.
+   * Generates vertex and index buffers from construction options.
    *
-   * @param {number} value      - Segment count value.
-   * @param {string} optionName - Name of the option for error messages.
-   * @returns {number}          - Normalized integer `>= 1`.
-   * @private
+   * @param {PlaneGeometryOptions} [options] - Geometry options.
+   * @returns {PlaneGeometryData}            - Generated CPU buffers.
+   * @protected
    */
-  static #normalizeSegmentCount(value, optionName) {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      throw new TypeError("`PlaneGeometry` expects `{name}` as a finite number.".replace("{name}", optionName));
-    }
-    const intValue = Math.floor(value);
-    if (intValue < MIN_SEGMENT_COUNT2) {
-      throw new RangeError(
-        "`PlaneGeometry` expects `{name}` to be `>= {min}`.".replace("{name}", optionName).replace("{min}", String(MIN_SEGMENT_COUNT2))
-      );
-    }
-    return intValue;
-  }
-  /**
-   * Creates full geometry data for a segmented plane.
-   *
-   * @param {Required<PlaneGeometryOptions>} options - Normalized options.
-   * @returns {PlaneGeometryData}                    - Geometry buffers.
-   * @private
-   */
-  static #createGeometryData(options) {
-    const widthSegments = options.widthSegments;
-    const heightSegments = options.heightSegments;
-    const widthVertexCount = widthSegments + VERTICES_PER_SEGMENT_INCREMENT2;
-    const heightVertexCount = heightSegments + VERTICES_PER_SEGMENT_INCREMENT2;
+  static createGeometryData(options = {}) {
+    const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+    const uvComponentCount = GEOMETRY_LAYOUT.UV_COMPONENT_COUNT;
+    const normalized = _PlaneGeometry.#normalizeOptions(options);
+    const widthSegments = normalized.widthSegments;
+    const heightSegments = normalized.heightSegments;
+    const widthVertexCount = widthSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+    const heightVertexCount = heightSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
     const vertexCount = widthVertexCount * heightVertexCount;
-    const positions = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT2);
-    const normals = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT2);
-    const uvs = new Float32Array(vertexCount * VEC2_COMPONENT_COUNT);
-    let vertexIndex = 0;
-    for (let rowIndex = 0; rowIndex < heightVertexCount; rowIndex += 1) {
-      const vNormalized = rowIndex / heightSegments;
-      const positionY = (vNormalized - CENTER_T_OFFSET2) * options.height;
-      for (let columnIndex = 0; columnIndex < widthVertexCount; columnIndex += 1) {
-        const uNormalized = columnIndex / widthSegments;
-        const positionX = (uNormalized - CENTER_T_OFFSET2) * options.width;
-        const positionBaseOffset = vertexIndex * VEC3_COMPONENT_COUNT2;
-        positions[positionBaseOffset + 0] = positionX;
-        positions[positionBaseOffset + 1] = positionY;
-        positions[positionBaseOffset + 2] = PLANE_Z_POSITION;
-        normals[positionBaseOffset + 0] = PLANE_NORMAL_X;
-        normals[positionBaseOffset + 1] = PLANE_NORMAL_Y;
-        normals[positionBaseOffset + 2] = PLANE_NORMAL_Z;
-        const uvBaseOffset = vertexIndex * VEC2_COMPONENT_COUNT;
-        uvs[uvBaseOffset + 0] = uNormalized;
-        uvs[uvBaseOffset + 1] = UV_V_FLIP_BASE2 - vNormalized;
-        vertexIndex += 1;
-      }
-    }
+    const positions = new Float32Array(vertexCount * positionComponentCount);
+    const normals = new Float32Array(vertexCount * positionComponentCount);
+    const uvs = new Float32Array(vertexCount * uvComponentCount);
+    _PlaneGeometry.#writeVertices(positions, normals, uvs, normalized);
     const solidTriangleIndices = [];
-    for (let rowIndex = 0; rowIndex < heightSegments; rowIndex += 1) {
-      for (let columnIndex = 0; columnIndex < widthSegments; columnIndex += 1) {
-        const topLeftVertexIndex = rowIndex * widthVertexCount + columnIndex;
-        const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET2;
-        const bottomLeftVertexIndex = topLeftVertexIndex + widthVertexCount;
-        const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET2;
-        solidTriangleIndices.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
-        solidTriangleIndices.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
-      }
-    }
-    const indicesSolid = createIndexArray(vertexCount, solidTriangleIndices);
-    const indicesWireframe = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
-    const colors = createColorsFromSpec(vertexCount, options.colors);
+    GeometryUtils.appendGridTriangleIndices(solidTriangleIndices, widthSegments, heightSegments);
+    const indicesSolid = GeometryUtils.createIndexArray(vertexCount, solidTriangleIndices);
+    const indicesWireframe = GeometryUtils.createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
+    const colors = GeometryUtils.createColorsFromSpec(vertexCount, normalized.colors);
     return {
       positions,
       normals,
@@ -3034,43 +3354,64 @@ var PlaneGeometry = class _PlaneGeometry extends Geometry {
       indicesWireframe
     };
   }
+  /**
+   * Writes the grid positions, normals and texture coordinates.
+   *
+   * @param {Float32Array} positions                    - Output positions.
+   * @param {Float32Array} normals                      - Output normals.
+   * @param {Float32Array} uvs                          - Output texture coordinates.
+   * @param {Required<PlaneGeometryOptions>} normalized - Normalized geometry options.
+   * @private
+   */
+  static #writeVertices(positions, normals, uvs, normalized) {
+    const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+    const uvComponentCount = GEOMETRY_LAYOUT.UV_COMPONENT_COUNT;
+    const centerOffset = GEOMETRY_GRID.CENTER_OFFSET;
+    const xComponentIndex = MATH_VECTOR3_INDEXES.X;
+    const yComponentIndex = MATH_VECTOR3_INDEXES.Y;
+    const zComponentIndex = MATH_VECTOR3_INDEXES.Z;
+    const widthSegments = normalized.widthSegments;
+    const heightSegments = normalized.heightSegments;
+    const widthVertexCount = widthSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+    const heightVertexCount = heightSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+    let vertexIndex = MATH_COMMON_VALUES.ZERO;
+    for (let rowIndex = MATH_COMMON_VALUES.ZERO; rowIndex < heightVertexCount; rowIndex += MATH_COMMON_VALUES.UNIT) {
+      const vNormalized = rowIndex / heightSegments;
+      const positionY = (vNormalized - centerOffset) * normalized.height;
+      for (let columnIndex = MATH_COMMON_VALUES.ZERO; columnIndex < widthVertexCount; columnIndex += MATH_COMMON_VALUES.UNIT) {
+        const uNormalized = columnIndex / widthSegments;
+        const positionX = (uNormalized - centerOffset) * normalized.width;
+        const positionBaseOffset = vertexIndex * positionComponentCount;
+        positions[positionBaseOffset + xComponentIndex] = positionX;
+        positions[positionBaseOffset + yComponentIndex] = positionY;
+        positions[positionBaseOffset + zComponentIndex] = PLANE_LAYOUT.Z_POSITION;
+        normals[positionBaseOffset + xComponentIndex] = PLANE_NORMALS.X;
+        normals[positionBaseOffset + yComponentIndex] = PLANE_NORMALS.Y;
+        normals[positionBaseOffset + zComponentIndex] = PLANE_NORMALS.Z;
+        const uvBaseOffset = vertexIndex * uvComponentCount;
+        uvs[uvBaseOffset + GEOMETRY_UV_INDEXES.U] = uNormalized;
+        uvs[uvBaseOffset + GEOMETRY_UV_INDEXES.V] = GEOMETRY_UV.V_FLIP_BASE - vNormalized;
+        vertexIndex += MATH_COMMON_VALUES.UNIT;
+      }
+    }
+  }
 };
 
+// core/constants/sphere-geometry.js
+var SPHERE_DEFAULTS = Object.freeze({
+  WIDTH: 1,
+  HEIGHT: 1,
+  DEPTH: 1,
+  WIDTH_SEGMENTS: 24,
+  HEIGHT_SEGMENTS: 16
+});
+var SPHERE_LIMITS = Object.freeze({
+  MIN_WIDTH_SEGMENT_COUNT: 3,
+  MIN_HEIGHT_SEGMENT_COUNT: 2
+});
+
 // core/geometry/sphere-geometry.js
-var DEFAULT_SPHERE_WIDTH = 1;
-var DEFAULT_SPHERE_HEIGHT = 1;
-var DEFAULT_SPHERE_DEPTH = 1;
-var DEFAULT_WIDTH_SEGMENTS = 24;
-var DEFAULT_HEIGHT_SEGMENTS = 16;
-var MIN_WIDTH_SEGMENT_COUNT = 3;
-var MIN_HEIGHT_SEGMENT_COUNT = 2;
-var HALF_SIZE_DIVISOR2 = 2;
-var VERTICES_PER_SEGMENT_INCREMENT3 = 1;
-var NEXT_VERTEX_OFFSET3 = 1;
-var UV_V_FLIP_BASE3 = 1;
-var ZERO_VALUE5 = 0;
-var ONE_VALUE4 = 1;
-var VEC3_COMPONENT_COUNT3 = 3;
-var VEC2_COMPONENT_COUNT2 = 2;
-var TWO_PI = Math.PI * 2;
-var SphereGeometry = class _SphereGeometry extends Geometry {
-  /**
-   * @param {WebGL2RenderingContext} webglContext  - WebGL2 rendering context.
-   * @param {SphereGeometryOptions} [options = {}] - Geometry options.
-   */
-  constructor(webglContext, options = {}) {
-    const normalized = _SphereGeometry.#normalizeOptions(options);
-    const data = _SphereGeometry.#createGeometryData(normalized);
-    super(
-      webglContext,
-      data.positions,
-      data.colors,
-      data.indicesSolid,
-      data.indicesWireframe,
-      data.uvs,
-      data.normals
-    );
-  }
+var SphereGeometry = class _SphereGeometry extends GeneratedGeometry {
   /**
    * Normalizes constructor input to a `SphereGeometryOptions` object.
    *
@@ -3079,120 +3420,60 @@ var SphereGeometry = class _SphereGeometry extends Geometry {
    * @private
    */
   static #normalizeOptions(options) {
-    if (options === null || typeof options !== "object") {
-      throw new TypeError("`SphereGeometry` expects options as an object.");
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT) {
+      throw new TypeError("SphereGeometry expects options as an object.");
     }
     const {
-      width = DEFAULT_SPHERE_WIDTH,
-      height = DEFAULT_SPHERE_HEIGHT,
-      depth = DEFAULT_SPHERE_DEPTH,
-      widthSegments = DEFAULT_WIDTH_SEGMENTS,
-      heightSegments = DEFAULT_HEIGHT_SEGMENTS,
+      width = SPHERE_DEFAULTS.WIDTH,
+      height = SPHERE_DEFAULTS.HEIGHT,
+      depth = SPHERE_DEFAULTS.DEPTH,
+      widthSegments = SPHERE_DEFAULTS.WIDTH_SEGMENTS,
+      heightSegments = SPHERE_DEFAULTS.HEIGHT_SEGMENTS,
       colors = DEFAULT_VERTEX_COLOR
     } = options;
-    if (typeof width !== "number" || typeof height !== "number" || typeof depth !== "number") {
-      throw new TypeError("`SphereGeometry` expects `width/height/depth` as numbers.");
+    if (typeof width !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || typeof height !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || typeof depth !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER) {
+      throw new TypeError("SphereGeometry expects width, height or depth as numbers.");
     }
     if (!Number.isFinite(width) || !Number.isFinite(height) || !Number.isFinite(depth)) {
-      throw new RangeError("`SphereGeometry` expects finite `width/height/depth`.");
+      throw new RangeError("SphereGeometry expects finite width, height or depth.");
     }
     if (!(colors instanceof Float32Array)) {
-      throw new TypeError("`SphereGeometry` expects colors as a `Float32Array`.");
+      throw new TypeError("SphereGeometry expects colors as a Float32Array.");
     }
     return {
       width,
       height,
       depth,
-      widthSegments: _SphereGeometry.#normalizeSegmentCount(widthSegments, "widthSegments", MIN_WIDTH_SEGMENT_COUNT),
-      heightSegments: _SphereGeometry.#normalizeSegmentCount(heightSegments, "heightSegments", MIN_HEIGHT_SEGMENT_COUNT),
+      widthSegments: GeometryUtils.normalizeSegmentCount(widthSegments, "widthSegments", SPHERE_LIMITS.MIN_WIDTH_SEGMENT_COUNT, "SphereGeometry"),
+      heightSegments: GeometryUtils.normalizeSegmentCount(heightSegments, "heightSegments", SPHERE_LIMITS.MIN_HEIGHT_SEGMENT_COUNT, "SphereGeometry"),
       colors
     };
   }
   /**
-   * Normalizes and validates a segment count parameter.
+   * Generates vertex and index buffers from construction options.
    *
-   * @param {number} value      - Segment count value.
-   * @param {string} optionName - Name of the option for error messages.
-   * @param {number} minValue   - Minimal allowed value.
-   * @returns {number}          - Normalized integer segment count.
-   * @private
+   * @param {SphereGeometryOptions} [options] - Geometry options.
+   * @returns {SphereGeometryData}            - Generated CPU buffers.
+   * @protected
    */
-  static #normalizeSegmentCount(value, optionName, minValue) {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      throw new TypeError("`SphereGeometry` expects `{name}` as a finite number.".replace("{name}", optionName));
-    }
-    const intValue = Math.floor(value);
-    if (intValue < minValue) {
-      throw new RangeError(
-        "`SphereGeometry` expects `{name}` to be `>= {min}`.".replace("{name}", optionName).replace("{min}", String(minValue))
-      );
-    }
-    return intValue;
-  }
-  /**
-   * Creates full geometry data for a segmented UV sphere.
-   *
-   * @param {Required<SphereGeometryOptions>} options - Normalized options.
-   * @returns {SphereGeometryData}                    - Geometry buffers.
-   * @private
-   */
-  static #createGeometryData(options) {
-    const radiusX = options.width / HALF_SIZE_DIVISOR2;
-    const radiusY = options.height / HALF_SIZE_DIVISOR2;
-    const radiusZ = options.depth / HALF_SIZE_DIVISOR2;
-    const widthSegments = options.widthSegments;
-    const heightSegments = options.heightSegments;
-    const widthVertexCount = widthSegments + VERTICES_PER_SEGMENT_INCREMENT3;
-    const heightVertexCount = heightSegments + VERTICES_PER_SEGMENT_INCREMENT3;
+  static createGeometryData(options = {}) {
+    const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+    const uvComponentCount = GEOMETRY_LAYOUT.UV_COMPONENT_COUNT;
+    const normalized = _SphereGeometry.#normalizeOptions(options);
+    const widthSegments = normalized.widthSegments;
+    const heightSegments = normalized.heightSegments;
+    const widthVertexCount = widthSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+    const heightVertexCount = heightSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
     const vertexCount = widthVertexCount * heightVertexCount;
-    const positions = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT3);
-    const normals = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT3);
-    const uvs = new Float32Array(vertexCount * VEC2_COMPONENT_COUNT2);
-    let vertexIndex = 0;
-    for (let latitudeIndex = 0; latitudeIndex < heightVertexCount; latitudeIndex += 1) {
-      const vNormalized = latitudeIndex / heightSegments;
-      const phiRadians = vNormalized * Math.PI;
-      const sinPhi = Math.sin(phiRadians);
-      const cosPhi = Math.cos(phiRadians);
-      for (let longitudeIndex = 0; longitudeIndex < widthVertexCount; longitudeIndex += 1) {
-        const uNormalized = longitudeIndex / widthSegments;
-        const thetaRadians = uNormalized * TWO_PI;
-        const sinTheta = Math.sin(thetaRadians);
-        const cosTheta = Math.cos(thetaRadians);
-        const positionX = cosTheta * sinPhi * radiusX;
-        const positionY = cosPhi * radiusY;
-        const positionZ = sinTheta * sinPhi * radiusZ;
-        const positionBaseOffset = vertexIndex * VEC3_COMPONENT_COUNT3;
-        positions[positionBaseOffset + 0] = positionX;
-        positions[positionBaseOffset + 1] = positionY;
-        positions[positionBaseOffset + 2] = positionZ;
-        const normalX0 = radiusX !== ZERO_VALUE5 ? positionX / (radiusX * radiusX) : ZERO_VALUE5;
-        const normalY0 = radiusY !== ZERO_VALUE5 ? positionY / (radiusY * radiusY) : ZERO_VALUE5;
-        const normalZ0 = radiusZ !== ZERO_VALUE5 ? positionZ / (radiusZ * radiusZ) : ZERO_VALUE5;
-        const inverseNormalLength = _SphereGeometry.#inverseLength(normalX0, normalY0, normalZ0);
-        normals[positionBaseOffset + 0] = normalX0 * inverseNormalLength;
-        normals[positionBaseOffset + 1] = normalY0 * inverseNormalLength;
-        normals[positionBaseOffset + 2] = normalZ0 * inverseNormalLength;
-        const uvBaseOffset = vertexIndex * VEC2_COMPONENT_COUNT2;
-        uvs[uvBaseOffset + 0] = uNormalized;
-        uvs[uvBaseOffset + 1] = UV_V_FLIP_BASE3 - vNormalized;
-        vertexIndex += 1;
-      }
-    }
+    const positions = new Float32Array(vertexCount * positionComponentCount);
+    const normals = new Float32Array(vertexCount * positionComponentCount);
+    const uvs = new Float32Array(vertexCount * uvComponentCount);
+    _SphereGeometry.#writeVertices(positions, normals, uvs, normalized);
     const solidTriangleIndices = [];
-    for (let latitudeIndex = 0; latitudeIndex < heightSegments; latitudeIndex += 1) {
-      for (let longitudeIndex = 0; longitudeIndex < widthSegments; longitudeIndex += 1) {
-        const topLeftVertexIndex = latitudeIndex * widthVertexCount + longitudeIndex;
-        const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET3;
-        const bottomLeftVertexIndex = topLeftVertexIndex + widthVertexCount;
-        const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET3;
-        solidTriangleIndices.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
-        solidTriangleIndices.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
-      }
-    }
-    const indicesSolid = createIndexArray(vertexCount, solidTriangleIndices);
-    const indicesWireframe = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
-    const colors = createColorsFromSpec(vertexCount, options.colors);
+    GeometryUtils.appendGridTriangleIndices(solidTriangleIndices, widthSegments, heightSegments);
+    const indicesSolid = GeometryUtils.createIndexArray(vertexCount, solidTriangleIndices);
+    const indicesWireframe = GeometryUtils.createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
+    const colors = GeometryUtils.createColorsFromSpec(vertexCount, normalized.colors);
     return {
       positions,
       normals,
@@ -3214,44 +3495,78 @@ var SphereGeometry = class _SphereGeometry extends Geometry {
    */
   static #inverseLength(x, y, z) {
     const length = Math.sqrt(x * x + y * y + z * z);
-    if (length === ZERO_VALUE5) {
-      return ZERO_VALUE5;
+    if (length === MATH_COMMON_VALUES.ZERO) {
+      return MATH_COMMON_VALUES.ZERO;
     }
-    return ONE_VALUE4 / length;
+    return MATH_COMMON_VALUES.UNIT / length;
+  }
+  /**
+   * Writes the grid positions, normals and texture coordinates.
+   *
+   * @param {Float32Array} positions                     - Output positions.
+   * @param {Float32Array} normals                       - Output normals.
+   * @param {Float32Array} uvs                           - Output texture coordinates.
+   * @param {Required<SphereGeometryOptions>} normalized - Normalized geometry options.
+   * @private
+   */
+  static #writeVertices(positions, normals, uvs, normalized) {
+    const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+    const uvComponentCount = GEOMETRY_LAYOUT.UV_COMPONENT_COUNT;
+    const xComponentIndex = MATH_VECTOR3_INDEXES.X;
+    const yComponentIndex = MATH_VECTOR3_INDEXES.Y;
+    const zComponentIndex = MATH_VECTOR3_INDEXES.Z;
+    const radiusX = normalized.width / GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
+    const radiusY = normalized.height / GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
+    const radiusZ = normalized.depth / GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
+    const widthSegments = normalized.widthSegments;
+    const heightSegments = normalized.heightSegments;
+    const widthVertexCount = widthSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+    const heightVertexCount = heightSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+    let vertexIndex = MATH_COMMON_VALUES.ZERO;
+    for (let latitudeIndex = MATH_COMMON_VALUES.ZERO; latitudeIndex < heightVertexCount; latitudeIndex += MATH_COMMON_VALUES.UNIT) {
+      const vNormalized = latitudeIndex / heightSegments;
+      const phiRadians = vNormalized * Math.PI;
+      const sinPhi = Math.sin(phiRadians);
+      const cosPhi = Math.cos(phiRadians);
+      for (let longitudeIndex = MATH_COMMON_VALUES.ZERO; longitudeIndex < widthVertexCount; longitudeIndex += MATH_COMMON_VALUES.UNIT) {
+        const uNormalized = longitudeIndex / widthSegments;
+        const thetaRadians = uNormalized * GEOMETRY_ANGLES.FULL_TURN;
+        const sinTheta = Math.sin(thetaRadians);
+        const cosTheta = Math.cos(thetaRadians);
+        const positionX = cosTheta * sinPhi * radiusX;
+        const positionY = cosPhi * radiusY;
+        const positionZ = sinTheta * sinPhi * radiusZ;
+        const positionBaseOffset = vertexIndex * positionComponentCount;
+        positions[positionBaseOffset + xComponentIndex] = positionX;
+        positions[positionBaseOffset + yComponentIndex] = positionY;
+        positions[positionBaseOffset + zComponentIndex] = positionZ;
+        const normalX0 = radiusX !== MATH_COMMON_VALUES.ZERO ? positionX / (radiusX * radiusX) : MATH_COMMON_VALUES.ZERO;
+        const normalY0 = radiusY !== MATH_COMMON_VALUES.ZERO ? positionY / (radiusY * radiusY) : MATH_COMMON_VALUES.ZERO;
+        const normalZ0 = radiusZ !== MATH_COMMON_VALUES.ZERO ? positionZ / (radiusZ * radiusZ) : MATH_COMMON_VALUES.ZERO;
+        const inverseNormalLength = _SphereGeometry.#inverseLength(normalX0, normalY0, normalZ0);
+        normals[positionBaseOffset + xComponentIndex] = normalX0 * inverseNormalLength;
+        normals[positionBaseOffset + yComponentIndex] = normalY0 * inverseNormalLength;
+        normals[positionBaseOffset + zComponentIndex] = normalZ0 * inverseNormalLength;
+        const uvBaseOffset = vertexIndex * uvComponentCount;
+        uvs[uvBaseOffset + GEOMETRY_UV_INDEXES.U] = uNormalized;
+        uvs[uvBaseOffset + GEOMETRY_UV_INDEXES.V] = GEOMETRY_UV.V_FLIP_BASE - vNormalized;
+        vertexIndex += MATH_COMMON_VALUES.UNIT;
+      }
+    }
   }
 };
 
+// core/constants/torus-geometry.js
+var TORUS_DEFAULTS = Object.freeze({
+  MAJOR_DIAMETER: 1.5,
+  TUBE_DIAMETER: 0.5,
+  RADIAL_SEGMENTS: 16,
+  TUBULAR_SEGMENTS: 32
+});
+var TORUS_LIMITS = Object.freeze({ MIN_SEGMENT_COUNT: 3 });
+
 // core/geometry/torus-geometry.js
-var DEFAULT_MAJOR_DIAMETER = 1.5;
-var DEFAULT_TUBE_DIAMETER = 0.5;
-var DEFAULT_RADIAL_SEGMENTS = 16;
-var DEFAULT_TUBULAR_SEGMENTS = 32;
-var MIN_SEGMENT_COUNT3 = 3;
-var HALF_SIZE_DIVISOR3 = 2;
-var VERTICES_PER_SEGMENT_INCREMENT4 = 1;
-var UV_V_FLIP_BASE4 = 1;
-var VEC3_COMPONENT_COUNT4 = 3;
-var VEC2_COMPONENT_COUNT3 = 2;
-var TWO_PI2 = Math.PI * 2;
-var NEXT_VERTEX_OFFSET4 = 1;
-var TorusGeometry = class _TorusGeometry extends Geometry {
-  /**
-   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
-   * @param {TorusGeometryOptions} [options = {}] - Geometry options.
-   */
-  constructor(webglContext, options = {}) {
-    const normalized = _TorusGeometry.#normalizeOptions(options);
-    const data = _TorusGeometry.#createGeometryData(normalized);
-    super(
-      webglContext,
-      data.positions,
-      data.colors,
-      data.indicesSolid,
-      data.indicesWireframe,
-      data.uvs,
-      data.normals
-    );
-  }
+var TorusGeometry = class _TorusGeometry extends GeneratedGeometry {
   /**
    * Normalizes constructor input to a `TorusGeometryOptions` object.
    *
@@ -3260,113 +3575,58 @@ var TorusGeometry = class _TorusGeometry extends Geometry {
    * @private
    */
   static #normalizeOptions(options) {
-    if (options === null || typeof options !== "object") {
-      throw new TypeError("`TorusGeometry` expects options as an object.");
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT) {
+      throw new TypeError("TorusGeometry expects options as an object.");
     }
     const {
-      width = DEFAULT_MAJOR_DIAMETER,
-      height = DEFAULT_TUBE_DIAMETER,
-      tubularSegments = DEFAULT_TUBULAR_SEGMENTS,
-      radialSegments = DEFAULT_RADIAL_SEGMENTS,
+      width = TORUS_DEFAULTS.MAJOR_DIAMETER,
+      height = TORUS_DEFAULTS.TUBE_DIAMETER,
+      tubularSegments = TORUS_DEFAULTS.TUBULAR_SEGMENTS,
+      radialSegments = TORUS_DEFAULTS.RADIAL_SEGMENTS,
       colors = DEFAULT_VERTEX_COLOR
     } = options;
-    if (typeof width !== "number" || typeof height !== "number") {
-      throw new TypeError("`TorusGeometry` expects `width/height` as numbers.");
+    if (typeof width !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || typeof height !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER) {
+      throw new TypeError("TorusGeometry expects width/height as numbers.");
     }
     if (!Number.isFinite(width) || !Number.isFinite(height)) {
-      throw new RangeError("`TorusGeometry` expects finite `width/height`.");
+      throw new RangeError("TorusGeometry expects finite width/height.");
     }
     if (!(colors instanceof Float32Array)) {
-      throw new TypeError("`TorusGeometry` expects colors as a `Float32Array`.");
+      throw new TypeError("TorusGeometry expects colors as a Float32Array.");
     }
     return {
       width,
       height,
-      tubularSegments: _TorusGeometry.#normalizeSegmentCount(tubularSegments, "tubularSegments"),
-      radialSegments: _TorusGeometry.#normalizeSegmentCount(radialSegments, "radialSegments"),
+      tubularSegments: GeometryUtils.normalizeSegmentCount(tubularSegments, "tubularSegments", TORUS_LIMITS.MIN_SEGMENT_COUNT, "TorusGeometry"),
+      radialSegments: GeometryUtils.normalizeSegmentCount(radialSegments, "radialSegments", TORUS_LIMITS.MIN_SEGMENT_COUNT, "TorusGeometry"),
       colors
     };
   }
   /**
-   * Normalizes and validates a segment count parameter.
+   * Generates vertex and index buffers from construction options.
    *
-   * @param {number} value      - Segment count value.
-   * @param {string} optionName - Name of the option for error messages.
-   * @returns {number}          - Normalized integer `>= 3`.
-   * @private
+   * @param {TorusGeometryOptions} [options] - Geometry options.
+   * @returns {TorusGeometryData}            - Generated CPU buffers.
+   * @protected
    */
-  static #normalizeSegmentCount(value, optionName) {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      throw new TypeError("`TorusGeometry` expects `{name}` as a finite number.".replace("{name}", optionName));
-    }
-    const intValue = Math.floor(value);
-    if (intValue < MIN_SEGMENT_COUNT3) {
-      throw new RangeError(
-        "`TorusGeometry` expects `{name}` to be `>= {min}`.".replace("{name}", optionName).replace("{min}", String(MIN_SEGMENT_COUNT3))
-      );
-    }
-    return intValue;
-  }
-  /**
-   * Creates full geometry data for a torus.
-   *
-   * @param {Required<TorusGeometryOptions>} options - Normalized options.
-   * @returns {TorusGeometryData}                    - Geometry buffers.
-   * @private
-   */
-  static #createGeometryData(options) {
-    const majorRadius = options.width / HALF_SIZE_DIVISOR3;
-    const tubeRadius = options.height / HALF_SIZE_DIVISOR3;
-    const tubularSegments = options.tubularSegments;
-    const radialSegments = options.radialSegments;
-    const tubularVertexCount = tubularSegments + VERTICES_PER_SEGMENT_INCREMENT4;
-    const radialVertexCount = radialSegments + VERTICES_PER_SEGMENT_INCREMENT4;
+  static createGeometryData(options = {}) {
+    const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+    const uvComponentCount = GEOMETRY_LAYOUT.UV_COMPONENT_COUNT;
+    const normalized = _TorusGeometry.#normalizeOptions(options);
+    const tubularSegments = normalized.tubularSegments;
+    const radialSegments = normalized.radialSegments;
+    const tubularVertexCount = tubularSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+    const radialVertexCount = radialSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
     const vertexCount = tubularVertexCount * radialVertexCount;
-    const positions = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT4);
-    const normals = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT4);
-    const uvs = new Float32Array(vertexCount * VEC2_COMPONENT_COUNT3);
-    let vertexIndex = 0;
-    for (let radialIndex = 0; radialIndex < radialVertexCount; radialIndex += 1) {
-      const vNormalized = radialIndex / radialSegments;
-      const phi = vNormalized * TWO_PI2;
-      const cosPhi = Math.cos(phi);
-      const sinPhi = Math.sin(phi);
-      for (let tubularIndex = 0; tubularIndex < tubularVertexCount; tubularIndex += 1) {
-        const uNormalized = tubularIndex / tubularSegments;
-        const theta = uNormalized * TWO_PI2;
-        const cosTheta = Math.cos(theta);
-        const sinTheta = Math.sin(theta);
-        const ringRadius = majorRadius + tubeRadius * cosPhi;
-        const positionX = ringRadius * cosTheta;
-        const positionY = tubeRadius * sinPhi;
-        const positionZ = ringRadius * sinTheta;
-        const positionBase = vertexIndex * VEC3_COMPONENT_COUNT4;
-        positions[positionBase + 0] = positionX;
-        positions[positionBase + 1] = positionY;
-        positions[positionBase + 2] = positionZ;
-        normals[positionBase + 0] = cosTheta * cosPhi;
-        normals[positionBase + 1] = sinPhi;
-        normals[positionBase + 2] = sinTheta * cosPhi;
-        const uvBase = vertexIndex * VEC2_COMPONENT_COUNT3;
-        uvs[uvBase + 0] = uNormalized;
-        uvs[uvBase + 1] = UV_V_FLIP_BASE4 - vNormalized;
-        vertexIndex += 1;
-      }
-    }
+    const positions = new Float32Array(vertexCount * positionComponentCount);
+    const normals = new Float32Array(vertexCount * positionComponentCount);
+    const uvs = new Float32Array(vertexCount * uvComponentCount);
+    _TorusGeometry.#writeVertices(positions, normals, uvs, normalized);
     const indicesSolidList = [];
-    for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
-      for (let tubularIndex = 0; tubularIndex < tubularSegments; tubularIndex += 1) {
-        const topLeftVertexIndex = radialIndex * tubularVertexCount + tubularIndex;
-        const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET4;
-        const bottomLeftVertexIndex = topLeftVertexIndex + tubularVertexCount;
-        const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET4;
-        indicesSolidList.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
-        indicesSolidList.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
-      }
-    }
-    const indicesSolid = createIndexArray(vertexCount, indicesSolidList);
-    const indicesWireframe = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
-    const colors = createColorsFromSpec(vertexCount, options.colors);
+    GeometryUtils.appendGridTriangleIndices(indicesSolidList, tubularSegments, radialSegments);
+    const indicesSolid = GeometryUtils.createIndexArray(vertexCount, indicesSolidList);
+    const indicesWireframe = GeometryUtils.createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
+    const colors = GeometryUtils.createColorsFromSpec(vertexCount, normalized.colors);
     return {
       positions,
       normals,
@@ -3376,49 +3636,83 @@ var TorusGeometry = class _TorusGeometry extends Geometry {
       indicesWireframe
     };
   }
+  /**
+   * Writes the grid positions, normals and texture coordinates.
+   *
+   * @param {Float32Array} positions                    - Output positions.
+   * @param {Float32Array} normals                      - Output normals.
+   * @param {Float32Array} uvs                          - Output texture coordinates.
+   * @param {Required<TorusGeometryOptions>} normalized - Normalized geometry options.
+   * @private
+   */
+  static #writeVertices(positions, normals, uvs, normalized) {
+    const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+    const uvComponentCount = GEOMETRY_LAYOUT.UV_COMPONENT_COUNT;
+    const fullTurn = GEOMETRY_ANGLES.FULL_TURN;
+    const xComponentIndex = MATH_VECTOR3_INDEXES.X;
+    const yComponentIndex = MATH_VECTOR3_INDEXES.Y;
+    const zComponentIndex = MATH_VECTOR3_INDEXES.Z;
+    const majorRadius = normalized.width / GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
+    const tubeRadius = normalized.height / GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
+    const tubularSegments = normalized.tubularSegments;
+    const radialSegments = normalized.radialSegments;
+    const tubularVertexCount = tubularSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+    const radialVertexCount = radialSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+    let vertexIndex = MATH_COMMON_VALUES.ZERO;
+    for (let radialIndex = MATH_COMMON_VALUES.ZERO; radialIndex < radialVertexCount; radialIndex += MATH_COMMON_VALUES.UNIT) {
+      const vNormalized = radialIndex / radialSegments;
+      const phi = vNormalized * fullTurn;
+      const cosPhi = Math.cos(phi);
+      const sinPhi = Math.sin(phi);
+      for (let tubularIndex = MATH_COMMON_VALUES.ZERO; tubularIndex < tubularVertexCount; tubularIndex += MATH_COMMON_VALUES.UNIT) {
+        const uNormalized = tubularIndex / tubularSegments;
+        const theta = uNormalized * fullTurn;
+        const cosTheta = Math.cos(theta);
+        const sinTheta = Math.sin(theta);
+        const ringRadius = majorRadius + tubeRadius * cosPhi;
+        const positionX = ringRadius * cosTheta;
+        const positionY = tubeRadius * sinPhi;
+        const positionZ = ringRadius * sinTheta;
+        const positionBase = vertexIndex * positionComponentCount;
+        positions[positionBase + xComponentIndex] = positionX;
+        positions[positionBase + yComponentIndex] = positionY;
+        positions[positionBase + zComponentIndex] = positionZ;
+        normals[positionBase + xComponentIndex] = cosTheta * cosPhi;
+        normals[positionBase + yComponentIndex] = sinPhi;
+        normals[positionBase + zComponentIndex] = sinTheta * cosPhi;
+        const uvBase = vertexIndex * uvComponentCount;
+        uvs[uvBase + GEOMETRY_UV_INDEXES.U] = uNormalized;
+        uvs[uvBase + GEOMETRY_UV_INDEXES.V] = GEOMETRY_UV.V_FLIP_BASE - vNormalized;
+        vertexIndex += MATH_COMMON_VALUES.UNIT;
+      }
+    }
+  }
 };
 
+// core/constants/cone-geometry.js
+var CONE_DEFAULTS = Object.freeze({
+  WIDTH: 1,
+  HEIGHT: 1.5,
+  RADIAL_SEGMENTS: 24,
+  HEIGHT_SEGMENTS: 1
+});
+var CONE_LIMITS = Object.freeze({
+  MIN_RADIAL_SEGMENT_COUNT: 3,
+  MIN_HEIGHT_SEGMENT_COUNT: 1
+});
+var CONE_NORMALS = Object.freeze({
+  X_ZERO: 0,
+  Z_ZERO: 0,
+  Y_UP: 1,
+  Y_DOWN: -1
+});
+var CONE_LAYOUT = Object.freeze({
+  ORIGIN: 0,
+  ZERO_VERTEX_COUNT: 0
+});
+
 // core/geometry/cone-geometry.js
-var DEFAULT_CONE_WIDTH = 1;
-var DEFAULT_CONE_HEIGHT = 1.5;
-var DEFAULT_RADIAL_SEGMENTS2 = 24;
-var DEFAULT_HEIGHT_SEGMENTS2 = 1;
-var MIN_RADIAL_SEGMENT_COUNT = 3;
-var MIN_HEIGHT_SEGMENT_COUNT2 = 1;
-var HALF_SIZE_DIVISOR4 = 2;
-var VERTICES_PER_SEGMENT_INCREMENT5 = 1;
-var NEXT_INDEX_OFFSET = 1;
-var UV_V_FLIP_BASE5 = 1;
-var UV_CENTER = 0.5;
-var TWO_PI3 = Math.PI * 2;
-var NORMAL_X_ZERO = 0;
-var NORMAL_Z_ZERO = 0;
-var NORMAL_Y_UP = 1;
-var NORMAL_Y_DOWN = -1;
-var ORIGIN = 0;
-var DOUBLE_SIZE_MULTIPLIER = 2;
-var ZERO_VALUE6 = 0;
-var VEC3_COMPONENT_COUNT5 = 3;
-var VEC2_COMPONENT_COUNT4 = 2;
-var ZERO_VERTEX_COUNT = 0;
-var ConeGeometry = class _ConeGeometry extends Geometry {
-  /**
-   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
-   * @param {ConeGeometryOptions} [options = {}]  - Geometry options.
-   */
-  constructor(webglContext, options = {}) {
-    const normalized = _ConeGeometry.#normalizeOptions(options);
-    const data = _ConeGeometry.#createGeometryData(normalized);
-    super(
-      webglContext,
-      data.positions,
-      data.colors,
-      data.indicesSolid,
-      data.indicesWireframe,
-      data.uvs,
-      data.normals
-    );
-  }
+var ConeGeometry = class _ConeGeometry extends GeneratedGeometry {
   /**
    * Normalizes constructor input to a `ConeGeometryOptions` object.
    *
@@ -3427,190 +3721,64 @@ var ConeGeometry = class _ConeGeometry extends Geometry {
    * @private
    */
   static #normalizeOptions(options) {
-    if (options === null || typeof options !== "object") {
-      throw new TypeError("`ConeGeometry` expects options as an object.");
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT) {
+      throw new TypeError("ConeGeometry expects options as an object.");
     }
     const {
-      width = DEFAULT_CONE_WIDTH,
-      height = DEFAULT_CONE_HEIGHT,
+      width = CONE_DEFAULTS.WIDTH,
+      height = CONE_DEFAULTS.HEIGHT,
       depth = width,
-      radialSegments = DEFAULT_RADIAL_SEGMENTS2,
-      heightSegments = DEFAULT_HEIGHT_SEGMENTS2,
-      capped = true,
+      radialSegments = CONE_DEFAULTS.RADIAL_SEGMENTS,
+      heightSegments = CONE_DEFAULTS.HEIGHT_SEGMENTS,
+      capped = GEOMETRY_DEFAULTS.CAPPED,
       colors = DEFAULT_VERTEX_COLOR
     } = options;
-    if (typeof width !== "number" || typeof height !== "number" || typeof depth !== "number") {
-      throw new TypeError("`ConeGeometry` expects `width/height/depth` as numbers.");
+    if (typeof width !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || typeof height !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || typeof depth !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER) {
+      throw new TypeError("ConeGeometry expects width, height or depth as numbers.");
     }
     if (!Number.isFinite(width) || !Number.isFinite(height) || !Number.isFinite(depth)) {
-      throw new RangeError("`ConeGeometry` expects finite `width/height/depth`.");
+      throw new RangeError("ConeGeometry expects finite width, height or depth.");
     }
     if (!(colors instanceof Float32Array)) {
-      throw new TypeError("`ConeGeometry` expects colors as a `Float32Array`.");
+      throw new TypeError("ConeGeometry expects colors as a Float32Array.");
     }
     return {
       width,
       height,
       depth,
-      radialSegments: _ConeGeometry.#normalizeSegmentCount(radialSegments, "radialSegments", MIN_RADIAL_SEGMENT_COUNT),
-      heightSegments: _ConeGeometry.#normalizeSegmentCount(heightSegments, "heightSegments", MIN_HEIGHT_SEGMENT_COUNT2),
+      radialSegments: GeometryUtils.normalizeSegmentCount(radialSegments, "radialSegments", CONE_LIMITS.MIN_RADIAL_SEGMENT_COUNT, "ConeGeometry"),
+      heightSegments: GeometryUtils.normalizeSegmentCount(heightSegments, "heightSegments", CONE_LIMITS.MIN_HEIGHT_SEGMENT_COUNT, "ConeGeometry"),
       capped: Boolean(capped),
       colors
     };
   }
   /**
-   * Normalizes and validates a segment count parameter.
+   * Generates vertex and index buffers from construction options.
    *
-   * @param {number} value      - Segment count.
-   * @param {string} optionName - Option name.
-   * @param {number} minValue   - Minimal allowed value.
-   * @returns {number}          - Normalized integer segment count.
-   * @private
+   * @param {ConeGeometryOptions} [options] - Geometry options.
+   * @returns {ConeGeometryData}            - Generated CPU buffers.
+   * @protected
    */
-  static #normalizeSegmentCount(value, optionName, minValue) {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      throw new TypeError("`ConeGeometry` expects `{name}` as a finite number.".replace("{name}", optionName));
+  static createGeometryData(options = {}) {
+    const normalized = _ConeGeometry.#normalizeOptions(options);
+    const ringVertexCount = normalized.radialSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+    const sideVertexCount = normalized.heightSegments * ringVertexCount;
+    const capVertexCount = normalized.capped ? ringVertexCount + GEOMETRY_GRID.VERTEX_INCREMENT : CONE_LAYOUT.ZERO_VERTEX_COUNT;
+    const vertexCount = sideVertexCount + GEOMETRY_GRID.VERTEX_INCREMENT + capVertexCount;
+    const positions = new Float32Array(vertexCount * GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT);
+    const normals = new Float32Array(vertexCount * GEOMETRY_LAYOUT.NORMAL_COMPONENT_COUNT);
+    const uvs = new Float32Array(vertexCount * GEOMETRY_LAYOUT.UV_COMPONENT_COUNT);
+    const apexIndex = _ConeGeometry.#writeSides(positions, normals, uvs, normalized);
+    const capCenterIndex = apexIndex + GEOMETRY_GRID.VERTEX_INCREMENT;
+    _ConeGeometry.#writeApex(positions, normals, uvs, normalized, apexIndex);
+    if (normalized.capped) {
+      _ConeGeometry.#writeCapCenter(positions, normals, uvs, normalized, capCenterIndex);
+      _ConeGeometry.#writeCapRing(positions, normals, uvs, normalized, capCenterIndex);
     }
-    const intValue = Math.floor(value);
-    if (intValue < minValue) {
-      throw new RangeError(
-        "`ConeGeometry` expects `{name}` to be `>= {min}`.".replace("{name}", optionName).replace("{min}", String(minValue))
-      );
-    }
-    return intValue;
-  }
-  /**
-   * Creates full geometry data for a segmented cone.
-   *
-   * @param {Required<ConeGeometryOptions>} options - Normalized options.
-   * @returns {ConeGeometryData}                    - Geometry buffers.
-   * @private
-   */
-  static #createGeometryData(options) {
-    const radiusX = options.width / HALF_SIZE_DIVISOR4;
-    const radiusZ = options.depth / HALF_SIZE_DIVISOR4;
-    const height = options.height;
-    const radialSegments = options.radialSegments;
-    const heightSegments = options.heightSegments;
-    const ringVertexCount = radialSegments + VERTICES_PER_SEGMENT_INCREMENT5;
-    const sideRingCount = heightSegments;
-    const sideVertexCount = sideRingCount * ringVertexCount;
-    const hasCap = options.capped;
-    const capVertexCount = hasCap ? ringVertexCount + VERTICES_PER_SEGMENT_INCREMENT5 : ZERO_VERTEX_COUNT;
-    const vertexCount = sideVertexCount + VERTICES_PER_SEGMENT_INCREMENT5 + capVertexCount;
-    const positions = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT5);
-    const normals = new Float32Array(vertexCount * VEC3_COMPONENT_COUNT5);
-    const uvs = new Float32Array(vertexCount * VEC2_COMPONENT_COUNT4);
-    let vertexIndex = 0;
-    for (let heightRingIndex = 0; heightRingIndex < sideRingCount; heightRingIndex += 1) {
-      const heightNormalized = heightRingIndex / heightSegments;
-      const radiusFactor = UV_V_FLIP_BASE5 - heightNormalized;
-      const positionY = -height / HALF_SIZE_DIVISOR4 + heightNormalized * height;
-      const currentRadiusX = radiusX * radiusFactor;
-      const currentRadiusZ = radiusZ * radiusFactor;
-      for (let radialVertexIndex = 0; radialVertexIndex < ringVertexCount; radialVertexIndex += 1) {
-        const uNormalized = radialVertexIndex / radialSegments;
-        const angleRadians = uNormalized * TWO_PI3;
-        const cosTheta = Math.cos(angleRadians);
-        const sinTheta = Math.sin(angleRadians);
-        const positionX = cosTheta * currentRadiusX;
-        const positionZ = sinTheta * currentRadiusZ;
-        const positionBaseOffset = vertexIndex * VEC3_COMPONENT_COUNT5;
-        positions[positionBaseOffset + 0] = positionX;
-        positions[positionBaseOffset + 1] = positionY;
-        positions[positionBaseOffset + 2] = positionZ;
-        const normalX0 = radiusZ * height * cosTheta;
-        const normalY0 = radiusX * radiusZ;
-        const normalZ0 = radiusX * height * sinTheta;
-        const inverseNormalLength = _ConeGeometry.#inverseLength(normalX0, normalY0, normalZ0);
-        normals[positionBaseOffset + 0] = normalX0 * inverseNormalLength;
-        normals[positionBaseOffset + 1] = normalY0 * inverseNormalLength;
-        normals[positionBaseOffset + 2] = normalZ0 * inverseNormalLength;
-        const uvBaseOffset = vertexIndex * VEC2_COMPONENT_COUNT4;
-        uvs[uvBaseOffset + 0] = uNormalized;
-        uvs[uvBaseOffset + 1] = UV_V_FLIP_BASE5 - heightNormalized;
-        vertexIndex += 1;
-      }
-    }
-    const apexIndex = vertexIndex;
-    {
-      const apexBaseOffset = apexIndex * VEC3_COMPONENT_COUNT5;
-      positions[apexBaseOffset + 0] = ORIGIN;
-      positions[apexBaseOffset + 1] = height / HALF_SIZE_DIVISOR4;
-      positions[apexBaseOffset + 2] = ORIGIN;
-      normals[apexBaseOffset + 0] = NORMAL_X_ZERO;
-      normals[apexBaseOffset + 1] = NORMAL_Y_UP;
-      normals[apexBaseOffset + 2] = NORMAL_Z_ZERO;
-      const apexUvOffset = apexIndex * VEC2_COMPONENT_COUNT4;
-      uvs[apexUvOffset + 0] = UV_CENTER;
-      uvs[apexUvOffset + 1] = ORIGIN;
-    }
-    vertexIndex += 1;
-    const capCenterIndex = vertexIndex;
-    if (hasCap) {
-      {
-        const capCenterBaseOffset = capCenterIndex * VEC3_COMPONENT_COUNT5;
-        positions[capCenterBaseOffset + 0] = ORIGIN;
-        positions[capCenterBaseOffset + 1] = -height / HALF_SIZE_DIVISOR4;
-        positions[capCenterBaseOffset + 2] = ORIGIN;
-        normals[capCenterBaseOffset + 0] = NORMAL_X_ZERO;
-        normals[capCenterBaseOffset + 1] = NORMAL_Y_DOWN;
-        normals[capCenterBaseOffset + 2] = NORMAL_Z_ZERO;
-        const capCenterUvOffset = capCenterIndex * VEC2_COMPONENT_COUNT4;
-        uvs[capCenterUvOffset + 0] = UV_CENTER;
-        uvs[capCenterUvOffset + 1] = UV_CENTER;
-      }
-      vertexIndex += 1;
-      for (let radialVertexIndex = 0; radialVertexIndex < ringVertexCount; radialVertexIndex += 1) {
-        const uNormalized = radialVertexIndex / radialSegments;
-        const angleRadians = uNormalized * TWO_PI3;
-        const cosTheta = Math.cos(angleRadians);
-        const sinTheta = Math.sin(angleRadians);
-        const positionX = cosTheta * radiusX;
-        const positionZ = sinTheta * radiusZ;
-        const positionBaseOffset = vertexIndex * VEC3_COMPONENT_COUNT5;
-        positions[positionBaseOffset + 0] = positionX;
-        positions[positionBaseOffset + 1] = -height / HALF_SIZE_DIVISOR4;
-        positions[positionBaseOffset + 2] = positionZ;
-        normals[positionBaseOffset + 0] = NORMAL_X_ZERO;
-        normals[positionBaseOffset + 1] = NORMAL_Y_DOWN;
-        normals[positionBaseOffset + 2] = NORMAL_Z_ZERO;
-        const uvBaseOffset = vertexIndex * VEC2_COMPONENT_COUNT4;
-        uvs[uvBaseOffset + 0] = radiusX === ZERO_VALUE6 ? UV_CENTER : positionX / (radiusX * DOUBLE_SIZE_MULTIPLIER) + UV_CENTER;
-        uvs[uvBaseOffset + 1] = radiusZ === ZERO_VALUE6 ? UV_CENTER : positionZ / (radiusZ * DOUBLE_SIZE_MULTIPLIER) + UV_CENTER;
-        vertexIndex += 1;
-      }
-    }
-    const solidTriangleIndices = [];
-    for (let heightRingIndex = 0; heightRingIndex < sideRingCount - VERTICES_PER_SEGMENT_INCREMENT5; heightRingIndex += 1) {
-      const currentRingStartIndex = heightRingIndex * ringVertexCount;
-      const nextRingStartIndex = (heightRingIndex + VERTICES_PER_SEGMENT_INCREMENT5) * ringVertexCount;
-      for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
-        const topLeftVertexIndex = currentRingStartIndex + radialIndex;
-        const topRightVertexIndex = topLeftVertexIndex + NEXT_INDEX_OFFSET;
-        const bottomLeftVertexIndex = nextRingStartIndex + radialIndex;
-        const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_INDEX_OFFSET;
-        solidTriangleIndices.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
-        solidTriangleIndices.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
-      }
-    }
-    const topRingStartIndex = (sideRingCount - VERTICES_PER_SEGMENT_INCREMENT5) * ringVertexCount;
-    for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
-      const topLeftVertexIndex = topRingStartIndex + radialIndex;
-      const topRightVertexIndex = topLeftVertexIndex + NEXT_INDEX_OFFSET;
-      solidTriangleIndices.push(topLeftVertexIndex, apexIndex, topRightVertexIndex);
-    }
-    if (hasCap) {
-      const capRingStartIndex = capCenterIndex + VERTICES_PER_SEGMENT_INCREMENT5;
-      for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
-        const capLeftVertexIndex = capRingStartIndex + radialIndex;
-        const capRightVertexIndex = capRingStartIndex + radialIndex + VERTICES_PER_SEGMENT_INCREMENT5;
-        solidTriangleIndices.push(capCenterIndex, capRightVertexIndex, capLeftVertexIndex);
-      }
-    }
-    const indicesSolid = createIndexArray(vertexCount, solidTriangleIndices);
-    const indicesWireframe = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
-    const colors = createColorsFromSpec(vertexCount, options.colors);
+    const indexList = _ConeGeometry.#createTriangleIndices(normalized, apexIndex, capCenterIndex);
+    const indicesSolid = GeometryUtils.createIndexArray(vertexCount, indexList);
+    const indicesWireframe = GeometryUtils.createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
+    const colors = GeometryUtils.createColorsFromSpec(vertexCount, normalized.colors);
     return {
       positions,
       normals,
@@ -3632,51 +3800,265 @@ var ConeGeometry = class _ConeGeometry extends Geometry {
    */
   static #inverseLength(x, y, z) {
     const length = Math.sqrt(x * x + y * y + z * z);
-    if (length === ZERO_VALUE6) {
-      return ZERO_VALUE6;
+    if (length === MATH_COMMON_VALUES.ZERO) {
+      return MATH_COMMON_VALUES.ZERO;
     }
-    return UV_V_FLIP_BASE5 / length;
+    return MATH_COMMON_VALUES.UNIT / length;
+  }
+  /**
+   * Writes the side rings and returns the apex vertex index.
+   *
+   * @param {Float32Array} positions                   - Output positions.
+   * @param {Float32Array} normals                     - Output normals.
+   * @param {Float32Array} uvs                         - Output texture coordinates.
+   * @param {Required<ConeGeometryOptions>} normalized - Normalized geometry options.
+   * @returns {number}
+   * @private
+   */
+  static #writeSides(positions, normals, uvs, normalized) {
+    const halfSizeDivisor = GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
+    const vertexIncrement = GEOMETRY_GRID.VERTEX_INCREMENT;
+    const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+    const uvComponentCount = GEOMETRY_LAYOUT.UV_COMPONENT_COUNT;
+    const vFlipBase = GEOMETRY_UV.V_FLIP_BASE;
+    const fullTurn = GEOMETRY_ANGLES.FULL_TURN;
+    const xComponentIndex = MATH_VECTOR3_INDEXES.X;
+    const yComponentIndex = MATH_VECTOR3_INDEXES.Y;
+    const zComponentIndex = MATH_VECTOR3_INDEXES.Z;
+    const uIndex = GEOMETRY_UV_INDEXES.U;
+    const vIndex = GEOMETRY_UV_INDEXES.V;
+    const radiusX = normalized.width / halfSizeDivisor;
+    const radiusZ = normalized.depth / halfSizeDivisor;
+    const height = normalized.height;
+    const radialSegments = normalized.radialSegments;
+    const heightSegments = normalized.heightSegments;
+    const ringVertexCount = radialSegments + vertexIncrement;
+    const sideRingCount = heightSegments;
+    let vertexIndex = MATH_COMMON_VALUES.ZERO;
+    for (let heightRingIndex = MATH_COMMON_VALUES.ZERO; heightRingIndex < sideRingCount; heightRingIndex += MATH_COMMON_VALUES.UNIT) {
+      const heightNormalized = heightRingIndex / heightSegments;
+      const radiusFactor = vFlipBase - heightNormalized;
+      const positionY = -height / halfSizeDivisor + heightNormalized * height;
+      const currentRadiusX = radiusX * radiusFactor;
+      const currentRadiusZ = radiusZ * radiusFactor;
+      for (let radialVertexIndex = MATH_COMMON_VALUES.ZERO; radialVertexIndex < ringVertexCount; radialVertexIndex += MATH_COMMON_VALUES.UNIT) {
+        const uNormalized = radialVertexIndex / radialSegments;
+        const angleRadians = uNormalized * fullTurn;
+        const cosTheta = Math.cos(angleRadians);
+        const sinTheta = Math.sin(angleRadians);
+        const positionX = cosTheta * currentRadiusX;
+        const positionZ = sinTheta * currentRadiusZ;
+        const positionBaseOffset = vertexIndex * positionComponentCount;
+        positions[positionBaseOffset + xComponentIndex] = positionX;
+        positions[positionBaseOffset + yComponentIndex] = positionY;
+        positions[positionBaseOffset + zComponentIndex] = positionZ;
+        const normalX0 = radiusZ * height * cosTheta;
+        const normalY0 = radiusX * radiusZ;
+        const normalZ0 = radiusX * height * sinTheta;
+        const inverseNormalLength = _ConeGeometry.#inverseLength(normalX0, normalY0, normalZ0);
+        const uvBaseOffset = vertexIndex * uvComponentCount;
+        normals[positionBaseOffset + xComponentIndex] = normalX0 * inverseNormalLength;
+        normals[positionBaseOffset + yComponentIndex] = normalY0 * inverseNormalLength;
+        normals[positionBaseOffset + zComponentIndex] = normalZ0 * inverseNormalLength;
+        uvs[uvBaseOffset + uIndex] = uNormalized;
+        uvs[uvBaseOffset + vIndex] = vFlipBase - heightNormalized;
+        vertexIndex += MATH_COMMON_VALUES.UNIT;
+      }
+    }
+    return vertexIndex;
+  }
+  /**
+   * Writes the apex position, upward normal and texture coordinates.
+   *
+   * @param {Float32Array} positions                   - Output positions.
+   * @param {Float32Array} normals                     - Output normals.
+   * @param {Float32Array} uvs                         - Output texture coordinates.
+   * @param {Required<ConeGeometryOptions>} normalized - Normalized geometry options.
+   * @param {number} apexIndex                         - Apex index.
+   * @private
+   */
+  static #writeApex(positions, normals, uvs, normalized, apexIndex) {
+    const halfSizeDivisor = GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
+    const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+    const uvComponentCount = GEOMETRY_LAYOUT.UV_COMPONENT_COUNT;
+    const xComponentIndex = MATH_VECTOR3_INDEXES.X;
+    const yComponentIndex = MATH_VECTOR3_INDEXES.Y;
+    const zComponentIndex = MATH_VECTOR3_INDEXES.Z;
+    const uIndex = GEOMETRY_UV_INDEXES.U;
+    const vIndex = GEOMETRY_UV_INDEXES.V;
+    const xZero = CONE_NORMALS.X_ZERO;
+    const zZero = CONE_NORMALS.Z_ZERO;
+    const center = GEOMETRY_UV.CENTER;
+    const height = normalized.height;
+    const apexBaseOffset = apexIndex * positionComponentCount;
+    positions[apexBaseOffset + xComponentIndex] = CONE_LAYOUT.ORIGIN;
+    positions[apexBaseOffset + yComponentIndex] = height / halfSizeDivisor;
+    positions[apexBaseOffset + zComponentIndex] = CONE_LAYOUT.ORIGIN;
+    normals[apexBaseOffset + xComponentIndex] = xZero;
+    normals[apexBaseOffset + yComponentIndex] = CONE_NORMALS.Y_UP;
+    normals[apexBaseOffset + zComponentIndex] = zZero;
+    const apexUvOffset = apexIndex * uvComponentCount;
+    uvs[apexUvOffset + uIndex] = center;
+    uvs[apexUvOffset + vIndex] = CONE_LAYOUT.ORIGIN;
+  }
+  /**
+   * Writes the bottom cap center and its downward normal.
+   *
+   * @param {Float32Array} positions                   - Output positions.
+   * @param {Float32Array} normals                     - Output normals.
+   * @param {Float32Array} uvs                         - Output texture coordinates.
+   * @param {Required<ConeGeometryOptions>} normalized - Normalized geometry options.
+   * @param {number} capCenterIndex                    - Cap center index.
+   * @private
+   */
+  static #writeCapCenter(positions, normals, uvs, normalized, capCenterIndex) {
+    const halfSizeDivisor = GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
+    const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+    const uvComponentCount = GEOMETRY_LAYOUT.UV_COMPONENT_COUNT;
+    const xComponentIndex = MATH_VECTOR3_INDEXES.X;
+    const yComponentIndex = MATH_VECTOR3_INDEXES.Y;
+    const zComponentIndex = MATH_VECTOR3_INDEXES.Z;
+    const uIndex = GEOMETRY_UV_INDEXES.U;
+    const vIndex = GEOMETRY_UV_INDEXES.V;
+    const xZero = CONE_NORMALS.X_ZERO;
+    const zZero = CONE_NORMALS.Z_ZERO;
+    const center = GEOMETRY_UV.CENTER;
+    const yDown = CONE_NORMALS.Y_DOWN;
+    const height = normalized.height;
+    const capCenterBaseOffset = capCenterIndex * positionComponentCount;
+    positions[capCenterBaseOffset + xComponentIndex] = CONE_LAYOUT.ORIGIN;
+    positions[capCenterBaseOffset + yComponentIndex] = -height / halfSizeDivisor;
+    positions[capCenterBaseOffset + zComponentIndex] = CONE_LAYOUT.ORIGIN;
+    normals[capCenterBaseOffset + xComponentIndex] = xZero;
+    normals[capCenterBaseOffset + yComponentIndex] = yDown;
+    normals[capCenterBaseOffset + zComponentIndex] = zZero;
+    const capCenterUvOffset = capCenterIndex * uvComponentCount;
+    uvs[capCenterUvOffset + uIndex] = center;
+    uvs[capCenterUvOffset + vIndex] = center;
+  }
+  /**
+   * Writes the bottom cap rim with radial texture coordinates.
+   *
+   * @param {Float32Array} positions                   - Output positions.
+   * @param {Float32Array} normals                     - Output normals.
+   * @param {Float32Array} uvs                         - Output texture coordinates.
+   * @param {Required<ConeGeometryOptions>} normalized - Normalized geometry options.
+   * @param {number} capCenterIndex                    - Cap center index.
+   * @private
+   */
+  static #writeCapRing(positions, normals, uvs, normalized, capCenterIndex) {
+    const halfSizeDivisor = GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
+    const vertexIncrement = GEOMETRY_GRID.VERTEX_INCREMENT;
+    const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+    const uvComponentCount = GEOMETRY_LAYOUT.UV_COMPONENT_COUNT;
+    const fullTurn = GEOMETRY_ANGLES.FULL_TURN;
+    const xComponentIndex = MATH_VECTOR3_INDEXES.X;
+    const yComponentIndex = MATH_VECTOR3_INDEXES.Y;
+    const zComponentIndex = MATH_VECTOR3_INDEXES.Z;
+    const uIndex = GEOMETRY_UV_INDEXES.U;
+    const vIndex = GEOMETRY_UV_INDEXES.V;
+    const xZero = CONE_NORMALS.X_ZERO;
+    const zZero = CONE_NORMALS.Z_ZERO;
+    const center = GEOMETRY_UV.CENTER;
+    const yDown = CONE_NORMALS.Y_DOWN;
+    const doubleSizeMultiplier = GEOMETRY_SIZES.DOUBLE_SIZE_MULTIPLIER;
+    const radiusX = normalized.width / halfSizeDivisor;
+    const radiusZ = normalized.depth / halfSizeDivisor;
+    const height = normalized.height;
+    const radialSegments = normalized.radialSegments;
+    const ringVertexCount = radialSegments + vertexIncrement;
+    let vertexIndex = capCenterIndex + GEOMETRY_GRID.VERTEX_INCREMENT;
+    for (let radialVertexIndex = MATH_COMMON_VALUES.ZERO; radialVertexIndex < ringVertexCount; radialVertexIndex += MATH_COMMON_VALUES.UNIT) {
+      const uNormalized = radialVertexIndex / radialSegments;
+      const angleRadians = uNormalized * fullTurn;
+      const cosTheta = Math.cos(angleRadians);
+      const sinTheta = Math.sin(angleRadians);
+      const positionX = cosTheta * radiusX;
+      const positionZ = sinTheta * radiusZ;
+      const positionBaseOffset = vertexIndex * positionComponentCount;
+      positions[positionBaseOffset + xComponentIndex] = positionX;
+      positions[positionBaseOffset + yComponentIndex] = -height / halfSizeDivisor;
+      positions[positionBaseOffset + zComponentIndex] = positionZ;
+      normals[positionBaseOffset + xComponentIndex] = xZero;
+      normals[positionBaseOffset + yComponentIndex] = yDown;
+      normals[positionBaseOffset + zComponentIndex] = zZero;
+      const uvBaseOffset = vertexIndex * uvComponentCount;
+      uvs[uvBaseOffset + uIndex] = radiusX === MATH_COMMON_VALUES.ZERO ? center : positionX / (radiusX * doubleSizeMultiplier) + center;
+      uvs[uvBaseOffset + vIndex] = radiusZ === MATH_COMMON_VALUES.ZERO ? center : positionZ / (radiusZ * doubleSizeMultiplier) + center;
+      vertexIndex += MATH_COMMON_VALUES.UNIT;
+    }
+  }
+  /**
+   * Connects the side rings, apex and optional bottom cap.
+   *
+   * @param {Required<ConeGeometryOptions>} normalized - Normalized geometry options.
+   * @param {number} apexIndex                         - Apex index.
+   * @param {number} capCenterIndex                    - Cap center index.
+   * @returns {number[]}
+   * @private
+   */
+  static #createTriangleIndices(normalized, apexIndex, capCenterIndex) {
+    const vertexIncrement = GEOMETRY_GRID.VERTEX_INCREMENT;
+    const nextVertexOffset = GEOMETRY_GRID.NEXT_VERTEX_OFFSET;
+    const radialSegments = normalized.radialSegments;
+    const heightSegments = normalized.heightSegments;
+    const ringVertexCount = radialSegments + vertexIncrement;
+    const sideRingCount = heightSegments;
+    const hasCap = normalized.capped;
+    const solidTriangleIndices = [];
+    GeometryUtils.appendGridTriangleIndices(solidTriangleIndices, radialSegments, sideRingCount - vertexIncrement);
+    const topRingStartIndex = (sideRingCount - vertexIncrement) * ringVertexCount;
+    for (let radialIndex = MATH_COMMON_VALUES.ZERO; radialIndex < radialSegments; radialIndex += MATH_COMMON_VALUES.UNIT) {
+      const topLeftVertexIndex = topRingStartIndex + radialIndex;
+      const topRightVertexIndex = topLeftVertexIndex + nextVertexOffset;
+      solidTriangleIndices.push(topLeftVertexIndex, apexIndex, topRightVertexIndex);
+    }
+    if (hasCap) {
+      _ConeGeometry.#appendCapIndices(solidTriangleIndices, radialSegments, capCenterIndex);
+    }
+    return solidTriangleIndices;
+  }
+  /**
+   * Appends the triangle fan around the bottom cap center.
+   *
+   * @param {number[]} solidTriangleIndices - Output triangle indexes.
+   * @param {number} radialSegments         - Radial segments.
+   * @param {number} capCenterIndex         - Cap center index.
+   * @private
+   */
+  static #appendCapIndices(solidTriangleIndices, radialSegments, capCenterIndex) {
+    const vertexIncrement = GEOMETRY_GRID.VERTEX_INCREMENT;
+    const capRingStartIndex = capCenterIndex + vertexIncrement;
+    for (let radialIndex = MATH_COMMON_VALUES.ZERO; radialIndex < radialSegments; radialIndex += MATH_COMMON_VALUES.UNIT) {
+      const capLeftVertexIndex = capRingStartIndex + radialIndex;
+      const capRightVertexIndex = capRingStartIndex + radialIndex + vertexIncrement;
+      solidTriangleIndices.push(capCenterIndex, capRightVertexIndex, capLeftVertexIndex);
+    }
   }
 };
 
+// core/constants/pyramid-geometry.js
+var PYRAMID_DEFAULTS = Object.freeze({
+  WIDTH: 1,
+  HEIGHT: 1.5,
+  BASE_SEGMENT_COUNT: 1,
+  HEIGHT_SEGMENT_COUNT: 1
+});
+var PYRAMID_LIMITS = Object.freeze({ MIN_SEGMENT_COUNT: 1 });
+var PYRAMID_LAYOUT = Object.freeze({
+  NEGATIVE_ONE_VALUE: -1,
+  APEX_UV_U: 0.5,
+  APEX_UV_V: 0
+});
+var PYRAMID_DIRECTIONS = Object.freeze({
+  FRONT: GEOMETRY_DIRECTIONS.POSITIVE_Z,
+  RIGHT: GEOMETRY_DIRECTIONS.POSITIVE_X,
+  BACK: GEOMETRY_DIRECTIONS.NEGATIVE_Z,
+  LEFT: GEOMETRY_DIRECTIONS.NEGATIVE_X
+});
+
 // core/geometry/pyramid-geometry.js
-var DEFAULT_PYRAMID_WIDTH = 1;
-var DEFAULT_PYRAMID_HEIGHT = 1.5;
-var DEFAULT_BASE_SEGMENT_COUNT = 1;
-var DEFAULT_HEIGHT_SEGMENT_COUNT = 1;
-var MIN_SEGMENT_COUNT4 = 1;
-var HALF_SIZE_DIVISOR5 = 2;
-var CENTER_T_OFFSET3 = 0.5;
-var UV_V_FLIP_BASE6 = 1;
-var VERTICES_PER_SEGMENT_INCREMENT6 = 1;
-var NEXT_VERTEX_OFFSET5 = 1;
-var ZERO_VALUE7 = 0;
-var ONE_VALUE5 = 1;
-var NEGATIVE_ONE_VALUE = -1;
-var APEX_UV_U = 0.5;
-var APEX_UV_V = 0;
-var OUTWARD_HINT_FRONT = [0, 0, 1];
-var OUTWARD_HINT_RIGHT = [1, 0, 0];
-var OUTWARD_HINT_BACK = [0, 0, -1];
-var OUTWARD_HINT_LEFT = [-1, 0, 0];
-var PyramidGeometry = class _PyramidGeometry extends Geometry {
-  /**
-   * @param {WebGL2RenderingContext} webglContext   - WebGL2 rendering context.
-   * @param {PyramidGeometryOptions} [options = {}] - Geometry options.
-   */
-  constructor(webglContext, options = {}) {
-    const normalized = _PyramidGeometry.#normalizeOptions(options);
-    const data = _PyramidGeometry.#createGeometryData(normalized);
-    super(
-      webglContext,
-      data.positions,
-      data.colors,
-      data.indicesSolid,
-      data.indicesWireframe,
-      data.uvs,
-      data.normals
-    );
-  }
+var PyramidGeometry = class _PyramidGeometry extends GeneratedGeometry {
   /**
    * Normalizes constructor input to a `PyramidGeometryOptions` object.
    *
@@ -3685,159 +4067,61 @@ var PyramidGeometry = class _PyramidGeometry extends Geometry {
    * @private
    */
   static #normalizeOptions(options) {
-    if (options === null || typeof options !== "object") {
-      throw new TypeError("`PyramidGeometry` expects options as an object.");
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT) {
+      throw new TypeError("PyramidGeometry expects options as an object.");
     }
     const {
-      width = DEFAULT_PYRAMID_WIDTH,
-      height = DEFAULT_PYRAMID_HEIGHT,
+      width = PYRAMID_DEFAULTS.WIDTH,
+      height = PYRAMID_DEFAULTS.HEIGHT,
       depth = width,
-      widthSegments = DEFAULT_BASE_SEGMENT_COUNT,
+      widthSegments = PYRAMID_DEFAULTS.BASE_SEGMENT_COUNT,
       depthSegments = widthSegments,
-      heightSegments = DEFAULT_HEIGHT_SEGMENT_COUNT,
-      capped = true,
+      heightSegments = PYRAMID_DEFAULTS.HEIGHT_SEGMENT_COUNT,
+      capped = GEOMETRY_DEFAULTS.CAPPED,
       colors = DEFAULT_VERTEX_COLOR
     } = options;
-    if (typeof width !== "number" || typeof height !== "number" || typeof depth !== "number") {
-      throw new TypeError("`PyramidGeometry` expects `width/height/depth` as numbers.");
+    if (typeof width !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || typeof height !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || typeof depth !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER) {
+      throw new TypeError("PyramidGeometry expects width, height or depth as numbers.");
     }
     if (!Number.isFinite(width) || !Number.isFinite(height) || !Number.isFinite(depth)) {
-      throw new RangeError("`PyramidGeometry` expects finite `width/height/depth`.");
+      throw new RangeError("PyramidGeometry expects finite width, height or depth.");
     }
     if (!(colors instanceof Float32Array)) {
-      throw new TypeError("`PyramidGeometry` expects colors as a `Float32Array`.");
+      throw new TypeError("PyramidGeometry expects colors as a Float32Array.");
     }
     return {
       width,
       height,
       depth,
-      widthSegments: _PyramidGeometry.#normalizeSegmentCount(widthSegments, "widthSegments", MIN_SEGMENT_COUNT4),
-      depthSegments: _PyramidGeometry.#normalizeSegmentCount(depthSegments, "depthSegments", MIN_SEGMENT_COUNT4),
-      heightSegments: _PyramidGeometry.#normalizeSegmentCount(heightSegments, "heightSegments", MIN_SEGMENT_COUNT4),
+      widthSegments: GeometryUtils.normalizeSegmentCount(widthSegments, "widthSegments", PYRAMID_LIMITS.MIN_SEGMENT_COUNT, "PyramidGeometry"),
+      depthSegments: GeometryUtils.normalizeSegmentCount(depthSegments, "depthSegments", PYRAMID_LIMITS.MIN_SEGMENT_COUNT, "PyramidGeometry"),
+      heightSegments: GeometryUtils.normalizeSegmentCount(heightSegments, "heightSegments", PYRAMID_LIMITS.MIN_SEGMENT_COUNT, "PyramidGeometry"),
       capped: Boolean(capped),
       colors
     };
   }
   /**
-   * Normalizes and validates a segment count parameter.
+   * Generates vertex and index buffers from construction options.
    *
-   * @param {number} value      - Segment count.
-   * @param {string} optionName - Option name.
-   * @param {number} minValue   - Minimal allowed value.
-   * @returns {number}          - Integer segment count.
-   * @private
+   * @param {PyramidGeometryOptions} [options] - Geometry options.
+   * @returns {PyramidGeometryData}            - Generated CPU buffers.
+   * @protected
    */
-  static #normalizeSegmentCount(value, optionName, minValue) {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      throw new TypeError("`PyramidGeometry` expects `{name}` as a finite number.".replace("{name}", optionName));
+  static createGeometryData(options = {}) {
+    const normalized = _PyramidGeometry.#normalizeOptions(options);
+    const buffers = { positions: [], normals: [], uvs: [], indicesSolid: [] };
+    let vertexOffset = MATH_COMMON_VALUES.ZERO;
+    if (normalized.capped) {
+      vertexOffset = _PyramidGeometry.#appendBottom(buffers, normalized);
     }
-    const intValue = Math.floor(value);
-    if (intValue < minValue) {
-      throw new RangeError(
-        "`PyramidGeometry` expects `{name}` to be `>= {min}`.".replace("{name}", optionName).replace("{min}", String(minValue))
-      );
-    }
-    return intValue;
-  }
-  /**
-   * Creates full geometry data for a segmented pyramid.
-   *
-   * @param {Required<PyramidGeometryOptions>} options - Normalized options.
-   * @returns {PyramidGeometryData}                    - Geometry buffers.
-   * @private
-   */
-  static #createGeometryData(options) {
-    const halfWidth = options.width / HALF_SIZE_DIVISOR5;
-    const halfDepth = options.depth / HALF_SIZE_DIVISOR5;
-    const halfHeight = options.height / HALF_SIZE_DIVISOR5;
-    const apexPoint = [ZERO_VALUE7, halfHeight, ZERO_VALUE7];
-    const positions = [];
-    const normals = [];
-    const uvs = [];
-    const indicesSolidList = [];
-    let vertexOffset = 0;
-    if (options.capped) {
-      const baseAppendResult = _PyramidGeometry.#appendBase(
-        positions,
-        normals,
-        uvs,
-        indicesSolidList,
-        vertexOffset,
-        halfWidth,
-        halfDepth,
-        halfHeight,
-        options.widthSegments,
-        options.depthSegments
-      );
-      vertexOffset += baseAppendResult.vertexCount;
-    }
-    const baseY = -halfHeight;
-    const corners = {
-      frontLeft: [-halfWidth, baseY, halfDepth],
-      frontRight: [halfWidth, baseY, halfDepth],
-      backRight: [halfWidth, baseY, -halfDepth],
-      backLeft: [-halfWidth, baseY, -halfDepth]
-    };
-    vertexOffset += _PyramidGeometry.#appendSideFace(
-      positions,
-      normals,
-      uvs,
-      indicesSolidList,
-      vertexOffset,
-      corners.frontLeft,
-      corners.frontRight,
-      apexPoint,
-      options.widthSegments,
-      options.heightSegments,
-      OUTWARD_HINT_FRONT
-    );
-    vertexOffset += _PyramidGeometry.#appendSideFace(
-      positions,
-      normals,
-      uvs,
-      indicesSolidList,
-      vertexOffset,
-      corners.frontRight,
-      corners.backRight,
-      apexPoint,
-      options.depthSegments,
-      options.heightSegments,
-      OUTWARD_HINT_RIGHT
-    );
-    vertexOffset += _PyramidGeometry.#appendSideFace(
-      positions,
-      normals,
-      uvs,
-      indicesSolidList,
-      vertexOffset,
-      corners.backRight,
-      corners.backLeft,
-      apexPoint,
-      options.widthSegments,
-      options.heightSegments,
-      OUTWARD_HINT_BACK
-    );
-    vertexOffset += _PyramidGeometry.#appendSideFace(
-      positions,
-      normals,
-      uvs,
-      indicesSolidList,
-      vertexOffset,
-      corners.backLeft,
-      corners.frontLeft,
-      apexPoint,
-      options.depthSegments,
-      options.heightSegments,
-      OUTWARD_HINT_LEFT
-    );
-    const vertexCount = vertexOffset;
-    const indicesSolid = createIndexArray(vertexCount, indicesSolidList);
-    const indicesWireframe = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
-    const colors = createColorsFromSpec(vertexCount, options.colors);
+    const vertexCount = _PyramidGeometry.#appendSides(buffers, normalized, vertexOffset);
+    const indicesSolid = GeometryUtils.createIndexArray(vertexCount, buffers.indicesSolid);
+    const indicesWireframe = GeometryUtils.createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
+    const colors = GeometryUtils.createColorsFromSpec(vertexCount, normalized.colors);
     return {
-      positions: new Float32Array(positions),
-      normals: new Float32Array(normals),
-      uvs: new Float32Array(uvs),
+      positions: new Float32Array(buffers.positions),
+      normals: new Float32Array(buffers.normals),
+      uvs: new Float32Array(buffers.uvs),
       colors,
       indicesSolid,
       indicesWireframe
@@ -3860,44 +4144,34 @@ var PyramidGeometry = class _PyramidGeometry extends Geometry {
    * @private
    */
   static #appendBase(positions, normals, uvs, indicesSolid, vertexOffset, halfWidth, halfDepth, halfHeight, widthSegments, depthSegments) {
+    const centerOffset = GEOMETRY_GRID.CENTER_OFFSET;
+    const zeroValue = MATH_COMMON_VALUES.ZERO;
     const xSegments = widthSegments;
     const zSegments = depthSegments;
-    const xVertexCount = xSegments + VERTICES_PER_SEGMENT_INCREMENT6;
-    const zVertexCount = zSegments + VERTICES_PER_SEGMENT_INCREMENT6;
+    const xVertexCount = xSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+    const zVertexCount = zSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
     const baseY = -halfHeight;
-    const fullWidth = halfWidth * HALF_SIZE_DIVISOR5;
-    const fullDepth = halfDepth * HALF_SIZE_DIVISOR5;
-    for (let zIndex = 0; zIndex < zVertexCount; zIndex += 1) {
+    const fullWidth = halfWidth * GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
+    const fullDepth = halfDepth * GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
+    for (let zIndex = MATH_COMMON_VALUES.ZERO; zIndex < zVertexCount; zIndex += MATH_COMMON_VALUES.UNIT) {
       const vNormalized = zIndex / zSegments;
-      const positionZ = (vNormalized - CENTER_T_OFFSET3) * fullDepth;
-      for (let xIndex = 0; xIndex < xVertexCount; xIndex += 1) {
+      const positionZ = (vNormalized - centerOffset) * fullDepth;
+      for (let xIndex = MATH_COMMON_VALUES.ZERO; xIndex < xVertexCount; xIndex += MATH_COMMON_VALUES.UNIT) {
         const uNormalized = xIndex / xSegments;
-        const positionX = (uNormalized - CENTER_T_OFFSET3) * fullWidth;
+        const positionX = (uNormalized - centerOffset) * fullWidth;
         positions.push(positionX, baseY, positionZ);
-        normals.push(ZERO_VALUE7, NEGATIVE_ONE_VALUE, ZERO_VALUE7);
-        uvs.push(uNormalized, UV_V_FLIP_BASE6 - vNormalized);
+        normals.push(zeroValue, PYRAMID_LAYOUT.NEGATIVE_ONE_VALUE, zeroValue);
+        uvs.push(uNormalized, GEOMETRY_UV.V_FLIP_BASE - vNormalized);
       }
     }
-    for (let zIndex = 0; zIndex < zSegments; zIndex += 1) {
-      for (let xIndex = 0; xIndex < xSegments; xIndex += 1) {
-        const topLeftVertexIndex = vertexOffset + zIndex * xVertexCount + xIndex;
-        const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET5;
-        const bottomLeftVertexIndex = topLeftVertexIndex + xVertexCount;
-        const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET5;
-        indicesSolid.push(topLeftVertexIndex, topRightVertexIndex, bottomLeftVertexIndex);
-        indicesSolid.push(topRightVertexIndex, bottomRightVertexIndex, bottomLeftVertexIndex);
-      }
-    }
+    GeometryUtils.appendGridTriangleIndices(indicesSolid, xSegments, zSegments, vertexOffset, true);
     return { vertexCount: xVertexCount * zVertexCount };
   }
   /**
    * Appends a single planar side face subdivided into a grid.
    * The face uses a flat normal (sharp edges).
    *
-   * @param {number[]} positions    - Output positions.
-   * @param {number[]} normals      - Output normals.
-   * @param {number[]} uvs          - Output UVs.
-   * @param {number[]} indicesSolid - Output solid indices.
+   * @param {Object} buffers        - Output vertex and index lists.
    * @param {number} vertexOffset   - Starting vertex index.
    * @param {number[]} baseStart    - Base edge start point [x, y, z].
    * @param {number[]} baseEnd      - Base edge end point [x, y, z].
@@ -3908,50 +4182,42 @@ var PyramidGeometry = class _PyramidGeometry extends Geometry {
    * @returns {number}              - Number of vertices appended.
    * @private
    */
-  static #appendSideFace(positions, normals, uvs, indicesSolid, vertexOffset, baseStart, baseEnd, apex, edgeSegments, heightSegments, outwardHint) {
+  static #appendSideFace(buffers, vertexOffset, baseStart, baseEnd, apex, edgeSegments, heightSegments, outwardHint) {
+    const { positions, normals, uvs, indicesSolid } = buffers;
+    const vertexIncrement = GEOMETRY_GRID.VERTEX_INCREMENT;
+    const nextVertexOffset = GEOMETRY_GRID.NEXT_VERTEX_OFFSET;
     let edgeStart = baseStart;
     let edgeEnd = baseEnd;
     let faceNormal = _PyramidGeometry.#computeFaceNormal(edgeStart, edgeEnd, apex);
-    if (_PyramidGeometry.#dot(faceNormal, outwardHint) < ZERO_VALUE7) {
+    if (_PyramidGeometry.#dot(faceNormal, outwardHint) < MATH_COMMON_VALUES.ZERO) {
       edgeStart = baseEnd;
       edgeEnd = baseStart;
       faceNormal = _PyramidGeometry.#computeFaceNormal(edgeStart, edgeEnd, apex);
     }
-    const edgeVertexCount = edgeSegments + VERTICES_PER_SEGMENT_INCREMENT6;
+    const edgeVertexCount = edgeSegments + vertexIncrement;
     const ringCount = heightSegments;
-    const faceVertexCount = ringCount * edgeVertexCount + VERTICES_PER_SEGMENT_INCREMENT6;
-    for (let ringIndex = 0; ringIndex < ringCount; ringIndex += 1) {
+    const faceVertexCount = ringCount * edgeVertexCount + vertexIncrement;
+    for (let ringIndex = MATH_COMMON_VALUES.ZERO; ringIndex < ringCount; ringIndex += MATH_COMMON_VALUES.UNIT) {
       const heightNormalized = ringIndex / heightSegments;
       const rowStart = _PyramidGeometry.#lerp3(edgeStart, apex, heightNormalized);
       const rowEnd = _PyramidGeometry.#lerp3(edgeEnd, apex, heightNormalized);
-      for (let edgeIndex = 0; edgeIndex < edgeVertexCount; edgeIndex += 1) {
+      for (let edgeIndex = MATH_COMMON_VALUES.ZERO; edgeIndex < edgeVertexCount; edgeIndex += MATH_COMMON_VALUES.UNIT) {
         const edgeNormalized = edgeIndex / edgeSegments;
         const point = _PyramidGeometry.#lerp3(rowStart, rowEnd, edgeNormalized);
-        positions.push(point[0], point[1], point[2]);
-        normals.push(faceNormal[0], faceNormal[1], faceNormal[2]);
-        uvs.push(edgeNormalized, UV_V_FLIP_BASE6 - heightNormalized);
+        positions.push(point[MATH_VECTOR3_INDEXES.X], point[MATH_VECTOR3_INDEXES.Y], point[MATH_VECTOR3_INDEXES.Z]);
+        normals.push(faceNormal[MATH_VECTOR3_INDEXES.X], faceNormal[MATH_VECTOR3_INDEXES.Y], faceNormal[MATH_VECTOR3_INDEXES.Z]);
+        uvs.push(edgeNormalized, GEOMETRY_UV.V_FLIP_BASE - heightNormalized);
       }
     }
-    positions.push(apex[0], apex[1], apex[2]);
-    normals.push(faceNormal[0], faceNormal[1], faceNormal[2]);
-    uvs.push(APEX_UV_U, APEX_UV_V);
-    const apexVertexIndex = vertexOffset + faceVertexCount - VERTICES_PER_SEGMENT_INCREMENT6;
-    for (let ringIndex = 0; ringIndex < ringCount - VERTICES_PER_SEGMENT_INCREMENT6; ringIndex += 1) {
-      const ringStartVertexIndex = vertexOffset + ringIndex * edgeVertexCount;
-      const nextRingVertexIndex = vertexOffset + (ringIndex + VERTICES_PER_SEGMENT_INCREMENT6) * edgeVertexCount;
-      for (let edgeIndex = 0; edgeIndex < edgeSegments; edgeIndex += 1) {
-        const topLeftVertexIndex = ringStartVertexIndex + edgeIndex;
-        const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET5;
-        const bottomLeftVertexIndex = nextRingVertexIndex + edgeIndex;
-        const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET5;
-        indicesSolid.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
-        indicesSolid.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
-      }
-    }
-    const topRingStartVertexIndex = vertexOffset + (ringCount - VERTICES_PER_SEGMENT_INCREMENT6) * edgeVertexCount;
-    for (let edgeIndex = 0; edgeIndex < edgeSegments; edgeIndex += 1) {
+    positions.push(apex[MATH_VECTOR3_INDEXES.X], apex[MATH_VECTOR3_INDEXES.Y], apex[MATH_VECTOR3_INDEXES.Z]);
+    normals.push(faceNormal[MATH_VECTOR3_INDEXES.X], faceNormal[MATH_VECTOR3_INDEXES.Y], faceNormal[MATH_VECTOR3_INDEXES.Z]);
+    uvs.push(PYRAMID_LAYOUT.APEX_UV_U, PYRAMID_LAYOUT.APEX_UV_V);
+    const apexVertexIndex = vertexOffset + faceVertexCount - vertexIncrement;
+    GeometryUtils.appendGridTriangleIndices(indicesSolid, edgeSegments, ringCount - vertexIncrement, vertexOffset);
+    const topRingStartVertexIndex = vertexOffset + (ringCount - vertexIncrement) * edgeVertexCount;
+    for (let edgeIndex = MATH_COMMON_VALUES.ZERO; edgeIndex < edgeSegments; edgeIndex += MATH_COMMON_VALUES.UNIT) {
       const topLeftVertexIndex = topRingStartVertexIndex + edgeIndex;
-      const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET5;
+      const topRightVertexIndex = topLeftVertexIndex + nextVertexOffset;
       indicesSolid.push(topLeftVertexIndex, apexVertexIndex, topRightVertexIndex);
     }
     return faceVertexCount;
@@ -3967,18 +4233,18 @@ var PyramidGeometry = class _PyramidGeometry extends Geometry {
    */
   static #computeFaceNormal(pointA, pointB, pointC) {
     const vectorAB = [
-      pointB[0] - pointA[0],
-      pointB[1] - pointA[1],
-      pointB[2] - pointA[2]
+      pointB[MATH_VECTOR3_INDEXES.X] - pointA[MATH_VECTOR3_INDEXES.X],
+      pointB[MATH_VECTOR3_INDEXES.Y] - pointA[MATH_VECTOR3_INDEXES.Y],
+      pointB[MATH_VECTOR3_INDEXES.Z] - pointA[MATH_VECTOR3_INDEXES.Z]
     ];
     const vectorAC = [
-      pointC[0] - pointA[0],
-      pointC[1] - pointA[1],
-      pointC[2] - pointA[2]
+      pointC[MATH_VECTOR3_INDEXES.X] - pointA[MATH_VECTOR3_INDEXES.X],
+      pointC[MATH_VECTOR3_INDEXES.Y] - pointA[MATH_VECTOR3_INDEXES.Y],
+      pointC[MATH_VECTOR3_INDEXES.Z] - pointA[MATH_VECTOR3_INDEXES.Z]
     ];
-    const normalX0 = vectorAB[1] * vectorAC[2] - vectorAB[2] * vectorAC[1];
-    const normalY0 = vectorAB[2] * vectorAC[0] - vectorAB[0] * vectorAC[2];
-    const normalZ0 = vectorAB[0] * vectorAC[1] - vectorAB[1] * vectorAC[0];
+    const normalX0 = vectorAB[MATH_VECTOR3_INDEXES.Y] * vectorAC[MATH_VECTOR3_INDEXES.Z] - vectorAB[MATH_VECTOR3_INDEXES.Z] * vectorAC[MATH_VECTOR3_INDEXES.Y];
+    const normalY0 = vectorAB[MATH_VECTOR3_INDEXES.Z] * vectorAC[MATH_VECTOR3_INDEXES.X] - vectorAB[MATH_VECTOR3_INDEXES.X] * vectorAC[MATH_VECTOR3_INDEXES.Z];
+    const normalZ0 = vectorAB[MATH_VECTOR3_INDEXES.X] * vectorAC[MATH_VECTOR3_INDEXES.Y] - vectorAB[MATH_VECTOR3_INDEXES.Y] * vectorAC[MATH_VECTOR3_INDEXES.X];
     const inverseNormalLength = _PyramidGeometry.#inverseLength(normalX0, normalY0, normalZ0);
     return [normalX0 * inverseNormalLength, normalY0 * inverseNormalLength, normalZ0 * inverseNormalLength];
   }
@@ -3993,9 +4259,9 @@ var PyramidGeometry = class _PyramidGeometry extends Geometry {
    */
   static #lerp3(pointA, pointB, interpolationFactor) {
     return [
-      pointA[0] + (pointB[0] - pointA[0]) * interpolationFactor,
-      pointA[1] + (pointB[1] - pointA[1]) * interpolationFactor,
-      pointA[2] + (pointB[2] - pointA[2]) * interpolationFactor
+      pointA[MATH_VECTOR3_INDEXES.X] + (pointB[MATH_VECTOR3_INDEXES.X] - pointA[MATH_VECTOR3_INDEXES.X]) * interpolationFactor,
+      pointA[MATH_VECTOR3_INDEXES.Y] + (pointB[MATH_VECTOR3_INDEXES.Y] - pointA[MATH_VECTOR3_INDEXES.Y]) * interpolationFactor,
+      pointA[MATH_VECTOR3_INDEXES.Z] + (pointB[MATH_VECTOR3_INDEXES.Z] - pointA[MATH_VECTOR3_INDEXES.Z]) * interpolationFactor
     ];
   }
   /**
@@ -4007,7 +4273,7 @@ var PyramidGeometry = class _PyramidGeometry extends Geometry {
    * @private
    */
   static #dot(vectorA, vectorB) {
-    return vectorA[0] * vectorB[0] + vectorA[1] * vectorB[1] + vectorA[2] * vectorB[2];
+    return vectorA[MATH_VECTOR3_INDEXES.X] * vectorB[MATH_VECTOR3_INDEXES.X] + vectorA[MATH_VECTOR3_INDEXES.Y] * vectorB[MATH_VECTOR3_INDEXES.Y] + vectorA[MATH_VECTOR3_INDEXES.Z] * vectorB[MATH_VECTOR3_INDEXES.Z];
   }
   /**
    * Computes inverse vector length `(1 / sqrt(x ^ 2 + y ^ 2 + z ^ 2))`.
@@ -4021,75 +4287,127 @@ var PyramidGeometry = class _PyramidGeometry extends Geometry {
    */
   static #inverseLength(x, y, z) {
     const length = Math.sqrt(x * x + y * y + z * z);
-    if (length === ZERO_VALUE7) {
-      return ZERO_VALUE7;
+    if (length === MATH_COMMON_VALUES.ZERO) {
+      return MATH_COMMON_VALUES.ZERO;
     }
-    return ONE_VALUE5 / length;
+    return MATH_COMMON_VALUES.UNIT / length;
+  }
+  /**
+   * Appends the optional bottom grid before the side faces.
+   *
+   * @param {Object} buffers                           - Output vertex and index lists.
+   * @param {Required<PyramidGeometryOptions>} options - Normalized geometry options.
+   * @returns {number} - Number of base vertices.
+   * @private
+   */
+  static #appendBottom(buffers, options) {
+    const divisor = GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
+    const result = _PyramidGeometry.#appendBase(
+      buffers.positions,
+      buffers.normals,
+      buffers.uvs,
+      buffers.indicesSolid,
+      MATH_COMMON_VALUES.ZERO,
+      options.width / divisor,
+      options.depth / divisor,
+      options.height / divisor,
+      options.widthSegments,
+      options.depthSegments
+    );
+    return result.vertexCount;
+  }
+  /**
+   * Appends the front, right, back and left faces in their existing order.
+   *
+   * @param {Object} buffers                           - Output vertex and index lists.
+   * @param {Required<PyramidGeometryOptions>} options - Normalized geometry options.
+   * @param {number} vertexOffset                      - First side vertex.
+   * @returns {number}                                 - Total vertex count after appending all sides.
+   * @private
+   */
+  static #appendSides(buffers, options, vertexOffset) {
+    const divisor = GEOMETRY_SIZES.HALF_SIZE_DIVISOR;
+    const halfWidth = options.width / divisor;
+    const halfDepth = options.depth / divisor;
+    const halfHeight = options.height / divisor;
+    const apex = [MATH_COMMON_VALUES.ZERO, halfHeight, MATH_COMMON_VALUES.ZERO];
+    const frontLeft = [-halfWidth, -halfHeight, halfDepth];
+    const frontRight = [halfWidth, -halfHeight, halfDepth];
+    const backRight = [halfWidth, -halfHeight, -halfDepth];
+    const backLeft = [-halfWidth, -halfHeight, -halfDepth];
+    const heightSegments = options.heightSegments;
+    const appendFace = (firstCorner, secondCorner, segmentCount, direction) => {
+      vertexOffset += _PyramidGeometry.#appendSideFace(
+        buffers,
+        vertexOffset,
+        firstCorner,
+        secondCorner,
+        apex,
+        segmentCount,
+        heightSegments,
+        direction
+      );
+    };
+    appendFace(frontLeft, frontRight, options.widthSegments, PYRAMID_DIRECTIONS.FRONT);
+    appendFace(frontRight, backRight, options.depthSegments, PYRAMID_DIRECTIONS.RIGHT);
+    appendFace(backRight, backLeft, options.widthSegments, PYRAMID_DIRECTIONS.BACK);
+    appendFace(backLeft, frontLeft, options.depthSegments, PYRAMID_DIRECTIONS.LEFT);
+    return vertexOffset;
   }
 };
 
+// core/constants/heightmap-geometry.js
+var HEIGHTMAP_SAMPLING = Object.freeze({
+  NEAREST: "nearest",
+  BILINEAR: "bilinear"
+});
+var HEIGHTMAP_DEFAULTS = Object.freeze({
+  WIDTH: 1,
+  DEPTH: 1,
+  HEIGHT_SCALE: 1,
+  HEIGHT_OFFSET: 0,
+  SEGMENTS_X: 1,
+  SEGMENTS_Z: 1,
+  WIREFRAME_STATE: false,
+  FLIP_Y: true,
+  SAMPLING: HEIGHTMAP_SAMPLING.NEAREST,
+  TERRAIN_COLOR: new Float32Array([0.18, 0.65, 0.28])
+});
+var HEIGHTMAP_LIMITS = Object.freeze({
+  MIN_SEGMENT_COUNT: 1,
+  MIN_POSITIVE_VALUE: 0,
+  MIN_REQUIRED_STRING_LENGTH: 1
+});
+var HEIGHTMAP_LAYOUT = Object.freeze({
+  BYTES_PER_PIXEL: 4,
+  RED_CHANNEL_OFFSET: 0,
+  MAX_CHANNEL_VALUE: 255,
+  CANVAS_TAG_NAME: "canvas",
+  CANVAS_CONTEXT_2D: "2d",
+  SOURCE_IMAGE_DATA_FIELD: "imageData",
+  SEGMENTS_X_OPTION_NAME: "segmentsX",
+  SEGMENTS_Z_OPTION_NAME: "segmentsZ",
+  IMAGE_CROSS_ORIGIN_ANON: "anonymous"
+});
+var HEIGHTMAP_ERRORS = Object.freeze({
+  OPTIONS_PLAIN_OBJECT: "HeightmapGeometry expects options as a plain object.",
+  WEBGL_CONTEXT: "HeightmapGeometry expects webglContext as a WebGL2RenderingContext.",
+  HEIGHTMAP_IMAGE_DATA: "HeightmapGeometry expects heightmapImageData as an ImageData instance or a HeightmapSource with imageData.",
+  SIZE_VALUES: "HeightmapGeometry expects width and depth as positive numbers.",
+  HEIGHT_SCALE_VALUE: "HeightmapGeometry expects heightScale as a positive number.",
+  HEIGHT_OFFSET_VALUE: "HeightmapGeometry expects heightOffset as a finite number.",
+  COLORS_BUFFER: "HeightmapGeometry expects colors as a Float32Array.",
+  FLIP_Y_VALUE: "HeightmapGeometry expects flipY as a boolean.",
+  WIREFRAME_VALUE: "HeightmapGeometry expects isWireframe as a boolean.",
+  SAMPLING_VALUE: "HeightmapGeometry expects sampling to be a supported string value.",
+  LOAD_URL: "HeightmapGeometry.loadFromUrl expects url as a non-empty string.",
+  LOAD_OPTIONS: "HeightmapGeometry.loadFromUrl expects options as a plain object.",
+  CANVAS_CONTEXT: "HeightmapGeometry.loadFromUrl failed to acquire a 2D canvas context.",
+  LOAD_IMAGE_PREFIX: "Failed to load the heightmap image: "
+});
+
 // core/geometry/heightmap-geometry.js
-var DEFAULT_HEIGHTMAP_WIDTH = 1;
-var DEFAULT_HEIGHTMAP_DEPTH = 1;
-var DEFAULT_HEIGHT_SCALE = 1;
-var DEFAULT_HEIGHT_OFFSET = 0;
-var DEFAULT_SEGMENTS_X = 1;
-var DEFAULT_SEGMENTS_Z = 1;
-var MIN_SEGMENT_COUNT5 = 1;
-var MIN_POSITIVE_VALUE = 0;
-var DEFAULT_WIREFRAME_STATE = false;
-var DEFAULT_FLIP_Y = true;
-var SAMPLING_NEAREST = "nearest";
-var SAMPLING_BILINEAR = "bilinear";
-var DEFAULT_SAMPLING = SAMPLING_NEAREST;
-var DEFAULT_TERRAIN_COLOR_RED = 0.18;
-var DEFAULT_TERRAIN_COLOR_GREEN = 0.65;
-var DEFAULT_TERRAIN_COLOR_BLUE = 0.28;
-var DEFAULT_TERRAIN_COLOR = new Float32Array([
-  DEFAULT_TERRAIN_COLOR_RED,
-  DEFAULT_TERRAIN_COLOR_GREEN,
-  DEFAULT_TERRAIN_COLOR_BLUE
-]);
-var VERTICES_PER_SEGMENT_INCREMENT7 = 1;
-var NEXT_VERTEX_OFFSET6 = 1;
-var CENTER_T_OFFSET4 = 0.5;
-var VECTOR_COMPONENTS_3 = 3;
-var UV_COMPONENTS_2 = 2;
-var X_INDEX = 0;
-var Y_INDEX = 1;
-var Z_INDEX = 2;
-var U_INDEX = 0;
-var V_INDEX = 1;
-var TRIANGLE_INDEX_STRIDE2 = 3;
-var BYTES_PER_PIXEL = 4;
-var RED_CHANNEL_OFFSET = 0;
-var MAX_CHANNEL_VALUE = 255;
-var CANVAS_TAG_NAME = "canvas";
-var CANVAS_CONTEXT_2D = "2d";
-var MIN_REQUIRED_STRING_LENGTH = 1;
-var ZERO_VALUE8 = 0;
-var ONE_VALUE6 = 1;
-var ERROR_OPTIONS_PLAIN_OBJECT = "`HeightmapGeometry` expects options as a plain object.";
-var ERROR_WEBGL_CONTEXT = "`HeightmapGeometry` expects `webglContext` as a `WebGL2RenderingContext`.";
-var ERROR_HEIGHTMAP_IMAGE_DATA = "`HeightmapGeometry` expects `heightmapImageData` as an `ImageData` instance or a `HeightmapSource` with `imageData`.";
-var HEIGHTMAP_SOURCE_IMAGE_DATA_FIELD = "imageData";
-var ERROR_SIZE_VALUES = "`HeightmapGeometry` expects `width` and `depth` as positive numbers.";
-var ERROR_HEIGHT_SCALE_VALUE = "`HeightmapGeometry` expects `heightScale` as a positive number.";
-var ERROR_HEIGHT_OFFSET_VALUE = "`HeightmapGeometry` expects `heightOffset` as a finite number.";
-var ERROR_COLORS_BUFFER = "`HeightmapGeometry` expects `colors` as a `Float32Array`.";
-var ERROR_FLIP_Y_VALUE = "`HeightmapGeometry` expects `flipY` as a boolean.";
-var ERROR_WIREFRAME_VALUE = "`HeightmapGeometry` expects `isWireframe` as a boolean.";
-var ERROR_SAMPLING_VALUE = "`HeightmapGeometry` expects `sampling` to be a supported string value.";
-var ERROR_SEGMENT_VALUE = "`HeightmapGeometry` expects `{name}` to be a finite number.";
-var ERROR_SEGMENT_RANGE = "`HeightmapGeometry` expects `{name}` to be `>= {min}`.";
-var ERROR_LOAD_URL = "`HeightmapGeometry.loadFromUrl` expects url as a non-empty string.";
-var ERROR_LOAD_OPTIONS = "`HeightmapGeometry.loadFromUrl` expects options as a plain object.";
-var ERROR_CANVAS_CONTEXT = "`HeightmapGeometry.loadFromUrl` failed to acquire a 2D canvas context.";
-var ERROR_LOAD_IMAGE_PREFIX = "Failed to load the heightmap image: ";
-var SEGMENTS_X_OPTION_NAME = "segmentsX";
-var SEGMENTS_Z_OPTION_NAME = "segmentsZ";
-var IMAGE_CROSS_ORIGIN_ANON = "anonymous";
-var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
+var HeightmapGeometry = class _HeightmapGeometry extends GeneratedGeometry {
   /**
    * Wireframe hint for consumers.
    *
@@ -4104,20 +4422,11 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
    */
   constructor(webglContext, heightmapImageData, options = {}) {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
-      throw new TypeError(ERROR_WEBGL_CONTEXT);
+      throw new TypeError(HEIGHTMAP_ERRORS.WEBGL_CONTEXT);
     }
     const imageData = _HeightmapGeometry.#normalizeHeightmapImageData(heightmapImageData);
     const normalized = _HeightmapGeometry.#normalizeOptions(options);
-    const data = _HeightmapGeometry.#createGeometryData(imageData, normalized);
-    super(
-      webglContext,
-      data.positions,
-      data.colors,
-      data.indicesSolid,
-      data.indicesWireframe,
-      data.uvs,
-      data.normals
-    );
+    super(webglContext, imageData, normalized);
     this.#isWireframe = normalized.isWireframe;
   }
   /**
@@ -4138,13 +4447,13 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
    */
   static async loadFromUrl(webglContext, url, options = {}) {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
-      throw new TypeError(ERROR_WEBGL_CONTEXT);
+      throw new TypeError(HEIGHTMAP_ERRORS.WEBGL_CONTEXT);
     }
-    if (typeof url !== "string" || url.length < MIN_REQUIRED_STRING_LENGTH) {
-      throw new TypeError(ERROR_LOAD_URL);
+    if (typeof url !== ECMASCRIPT_TYPEOF_RESULTS.STRING || url.length < HEIGHTMAP_LIMITS.MIN_REQUIRED_STRING_LENGTH) {
+      throw new TypeError(HEIGHTMAP_ERRORS.LOAD_URL);
     }
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError(ERROR_LOAD_OPTIONS);
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
+      throw new TypeError(HEIGHTMAP_ERRORS.LOAD_OPTIONS);
     }
     const image = await _HeightmapGeometry.#loadImage(url);
     const imageData = _HeightmapGeometry.#createImageData(image);
@@ -4158,38 +4467,38 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
    * @private
    */
   static #normalizeOptions(options) {
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError(ERROR_OPTIONS_PLAIN_OBJECT);
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
+      throw new TypeError(HEIGHTMAP_ERRORS.OPTIONS_PLAIN_OBJECT);
     }
     const {
-      width = DEFAULT_HEIGHTMAP_WIDTH,
-      depth = DEFAULT_HEIGHTMAP_DEPTH,
-      heightScale = DEFAULT_HEIGHT_SCALE,
-      heightOffset = DEFAULT_HEIGHT_OFFSET,
-      segmentsX = DEFAULT_SEGMENTS_X,
-      segmentsZ = DEFAULT_SEGMENTS_Z,
-      isWireframe = DEFAULT_WIREFRAME_STATE,
-      colors = DEFAULT_TERRAIN_COLOR,
-      flipY = DEFAULT_FLIP_Y,
-      sampling = DEFAULT_SAMPLING
+      width = HEIGHTMAP_DEFAULTS.WIDTH,
+      depth = HEIGHTMAP_DEFAULTS.DEPTH,
+      heightScale = HEIGHTMAP_DEFAULTS.HEIGHT_SCALE,
+      heightOffset = HEIGHTMAP_DEFAULTS.HEIGHT_OFFSET,
+      segmentsX = HEIGHTMAP_DEFAULTS.SEGMENTS_X,
+      segmentsZ = HEIGHTMAP_DEFAULTS.SEGMENTS_Z,
+      isWireframe = HEIGHTMAP_DEFAULTS.WIREFRAME_STATE,
+      colors = HEIGHTMAP_DEFAULTS.TERRAIN_COLOR,
+      flipY = HEIGHTMAP_DEFAULTS.FLIP_Y,
+      sampling = HEIGHTMAP_DEFAULTS.SAMPLING
     } = options;
-    if (typeof width !== "number" || typeof depth !== "number" || !Number.isFinite(width) || !Number.isFinite(depth) || width <= MIN_POSITIVE_VALUE || depth <= MIN_POSITIVE_VALUE) {
-      throw new RangeError(ERROR_SIZE_VALUES);
+    if (typeof width !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || typeof depth !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(width) || !Number.isFinite(depth) || width <= HEIGHTMAP_LIMITS.MIN_POSITIVE_VALUE || depth <= HEIGHTMAP_LIMITS.MIN_POSITIVE_VALUE) {
+      throw new RangeError(HEIGHTMAP_ERRORS.SIZE_VALUES);
     }
-    if (typeof heightScale !== "number" || !Number.isFinite(heightScale) || heightScale <= MIN_POSITIVE_VALUE) {
-      throw new RangeError(ERROR_HEIGHT_SCALE_VALUE);
+    if (typeof heightScale !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(heightScale) || heightScale <= HEIGHTMAP_LIMITS.MIN_POSITIVE_VALUE) {
+      throw new RangeError(HEIGHTMAP_ERRORS.HEIGHT_SCALE_VALUE);
     }
-    if (typeof heightOffset !== "number" || !Number.isFinite(heightOffset)) {
-      throw new RangeError(ERROR_HEIGHT_OFFSET_VALUE);
+    if (typeof heightOffset !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(heightOffset)) {
+      throw new RangeError(HEIGHTMAP_ERRORS.HEIGHT_OFFSET_VALUE);
     }
     if (!(colors instanceof Float32Array)) {
-      throw new TypeError(ERROR_COLORS_BUFFER);
+      throw new TypeError(HEIGHTMAP_ERRORS.COLORS_BUFFER);
     }
-    if (typeof flipY !== "boolean") {
-      throw new TypeError(ERROR_FLIP_Y_VALUE);
+    if (typeof flipY !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+      throw new TypeError(HEIGHTMAP_ERRORS.FLIP_Y_VALUE);
     }
-    if (typeof isWireframe !== "boolean") {
-      throw new TypeError(ERROR_WIREFRAME_VALUE);
+    if (typeof isWireframe !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+      throw new TypeError(HEIGHTMAP_ERRORS.WIREFRAME_VALUE);
     }
     const normalizedSampling = _HeightmapGeometry.#normalizeSampling(sampling);
     return {
@@ -4197,33 +4506,13 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
       depth,
       heightScale,
       heightOffset,
-      segmentsX: _HeightmapGeometry.#normalizeSegmentCount(segmentsX, SEGMENTS_X_OPTION_NAME),
-      segmentsZ: _HeightmapGeometry.#normalizeSegmentCount(segmentsZ, SEGMENTS_Z_OPTION_NAME),
+      segmentsX: GeometryUtils.normalizeSegmentCount(segmentsX, HEIGHTMAP_LAYOUT.SEGMENTS_X_OPTION_NAME, HEIGHTMAP_LIMITS.MIN_SEGMENT_COUNT, "HeightmapGeometry"),
+      segmentsZ: GeometryUtils.normalizeSegmentCount(segmentsZ, HEIGHTMAP_LAYOUT.SEGMENTS_Z_OPTION_NAME, HEIGHTMAP_LIMITS.MIN_SEGMENT_COUNT, "HeightmapGeometry"),
       isWireframe,
       colors,
       flipY,
       sampling: normalizedSampling
     };
-  }
-  /**
-   * Normalizes and validates a segment count parameter.
-   *
-   * @param {number} value      - Segment count value.
-   * @param {string} optionName - Name of the option for error messages.
-   * @returns {number}          - Normalized integer `>= 1`.
-   * @private
-   */
-  static #normalizeSegmentCount(value, optionName) {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      throw new TypeError(ERROR_SEGMENT_VALUE.replace("{name}", optionName));
-    }
-    const intValue = Math.floor(value);
-    if (intValue < MIN_SEGMENT_COUNT5) {
-      throw new RangeError(
-        ERROR_SEGMENT_RANGE.replace("{name}", optionName).replace("{min}", String(MIN_SEGMENT_COUNT5))
-      );
-    }
-    return intValue;
   }
   /**
    * Normalizes sampling mode.
@@ -4233,13 +4522,13 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
    * @private
    */
   static #normalizeSampling(sampling) {
-    if (typeof sampling !== "string") {
-      throw new TypeError(ERROR_SAMPLING_VALUE);
+    if (typeof sampling !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
+      throw new TypeError(HEIGHTMAP_ERRORS.SAMPLING_VALUE);
     }
-    if (sampling === SAMPLING_NEAREST || sampling === SAMPLING_BILINEAR) {
+    if (sampling === HEIGHTMAP_SAMPLING.NEAREST || sampling === HEIGHTMAP_SAMPLING.BILINEAR) {
       return sampling;
     }
-    throw new RangeError(ERROR_SAMPLING_VALUE);
+    throw new RangeError(HEIGHTMAP_ERRORS.SAMPLING_VALUE);
   }
   /**
    * Creates full geometry data for a heightmap terrain.
@@ -4247,55 +4536,25 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
    * @param {ImageData} heightmapImageData               - Heightmap source image data.
    * @param {Required<HeightmapGeometryOptions>} options - Normalized options.
    * @returns {HeightmapGeometryData}                    - Geometry buffers.
-   * @private
+   * @protected
    */
-  static #createGeometryData(heightmapImageData, options) {
+  static createGeometryData(heightmapImageData, options) {
+    const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+    const uvComponentCount = GEOMETRY_LAYOUT.UV_COMPONENT_COUNT;
     const widthSegments = options.segmentsX;
     const depthSegments = options.segmentsZ;
-    const widthVertexCount = widthSegments + VERTICES_PER_SEGMENT_INCREMENT7;
-    const depthVertexCount = depthSegments + VERTICES_PER_SEGMENT_INCREMENT7;
+    const widthVertexCount = widthSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+    const depthVertexCount = depthSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
     const vertexCount = widthVertexCount * depthVertexCount;
-    const positions = new Float32Array(vertexCount * VECTOR_COMPONENTS_3);
-    const uvs = new Float32Array(vertexCount * UV_COMPONENTS_2);
-    let vertexIndex = ZERO_VALUE8;
-    for (let zIndex = ZERO_VALUE8; zIndex < depthVertexCount; zIndex += ONE_VALUE6) {
-      const vNormalized = zIndex / depthSegments;
-      const positionZ = (vNormalized - CENTER_T_OFFSET4) * options.depth;
-      for (let xIndex = ZERO_VALUE8; xIndex < widthVertexCount; xIndex += ONE_VALUE6) {
-        const uNormalized = xIndex / widthSegments;
-        const positionX = (uNormalized - CENTER_T_OFFSET4) * options.width;
-        const height = _HeightmapGeometry.#sampleHeight(
-          heightmapImageData,
-          uNormalized,
-          vNormalized,
-          options
-        );
-        const positionY = height * options.heightScale + options.heightOffset;
-        const positionBaseOffset = vertexIndex * VECTOR_COMPONENTS_3;
-        positions[positionBaseOffset + X_INDEX] = positionX;
-        positions[positionBaseOffset + Y_INDEX] = positionY;
-        positions[positionBaseOffset + Z_INDEX] = positionZ;
-        const uvBaseOffset = vertexIndex * UV_COMPONENTS_2;
-        uvs[uvBaseOffset + U_INDEX] = uNormalized;
-        uvs[uvBaseOffset + V_INDEX] = vNormalized;
-        vertexIndex += ONE_VALUE6;
-      }
-    }
+    const positions = new Float32Array(vertexCount * positionComponentCount);
+    const uvs = new Float32Array(vertexCount * uvComponentCount);
+    _HeightmapGeometry.#writeVertices(positions, uvs, heightmapImageData, options);
     const solidTriangleIndices = [];
-    for (let zIndex = ZERO_VALUE8; zIndex < depthSegments; zIndex += ONE_VALUE6) {
-      for (let xIndex = ZERO_VALUE8; xIndex < widthSegments; xIndex += ONE_VALUE6) {
-        const topLeftVertexIndex = zIndex * widthVertexCount + xIndex;
-        const topRightVertexIndex = topLeftVertexIndex + NEXT_VERTEX_OFFSET6;
-        const bottomLeftVertexIndex = topLeftVertexIndex + widthVertexCount;
-        const bottomRightVertexIndex = bottomLeftVertexIndex + NEXT_VERTEX_OFFSET6;
-        solidTriangleIndices.push(topLeftVertexIndex, bottomLeftVertexIndex, topRightVertexIndex);
-        solidTriangleIndices.push(topRightVertexIndex, bottomLeftVertexIndex, bottomRightVertexIndex);
-      }
-    }
-    const indicesSolid = createIndexArray(vertexCount, solidTriangleIndices);
-    const indicesWireframe = createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
+    GeometryUtils.appendGridTriangleIndices(solidTriangleIndices, widthSegments, depthSegments);
+    const indicesSolid = GeometryUtils.createIndexArray(vertexCount, solidTriangleIndices);
+    const indicesWireframe = GeometryUtils.createWireframeIndicesFromSolidIndices(vertexCount, indicesSolid);
     const normals = _HeightmapGeometry.#computeVertexNormals(positions, indicesSolid, vertexCount);
-    const colors = createColorsFromSpec(vertexCount, options.colors);
+    const colors = GeometryUtils.createColorsFromSpec(vertexCount, options.colors);
     return {
       positions,
       normals,
@@ -4318,14 +4577,14 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
   static #sampleHeight(heightmapImageData, uNormalized, vNormalized, options) {
     const heightmapWidth = heightmapImageData.width;
     const heightmapHeight = heightmapImageData.height;
-    const vSample = options.flipY ? ONE_VALUE6 - vNormalized : vNormalized;
-    if (options.sampling === SAMPLING_BILINEAR) {
-      const xFloat = uNormalized * (heightmapWidth - ONE_VALUE6);
-      const yFloat = vSample * (heightmapHeight - ONE_VALUE6);
+    const vSample = options.flipY ? MATH_COMMON_VALUES.UNIT - vNormalized : vNormalized;
+    if (options.sampling === HEIGHTMAP_SAMPLING.BILINEAR) {
+      const xFloat = uNormalized * (heightmapWidth - MATH_COMMON_VALUES.UNIT);
+      const yFloat = vSample * (heightmapHeight - MATH_COMMON_VALUES.UNIT);
       const x0 = Math.floor(xFloat);
       const y0 = Math.floor(yFloat);
-      const x1 = Math.min(x0 + ONE_VALUE6, heightmapWidth - ONE_VALUE6);
-      const y1 = Math.min(y0 + ONE_VALUE6, heightmapHeight - ONE_VALUE6);
+      const x1 = Math.min(x0 + MATH_COMMON_VALUES.UNIT, heightmapWidth - MATH_COMMON_VALUES.UNIT);
+      const y1 = Math.min(y0 + MATH_COMMON_VALUES.UNIT, heightmapHeight - MATH_COMMON_VALUES.UNIT);
       const tx = xFloat - x0;
       const ty = yFloat - y0;
       const h00 = _HeightmapGeometry.#getHeightAt(heightmapImageData, x0, y0);
@@ -4336,8 +4595,8 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
       const h1 = h01 + (h11 - h01) * tx;
       return h0 + (h1 - h0) * ty;
     }
-    const xIndex = Math.round(uNormalized * (heightmapWidth - ONE_VALUE6));
-    const yIndex = Math.round(vSample * (heightmapHeight - ONE_VALUE6));
+    const xIndex = Math.round(uNormalized * (heightmapWidth - MATH_COMMON_VALUES.UNIT));
+    const yIndex = Math.round(vSample * (heightmapHeight - MATH_COMMON_VALUES.UNIT));
     return _HeightmapGeometry.#getHeightAt(heightmapImageData, xIndex, yIndex);
   }
   /**
@@ -4352,9 +4611,9 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
   static #getHeightAt(heightmapImageData, xIndex, yIndex) {
     const width = heightmapImageData.width;
     const data = heightmapImageData.data;
-    const pixelIndex = (yIndex * width + xIndex) * BYTES_PER_PIXEL;
-    const redValue = data[pixelIndex + RED_CHANNEL_OFFSET];
-    return redValue / MAX_CHANNEL_VALUE;
+    const pixelIndex = (yIndex * width + xIndex) * HEIGHTMAP_LAYOUT.BYTES_PER_PIXEL;
+    const redValue = data[pixelIndex + HEIGHTMAP_LAYOUT.RED_CHANNEL_OFFSET];
+    return redValue / HEIGHTMAP_LAYOUT.MAX_CHANNEL_VALUE;
   }
   /**
    * Computes per-vertex normals from positions and indices.
@@ -4366,52 +4625,9 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
    * @private
    */
   static #computeVertexNormals(positions, indices, vertexCount) {
-    const normals = new Float32Array(vertexCount * VECTOR_COMPONENTS_3);
-    for (let i = ZERO_VALUE8; i < indices.length; i += TRIANGLE_INDEX_STRIDE2) {
-      const indexA = indices[i + X_INDEX] * VECTOR_COMPONENTS_3;
-      const indexB = indices[i + Y_INDEX] * VECTOR_COMPONENTS_3;
-      const indexC = indices[i + Z_INDEX] * VECTOR_COMPONENTS_3;
-      const ax = positions[indexA + X_INDEX];
-      const ay = positions[indexA + Y_INDEX];
-      const az = positions[indexA + Z_INDEX];
-      const bx = positions[indexB + X_INDEX];
-      const by = positions[indexB + Y_INDEX];
-      const bz = positions[indexB + Z_INDEX];
-      const cx = positions[indexC + X_INDEX];
-      const cy = positions[indexC + Y_INDEX];
-      const cz = positions[indexC + Z_INDEX];
-      const abx = bx - ax;
-      const aby = by - ay;
-      const abz = bz - az;
-      const acx = cx - ax;
-      const acy = cy - ay;
-      const acz = cz - az;
-      const crossX = aby * acz - abz * acy;
-      const crossY = abz * acx - abx * acz;
-      const crossZ = abx * acy - aby * acx;
-      normals[indexA + X_INDEX] += crossX;
-      normals[indexA + Y_INDEX] += crossY;
-      normals[indexA + Z_INDEX] += crossZ;
-      normals[indexB + X_INDEX] += crossX;
-      normals[indexB + Y_INDEX] += crossY;
-      normals[indexB + Z_INDEX] += crossZ;
-      normals[indexC + X_INDEX] += crossX;
-      normals[indexC + Y_INDEX] += crossY;
-      normals[indexC + Z_INDEX] += crossZ;
-    }
-    for (let vertexIndex = ZERO_VALUE8; vertexIndex < vertexCount; vertexIndex += ONE_VALUE6) {
-      const baseIndex = vertexIndex * VECTOR_COMPONENTS_3;
-      const nx = normals[baseIndex + X_INDEX];
-      const ny = normals[baseIndex + Y_INDEX];
-      const nz = normals[baseIndex + Z_INDEX];
-      const length = Math.sqrt(nx * nx + ny * ny + nz * nz);
-      if (length > ZERO_VALUE8) {
-        const invLength = ONE_VALUE6 / length;
-        normals[baseIndex + X_INDEX] = nx * invLength;
-        normals[baseIndex + Y_INDEX] = ny * invLength;
-        normals[baseIndex + Z_INDEX] = nz * invLength;
-      }
-    }
+    const normals = new Float32Array(vertexCount * GEOMETRY_LAYOUT.NORMAL_COMPONENT_COUNT);
+    _HeightmapGeometry.#accumulateFaceNormals(positions, indices, normals);
+    _HeightmapGeometry.#normalizeVertexNormals(normals, vertexCount);
     return normals;
   }
   /**
@@ -4425,12 +4641,12 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
     if (source instanceof ImageData) {
       return source;
     }
-    if (source === null || typeof source !== "object" || Array.isArray(source)) {
-      throw new TypeError(ERROR_HEIGHTMAP_IMAGE_DATA);
+    if (source === null || typeof source !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(source)) {
+      throw new TypeError(HEIGHTMAP_ERRORS.HEIGHTMAP_IMAGE_DATA);
     }
-    const imageData = source[HEIGHTMAP_SOURCE_IMAGE_DATA_FIELD];
+    const imageData = source[HEIGHTMAP_LAYOUT.SOURCE_IMAGE_DATA_FIELD];
     if (!(imageData instanceof ImageData)) {
-      throw new TypeError(ERROR_HEIGHTMAP_IMAGE_DATA);
+      throw new TypeError(HEIGHTMAP_ERRORS.HEIGHTMAP_IMAGE_DATA);
     }
     return imageData;
   }
@@ -4444,9 +4660,9 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
   static #loadImage(url) {
     return new Promise((resolve, reject) => {
       const image = new Image();
-      image.crossOrigin = IMAGE_CROSS_ORIGIN_ANON;
+      image.crossOrigin = HEIGHTMAP_LAYOUT.IMAGE_CROSS_ORIGIN_ANON;
       image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error(ERROR_LOAD_IMAGE_PREFIX + url));
+      image.onerror = () => reject(new Error(HEIGHTMAP_ERRORS.LOAD_IMAGE_PREFIX + url));
       image.src = url;
     });
   }
@@ -4458,15 +4674,15 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
    * @private
    */
   static #createImageData(image) {
-    const canvas = document.createElement(CANVAS_TAG_NAME);
-    const context = canvas.getContext(CANVAS_CONTEXT_2D);
+    const canvas = document.createElement(HEIGHTMAP_LAYOUT.CANVAS_TAG_NAME);
+    const context = canvas.getContext(HEIGHTMAP_LAYOUT.CANVAS_CONTEXT_2D);
     if (!context) {
-      throw new Error(ERROR_CANVAS_CONTEXT);
+      throw new Error(HEIGHTMAP_ERRORS.CANVAS_CONTEXT);
     }
     canvas.width = image.width;
     canvas.height = image.height;
-    context.drawImage(image, ZERO_VALUE8, ZERO_VALUE8);
-    return context.getImageData(ZERO_VALUE8, ZERO_VALUE8, image.width, image.height);
+    context.drawImage(image, MATH_COMMON_VALUES.ZERO, MATH_COMMON_VALUES.ZERO);
+    return context.getImageData(MATH_COMMON_VALUES.ZERO, MATH_COMMON_VALUES.ZERO, image.width, image.height);
   }
   /**
    * Heightmap sampling modes.
@@ -4475,66 +4691,172 @@ var HeightmapGeometry = class _HeightmapGeometry extends Geometry {
    */
   static get Sampling() {
     return Object.freeze({
-      NEAREST: SAMPLING_NEAREST,
-      BILINEAR: SAMPLING_BILINEAR
+      NEAREST: HEIGHTMAP_SAMPLING.NEAREST,
+      BILINEAR: HEIGHTMAP_SAMPLING.BILINEAR
     });
+  }
+  /**
+   * Writes terrain positions and texture coordinates from the heightmap.
+   *
+   * @param {Float32Array} positions                     - Output positions.
+   * @param {Float32Array} uvs                           - Output texture coordinates.
+   * @param {ImageData} heightmapImageData               - Source heightmap pixels.
+   * @param {Required<HeightmapGeometryOptions>} options - Normalized geometry options.
+   * @private
+   */
+  static #writeVertices(positions, uvs, heightmapImageData, options) {
+    const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+    const uvComponentCount = GEOMETRY_LAYOUT.UV_COMPONENT_COUNT;
+    const centerOffset = GEOMETRY_GRID.CENTER_OFFSET;
+    const widthSegments = options.segmentsX;
+    const depthSegments = options.segmentsZ;
+    const widthVertexCount = widthSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+    const depthVertexCount = depthSegments + GEOMETRY_GRID.VERTEX_INCREMENT;
+    let vertexIndex = MATH_COMMON_VALUES.ZERO;
+    for (let zIndex = MATH_COMMON_VALUES.ZERO; zIndex < depthVertexCount; zIndex += MATH_COMMON_VALUES.UNIT) {
+      const vNormalized = zIndex / depthSegments;
+      const positionZ = (vNormalized - centerOffset) * options.depth;
+      for (let xIndex = MATH_COMMON_VALUES.ZERO; xIndex < widthVertexCount; xIndex += MATH_COMMON_VALUES.UNIT) {
+        const uNormalized = xIndex / widthSegments;
+        const positionX = (uNormalized - centerOffset) * options.width;
+        const height = _HeightmapGeometry.#sampleHeight(
+          heightmapImageData,
+          uNormalized,
+          vNormalized,
+          options
+        );
+        const positionY = height * options.heightScale + options.heightOffset;
+        const positionBaseOffset = vertexIndex * positionComponentCount;
+        positions[positionBaseOffset + MATH_VECTOR3_INDEXES.X] = positionX;
+        positions[positionBaseOffset + MATH_VECTOR3_INDEXES.Y] = positionY;
+        positions[positionBaseOffset + MATH_VECTOR3_INDEXES.Z] = positionZ;
+        const uvBaseOffset = vertexIndex * uvComponentCount;
+        uvs[uvBaseOffset + GEOMETRY_UV_INDEXES.U] = uNormalized;
+        uvs[uvBaseOffset + GEOMETRY_UV_INDEXES.V] = vNormalized;
+        vertexIndex += MATH_COMMON_VALUES.UNIT;
+      }
+    }
+  }
+  /**
+   * Adds each triangle normal to the three vertices that share it.
+   *
+   * @param {Float32Array} positions            - Output positions.
+   * @param {Uint16Array | Uint32Array} indices - Indices.
+   * @param {Float32Array} normals              - Output normals.
+   * @private
+   */
+  static #accumulateFaceNormals(positions, indices, normals) {
+    const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+    const xComponentIndex = MATH_VECTOR3_INDEXES.X;
+    const yComponentIndex = MATH_VECTOR3_INDEXES.Y;
+    const zComponentIndex = MATH_VECTOR3_INDEXES.Z;
+    for (let i = MATH_COMMON_VALUES.ZERO; i < indices.length; i += GEOMETRY_LAYOUT.TRIANGLE_INDEX_COUNT) {
+      const indexA = indices[i + GEOMETRY_TRIANGLE_INDEXES.FIRST] * positionComponentCount;
+      const indexB = indices[i + GEOMETRY_TRIANGLE_INDEXES.SECOND] * positionComponentCount;
+      const indexC = indices[i + GEOMETRY_TRIANGLE_INDEXES.THIRD] * positionComponentCount;
+      const ax = positions[indexA + xComponentIndex];
+      const ay = positions[indexA + yComponentIndex];
+      const az = positions[indexA + zComponentIndex];
+      const bx = positions[indexB + xComponentIndex];
+      const by = positions[indexB + yComponentIndex];
+      const bz = positions[indexB + zComponentIndex];
+      const cx = positions[indexC + xComponentIndex];
+      const cy = positions[indexC + yComponentIndex];
+      const cz = positions[indexC + zComponentIndex];
+      const abx = bx - ax;
+      const aby = by - ay;
+      const abz = bz - az;
+      const acx = cx - ax;
+      const acy = cy - ay;
+      const acz = cz - az;
+      const crossX = aby * acz - abz * acy;
+      const crossY = abz * acx - abx * acz;
+      const crossZ = abx * acy - aby * acx;
+      normals[indexA + xComponentIndex] += crossX;
+      normals[indexA + yComponentIndex] += crossY;
+      normals[indexA + zComponentIndex] += crossZ;
+      normals[indexB + xComponentIndex] += crossX;
+      normals[indexB + yComponentIndex] += crossY;
+      normals[indexB + zComponentIndex] += crossZ;
+      normals[indexC + xComponentIndex] += crossX;
+      normals[indexC + yComponentIndex] += crossY;
+      normals[indexC + zComponentIndex] += crossZ;
+    }
+  }
+  /**
+   * Normalizes accumulated vertex normals while preserving zero-length normals.
+   *
+   * @param {Float32Array} normals - Output normals.
+   * @param {number} vertexCount   - Vertex count.
+   * @private
+   */
+  static #normalizeVertexNormals(normals, vertexCount) {
+    const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+    const xComponentIndex = MATH_VECTOR3_INDEXES.X;
+    const yComponentIndex = MATH_VECTOR3_INDEXES.Y;
+    const zComponentIndex = MATH_VECTOR3_INDEXES.Z;
+    for (let vertexIndex = MATH_COMMON_VALUES.ZERO; vertexIndex < vertexCount; vertexIndex += MATH_COMMON_VALUES.UNIT) {
+      const baseIndex = vertexIndex * positionComponentCount;
+      const nx = normals[baseIndex + xComponentIndex];
+      const ny = normals[baseIndex + yComponentIndex];
+      const nz = normals[baseIndex + zComponentIndex];
+      const length = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      if (length > MATH_COMMON_VALUES.ZERO) {
+        const inverseLength = MATH_COMMON_VALUES.UNIT / length;
+        normals[baseIndex + xComponentIndex] = nx * inverseLength;
+        normals[baseIndex + yComponentIndex] = ny * inverseLength;
+        normals[baseIndex + zComponentIndex] = nz * inverseLength;
+      }
+    }
   }
 };
 
+// core/constants/points-geometry.js
+var POINTS_DEFAULTS = Object.freeze({ POSITIONS: null });
+
 // core/geometry/points-geometry.js
-var POSITION_COMPONENT_COUNT3 = 3;
-var POSITION_X_OFFSET2 = 0;
-var POSITION_Y_OFFSET2 = 1;
-var POSITION_Z_OFFSET2 = 2;
-var DEFAULT_COLORS2 = null;
-var DEFAULT_POSITIONS = null;
-var MIN_POINT_COUNT2 = 0;
-var PointsGeometry = class _PointsGeometry extends Geometry {
+var PointsGeometry = class _PointsGeometry extends GeneratedGeometry {
   /**
-   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
-   * @param {PointsGeometryOptions} options       - Points geometry options.
-   * @throws {TypeError}  When inputs are invalid.
-   * @throws {RangeError} When positions are invalid.
+   * @param {PointsGeometryOptions} options - Points geometry options.
+   * @throws {TypeError}                      When inputs are invalid.
+   * @returns {GeneratedGeometryData}       - Generated CPU buffers.
+   * @protected
    */
-  constructor(webglContext, options = {}) {
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError("`PointsGeometry` expects options as a plain object.");
+  static createGeometryData(options = {}) {
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
+      throw new TypeError("PointsGeometry expects options as a plain object.");
     }
     const {
-      positions = DEFAULT_POSITIONS,
-      colors = DEFAULT_COLORS2
+      positions = POINTS_DEFAULTS.POSITIONS,
+      colors = GEOMETRY_DEFAULTS.COLORS
     } = options;
     if (!Array.isArray(positions)) {
-      throw new TypeError("`PointsGeometry` expects `positions` as an array of Vector3.");
-    }
-    if (positions.length < MIN_POINT_COUNT2) {
-      throw new RangeError("`PointsGeometry` expects a non-negative point count.");
+      throw new TypeError("PointsGeometry expects positions as an array of Vector3.");
     }
     for (const point of positions) {
       if (!(point instanceof Vector3)) {
-        throw new TypeError("`PointsGeometry` expects all positions to be `Vector3` instances.");
+        throw new TypeError("PointsGeometry expects all positions to be Vector3 instances.");
       }
     }
     if (colors !== null && !(colors instanceof Float32Array)) {
-      throw new TypeError("`PointsGeometry` expects `colors` as a `Float32Array` or null.");
+      throw new TypeError("PointsGeometry expects colors as a Float32Array or null.");
     }
     const positionsBuffer = _PointsGeometry.#createPositionsArray(positions);
     const vertexCount = positions.length;
-    const colorBuffer = colors ? createColorsFromSpec(vertexCount, colors) : null;
-    const indices = createSequentialIndexArray(vertexCount);
-    super(
-      webglContext,
-      positionsBuffer,
-      colorBuffer,
-      indices,
-      indices,
-      null,
-      null,
-      {
+    const colorBuffer = colors ? GeometryUtils.createColorsFromSpec(vertexCount, colors) : null;
+    const indices = GeometryUtils.createSequentialIndexArray(vertexCount);
+    return {
+      positions: positionsBuffer,
+      colors: colorBuffer,
+      indicesSolid: indices,
+      indicesWireframe: indices,
+      uvs: null,
+      normals: null,
+      primitiveOptions: {
         solidPrimitive: PRIMITIVE_POINTS,
         wireframePrimitive: PRIMITIVE_POINTS
       }
-    );
+    };
   }
   /**
    * @param {Vector3[]} positions - Input positions.
@@ -4542,77 +4864,75 @@ var PointsGeometry = class _PointsGeometry extends Geometry {
    * @private
    */
   static #createPositionsArray(positions) {
-    const buffer = new Float32Array(positions.length * POSITION_COMPONENT_COUNT3);
-    for (let index = 0; index < positions.length; index += 1) {
-      const baseIndex = index * POSITION_COMPONENT_COUNT3;
+    const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+    const buffer = new Float32Array(positions.length * positionComponentCount);
+    for (let index = MATH_COMMON_VALUES.ZERO; index < positions.length; index += MATH_COMMON_VALUES.UNIT) {
+      const baseIndex = index * positionComponentCount;
       const point = positions[index];
-      buffer[baseIndex + POSITION_X_OFFSET2] = point.x;
-      buffer[baseIndex + POSITION_Y_OFFSET2] = point.y;
-      buffer[baseIndex + POSITION_Z_OFFSET2] = point.z;
+      buffer[baseIndex + MATH_VECTOR3_INDEXES.X] = point.x;
+      buffer[baseIndex + MATH_VECTOR3_INDEXES.Y] = point.y;
+      buffer[baseIndex + MATH_VECTOR3_INDEXES.Z] = point.z;
     }
     return buffer;
   }
 };
 
+// core/constants/polyline-geometry.js
+var POLYLINE_LIMITS = Object.freeze({ MIN_VERTEX_COUNT: 2 });
+var POLYLINE_DEFAULTS = Object.freeze({ LOOP: false });
+
 // core/geometry/polyline-geometry.js
-var POSITION_COMPONENT_COUNT4 = 3;
-var POSITION_X_OFFSET3 = 0;
-var POSITION_Y_OFFSET3 = 1;
-var POSITION_Z_OFFSET3 = 2;
-var MIN_VERTEX_COUNT2 = 2;
-var DEFAULT_COLORS3 = null;
-var DEFAULT_LOOP2 = false;
-var PolylineGeometry = class _PolylineGeometry extends Geometry {
+var PolylineGeometry = class _PolylineGeometry extends GeneratedGeometry {
   /**
-   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
-   * @param {PolylineGeometryOptions} options     - Polyline geometry options.
-   * @throws {TypeError}  When inputs are invalid.
-   * @throws {RangeError} When positions are invalid.
+   * @param {PolylineGeometryOptions} options - Polyline geometry options.
+   * @throws {TypeError}                        When inputs are invalid.
+   * @throws {RangeError}                       When positions are invalid.
+   * @returns {GeneratedGeometryData}         - Generated CPU buffers.
+   * @protected
    */
-  constructor(webglContext, options = {}) {
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError("`PolylineGeometry` expects options as a plain object.");
+  static createGeometryData(options = {}) {
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
+      throw new TypeError("PolylineGeometry expects options as a plain object.");
     }
     const {
       positions,
-      loop = DEFAULT_LOOP2,
-      colors = DEFAULT_COLORS3
+      loop = POLYLINE_DEFAULTS.LOOP,
+      colors = GEOMETRY_DEFAULTS.COLORS
     } = options;
     if (!Array.isArray(positions)) {
-      throw new TypeError("`PolylineGeometry` expects `positions` as an array of `Vector3`.");
+      throw new TypeError("PolylineGeometry expects positions as an array of Vector3.");
     }
-    if (positions.length < MIN_VERTEX_COUNT2) {
-      throw new RangeError("`PolylineGeometry` expects at least 2 points.");
+    if (positions.length < POLYLINE_LIMITS.MIN_VERTEX_COUNT) {
+      throw new RangeError("PolylineGeometry expects at least 2 points.");
     }
     for (const point of positions) {
       if (!(point instanceof Vector3)) {
-        throw new TypeError("`PolylineGeometry` expects all positions to be the `Vector3` instances.");
+        throw new TypeError("PolylineGeometry expects all positions to be the Vector3 instances.");
       }
     }
-    if (typeof loop !== "boolean") {
-      throw new TypeError("`PolylineGeometry` expects `loop` as a boolean.");
+    if (typeof loop !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+      throw new TypeError("PolylineGeometry expects loop as a boolean.");
     }
     if (colors !== null && !(colors instanceof Float32Array)) {
-      throw new TypeError("`PolylineGeometry` expects `colors` as `Float32Array` or null.");
+      throw new TypeError("PolylineGeometry expects colors as Float32Array or null.");
     }
     const positionsBuffer = _PolylineGeometry.#createPositionsArray(positions);
     const vertexCount = positions.length;
-    const colorBuffer = colors ? createColorsFromSpec(vertexCount, colors) : null;
-    const indices = createSequentialIndexArray(vertexCount);
+    const colorBuffer = colors ? GeometryUtils.createColorsFromSpec(vertexCount, colors) : null;
+    const indices = GeometryUtils.createSequentialIndexArray(vertexCount);
     const primitive = loop ? PRIMITIVE_LINE_LOOP : PRIMITIVE_LINE_STRIP;
-    super(
-      webglContext,
-      positionsBuffer,
-      colorBuffer,
-      indices,
-      indices,
-      null,
-      null,
-      {
+    return {
+      positions: positionsBuffer,
+      colors: colorBuffer,
+      indicesSolid: indices,
+      indicesWireframe: indices,
+      uvs: null,
+      normals: null,
+      primitiveOptions: {
         solidPrimitive: primitive,
         wireframePrimitive: primitive
       }
-    );
+    };
   }
   /**
    * @param {Vector3[]} positions - Input positions.
@@ -4620,118 +4940,90 @@ var PolylineGeometry = class _PolylineGeometry extends Geometry {
    * @private
    */
   static #createPositionsArray(positions) {
-    const buffer = new Float32Array(positions.length * POSITION_COMPONENT_COUNT4);
-    for (let index = 0; index < positions.length; index += 1) {
-      const baseIndex = index * POSITION_COMPONENT_COUNT4;
+    const positionComponentCount = GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+    const buffer = new Float32Array(positions.length * positionComponentCount);
+    for (let index = MATH_COMMON_VALUES.ZERO; index < positions.length; index += MATH_COMMON_VALUES.UNIT) {
+      const baseIndex = index * positionComponentCount;
       const point = positions[index];
-      buffer[baseIndex + POSITION_X_OFFSET3] = point.x;
-      buffer[baseIndex + POSITION_Y_OFFSET3] = point.y;
-      buffer[baseIndex + POSITION_Z_OFFSET3] = point.z;
+      buffer[baseIndex + MATH_VECTOR3_INDEXES.X] = point.x;
+      buffer[baseIndex + MATH_VECTOR3_INDEXES.Y] = point.y;
+      buffer[baseIndex + MATH_VECTOR3_INDEXES.Z] = point.z;
     }
     return buffer;
   }
 };
 
+// core/constants/tube-line-geometry.js
+var TUBE_LINE_CAP_TYPES = Object.freeze({
+  NONE: "none",
+  FLAT: "flat"
+});
+var TUBE_LINE_LIMITS = Object.freeze({
+  MIN_POINT_COUNT: 2,
+  MIN_RADIAL_SEGMENTS: 3
+});
+var TUBE_LINE_DEFAULTS = Object.freeze({
+  RADIUS: 0.05,
+  WIDTH: null,
+  RADIAL_SEGMENTS: 8,
+  CLOSED: false,
+  CAP_TYPE: TUBE_LINE_CAP_TYPES.NONE
+});
+var TUBE_LINE_ERRORS = Object.freeze({
+  INVALID_CAP_TYPE: 'TubeLineGeometry expects capType to be "none" or "flat".'
+});
+var TUBE_LINE_LAYOUT = Object.freeze({
+  NORMALIZE_EPSILON: 1e-8,
+  CAP_CENTER_COUNT: 2
+});
+var TUBE_LINE_NORMALS = Object.freeze({
+  UP_AXIS_X: 0,
+  UP_AXIS_Y: 1,
+  UP_AXIS_Z: 0,
+  FALLBACK_AXIS_X: 1,
+  FALLBACK_AXIS_Y: 0,
+  FALLBACK_AXIS_Z: 0,
+  SECOND_FALLBACK_AXIS_X: 0,
+  SECOND_FALLBACK_AXIS_Y: 0,
+  SECOND_FALLBACK_AXIS_Z: 1
+});
+
 // core/geometry/tube-line-geometry.js
-var POSITION_COMPONENT_COUNT5 = 3;
-var POSITION_X_OFFSET4 = 0;
-var POSITION_Y_OFFSET4 = 1;
-var POSITION_Z_OFFSET4 = 2;
-var MIN_POINT_COUNT3 = 2;
-var DEFAULT_RADIUS = 0.05;
-var DEFAULT_WIDTH = null;
-var DEFAULT_RADIAL_SEGMENTS3 = 8;
-var MIN_RADIAL_SEGMENTS = 3;
-var DEFAULT_CLOSED2 = false;
-var CAP_TYPE_NONE = "none";
-var CAP_TYPE_FLAT = "flat";
-var DEFAULT_CAP_TYPE = CAP_TYPE_NONE;
-var ERROR_INVALID_CAP_TYPE = `\`TubeLineGeometry\` expects \`capType\` to be "${CAP_TYPE_NONE}" or "${CAP_TYPE_FLAT}".`;
-var WIDTH_TO_RADIUS_DIVISOR = 2;
-var TWO_PI4 = Math.PI * 2;
-var NORMALIZE_EPSILON2 = 1e-8;
-var UP_AXIS_X = 0;
-var UP_AXIS_Y = 1;
-var UP_AXIS_Z = 0;
-var FALLBACK_AXIS_X = 1;
-var FALLBACK_AXIS_Y = 0;
-var FALLBACK_AXIS_Z = 0;
-var SECOND_FALLBACK_AXIS_X = 0;
-var SECOND_FALLBACK_AXIS_Y = 0;
-var SECOND_FALLBACK_AXIS_Z = 1;
-var ZERO_VALUE9 = 0;
-var ONE_VALUE7 = 1;
-var TWO_VALUE2 = 2;
-var TubeLineGeometry = class _TubeLineGeometry extends Geometry {
+var TubeLineGeometry = class _TubeLineGeometry extends GeneratedGeometry {
   /**
-   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
-   * @param {TubeLineGeometryOptions} options     - Tube geometry options.
-   * @throws {TypeError}  When inputs are invalid.
-   * @throws {RangeError} When numeric inputs are out of range.
+   * @param {TubeLineGeometryOptions} options - Tube geometry options.
+   * @throws {TypeError}                        When inputs are invalid.
+   * @throws {RangeError}                       When numeric inputs are out of range.
+   * @returns {GeneratedGeometryData}         - Generated CPU buffers.
+   * @protected
    */
-  constructor(webglContext, options = {}) {
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError("`TubeLineGeometry` expects options as a plain object.");
-    }
-    const {
-      positions,
-      radius = DEFAULT_RADIUS,
-      width = DEFAULT_WIDTH,
-      radialSegments = DEFAULT_RADIAL_SEGMENTS3,
-      closed = DEFAULT_CLOSED2,
-      capType = DEFAULT_CAP_TYPE
-    } = options;
-    if (!Array.isArray(positions)) {
-      throw new TypeError("`TubeLineGeometry` expects `positions` as an array of `Vector3`.");
-    }
-    if (positions.length < MIN_POINT_COUNT3) {
-      throw new RangeError("`TubeLineGeometry` expects at least the 2 points.");
-    }
-    for (const point of positions) {
-      if (!(point instanceof Vector3)) {
-        throw new TypeError("`TubeLineGeometry` expects all positions to be the `Vector3` instances.");
-      }
-    }
-    if (typeof radius !== "number" || !Number.isFinite(radius) || radius <= ZERO_VALUE9) {
-      throw new RangeError("`TubeLineGeometry` expects `radius` as a positive number.");
-    }
-    if (width !== null && (typeof width !== "number" || !Number.isFinite(width) || width <= ZERO_VALUE9)) {
-      throw new RangeError("`TubeLineGeometry` expects `width` as a positive number or null.");
-    }
-    if (!Number.isInteger(radialSegments) || radialSegments < MIN_RADIAL_SEGMENTS) {
-      throw new RangeError("`TubeLineGeometry` expects `radialSegments` as an `integer >= 3`.");
-    }
-    if (typeof closed !== "boolean") {
-      throw new TypeError("`TubeLineGeometry` expects `closed` as a boolean.");
-    }
-    if (capType !== CAP_TYPE_NONE && capType !== CAP_TYPE_FLAT) {
-      throw new RangeError(ERROR_INVALID_CAP_TYPE);
-    }
-    const resolvedRadius = width !== null ? width / WIDTH_TO_RADIUS_DIVISOR : radius;
+  static createGeometryData(options = {}) {
+    const normalized = _TubeLineGeometry.#normalizeOptions(options);
+    const { positions, radius, width, radialSegments, closed, capType } = normalized;
+    const resolvedRadius = width !== null ? width / GEOMETRY_SIZES.HALF_SIZE_DIVISOR : radius;
     const baseVertexCount = positions.length * radialSegments;
-    const addCaps = capType === CAP_TYPE_FLAT && !closed;
-    const extraCapVertices = addCaps ? TWO_VALUE2 : ZERO_VALUE9;
+    const addCaps = capType === TUBE_LINE_CAP_TYPES.FLAT && !closed;
+    const extraCapVertices = addCaps ? TUBE_LINE_LAYOUT.CAP_CENTER_COUNT : MATH_COMMON_VALUES.ZERO;
     const totalVertexCount = baseVertexCount + extraCapVertices;
-    const positionsBuffer = new Float32Array(totalVertexCount * POSITION_COMPONENT_COUNT5);
+    const positionsBuffer = new Float32Array(totalVertexCount * GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT);
     _TubeLineGeometry.#writeRingPositions(positionsBuffer, positions, radialSegments, resolvedRadius, closed);
     if (addCaps) {
       _TubeLineGeometry.#writeCapCenters(positionsBuffer, positions, baseVertexCount);
     }
     const indices = _TubeLineGeometry.#buildIndices(positions.length, radialSegments, closed, addCaps, baseVertexCount);
-    const wireframeIndices = createWireframeIndicesFromSolidIndices(totalVertexCount, indices);
-    super(
-      webglContext,
-      positionsBuffer,
-      null,
-      indices,
-      wireframeIndices,
-      null,
-      null,
-      {
+    const wireframeIndices = GeometryUtils.createWireframeIndicesFromSolidIndices(totalVertexCount, indices);
+    return {
+      positions: positionsBuffer,
+      colors: null,
+      indicesSolid: indices,
+      indicesWireframe: wireframeIndices,
+      uvs: null,
+      normals: null,
+      primitiveOptions: {
         solidPrimitive: PRIMITIVE_TRIANGLES,
         wireframePrimitive: PRIMITIVE_LINES
       }
-    );
+    };
   }
   /**
    * @param {Float32Array} buffer   - Output positions buffer.
@@ -4743,7 +5035,7 @@ var TubeLineGeometry = class _TubeLineGeometry extends Geometry {
    */
   static #writeRingPositions(buffer, positions, radialSegments, radius, closed) {
     const pointCount = positions.length;
-    for (let index = ZERO_VALUE9; index < pointCount; index += ONE_VALUE7) {
+    for (let index = MATH_COMMON_VALUES.ZERO; index < pointCount; index += MATH_COMMON_VALUES.UNIT) {
       const previousIndex = _TubeLineGeometry.#getPreviousIndex(index, pointCount, closed);
       const nextIndex = _TubeLineGeometry.#getNextIndex(index, pointCount, closed);
       const tangent = _TubeLineGeometry.#computeTangent(positions[previousIndex], positions[nextIndex]);
@@ -4751,18 +5043,18 @@ var TubeLineGeometry = class _TubeLineGeometry extends Geometry {
       const binormal = _TubeLineGeometry.#computeBinormal(tangent, normal);
       const ringBase = index * radialSegments;
       const point = positions[index];
-      for (let segmentIndex = ZERO_VALUE9; segmentIndex < radialSegments; segmentIndex += ONE_VALUE7) {
-        const angle = TWO_PI4 * (segmentIndex / radialSegments);
+      for (let segmentIndex = MATH_COMMON_VALUES.ZERO; segmentIndex < radialSegments; segmentIndex += MATH_COMMON_VALUES.UNIT) {
+        const angle = GEOMETRY_ANGLES.FULL_TURN * (segmentIndex / radialSegments);
         const cosAngle = Math.cos(angle);
         const sinAngle = Math.sin(angle);
         const offsetX = (normal.x * cosAngle + binormal.x * sinAngle) * radius;
         const offsetY = (normal.y * cosAngle + binormal.y * sinAngle) * radius;
         const offsetZ = (normal.z * cosAngle + binormal.z * sinAngle) * radius;
         const vertexIndex = ringBase + segmentIndex;
-        const baseIndex = vertexIndex * POSITION_COMPONENT_COUNT5;
-        buffer[baseIndex + POSITION_X_OFFSET4] = point.x + offsetX;
-        buffer[baseIndex + POSITION_Y_OFFSET4] = point.y + offsetY;
-        buffer[baseIndex + POSITION_Z_OFFSET4] = point.z + offsetZ;
+        const baseIndex = vertexIndex * GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+        buffer[baseIndex + MATH_VECTOR3_INDEXES.X] = point.x + offsetX;
+        buffer[baseIndex + MATH_VECTOR3_INDEXES.Y] = point.y + offsetY;
+        buffer[baseIndex + MATH_VECTOR3_INDEXES.Z] = point.z + offsetZ;
       }
     }
   }
@@ -4773,16 +5065,16 @@ var TubeLineGeometry = class _TubeLineGeometry extends Geometry {
    * @private
    */
   static #writeCapCenters(buffer, positions, baseVertexCount) {
-    const startBaseIndex = baseVertexCount * POSITION_COMPONENT_COUNT5;
-    const endBaseIndex = (baseVertexCount + ONE_VALUE7) * POSITION_COMPONENT_COUNT5;
-    const startPoint = positions[ZERO_VALUE9];
-    const endPoint = positions[positions.length - ONE_VALUE7];
-    buffer[startBaseIndex + POSITION_X_OFFSET4] = startPoint.x;
-    buffer[startBaseIndex + POSITION_Y_OFFSET4] = startPoint.y;
-    buffer[startBaseIndex + POSITION_Z_OFFSET4] = startPoint.z;
-    buffer[endBaseIndex + POSITION_X_OFFSET4] = endPoint.x;
-    buffer[endBaseIndex + POSITION_Y_OFFSET4] = endPoint.y;
-    buffer[endBaseIndex + POSITION_Z_OFFSET4] = endPoint.z;
+    const startBaseIndex = baseVertexCount * GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+    const endBaseIndex = (baseVertexCount + MATH_COMMON_VALUES.UNIT) * GEOMETRY_LAYOUT.POSITION_COMPONENT_COUNT;
+    const startPoint = positions[MATH_COMMON_VALUES.ZERO];
+    const endPoint = positions[positions.length - MATH_COMMON_VALUES.UNIT];
+    buffer[startBaseIndex + MATH_VECTOR3_INDEXES.X] = startPoint.x;
+    buffer[startBaseIndex + MATH_VECTOR3_INDEXES.Y] = startPoint.y;
+    buffer[startBaseIndex + MATH_VECTOR3_INDEXES.Z] = startPoint.z;
+    buffer[endBaseIndex + MATH_VECTOR3_INDEXES.X] = endPoint.x;
+    buffer[endBaseIndex + MATH_VECTOR3_INDEXES.Y] = endPoint.y;
+    buffer[endBaseIndex + MATH_VECTOR3_INDEXES.Z] = endPoint.z;
   }
   /**
    * @param {number} pointCount      - Number of path points.
@@ -4794,13 +5086,13 @@ var TubeLineGeometry = class _TubeLineGeometry extends Geometry {
    * @private
    */
   static #buildIndices(pointCount, radialSegments, closed, addCaps, baseVertexCount) {
-    const segmentCount = closed ? pointCount : pointCount - ONE_VALUE7;
+    const segmentCount = closed ? pointCount : pointCount - MATH_COMMON_VALUES.UNIT;
     const indices = [];
-    for (let segmentIndex = ZERO_VALUE9; segmentIndex < segmentCount; segmentIndex += ONE_VALUE7) {
+    for (let segmentIndex = MATH_COMMON_VALUES.ZERO; segmentIndex < segmentCount; segmentIndex += MATH_COMMON_VALUES.UNIT) {
       const ringStart = segmentIndex * radialSegments;
-      const nextRingStart = (segmentIndex + ONE_VALUE7) % pointCount * radialSegments;
-      for (let radialIndex = ZERO_VALUE9; radialIndex < radialSegments; radialIndex += ONE_VALUE7) {
-        const nextRadialIndex = (radialIndex + ONE_VALUE7) % radialSegments;
+      const nextRingStart = (segmentIndex + MATH_COMMON_VALUES.UNIT) % pointCount * radialSegments;
+      for (let radialIndex = MATH_COMMON_VALUES.ZERO; radialIndex < radialSegments; radialIndex += MATH_COMMON_VALUES.UNIT) {
+        const nextRadialIndex = (radialIndex + MATH_COMMON_VALUES.UNIT) % radialSegments;
         const groupA = ringStart + radialIndex;
         const groupB = ringStart + nextRadialIndex;
         const groupC = nextRingStart + radialIndex;
@@ -4811,11 +5103,11 @@ var TubeLineGeometry = class _TubeLineGeometry extends Geometry {
     }
     if (addCaps) {
       const startCenterIndex = baseVertexCount;
-      const endCenterIndex = baseVertexCount + ONE_VALUE7;
-      const startRingStart = ZERO_VALUE9;
-      const endRingStart = (pointCount - ONE_VALUE7) * radialSegments;
-      for (let radialIndex = ZERO_VALUE9; radialIndex < radialSegments; radialIndex += ONE_VALUE7) {
-        const nextRadialIndex = (radialIndex + ONE_VALUE7) % radialSegments;
+      const endCenterIndex = baseVertexCount + MATH_COMMON_VALUES.UNIT;
+      const startRingStart = MATH_COMMON_VALUES.ZERO;
+      const endRingStart = (pointCount - MATH_COMMON_VALUES.UNIT) * radialSegments;
+      for (let radialIndex = MATH_COMMON_VALUES.ZERO; radialIndex < radialSegments; radialIndex += MATH_COMMON_VALUES.UNIT) {
+        const nextRadialIndex = (radialIndex + MATH_COMMON_VALUES.UNIT) % radialSegments;
         const startA = startRingStart + radialIndex;
         const startB = startRingStart + nextRadialIndex;
         indices.push(startCenterIndex, startB, startA);
@@ -4824,7 +5116,7 @@ var TubeLineGeometry = class _TubeLineGeometry extends Geometry {
         indices.push(endCenterIndex, endA, endB);
       }
     }
-    return createIndexArray(baseVertexCount + (addCaps ? TWO_VALUE2 : ZERO_VALUE9), indices);
+    return GeometryUtils.createIndexArray(baseVertexCount + (addCaps ? TUBE_LINE_LAYOUT.CAP_CENTER_COUNT : MATH_COMMON_VALUES.ZERO), indices);
   }
   /**
    * @param {number} index   - Current index.
@@ -4834,10 +5126,10 @@ var TubeLineGeometry = class _TubeLineGeometry extends Geometry {
    * @private
    */
   static #getPreviousIndex(index, count, closed) {
-    if (index > ZERO_VALUE9) {
-      return index - ONE_VALUE7;
+    if (index > MATH_COMMON_VALUES.ZERO) {
+      return index - MATH_COMMON_VALUES.UNIT;
     }
-    return closed ? count - ONE_VALUE7 : index;
+    return closed ? count - MATH_COMMON_VALUES.UNIT : index;
   }
   /**
    * @param {number} index   - Current index.
@@ -4847,10 +5139,10 @@ var TubeLineGeometry = class _TubeLineGeometry extends Geometry {
    * @private
    */
   static #getNextIndex(index, count, closed) {
-    if (index < count - ONE_VALUE7) {
-      return index + ONE_VALUE7;
+    if (index < count - MATH_COMMON_VALUES.UNIT) {
+      return index + MATH_COMMON_VALUES.UNIT;
     }
-    return closed ? ZERO_VALUE9 : index;
+    return closed ? MATH_COMMON_VALUES.ZERO : index;
   }
   /**
    * @param {Vector3} pointA - Start point.
@@ -4863,8 +5155,12 @@ var TubeLineGeometry = class _TubeLineGeometry extends Geometry {
     const deltaY = pointB.y - pointA.y;
     const deltaZ = pointB.z - pointA.z;
     const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
-    if (length <= NORMALIZE_EPSILON2) {
-      return new Vector3(ZERO_VALUE9, ONE_VALUE7, ZERO_VALUE9);
+    if (length <= TUBE_LINE_LAYOUT.NORMALIZE_EPSILON) {
+      return new Vector3(
+        MATH_COMMON_VALUES.ZERO,
+        MATH_COMMON_VALUES.UNIT,
+        MATH_COMMON_VALUES.ZERO
+      );
     }
     return new Vector3(deltaX / length, deltaY / length, deltaZ / length);
   }
@@ -4874,24 +5170,24 @@ var TubeLineGeometry = class _TubeLineGeometry extends Geometry {
    * @private
    */
   static #computeNormal(tangent) {
-    let normalX = tangent.y * UP_AXIS_Z - tangent.z * UP_AXIS_Y;
-    let normalY = tangent.z * UP_AXIS_X - tangent.x * UP_AXIS_Z;
-    let normalZ = tangent.x * UP_AXIS_Y - tangent.y * UP_AXIS_X;
+    let normalX = tangent.y * TUBE_LINE_NORMALS.UP_AXIS_Z - tangent.z * TUBE_LINE_NORMALS.UP_AXIS_Y;
+    let normalY = tangent.z * TUBE_LINE_NORMALS.UP_AXIS_X - tangent.x * TUBE_LINE_NORMALS.UP_AXIS_Z;
+    let normalZ = tangent.x * TUBE_LINE_NORMALS.UP_AXIS_Y - tangent.y * TUBE_LINE_NORMALS.UP_AXIS_X;
     let length = Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
-    if (length <= NORMALIZE_EPSILON2) {
-      normalX = tangent.y * FALLBACK_AXIS_Z - tangent.z * FALLBACK_AXIS_Y;
-      normalY = tangent.z * FALLBACK_AXIS_X - tangent.x * FALLBACK_AXIS_Z;
-      normalZ = tangent.x * FALLBACK_AXIS_Y - tangent.y * FALLBACK_AXIS_X;
+    if (length <= TUBE_LINE_LAYOUT.NORMALIZE_EPSILON) {
+      normalX = tangent.y * TUBE_LINE_NORMALS.FALLBACK_AXIS_Z - tangent.z * TUBE_LINE_NORMALS.FALLBACK_AXIS_Y;
+      normalY = tangent.z * TUBE_LINE_NORMALS.FALLBACK_AXIS_X - tangent.x * TUBE_LINE_NORMALS.FALLBACK_AXIS_Z;
+      normalZ = tangent.x * TUBE_LINE_NORMALS.FALLBACK_AXIS_Y - tangent.y * TUBE_LINE_NORMALS.FALLBACK_AXIS_X;
       length = Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
     }
-    if (length <= NORMALIZE_EPSILON2) {
-      normalX = tangent.y * SECOND_FALLBACK_AXIS_Z - tangent.z * SECOND_FALLBACK_AXIS_Y;
-      normalY = tangent.z * SECOND_FALLBACK_AXIS_X - tangent.x * SECOND_FALLBACK_AXIS_Z;
-      normalZ = tangent.x * SECOND_FALLBACK_AXIS_Y - tangent.y * SECOND_FALLBACK_AXIS_X;
+    if (length <= TUBE_LINE_LAYOUT.NORMALIZE_EPSILON) {
+      normalX = tangent.y * TUBE_LINE_NORMALS.SECOND_FALLBACK_AXIS_Z - tangent.z * TUBE_LINE_NORMALS.SECOND_FALLBACK_AXIS_Y;
+      normalY = tangent.z * TUBE_LINE_NORMALS.SECOND_FALLBACK_AXIS_X - tangent.x * TUBE_LINE_NORMALS.SECOND_FALLBACK_AXIS_Z;
+      normalZ = tangent.x * TUBE_LINE_NORMALS.SECOND_FALLBACK_AXIS_Y - tangent.y * TUBE_LINE_NORMALS.SECOND_FALLBACK_AXIS_X;
       length = Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
     }
-    if (length <= NORMALIZE_EPSILON2) {
-      return new Vector3(ONE_VALUE7, ZERO_VALUE9, ZERO_VALUE9);
+    if (length <= TUBE_LINE_LAYOUT.NORMALIZE_EPSILON) {
+      return new Vector3(MATH_COMMON_VALUES.UNIT, MATH_COMMON_VALUES.ZERO, MATH_COMMON_VALUES.ZERO);
     }
     return new Vector3(normalX / length, normalY / length, normalZ / length);
   }
@@ -4906,54 +5202,169 @@ var TubeLineGeometry = class _TubeLineGeometry extends Geometry {
     const binormalY = tangent.z * normal.x - tangent.x * normal.z;
     const binormalZ = tangent.x * normal.y - tangent.y * normal.x;
     const length = Math.sqrt(binormalX * binormalX + binormalY * binormalY + binormalZ * binormalZ);
-    if (length <= NORMALIZE_EPSILON2) {
-      return new Vector3(ZERO_VALUE9, ZERO_VALUE9, ZERO_VALUE9);
+    if (length <= TUBE_LINE_LAYOUT.NORMALIZE_EPSILON) {
+      return new Vector3(
+        MATH_COMMON_VALUES.ZERO,
+        MATH_COMMON_VALUES.ZERO,
+        MATH_COMMON_VALUES.ZERO
+      );
     }
     return new Vector3(binormalX / length, binormalY / length, binormalZ / length);
   }
+  /**
+   * Validates the path and tube options before allocating geometry buffers.
+   *
+   * @param {TubeLineGeometryOptions} options - Normalized geometry options.
+   * @returns {Required<TubeLineGeometryOptions>}
+   * @private
+   */
+  static #normalizeOptions(options) {
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
+      throw new TypeError("TubeLineGeometry expects options as a plain object.");
+    }
+    const {
+      positions,
+      radius = TUBE_LINE_DEFAULTS.RADIUS,
+      width = TUBE_LINE_DEFAULTS.WIDTH,
+      radialSegments = TUBE_LINE_DEFAULTS.RADIAL_SEGMENTS,
+      closed = TUBE_LINE_DEFAULTS.CLOSED,
+      capType = TUBE_LINE_DEFAULTS.CAP_TYPE
+    } = options;
+    if (!Array.isArray(positions)) {
+      throw new TypeError("TubeLineGeometry expects positions as an array of Vector3.");
+    }
+    if (positions.length < TUBE_LINE_LIMITS.MIN_POINT_COUNT) {
+      throw new RangeError("TubeLineGeometry expects at least the 2 points.");
+    }
+    for (const point of positions) {
+      if (!(point instanceof Vector3)) {
+        throw new TypeError("TubeLineGeometry expects all positions to be the Vector3 instances.");
+      }
+    }
+    if (typeof radius !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(radius) || radius <= MATH_COMMON_VALUES.ZERO) {
+      throw new RangeError("TubeLineGeometry expects radius as a positive number.");
+    }
+    if (width !== null && (typeof width !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(width) || width <= MATH_COMMON_VALUES.ZERO)) {
+      throw new RangeError("TubeLineGeometry expects width as a positive number or null.");
+    }
+    if (!Number.isInteger(radialSegments) || radialSegments < TUBE_LINE_LIMITS.MIN_RADIAL_SEGMENTS) {
+      throw new RangeError("TubeLineGeometry expects radialSegments as an integer >= 3.");
+    }
+    if (typeof closed !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+      throw new TypeError("TubeLineGeometry expects closed as a boolean.");
+    }
+    if (capType !== TUBE_LINE_CAP_TYPES.NONE && capType !== TUBE_LINE_CAP_TYPES.FLAT) {
+      throw new RangeError(TUBE_LINE_ERRORS.INVALID_CAP_TYPE);
+    }
+    return { positions, radius, width, radialSegments, closed, capType };
+  }
 };
 
+// core/exception-messages/shader-program.js
+var SHADER_PROGRAM_EXCEPTION_MESSAGES = Object.freeze({
+  CONTEXT_TYPE: "`ShaderProgram` expects a `WebGL2RenderingContext`.",
+  SOURCE_TYPE: "`ShaderProgram` expects vertex and fragment source as strings.",
+  ATTRIBUTE_NAME_TYPE: "`ShaderProgram.getAttribLocation` expects attribute name as a string.",
+  UNIFORM_NAME_TYPE: "`ShaderProgram.#getUniformLocation` expects a string name.",
+  FLOAT_NAME_TYPE: "`ShaderProgram.setFloat` expects uniform name as a string.",
+  FLOAT_VALUE_TYPE: "`ShaderProgram.setFloat` expects value as a number.",
+  INT_NAME_TYPE: "`ShaderProgram.setInt` expects uniform name as a string.",
+  INT_VALUE_TYPE: "`ShaderProgram.setInt` expects an integer value.",
+  TEXTURE_NAME_TYPE: "`ShaderProgram.setTexture2D` expects uniform name as a string.",
+  TEXTURE_TYPE: "`ShaderProgram.setTexture2D` expects texture as Texture2D.",
+  TEXTURE_UNIT_INDEX: "`ShaderProgram.setTexture2D` expects textureUnitIndex as a non-negative integer.",
+  VECTOR2_NAME_TYPE: "`ShaderProgram.setVector2` expects uniform name as a string.",
+  VECTOR2_TYPE: "`ShaderProgram.setVector2` expects a number[] or Float32Array.",
+  VECTOR2_LENGTH: "`ShaderProgram.setVector2` expects exactly 2 components.",
+  VECTOR3_NAME_TYPE: "`ShaderProgram.setVector3` expects uniform name as a string.",
+  VECTOR3_TYPE: "`ShaderProgram.setVector3` expects a number[] or Float32Array.",
+  VECTOR3_LENGTH: "`ShaderProgram.setVector3` expects exactly 3 components.",
+  VECTOR4_NAME_TYPE: "`ShaderProgram.setVector4` expects uniform name as a string.",
+  VECTOR4_TYPE: "`ShaderProgram.setVector4` expects a number[] or `Float32Array`.",
+  VECTOR4_LENGTH: "`ShaderProgram.setVector4` expects exactly 4 components.",
+  MATRIX4_NAME_TYPE: "`ShaderProgram.setMatrix4` expects uniform name as a string.",
+  MATRIX4_TYPE: "`ShaderProgram.setMatrix4` expects a 4x4 Float32Array.",
+  DISPOSED: "`ShaderProgram` has been disposed and can no longer be used.",
+  PROGRAM_CREATION: "Failed to create WebGL program.",
+  SHADER_CREATION: "Failed to create the WebGL shader.",
+  UNKNOWN_LINK_ERROR: "Unknown program link error",
+  UNKNOWN_COMPILE_ERROR: "Unknown shader compilation error",
+  ATTRIBUTE_NOT_FOUND: (name) => `Attribute "${name}" not found in shader program.`,
+  UNIFORM_NOT_FOUND: (name) => `Uniform "${name}" not found in shader program.`,
+  PROGRAM_LINK: (infoLog) => `Failed to link program: ${infoLog}`,
+  SHADER_COMPILE: (infoLog) => `Failed to compile shader: ${infoLog}`
+});
+
+// core/constants/shader-program.js
+var SHADER_PROGRAM_LAYOUT = Object.freeze({
+  VECTOR2_ELEMENT_COUNT: 2,
+  VECTOR4_ELEMENT_COUNT: 4
+});
+var SHADER_PROGRAM_DEFAULTS = Object.freeze({
+  TEXTURE_UNIT_INDEX: 0,
+  MATRIX_TRANSPOSE: false
+});
+var SHADER_PROGRAM_LIMITS = Object.freeze({
+  ATTRIBUTE_LOCATION_NOT_FOUND: -1,
+  MIN_TEXTURE_UNIT_INDEX: 0
+});
+
+// core/exception-messages/texture2d.js
+var TEXTURE2D_EXCEPTION_MESSAGES = Object.freeze({
+  EXPECTS_WEBGL2_CONTEXT: "`Texture2D` expects `WebGL2RenderingContext`.",
+  EXPECTS_OPTIONS_OBJECT: "`Texture2D` expects options as an object.",
+  EXPECTS_FLIPY_BOOLEAN: "`Texture2D` expects `options.flipY` as boolean.",
+  FAILED_CREATE_TEXTURE: "Failed to create `WebGLTexture`.",
+  EXPECTS_WRAP_S_ENUM: "`Texture2D` expects `options.wrapS` as the valid WebGL wrap mode.",
+  EXPECTS_WRAP_T_ENUM: "`Texture2D` expects `options.wrapT` as the valid WebGL wrap mode.",
+  EXPECTS_MIN_FILTER_ENUM: "`Texture2D` expects `options.minFilter` as the valid WebGL min filter.",
+  EXPECTS_MAG_FILTER_ENUM: "`Texture2D` expects `options.magFilter` as the valid WebGL mag filter.",
+  EXPECTS_MIPMAP_POLICY: "`Texture2D` expects `options.mipmapPolicy` as the valid mipmap policy.",
+  MIPMAP_POLICY_CONFLICT: "`Texture2D` cannot use the mipmap min filter, when mipmap policy is NONE.",
+  MIPMAP_AUTO_POT_REQUIRED_FOR_MIPMAP_FILTER: "`Texture2D` cannot apply a mipmap min filter with the auto policy for a `non power-of-two` texture. Use `MIPMAP_POLICY_ALWAYS` or the non-mipmap min filter.",
+  EXPECTS_SAMPLER_OPTIONS_OBJECT: "`Texture2D.setSamplerParams` expects options as an object.",
+  EXPECTS_TEXTURE_UNIT_INDEX: "`Texture2D.bind` expects `textureUnitIndex` as a non-negative integer.",
+  EXPECTS_URL_STRING: "`Texture2D.loadFromUrl` expects url as a non-empty string.",
+  INSTANCE_DISPOSED: "`Texture2D` instance is disposed.",
+  EXPECTS_LOAD_OPTIONS_OBJECT: "`Texture2D.loadFromUrl` expects options as an object.",
+  EXPECTS_CROSS_ORIGIN: "`Texture2D.loadFromUrl` expects `options.crossOrigin` as `anonymous`, `use-credentials` or null.",
+  FAILED_READ_MAX_TEXTURE_UNITS: "Failed to read WebGL `MAX_COMBINED_TEXTURE_IMAGE_UNITS`.",
+  TEXTURE_UNIT_INDEX_OUT_OF_RANGE: (maximumIndex) => `\`Texture2D.bind\` texture unit index is out of range. Max allowed index is ${maximumIndex}.`,
+  FAILED_LOAD_IMAGE: (url) => `Failed to load the texture image: ${url}`
+});
+
+// core/constants/texture2d.js
+var TEXTURE2D_MIPMAP_POLICIES = Object.freeze({
+  NONE: 0,
+  ALWAYS: 1,
+  AUTO: 2
+});
+var TEXTURE2D_DEFAULTS = Object.freeze({
+  FLIP_Y: true,
+  MIPMAP_POLICY: TEXTURE2D_MIPMAP_POLICIES.AUTO
+});
+var TEXTURE2D_CROSS_ORIGIN = Object.freeze({
+  ANONYMOUS: "anonymous",
+  USE_CREDENTIALS: "use-credentials"
+});
+var TEXTURE2D_PLACEHOLDER = Object.freeze({
+  WIDTH: 1,
+  HEIGHT: 1
+});
+var TEXTURE2D_UPLOAD = Object.freeze({
+  BASE_MIPMAP_LEVEL: 0,
+  BORDER: 0,
+  TRUE_AS_INTEGER: 1,
+  FALSE_AS_INTEGER: 0
+});
+var TEXTURE2D_LIMITS = Object.freeze({
+  MIN_TEXTURE_UNIT_INDEX: MATH_COMMON_VALUES.ZERO,
+  MIN_URL_LENGTH: 1
+});
+var TEXTURE2D_PLACEHOLDER_PIXEL = new Uint8Array([255, 0, 255, 255]);
+
 // core/texture/texture2d.js
-var DEFAULT_FLIP_Y2 = true;
-var MIPMAP_POLICY_NONE = 0;
-var MIPMAP_POLICY_ALWAYS = 1;
-var MIPMAP_POLICY_AUTO = 2;
-var DEFAULT_MIPMAP_POLICY = MIPMAP_POLICY_AUTO;
-var CROSS_ORIGIN_ANONYMOUS = "anonymous";
-var CROSS_ORIGIN_USE_CREDENTIALS = "use-credentials";
-var ERROR_EXPECTS_WEBGL2_CONTEXT = "`Texture2D` expects `WebGL2RenderingContext`.";
-var ERROR_EXPECTS_OPTIONS_OBJECT = "`Texture2D` expects options as an object.";
-var ERROR_EXPECTS_FLIPY_BOOLEAN = "`Texture2D` expects `options.flipY` as boolean.";
-var ERROR_FAILED_CREATE_TEXTURE = "Failed to create `WebGLTexture`.";
-var ERROR_EXPECTS_WRAP_S_ENUM = "`Texture2D` expects `options.wrapS` as the valid WebGL wrap mode.";
-var ERROR_EXPECTS_WRAP_T_ENUM = "`Texture2D` expects `options.wrapT` as the valid WebGL wrap mode.";
-var ERROR_EXPECTS_MIN_FILTER_ENUM = "`Texture2D` expects `options.minFilter` as the valid WebGL min filter.";
-var ERROR_EXPECTS_MAG_FILTER_ENUM = "`Texture2D` expects `options.magFilter` as the valid WebGL mag filter.";
-var ERROR_EXPECTS_MIPMAP_POLICY = "`Texture2D` expects `options.mipmapPolicy` as the valid mipmap policy.";
-var ERROR_MIPMAP_POLICY_CONFLICT = "`Texture2D` cannot use the mipmap min filter, when mipmap policy is NONE.";
-var ERROR_MIPMAP_AUTO_POT_REQUIRED_FOR_MIPMAP_FILTER = "`Texture2D` cannot apply a mipmap min filter with the auto policy for a `non power-of-two` texture. Use `MIPMAP_POLICY_ALWAYS` or the non-mipmap min filter.";
-var ERROR_EXPECTS_SAMPLER_OPTIONS_OBJECT = "`Texture2D.setSamplerParams` expects options as an object.";
-var ERROR_EXPECTS_TEXTURE_UNIT_INDEX = "`Texture2D.bind` expects `textureUnitIndex` as a non-negative integer.";
-var ERROR_TEXTURE_UNIT_INDEX_OUT_OF_RANGE_PREFIX = "`Texture2D.bind` texture unit index is out of range. Max allowed index is ";
-var ERROR_EXPECTS_URL_STRING = "`Texture2D.loadFromUrl` expects url as a non-empty string.";
-var ERROR_INSTANCE_DISPOSED = "`Texture2D` instance is disposed.";
-var ERROR_EXPECTS_LOAD_OPTIONS_OBJECT = "`Texture2D.loadFromUrl` expects options as an object.";
-var ERROR_EXPECTS_CROSS_ORIGIN = "`Texture2D.loadFromUrl` expects `options.crossOrigin` as `anonymous`, `use-credentials` or null.";
-var ERROR_FAILED_LOAD_IMAGE_PREFIX = "Failed to load the texture image: ";
-var ERROR_FAILED_READ_MAX_TEXTURE_UNITS = "Failed to read WebGL `MAX_COMBINED_TEXTURE_IMAGE_UNITS`.";
-var PLACEHOLDER_TEXTURE_WIDTH = 1;
-var PLACEHOLDER_TEXTURE_HEIGHT = 1;
-var TEXTURE_BORDER_VALUE = 0;
-var BASE_MIPMAP_LEVEL = 0;
-var PLACEHOLDER_PIXEL_RGBA = new Uint8Array([255, 0, 255, 255]);
-var WEBGL_TRUE_AS_INTEGER = 1;
-var WEBGL_FALSE_AS_INTEGER = 0;
-var MIN_TEXTURE_UNIT_INDEX = 0;
-var MIN_REQUIRED_STRING_LENGTH2 = 1;
-var MIN_POWER_OF_TWO_VALUE = 1;
-var BIT_MASK_ONE = 1;
-var BITWISE_ZERO = 0;
-var Texture2D = class {
+var Texture2D = class _Texture2D {
   /**
    * WebGL2 rendering context, used to: create, upload and dispose the underlying WebGL texture.
    *
@@ -4969,7 +5380,7 @@ var Texture2D = class {
    */
   #texture;
   /**
-   * When true, uploaded images are flipped vertically during upload. Applied via `UNPACK_FLIP_Y_WEBGL`.
+   * When true, uploaded images are flipped vertically during upload. Applied via 'UNPACK_FLIP_Y_WEBGL'.
    *
    * @type {boolean}
    * @private
@@ -5023,14 +5434,14 @@ var Texture2D = class {
    * @type {number}
    * @private
    */
-  #width = PLACEHOLDER_TEXTURE_WIDTH;
+  #width = TEXTURE2D_PLACEHOLDER.WIDTH;
   /**
    * Current texture height in pixels. Initialized to placeholder size and updated after a successful upload.
    *
    * @type {number}
    * @private
    */
-  #height = PLACEHOLDER_TEXTURE_HEIGHT;
+  #height = TEXTURE2D_PLACEHOLDER.HEIGHT;
   /**
    * Indicates whether the image has been successfully loaded and uploaded to GPU.
    *
@@ -5048,84 +5459,19 @@ var Texture2D = class {
   /**
    * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context, used to create and manage the GPU resources.
    * @param {Texture2DOptions} [options]          - Optional texture creation options.
-   * @throws {TypeError} When provided arguments do not match expected types or supported enums.
+   * @throws {TypeError}                            When provided arguments do not match expected types or supported enums.
    */
   constructor(webglContext, options = {}) {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
-      throw new TypeError(ERROR_EXPECTS_WEBGL2_CONTEXT);
+      throw new TypeError(TEXTURE2D_EXCEPTION_MESSAGES.EXPECTS_WEBGL2_CONTEXT);
     }
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError(ERROR_EXPECTS_OPTIONS_OBJECT);
-    }
-    const {
-      flipY = DEFAULT_FLIP_Y2,
-      wrapS,
-      wrapT,
-      minFilter,
-      magFilter,
-      mipmapPolicy = DEFAULT_MIPMAP_POLICY
-    } = options;
-    if (typeof flipY !== "boolean") {
-      throw new TypeError(ERROR_EXPECTS_FLIPY_BOOLEAN);
-    }
+    _Texture2D.#assertOptionsObject(options, TEXTURE2D_EXCEPTION_MESSAGES.EXPECTS_OPTIONS_OBJECT);
     this.#webglContext = webglContext;
-    if (!this.#isValidMipmapPolicy(mipmapPolicy)) {
-      throw new TypeError(ERROR_EXPECTS_MIPMAP_POLICY);
-    }
-    const hasMinFilterProperty = Object.prototype.hasOwnProperty.call(options, "minFilter");
-    const isResetMinFilter = hasMinFilterProperty && minFilter === null;
-    const hasExplicitMinFilter = hasMinFilterProperty && !isResetMinFilter;
-    const hasExplicitWrapS = Object.prototype.hasOwnProperty.call(options, "wrapS");
-    const hasExplicitWrapT = Object.prototype.hasOwnProperty.call(options, "wrapT");
-    const hasExplicitMagFilter = Object.prototype.hasOwnProperty.call(options, "magFilter");
-    const resolvedWrapS = hasExplicitWrapS ? wrapS : webglContext.REPEAT;
-    const resolvedWrapT = hasExplicitWrapT ? wrapT : webglContext.REPEAT;
-    const resolvedMinFilter = hasExplicitMinFilter ? minFilter : webglContext.LINEAR;
-    const resolvedMagFilter = hasExplicitMagFilter ? magFilter : webglContext.LINEAR;
-    if (hasExplicitWrapS && !this.#isValidWrapMode(resolvedWrapS)) {
-      throw new TypeError(ERROR_EXPECTS_WRAP_S_ENUM);
-    }
-    if (hasExplicitWrapT && !this.#isValidWrapMode(resolvedWrapT)) {
-      throw new TypeError(ERROR_EXPECTS_WRAP_T_ENUM);
-    }
-    if (hasExplicitMinFilter && !this.#isValidMinFilter(resolvedMinFilter)) {
-      throw new TypeError(ERROR_EXPECTS_MIN_FILTER_ENUM);
-    }
-    if (hasExplicitMagFilter && !this.#isValidMagFilter(resolvedMagFilter)) {
-      throw new TypeError(ERROR_EXPECTS_MAG_FILTER_ENUM);
-    }
-    if (mipmapPolicy === MIPMAP_POLICY_NONE && hasExplicitMinFilter && this.#isMipmapMinFilter(resolvedMinFilter)) {
-      throw new TypeError(ERROR_MIPMAP_POLICY_CONFLICT);
-    }
-    this.#flipY = flipY;
-    this.#wrapS = resolvedWrapS;
-    this.#wrapT = resolvedWrapT;
-    this.#minFilter = resolvedMinFilter;
-    this.#magFilter = resolvedMagFilter;
-    this.#mipmapPolicy = mipmapPolicy;
-    this.#hasExplicitMinFilter = hasExplicitMinFilter;
-    const texture = webglContext.createTexture();
-    if (!texture) {
-      throw new Error(ERROR_FAILED_CREATE_TEXTURE);
-    }
-    this.#texture = texture;
-    this.#bindTexture();
-    webglContext.texImage2D(
-      webglContext.TEXTURE_2D,
-      BASE_MIPMAP_LEVEL,
-      webglContext.RGBA,
-      PLACEHOLDER_TEXTURE_WIDTH,
-      PLACEHOLDER_TEXTURE_HEIGHT,
-      TEXTURE_BORDER_VALUE,
-      webglContext.RGBA,
-      webglContext.UNSIGNED_BYTE,
-      PLACEHOLDER_PIXEL_RGBA
-    );
-    this.#applySamplerParams();
-    this.#unbindTexture();
+    this.#initializeOptions(options);
+    this.#createTexture();
   }
   /**
-   * Returns the underlying `WebGLTexture` object.
+   * Returns the underlying 'WebGLTexture' object.
    *
    * @returns {WebGLTexture}
    */
@@ -5175,16 +5521,16 @@ var Texture2D = class {
    */
   bind(textureUnitIndex) {
     this.#assertNotDisposed();
-    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < MIN_TEXTURE_UNIT_INDEX) {
-      throw new TypeError(ERROR_EXPECTS_TEXTURE_UNIT_INDEX);
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < TEXTURE2D_LIMITS.MIN_TEXTURE_UNIT_INDEX) {
+      throw new TypeError(TEXTURE2D_EXCEPTION_MESSAGES.EXPECTS_TEXTURE_UNIT_INDEX);
     }
     const webglContext = this.#webglContext;
     const maxUnits = webglContext.getParameter(webglContext.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
-    if (!Number.isInteger(maxUnits) || maxUnits <= MIN_TEXTURE_UNIT_INDEX) {
-      throw new Error(ERROR_FAILED_READ_MAX_TEXTURE_UNITS);
+    if (!Number.isInteger(maxUnits) || maxUnits <= TEXTURE2D_LIMITS.MIN_TEXTURE_UNIT_INDEX) {
+      throw new Error(TEXTURE2D_EXCEPTION_MESSAGES.FAILED_READ_MAX_TEXTURE_UNITS);
     }
     if (textureUnitIndex >= maxUnits) {
-      throw new RangeError(`${ERROR_TEXTURE_UNIT_INDEX_OUT_OF_RANGE_PREFIX}${maxUnits - 1}.`);
+      throw new RangeError(TEXTURE2D_EXCEPTION_MESSAGES.TEXTURE_UNIT_INDEX_OUT_OF_RANGE(maxUnits - MATH_COMMON_VALUES.UNIT));
     }
     webglContext.activeTexture(webglContext.TEXTURE0 + textureUnitIndex);
     webglContext.bindTexture(webglContext.TEXTURE_2D, this.#texture);
@@ -5193,57 +5539,21 @@ var Texture2D = class {
    * Updates sampler parameters for this texture.
    *
    * @param {Texture2DOptions} [options] - Sampler options to update.
-   * @throws {TypeError} When provided arguments do not match expected types or supported enums.
+   * @throws {TypeError}                   When provided arguments do not match expected types or supported enums.
    */
   setSamplerParams(options = {}) {
     this.#assertNotDisposed();
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError(ERROR_EXPECTS_SAMPLER_OPTIONS_OBJECT);
-    }
-    const hasExplicitWrapS = Object.prototype.hasOwnProperty.call(options, "wrapS");
-    const hasExplicitWrapT = Object.prototype.hasOwnProperty.call(options, "wrapT");
-    const hasMinFilterProperty = Object.prototype.hasOwnProperty.call(options, "minFilter");
-    const isResetMinFilter = hasMinFilterProperty && options.minFilter === null;
-    const hasExplicitMinFilter = hasMinFilterProperty && !isResetMinFilter;
-    const hasExplicitMagFilter = Object.prototype.hasOwnProperty.call(options, "magFilter");
-    const hasExplicitMipmapPolicy = Object.prototype.hasOwnProperty.call(options, "mipmapPolicy");
-    const nextWrapS = hasExplicitWrapS ? options.wrapS : this.#wrapS;
-    const nextWrapT = hasExplicitWrapT ? options.wrapT : this.#wrapT;
-    const nextMinFilter = isResetMinFilter ? this.#webglContext.LINEAR : hasExplicitMinFilter ? options.minFilter : this.#minFilter;
-    const nextMagFilter = hasExplicitMagFilter ? options.magFilter : this.#magFilter;
-    const nextMipmapPolicy = hasExplicitMipmapPolicy ? options.mipmapPolicy : this.#mipmapPolicy;
-    const nextHasExplicitMinFilter = isResetMinFilter ? false : hasExplicitMinFilter ? true : this.#hasExplicitMinFilter;
-    if (hasExplicitWrapS && !this.#isValidWrapMode(nextWrapS)) {
-      throw new TypeError(ERROR_EXPECTS_WRAP_S_ENUM);
-    }
-    if (hasExplicitWrapT && !this.#isValidWrapMode(nextWrapT)) {
-      throw new TypeError(ERROR_EXPECTS_WRAP_T_ENUM);
-    }
-    if (hasExplicitMinFilter && !this.#isValidMinFilter(nextMinFilter)) {
-      throw new TypeError(ERROR_EXPECTS_MIN_FILTER_ENUM);
-    }
-    if (hasExplicitMagFilter && !this.#isValidMagFilter(nextMagFilter)) {
-      throw new TypeError(ERROR_EXPECTS_MAG_FILTER_ENUM);
-    }
-    if (hasExplicitMipmapPolicy && !this.#isValidMipmapPolicy(nextMipmapPolicy)) {
-      throw new TypeError(ERROR_EXPECTS_MIPMAP_POLICY);
-    }
-    if (nextMipmapPolicy === MIPMAP_POLICY_NONE && nextHasExplicitMinFilter && this.#isMipmapMinFilter(nextMinFilter)) {
-      throw new TypeError(ERROR_MIPMAP_POLICY_CONFLICT);
-    }
-    this.#wrapS = nextWrapS;
-    this.#wrapT = nextWrapT;
-    this.#minFilter = nextMinFilter;
-    this.#magFilter = nextMagFilter;
-    this.#mipmapPolicy = nextMipmapPolicy;
-    this.#hasExplicitMinFilter = nextHasExplicitMinFilter;
+    _Texture2D.#assertOptionsObject(options, TEXTURE2D_EXCEPTION_MESSAGES.EXPECTS_SAMPLER_OPTIONS_OBJECT);
+    const hasMipmapPolicy = Object.prototype.hasOwnProperty.call(options, "mipmapPolicy");
+    const mipmapPolicy = hasMipmapPolicy ? options.mipmapPolicy : this.#mipmapPolicy;
+    const sampler = this.#resolveSamplerParams(options, mipmapPolicy);
+    this.#assertSamplerParams(sampler);
+    this.#assignSamplerParams(sampler);
     this.#bindTexture();
     try {
       if (this.#isLoaded) {
         const mipmapsGenerated = this.#maybeGenerateMipmaps();
         this.#syncMinFilterWithMipmaps(mipmapsGenerated);
-      } else if (!this.#hasExplicitMinFilter && this.#isMipmapMinFilter(this.#minFilter)) {
-        this.#minFilter = this.#webglContext.LINEAR;
       }
       this.#applySamplerParams();
     } finally {
@@ -5255,22 +5565,16 @@ var Texture2D = class {
    *
    * @param {string} url                     - Image URL (relative or absolute).
    * @param {Texture2DLoadOptions} [options] - Optional load options.
-   * @returns {Promise<void>}                - Promise, that resolves after successful GPU upload, or rejects on `load/decode/upload` error.
-   * @throws {TypeError} When arguments are invalid.
+   * @returns {Promise<void>}                - Promise, that resolves after successful GPU upload, or rejects on 'load/decode/upload' error.
+   * @throws {TypeError}                       When arguments are invalid.
    */
   async loadFromUrl(url, options = {}) {
     this.#assertNotDisposed();
-    if (typeof url !== "string" || url.length < MIN_REQUIRED_STRING_LENGTH2) {
-      throw new TypeError(ERROR_EXPECTS_URL_STRING);
+    if (typeof url !== ECMASCRIPT_TYPEOF_RESULTS.STRING || url.length < TEXTURE2D_LIMITS.MIN_URL_LENGTH) {
+      throw new TypeError(TEXTURE2D_EXCEPTION_MESSAGES.EXPECTS_URL_STRING);
     }
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError(ERROR_EXPECTS_LOAD_OPTIONS_OBJECT);
-    }
-    const hasCrossOrigin = Object.prototype.hasOwnProperty.call(options, "crossOrigin");
-    const crossOrigin = hasCrossOrigin ? options.crossOrigin : null;
-    if (hasCrossOrigin && crossOrigin !== null && crossOrigin !== CROSS_ORIGIN_ANONYMOUS && crossOrigin !== CROSS_ORIGIN_USE_CREDENTIALS) {
-      throw new TypeError(ERROR_EXPECTS_CROSS_ORIGIN);
-    }
+    _Texture2D.#assertOptionsObject(options, TEXTURE2D_EXCEPTION_MESSAGES.EXPECTS_LOAD_OPTIONS_OBJECT);
+    const crossOrigin = _Texture2D.#resolveCrossOrigin(options);
     const image = await this.#loadImage(url, crossOrigin);
     this.#assertNotDisposed();
     this.#uploadImage(image);
@@ -5286,21 +5590,197 @@ var Texture2D = class {
     this.#isDisposed = true;
   }
   /**
-   * Loads an `HTMLImageElement` from a URL.
+   * Checks the options container before reading individual properties.
    *
-   * @param {string} url                         - Image URL.
-   * @param {(string|null)} [crossOrigin = null] - Optional CORS mode: `anonymous/use-credentials`.
-   * @returns {Promise<HTMLImageElement>}        - Promise, that resolves with a decoded image on `load`, or rejects on `error`.
+   * @param {Object} options - Options to validate.
+   * @param {string} message - Error message for the calling method.
    * @private
    */
-  #loadImage(url, crossOrigin = null) {
+  static #assertOptionsObject(options, message) {
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
+      throw new TypeError(message);
+    }
+  }
+  /**
+   * Resolves creation defaults before allocating the WebGL texture.
+   *
+   * @param {Texture2DOptions} options - Texture creation options.
+   * @private
+   */
+  #initializeOptions(options) {
+    const {
+      flipY = TEXTURE2D_DEFAULTS.FLIP_Y,
+      mipmapPolicy = TEXTURE2D_DEFAULTS.MIPMAP_POLICY
+    } = options;
+    if (typeof flipY !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+      throw new TypeError(TEXTURE2D_EXCEPTION_MESSAGES.EXPECTS_FLIPY_BOOLEAN);
+    }
+    if (!this.#isValidMipmapPolicy(mipmapPolicy)) {
+      throw new TypeError(TEXTURE2D_EXCEPTION_MESSAGES.EXPECTS_MIPMAP_POLICY);
+    }
+    this.#flipY = flipY;
+    this.#wrapS = this.#webglContext.REPEAT;
+    this.#wrapT = this.#webglContext.REPEAT;
+    this.#minFilter = this.#webglContext.LINEAR;
+    this.#magFilter = this.#webglContext.LINEAR;
+    const sampler = this.#resolveSamplerParams(options, mipmapPolicy);
+    this.#assertSamplerParams(sampler);
+    this.#assignSamplerParams(sampler);
+  }
+  /**
+   * Combines explicitly supplied sampler values with the current settings.
+   * Inherited sampler properties are ignored.
+   * Setting 'minFilter' to 'null' restores automatic filter selection.
+   *
+   * @param {Texture2DOptions} options - Sampler overrides.
+   * @param {number} mipmapPolicy      - Resolved mipmap policy.
+   * @returns {Texture2DSamplerParams} - Sampler values and the explicit min filter flag.
+   * @private
+   */
+  #resolveSamplerParams(options, mipmapPolicy) {
+    const hasWrapS = Object.prototype.hasOwnProperty.call(options, "wrapS");
+    const hasWrapT = Object.prototype.hasOwnProperty.call(options, "wrapT");
+    const hasMagFilter = Object.prototype.hasOwnProperty.call(options, "magFilter");
+    const minFilter = this.#resolveMinFilter(options);
+    return {
+      wrapS: hasWrapS ? options.wrapS : this.#wrapS,
+      wrapT: hasWrapT ? options.wrapT : this.#wrapT,
+      minFilter: minFilter.value,
+      magFilter: hasMagFilter ? options.magFilter : this.#magFilter,
+      mipmapPolicy,
+      hasExplicitMinFilter: minFilter.isExplicit
+    };
+  }
+  /**
+   * Distinguishes an omitted min filter, an explicit override and a null reset.
+   *
+   * @param {Texture2DOptions} options               - Sampler overrides.
+   * @returns {{value: number, isExplicit: boolean}} - Min filter value and its explicit override flag.
+   * @private
+   */
+  #resolveMinFilter(options) {
+    if (!Object.prototype.hasOwnProperty.call(options, "minFilter")) {
+      return { value: this.#minFilter, isExplicit: this.#hasExplicitMinFilter };
+    }
+    if (options.minFilter === null) {
+      return { value: this.#webglContext.LINEAR, isExplicit: false };
+    }
+    return { value: options.minFilter, isExplicit: true };
+  }
+  /**
+   * Validates all resolved sampler values before changing the current settings.
+   *
+   * @param {Texture2DSamplerParams} sampler - Resolved sampler values.
+   * @private
+   */
+  #assertSamplerParams(sampler) {
+    if (!this.#isValidWrapMode(sampler.wrapS)) {
+      throw new TypeError(TEXTURE2D_EXCEPTION_MESSAGES.EXPECTS_WRAP_S_ENUM);
+    }
+    if (!this.#isValidWrapMode(sampler.wrapT)) {
+      throw new TypeError(TEXTURE2D_EXCEPTION_MESSAGES.EXPECTS_WRAP_T_ENUM);
+    }
+    if (!this.#isValidMinFilter(sampler.minFilter)) {
+      throw new TypeError(TEXTURE2D_EXCEPTION_MESSAGES.EXPECTS_MIN_FILTER_ENUM);
+    }
+    if (!this.#isValidMagFilter(sampler.magFilter)) {
+      throw new TypeError(TEXTURE2D_EXCEPTION_MESSAGES.EXPECTS_MAG_FILTER_ENUM);
+    }
+    if (!this.#isValidMipmapPolicy(sampler.mipmapPolicy)) {
+      throw new TypeError(TEXTURE2D_EXCEPTION_MESSAGES.EXPECTS_MIPMAP_POLICY);
+    }
+    if (sampler.mipmapPolicy === TEXTURE2D_MIPMAP_POLICIES.NONE && sampler.hasExplicitMinFilter && this.#isMipmapMinFilter(sampler.minFilter)) {
+      throw new TypeError(TEXTURE2D_EXCEPTION_MESSAGES.MIPMAP_POLICY_CONFLICT);
+    }
+  }
+  /**
+   * Stores validated sampler settings together.
+   *
+   * @param {Texture2DSamplerParams} sampler - Validated sampler values.
+   * @private
+   */
+  #assignSamplerParams(sampler) {
+    this.#wrapS = sampler.wrapS;
+    this.#wrapT = sampler.wrapT;
+    this.#minFilter = sampler.minFilter;
+    this.#magFilter = sampler.magFilter;
+    this.#mipmapPolicy = sampler.mipmapPolicy;
+    this.#hasExplicitMinFilter = sampler.hasExplicitMinFilter;
+  }
+  /**
+   * Creates the placeholder texture and releases it, if initialization fails.
+   *
+   * @private
+   */
+  #createTexture() {
+    const texture = this.#webglContext.createTexture();
+    if (!texture) {
+      throw new Error(TEXTURE2D_EXCEPTION_MESSAGES.FAILED_CREATE_TEXTURE);
+    }
+    this.#texture = texture;
+    try {
+      this.#bindTexture();
+      this.#uploadPlaceholder();
+      this.#applySamplerParams();
+    } catch (error) {
+      this.#webglContext.deleteTexture(texture);
+      throw error;
+    } finally {
+      this.#unbindTexture();
+    }
+  }
+  /**
+   * Uploads the placeholder pixel before a URL image is available.
+   *
+   * @private
+   */
+  #uploadPlaceholder() {
+    const context = this.#webglContext;
+    const upload = TEXTURE2D_UPLOAD;
+    const placeholder = TEXTURE2D_PLACEHOLDER;
+    context.texImage2D(
+      context.TEXTURE_2D,
+      upload.BASE_MIPMAP_LEVEL,
+      context.RGBA,
+      placeholder.WIDTH,
+      placeholder.HEIGHT,
+      upload.BORDER,
+      context.RGBA,
+      context.UNSIGNED_BYTE,
+      TEXTURE2D_PLACEHOLDER_PIXEL
+    );
+  }
+  /**
+   * Resolves and validates the optional cross-origin mode.
+   *
+   * @param {Texture2DLoadOptions} options - Image request options.
+   * @returns {string | null}              - Cross-origin mode for the image request.
+   * @private
+   */
+  static #resolveCrossOrigin(options) {
+    const hasCrossOrigin = Object.prototype.hasOwnProperty.call(options, "crossOrigin");
+    const crossOrigin = hasCrossOrigin ? options.crossOrigin : null;
+    if (crossOrigin !== null && crossOrigin !== TEXTURE2D_CROSS_ORIGIN.ANONYMOUS && crossOrigin !== TEXTURE2D_CROSS_ORIGIN.USE_CREDENTIALS) {
+      throw new TypeError(TEXTURE2D_EXCEPTION_MESSAGES.EXPECTS_CROSS_ORIGIN);
+    }
+    return crossOrigin;
+  }
+  /**
+   * Loads an 'HTMLImageElement' from a URL.
+   *
+   * @param {string} url                  - Image URL.
+   * @param {(string|null)} crossOrigin   - Optional CORS mode: 'anonymous/use-credentials'.
+   * @returns {Promise<HTMLImageElement>} - Promise, that resolves with a decoded image on 'load', or rejects on 'error'.
+   * @private
+   */
+  #loadImage(url, crossOrigin) {
     return new Promise((resolve, reject) => {
       const image = new Image();
-      if (typeof crossOrigin === "string") {
+      if (typeof crossOrigin === ECMASCRIPT_TYPEOF_RESULTS.STRING) {
         image.crossOrigin = crossOrigin;
       }
       image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error(`${ERROR_FAILED_LOAD_IMAGE_PREFIX}${url}`));
+      image.onerror = () => reject(new Error(TEXTURE2D_EXCEPTION_MESSAGES.FAILED_LOAD_IMAGE(url)));
       image.src = url;
     });
   }
@@ -5315,13 +5795,10 @@ var Texture2D = class {
     const previousFlipY = webglContext.getParameter(webglContext.UNPACK_FLIP_Y_WEBGL);
     this.#bindTexture();
     try {
-      webglContext.pixelStorei(
-        webglContext.UNPACK_FLIP_Y_WEBGL,
-        this.#flipY ? WEBGL_TRUE_AS_INTEGER : WEBGL_FALSE_AS_INTEGER
-      );
+      this.#setFlipY(this.#flipY);
       webglContext.texImage2D(
         webglContext.TEXTURE_2D,
-        BASE_MIPMAP_LEVEL,
+        TEXTURE2D_UPLOAD.BASE_MIPMAP_LEVEL,
         webglContext.RGBA,
         webglContext.RGBA,
         webglContext.UNSIGNED_BYTE,
@@ -5334,12 +5811,21 @@ var Texture2D = class {
       this.#syncMinFilterWithMipmaps(mipmapsGenerated);
       this.#applySamplerParams();
     } finally {
-      webglContext.pixelStorei(
-        webglContext.UNPACK_FLIP_Y_WEBGL,
-        previousFlipY ? WEBGL_TRUE_AS_INTEGER : WEBGL_FALSE_AS_INTEGER
-      );
+      this.#setFlipY(previousFlipY);
       this.#unbindTexture();
     }
+  }
+  /**
+   * Applies the upload orientation using the integer values expected by WebGL.
+   *
+   * @param {boolean} flipY - Vertical image orientation.
+   * @private
+   */
+  #setFlipY(flipY) {
+    const webglContext = this.#webglContext;
+    const upload = TEXTURE2D_UPLOAD;
+    const value = flipY ? upload.TRUE_AS_INTEGER : upload.FALSE_AS_INTEGER;
+    webglContext.pixelStorei(webglContext.UNPACK_FLIP_Y_WEBGL, value);
   }
   /**
    * Applies current sampler parameters to the bound texture.
@@ -5360,12 +5846,12 @@ var Texture2D = class {
    * @private
    */
   #maybeGenerateMipmaps() {
-    if (this.#mipmapPolicy === MIPMAP_POLICY_NONE) {
+    if (this.#mipmapPolicy === TEXTURE2D_MIPMAP_POLICIES.NONE) {
       return false;
     }
-    if (this.#mipmapPolicy === MIPMAP_POLICY_AUTO && !(this.#isPowerOfTwo(this.#width) && this.#isPowerOfTwo(this.#height))) {
+    if (this.#mipmapPolicy === TEXTURE2D_MIPMAP_POLICIES.AUTO && !(this.#isPowerOfTwo(this.#width) && this.#isPowerOfTwo(this.#height))) {
       if (this.#hasExplicitMinFilter && this.#isMipmapMinFilter(this.#minFilter)) {
-        throw new TypeError(ERROR_MIPMAP_AUTO_POT_REQUIRED_FOR_MIPMAP_FILTER);
+        throw new TypeError(TEXTURE2D_EXCEPTION_MESSAGES.MIPMAP_AUTO_POT_REQUIRED_FOR_MIPMAP_FILTER);
       }
       return false;
     }
@@ -5379,21 +5865,16 @@ var Texture2D = class {
    * @private
    */
   #syncMinFilterWithMipmaps(mipmapsGenerated) {
-    if (mipmapsGenerated) {
-      if (!this.#hasExplicitMinFilter) {
-        this.#minFilter = this.#webglContext.LINEAR_MIPMAP_LINEAR;
-      }
+    if (this.#hasExplicitMinFilter) {
       return;
     }
-    if (!this.#hasExplicitMinFilter && this.#isMipmapMinFilter(this.#minFilter)) {
-      this.#minFilter = this.#webglContext.LINEAR;
-    }
+    this.#minFilter = mipmapsGenerated ? this.#webglContext.LINEAR_MIPMAP_LINEAR : this.#webglContext.LINEAR;
   }
   /**
    * Checks whether a value is a valid wrap mode.
    *
    * @param {number} value - Wrap mode value to validate.
-   * @returns {boolean} True, when value is a supported wrap mode.
+   * @returns {boolean}      True, when value is a supported wrap mode.
    * @private
    */
   #isValidWrapMode(value) {
@@ -5404,7 +5885,7 @@ var Texture2D = class {
    * Checks whether a value is a valid minification filter.
    *
    * @param {number} value - Filter value to validate.
-   * @returns {boolean} True, when value is a supported min filter.
+   * @returns {boolean}      True, when value is a supported min filter.
    * @private
    */
   #isValidMinFilter(value) {
@@ -5415,7 +5896,7 @@ var Texture2D = class {
    * Checks whether a value is a valid magnification filter.
    *
    * @param {number} value - Filter value to validate.
-   * @returns {boolean} True, when value is a supported mag filter.
+   * @returns {boolean}      True, when value is a supported mag filter.
    * @private
    */
   #isValidMagFilter(value) {
@@ -5426,17 +5907,17 @@ var Texture2D = class {
    * Checks whether a value is a valid mipmap policy.
    *
    * @param {number} value - Policy value to validate.
-   * @returns {boolean} True, when value is a supported policy.
+   * @returns {boolean}      True, when value is a supported policy.
    * @private
    */
   #isValidMipmapPolicy(value) {
-    return value === MIPMAP_POLICY_NONE || value === MIPMAP_POLICY_ALWAYS || value === MIPMAP_POLICY_AUTO;
+    return value === TEXTURE2D_MIPMAP_POLICIES.NONE || value === TEXTURE2D_MIPMAP_POLICIES.ALWAYS || value === TEXTURE2D_MIPMAP_POLICIES.AUTO;
   }
   /**
    * Checks whether a min filter value uses mipmaps.
    *
    * @param {number} value - Filter value to validate.
-   * @returns {boolean} True, when the filter expects mipmaps.
+   * @returns {boolean}      True, when the filter expects mipmaps.
    * @private
    */
   #isMipmapMinFilter(value) {
@@ -5444,14 +5925,14 @@ var Texture2D = class {
     return value === webglContext.NEAREST_MIPMAP_NEAREST || value === webglContext.LINEAR_MIPMAP_NEAREST || value === webglContext.NEAREST_MIPMAP_LINEAR || value === webglContext.LINEAR_MIPMAP_LINEAR;
   }
   /**
-   * Checks whether an integer value is a `power-of-two`.
+   * Checks whether an integer value is a 'power-of-two'.
    *
    * @param {number} value - Value to check.
-   * @returns {boolean}    - True if value is a `power-of-two` (e.g.: 2, 4, 8, ...), otherwise false.
+   * @returns {boolean}    - True, if value is a 'power-of-two' (e.g.: 2, 4, 8, ...), otherwise false.
    * @private
    */
   #isPowerOfTwo(value) {
-    return Number.isInteger(value) && value >= MIN_POWER_OF_TWO_VALUE && (value & value - BIT_MASK_ONE) === BITWISE_ZERO;
+    return Number.isInteger(value) && value >= MATH_COMMON_VALUES.UNIT && (value & value - MATH_COMMON_VALUES.UNIT) === MATH_COMMON_VALUES.ZERO;
   }
   /**
    * @private
@@ -5470,20 +5951,13 @@ var Texture2D = class {
    */
   #assertNotDisposed() {
     if (this.#isDisposed) {
-      throw new Error(ERROR_INSTANCE_DISPOSED);
+      throw new Error(TEXTURE2D_EXCEPTION_MESSAGES.INSTANCE_DISPOSED);
     }
   }
 };
 
 // core/shader/shader-program.js
-var MATRIX_4x4_ELEMENT_COUNT = 16;
-var VECTOR_2_ELEMENT_COUNT = 2;
-var VECTOR_3_ELEMENT_COUNT = 3;
-var VECTOR_4_ELEMENT_COUNT = 4;
-var ATTRIBUTE_LOCATION_NOT_FOUND_VALUE = -1;
-var MIN_TEXTURE_UNIT_INDEX2 = 0;
-var DEFAULT_TEXTURE_UNIT_INDEX = 0;
-var ShaderProgram = class {
+var ShaderProgram = class _ShaderProgram {
   /**
    * Raw WebGL2 rendering context.
    * Used for all shader program operations (e.g.: compile/link/use, uniforms, attributes).
@@ -5520,37 +5994,10 @@ var ShaderProgram = class {
    * @param {string} fragmentSource                        - GLSL source code of the fragment shader.
    */
   constructor(webglRenderingContext, vertexSource, fragmentSource) {
-    if (!(webglRenderingContext instanceof WebGL2RenderingContext)) {
-      throw new TypeError("`ShaderProgram` expects a `WebGL2RenderingContext`.");
-    }
-    if (typeof vertexSource !== "string" || typeof fragmentSource !== "string") {
-      throw new TypeError("`ShaderProgram` expects vertex and fragment source as strings.");
-    }
+    _ShaderProgram.#assertConstructorArguments(webglRenderingContext, vertexSource, fragmentSource);
     this.#webglRenderingContext = webglRenderingContext;
     this.#uniformLocations = /* @__PURE__ */ new Map();
-    const vertexShader = this.#compileShader(this.#webglRenderingContext.VERTEX_SHADER, vertexSource);
-    const fragmentShader = this.#compileShader(this.#webglRenderingContext.FRAGMENT_SHADER, fragmentSource);
-    const program = this.#webglRenderingContext.createProgram();
-    if (!program) {
-      this.#webglRenderingContext.deleteShader(vertexShader);
-      this.#webglRenderingContext.deleteShader(fragmentShader);
-      throw new Error("Failed to create WebGL program.");
-    }
-    this.#webglRenderingContext.attachShader(program, vertexShader);
-    this.#webglRenderingContext.attachShader(program, fragmentShader);
-    this.#webglRenderingContext.linkProgram(program);
-    const linkStatus = this.#webglRenderingContext.getProgramParameter(
-      program,
-      this.#webglRenderingContext.LINK_STATUS
-    );
-    this.#webglRenderingContext.deleteShader(vertexShader);
-    this.#webglRenderingContext.deleteShader(fragmentShader);
-    if (!linkStatus) {
-      const infoLog = this.#webglRenderingContext.getProgramInfoLog(program) || "Unknown program link error";
-      this.#webglRenderingContext.deleteProgram(program);
-      throw new Error(`Failed to link program: ${infoLog}`);
-    }
-    this.#program = program;
+    this.#program = this.#createProgram(vertexSource, fragmentSource);
   }
   /**
    * Returns the underlying WebGL program object.
@@ -5577,12 +6024,12 @@ var ShaderProgram = class {
    */
   getAttribLocation(name) {
     this.#assertNotDisposed();
-    if (typeof name !== "string") {
-      throw new TypeError("`ShaderProgram.getAttribLocation` expects attribute name as a string.");
+    if (typeof name !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
+      throw new TypeError(SHADER_PROGRAM_EXCEPTION_MESSAGES.ATTRIBUTE_NAME_TYPE);
     }
     const location = this.#webglRenderingContext.getAttribLocation(this.#program, name);
-    if (location === ATTRIBUTE_LOCATION_NOT_FOUND_VALUE) {
-      throw new Error(`Attribute "${name}" not found in shader program.`);
+    if (location === SHADER_PROGRAM_LIMITS.ATTRIBUTE_LOCATION_NOT_FOUND) {
+      throw new Error(SHADER_PROGRAM_EXCEPTION_MESSAGES.ATTRIBUTE_NOT_FOUND(name));
     }
     return location;
   }
@@ -5594,6 +6041,7 @@ var ShaderProgram = class {
    * @returns {WebGLUniformLocation}
    */
   getUniformLocation(name) {
+    this.#assertUniformName(name, SHADER_PROGRAM_EXCEPTION_MESSAGES.UNIFORM_NAME_TYPE);
     return this.#getUniformLocation(name);
   }
   /**
@@ -5603,12 +6051,9 @@ var ShaderProgram = class {
    * @param {number} value - Float value to upload.
    */
   setFloat(name, value) {
-    this.#assertNotDisposed();
-    if (typeof name !== "string") {
-      throw new TypeError("`ShaderProgram.setFloat` expects uniform name as a string.");
-    }
-    if (typeof value !== "number") {
-      throw new TypeError("`ShaderProgram.setFloat` expects value as a number.");
+    this.#assertUniformName(name, SHADER_PROGRAM_EXCEPTION_MESSAGES.FLOAT_NAME_TYPE);
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER) {
+      throw new TypeError(SHADER_PROGRAM_EXCEPTION_MESSAGES.FLOAT_VALUE_TYPE);
     }
     const location = this.#getUniformLocation(name);
     this.#webglRenderingContext.uniform1f(location, value);
@@ -5620,12 +6065,9 @@ var ShaderProgram = class {
    * @param {number} value - Integer value to upload.
    */
   setInt(name, value) {
-    this.#assertNotDisposed();
-    if (typeof name !== "string") {
-      throw new TypeError("`ShaderProgram.setInt` expects uniform name as a string.");
-    }
-    if (typeof value !== "number" || !Number.isInteger(value)) {
-      throw new TypeError("`ShaderProgram.setInt` expects an integer value.");
+    this.#assertUniformName(name, SHADER_PROGRAM_EXCEPTION_MESSAGES.INT_NAME_TYPE);
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isInteger(value)) {
+      throw new TypeError(SHADER_PROGRAM_EXCEPTION_MESSAGES.INT_VALUE_TYPE);
     }
     const location = this.#getUniformLocation(name);
     this.#webglRenderingContext.uniform1i(location, value);
@@ -5637,16 +6079,13 @@ var ShaderProgram = class {
    * @param {Texture2D} texture             - `Texture2D` instance to bind.
    * @param {number} [textureUnitIndex = 0] - Texture unit index (0 => N).
    */
-  setTexture2D(name, texture, textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX) {
-    this.#assertNotDisposed();
-    if (typeof name !== "string") {
-      throw new TypeError("`ShaderProgram.setTexture2D` expects uniform name as a string.");
-    }
+  setTexture2D(name, texture, textureUnitIndex = SHADER_PROGRAM_DEFAULTS.TEXTURE_UNIT_INDEX) {
+    this.#assertUniformName(name, SHADER_PROGRAM_EXCEPTION_MESSAGES.TEXTURE_NAME_TYPE);
     if (!(texture instanceof Texture2D)) {
-      throw new TypeError("`ShaderProgram.setTexture2D` expects texture as Texture2D.");
+      throw new TypeError(SHADER_PROGRAM_EXCEPTION_MESSAGES.TEXTURE_TYPE);
     }
-    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < MIN_TEXTURE_UNIT_INDEX2) {
-      throw new TypeError("`ShaderProgram.setTexture2D` expects textureUnitIndex as a non-negative integer.");
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < SHADER_PROGRAM_LIMITS.MIN_TEXTURE_UNIT_INDEX) {
+      throw new TypeError(SHADER_PROGRAM_EXCEPTION_MESSAGES.TEXTURE_UNIT_INDEX);
     }
     texture.bind(textureUnitIndex);
     const location = this.#getUniformLocation(name);
@@ -5659,16 +6098,13 @@ var ShaderProgram = class {
    * @param {Float32Array | number[]} value - Two numeric components.
    */
   setVector2(name, value) {
-    this.#assertNotDisposed();
-    if (typeof name !== "string") {
-      throw new TypeError("`ShaderProgram.setVector2` expects uniform name as a string.");
-    }
-    if (!Array.isArray(value) && !(value instanceof Float32Array)) {
-      throw new TypeError("`ShaderProgram.setVector2` expects a number[] or Float32Array.");
-    }
-    if (value.length !== VECTOR_2_ELEMENT_COUNT) {
-      throw new TypeError("`ShaderProgram.setVector2` expects exactly 2 components.");
-    }
+    this.#assertUniformName(name, SHADER_PROGRAM_EXCEPTION_MESSAGES.VECTOR2_NAME_TYPE);
+    _ShaderProgram.#assertVector(
+      value,
+      SHADER_PROGRAM_LAYOUT.VECTOR2_ELEMENT_COUNT,
+      SHADER_PROGRAM_EXCEPTION_MESSAGES.VECTOR2_TYPE,
+      SHADER_PROGRAM_EXCEPTION_MESSAGES.VECTOR2_LENGTH
+    );
     const location = this.#getUniformLocation(name);
     this.#webglRenderingContext.uniform2fv(location, value);
   }
@@ -5679,16 +6115,13 @@ var ShaderProgram = class {
    * @param {Float32Array | number[]} value - Three numeric components.
    */
   setVector3(name, value) {
-    this.#assertNotDisposed();
-    if (typeof name !== "string") {
-      throw new TypeError("`ShaderProgram.setVector3` expects uniform name as a string.");
-    }
-    if (!Array.isArray(value) && !(value instanceof Float32Array)) {
-      throw new TypeError("`ShaderProgram.setVector3` expects a number[] or Float32Array.");
-    }
-    if (value.length !== VECTOR_3_ELEMENT_COUNT) {
-      throw new TypeError("`ShaderProgram.setVector3` expects exactly 3 components.");
-    }
+    this.#assertUniformName(name, SHADER_PROGRAM_EXCEPTION_MESSAGES.VECTOR3_NAME_TYPE);
+    _ShaderProgram.#assertVector(
+      value,
+      MATH_LAYOUT.VECTOR3_ELEMENT_COUNT,
+      SHADER_PROGRAM_EXCEPTION_MESSAGES.VECTOR3_TYPE,
+      SHADER_PROGRAM_EXCEPTION_MESSAGES.VECTOR3_LENGTH
+    );
     const location = this.#getUniformLocation(name);
     this.#webglRenderingContext.uniform3fv(location, value);
   }
@@ -5699,16 +6132,13 @@ var ShaderProgram = class {
    * @param {Float32Array | number[]} value - Four numeric components.
    */
   setVector4(name, value) {
-    this.#assertNotDisposed();
-    if (typeof name !== "string") {
-      throw new TypeError("`ShaderProgram.setVector4` expects uniform name as a string.");
-    }
-    if (!Array.isArray(value) && !(value instanceof Float32Array)) {
-      throw new TypeError("`ShaderProgram.setVector4` expects a number[] or `Float32Array`.");
-    }
-    if (value.length !== VECTOR_4_ELEMENT_COUNT) {
-      throw new TypeError("`ShaderProgram.setVector4` expects exactly 4 components.");
-    }
+    this.#assertUniformName(name, SHADER_PROGRAM_EXCEPTION_MESSAGES.VECTOR4_NAME_TYPE);
+    _ShaderProgram.#assertVector(
+      value,
+      SHADER_PROGRAM_LAYOUT.VECTOR4_ELEMENT_COUNT,
+      SHADER_PROGRAM_EXCEPTION_MESSAGES.VECTOR4_TYPE,
+      SHADER_PROGRAM_EXCEPTION_MESSAGES.VECTOR4_LENGTH
+    );
     const location = this.#getUniformLocation(name);
     this.#webglRenderingContext.uniform4fv(location, value);
   }
@@ -5719,15 +6149,16 @@ var ShaderProgram = class {
    * @param {Float32Array} matrix - 4x4 matrix in column-major order to upload to the uniform.
    */
   setMatrix4(name, matrix) {
-    this.#assertNotDisposed();
-    if (typeof name !== "string") {
-      throw new TypeError("`ShaderProgram.setMatrix4` expects uniform name as a string.");
-    }
-    if (!(matrix instanceof Float32Array) || matrix.length !== MATRIX_4x4_ELEMENT_COUNT) {
-      throw new TypeError("`ShaderProgram.setMatrix4` expects a 4x4 Float32Array.");
+    this.#assertUniformName(name, SHADER_PROGRAM_EXCEPTION_MESSAGES.MATRIX4_NAME_TYPE);
+    if (!(matrix instanceof Float32Array) || matrix.length !== MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT) {
+      throw new TypeError(SHADER_PROGRAM_EXCEPTION_MESSAGES.MATRIX4_TYPE);
     }
     const location = this.#getUniformLocation(name);
-    this.#webglRenderingContext.uniformMatrix4fv(location, false, matrix);
+    this.#webglRenderingContext.uniformMatrix4fv(
+      location,
+      SHADER_PROGRAM_DEFAULTS.MATRIX_TRANSPOSE,
+      matrix
+    );
   }
   /**
    * Releases the underlying WebGL program. After calling dispose, this instance must not be used.
@@ -5736,23 +6167,69 @@ var ShaderProgram = class {
     if (this.#isDisposed) {
       return;
     }
-    if (this.#program) {
-      this.#webglRenderingContext.deleteProgram(this.#program);
-    }
+    this.#webglRenderingContext.deleteProgram(this.#program);
     this.#uniformLocations.clear();
     this.#program = null;
     this.#isDisposed = true;
   }
   /**
+   * Validates constructor arguments before allocating WebGL resources.
+   *
+   * @param {WebGL2RenderingContext} webglRenderingContext - Rendering context to validate.
+   * @param {string} vertexSource                          - Vertex shader source.
+   * @param {string} fragmentSource                        - Fragment shader source.
    * @private
    */
-  #assertNotDisposed() {
-    if (this.#isDisposed || this.#program === null) {
-      throw new Error("`ShaderProgram` has been disposed and can no longer be used.");
+  static #assertConstructorArguments(webglRenderingContext, vertexSource, fragmentSource) {
+    if (!(webglRenderingContext instanceof WebGL2RenderingContext)) {
+      throw new TypeError(SHADER_PROGRAM_EXCEPTION_MESSAGES.CONTEXT_TYPE);
+    }
+    if (typeof vertexSource !== ECMASCRIPT_TYPEOF_RESULTS.STRING || typeof fragmentSource !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
+      throw new TypeError(SHADER_PROGRAM_EXCEPTION_MESSAGES.SOURCE_TYPE);
     }
   }
   /**
-   * Looks up a uniform location with caching.
+   * Rejects operations after the program has been released.
+   *
+   * @private
+   */
+  #assertNotDisposed() {
+    if (this.#isDisposed) {
+      throw new Error(SHADER_PROGRAM_EXCEPTION_MESSAGES.DISPOSED);
+    }
+  }
+  /**
+   * Validates a uniform name while preserving each public method's error message.
+   *
+   * @param {string} name    - Uniform name to validate.
+   * @param {string} message - Error message for the calling method.
+   * @private
+   */
+  #assertUniformName(name, message) {
+    this.#assertNotDisposed();
+    if (typeof name !== ECMASCRIPT_TYPEOF_RESULTS.STRING) {
+      throw new TypeError(message);
+    }
+  }
+  /**
+   * Checks vector storage and length without copying its components.
+   *
+   * @param {Float32Array | number[]} value - Vector to validate.
+   * @param {number} elementCount           - Required component count.
+   * @param {string} typeMessage            - Error message for unsupported storage.
+   * @param {string} lengthMessage          - Error message for an incorrect length.
+   * @private
+   */
+  static #assertVector(value, elementCount, typeMessage, lengthMessage) {
+    if (!Array.isArray(value) && !(value instanceof Float32Array)) {
+      throw new TypeError(typeMessage);
+    }
+    if (value.length !== elementCount) {
+      throw new TypeError(lengthMessage);
+    }
+  }
+  /**
+   * Looks up a validated uniform name and caches successful results.
    *
    * @param {string} name - Name of the uniform variable in the linked shader program.
    * @returns {WebGLUniformLocation}
@@ -5760,55 +6237,146 @@ var ShaderProgram = class {
    */
   #getUniformLocation(name) {
     this.#assertNotDisposed();
-    if (typeof name !== "string") {
-      throw new TypeError("`ShaderProgram.#getUniformLocation` expects a string name.");
-    }
     if (this.#uniformLocations.has(name)) {
-      const cachedLocation = this.#uniformLocations.get(name);
-      return cachedLocation;
+      return this.#uniformLocations.get(name);
     }
     const location = this.#webglRenderingContext.getUniformLocation(this.#program, name);
     if (location === null) {
-      throw new Error(`Uniform "${name}" not found in shader program.`);
+      throw new Error(SHADER_PROGRAM_EXCEPTION_MESSAGES.UNIFORM_NOT_FOUND(name));
     }
     this.#uniformLocations.set(name, location);
     return location;
   }
   /**
-   * Compiles a shader of the given type.
+   * Compiles both shaders and releases them after linking or a failure.
    *
-   * @param {number} type   - Shader type constant (e.g. gl.VERTEX_SHADER or gl.FRAGMENT_SHADER).
-   * @param {string} source - GLSL source code for the shader.
+   * @param {string} vertexSource   - Vertex shader source.
+   * @param {string} fragmentSource - Fragment shader source.
+   * @returns {WebGLProgram}
+   * @private
+   */
+  #createProgram(vertexSource, fragmentSource) {
+    const vertexShader = this.#compileShader(this.#webglRenderingContext.VERTEX_SHADER, vertexSource);
+    let fragmentShader = null;
+    try {
+      fragmentShader = this.#compileShader(this.#webglRenderingContext.FRAGMENT_SHADER, fragmentSource);
+      return this.#linkProgram(vertexShader, fragmentShader);
+    } finally {
+      this.#webglRenderingContext.deleteShader(vertexShader);
+      if (fragmentShader !== null) {
+        this.#webglRenderingContext.deleteShader(fragmentShader);
+      }
+    }
+  }
+  /**
+   * Links compiled shaders and deletes the program if linking fails.
+   *
+   * @param {WebGLShader} vertexShader   - Compiled vertex shader.
+   * @param {WebGLShader} fragmentShader - Compiled fragment shader.
+   * @returns {WebGLProgram}
+   * @private
+   */
+  #linkProgram(vertexShader, fragmentShader) {
+    const context = this.#webglRenderingContext;
+    const program = context.createProgram();
+    if (!program) {
+      throw new Error(SHADER_PROGRAM_EXCEPTION_MESSAGES.PROGRAM_CREATION);
+    }
+    try {
+      context.attachShader(program, vertexShader);
+      context.attachShader(program, fragmentShader);
+      context.linkProgram(program);
+      if (!context.getProgramParameter(program, context.LINK_STATUS)) {
+        const infoLog = context.getProgramInfoLog(program) || SHADER_PROGRAM_EXCEPTION_MESSAGES.UNKNOWN_LINK_ERROR;
+        throw new Error(SHADER_PROGRAM_EXCEPTION_MESSAGES.PROGRAM_LINK(infoLog));
+      }
+      return program;
+    } catch (error) {
+      context.deleteProgram(program);
+      throw error;
+    }
+  }
+  /**
+   * Compiles a shader and deletes it if compilation fails.
+   *
+   * @param {number} type   - WebGL shader type.
+   * @param {string} source - Shader source validated by the constructor.
    * @returns {WebGLShader}
    * @private
    */
   #compileShader(type, source) {
-    if (typeof type !== "number") {
-      throw new TypeError("`ShaderProgram.#compileShader` expects a numeric shader type.");
-    }
-    if (typeof source !== "string") {
-      throw new TypeError("`ShaderProgram.#compileShader` expects shader source as a string.");
-    }
-    const shader = this.#webglRenderingContext.createShader(type);
+    const context = this.#webglRenderingContext;
+    const shader = context.createShader(type);
     if (!shader) {
-      throw new Error("Failed to create the WebGL shader.");
+      throw new Error(SHADER_PROGRAM_EXCEPTION_MESSAGES.SHADER_CREATION);
     }
-    this.#webglRenderingContext.shaderSource(shader, source);
-    this.#webglRenderingContext.compileShader(shader);
-    const compileStatus = this.#webglRenderingContext.getShaderParameter(shader, this.#webglRenderingContext.COMPILE_STATUS);
-    if (!compileStatus) {
-      const infoLog = this.#webglRenderingContext.getShaderInfoLog(shader) || "Unknown shader compilation error";
-      this.#webglRenderingContext.deleteShader(shader);
-      throw new Error(`Failed to compile shader: ${infoLog}`);
+    try {
+      context.shaderSource(shader, source.trim());
+      context.compileShader(shader);
+      if (!context.getShaderParameter(shader, context.COMPILE_STATUS)) {
+        const infoLog = context.getShaderInfoLog(shader) || SHADER_PROGRAM_EXCEPTION_MESSAGES.UNKNOWN_COMPILE_ERROR;
+        throw new Error(SHADER_PROGRAM_EXCEPTION_MESSAGES.SHADER_COMPILE(infoLog));
+      }
+      return shader;
+    } catch (error) {
+      context.deleteShader(shader);
+      throw error;
     }
-    return shader;
   }
 };
 
+// core/constants/material.js
+var MATERIAL_ATTRIBUTES = Object.freeze({
+  POSITION: GEOMETRY_BUFFER_LAYOUT.POSITION_ATTRIBUTE_LOCATION,
+  COLOR: GEOMETRY_BUFFER_LAYOUT.COLOR_ATTRIBUTE_LOCATION,
+  UV: GEOMETRY_BUFFER_LAYOUT.UV_ATTRIBUTE_LOCATION,
+  NORMAL: GEOMETRY_BUFFER_LAYOUT.NORMAL_ATTRIBUTE_LOCATION
+});
+var MATERIAL_UNIFORMS = Object.freeze({
+  MATRIX: "u_matrix",
+  COLOR: "u_color",
+  OPACITY: "u_opacity",
+  SPECULAR_COLOR: "u_specularColor",
+  SPECULAR_STRENGTH: "u_specularStrength",
+  SHININESS: "u_shininess"
+});
+var MATERIAL_OPACITY = Object.freeze({
+  MIN: MATH_COMMON_VALUES.ZERO,
+  MAX: MATH_COMMON_VALUES.UNIT,
+  DEFAULT: MATH_COMMON_VALUES.UNIT
+});
+var MATERIAL_DEFAULTS = Object.freeze({
+  OWNS_SHADER_PROGRAM: false,
+  OWNS_GENERATED_SHADER_PROGRAM: true,
+  OWNS_TEXTURE: false,
+  WIREFRAME_ENABLED: false
+});
+var MATERIAL_BOOLEAN_FLOATS = Object.freeze({
+  FALSE: MATH_COMMON_VALUES.ZERO,
+  TRUE: MATH_COMMON_VALUES.UNIT
+});
+var MATERIAL_SPECULAR_DEFAULTS = Object.freeze({
+  STRENGTH: MATH_COMMON_VALUES.UNIT,
+  SHININESS: 16
+});
+var MATERIAL_TEXTURE_UNITS = Object.freeze({
+  DEFAULT: MATH_COMMON_VALUES.ZERO,
+  MIN: TEXTURE2D_LIMITS.MIN_TEXTURE_UNIT_INDEX
+});
+var MATERIAL_DEFAULT_COLOR = GEOMETRY_DEFAULT_VERTEX_COLOR;
+
+// core/exception-messages/material.js
+var MATERIAL_EXCEPTION_MESSAGES = Object.freeze({
+  WEBGL_CONTEXT_TYPE: "Material expects a WebGL2RenderingContext.",
+  OPTIONS_OBJECT: "Material expects an options object (plain object).",
+  OWNERSHIP_TYPE: 'Material option "ownsShaderProgram" must be a boolean.',
+  SHADER_PROGRAM_TYPE: "Material expects a ShaderProgram instance.",
+  OPACITY_TYPE: "`Material.setOpacity` expects a finite number.",
+  OPACITY_RANGE: `Material.setOpacity expects a value in [${MATERIAL_OPACITY.MIN}..${MATERIAL_OPACITY.MAX}].`,
+  INSTANCE_DISPOSED: "Material has been disposed and can no longer be used."
+});
+
 // core/material/material.js
-var MIN_OPACITY = 0;
-var MAX_OPACITY = 1;
-var DEFAULT_OPACITY = 1;
 var Material = class {
   /**
    * WebGL2 rendering context used to create and manage GPU resources.
@@ -5830,21 +6398,21 @@ var Material = class {
    * @type {number}
    * @private
    */
-  #opacity = DEFAULT_OPACITY;
+  #opacity = MATERIAL_OPACITY.DEFAULT;
   /**
    * When enabled, the renderer should draw geometry using wireframe indices (lines) instead of solid triangles.
    *
    * @type {boolean}
    * @private
    */
-  #wireframeEnabled = false;
+  #wireframeEnabled = MATERIAL_DEFAULTS.WIREFRAME_ENABLED;
   /**
    * Ownership flag. When true, this material is responsible for disposing the shader program.
    *
    * @type {boolean}
    * @private
    */
-  #ownsShaderProgram = false;
+  #ownsShaderProgram = MATERIAL_DEFAULTS.OWNS_SHADER_PROGRAM;
   /**
    * Indicates whether the material has been disposed and can no longer be used.
    *
@@ -5859,17 +6427,17 @@ var Material = class {
    */
   constructor(webglContext, shaderProgram, options = {}) {
     if (!(webglContext instanceof WebGL2RenderingContext)) {
-      throw new TypeError("Material expects a WebGL2RenderingContext.");
+      throw new TypeError(MATERIAL_EXCEPTION_MESSAGES.WEBGL_CONTEXT_TYPE);
     }
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError("Material expects an options object (plain object).");
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
+      throw new TypeError(MATERIAL_EXCEPTION_MESSAGES.OPTIONS_OBJECT);
     }
-    const { ownsShaderProgram = false } = options;
-    if (typeof ownsShaderProgram !== "boolean") {
-      throw new TypeError('Material option "ownsShaderProgram" must be a boolean.');
+    const { ownsShaderProgram = MATERIAL_DEFAULTS.OWNS_SHADER_PROGRAM } = options;
+    if (typeof ownsShaderProgram !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+      throw new TypeError(MATERIAL_EXCEPTION_MESSAGES.OWNERSHIP_TYPE);
     }
     if (!(shaderProgram instanceof ShaderProgram)) {
-      throw new TypeError("Material expects a ShaderProgram instance.");
+      throw new TypeError(MATERIAL_EXCEPTION_MESSAGES.SHADER_PROGRAM_TYPE);
     }
     this.#webglContext = webglContext;
     this.#shaderProgram = shaderProgram;
@@ -5905,11 +6473,11 @@ var Material = class {
    */
   setOpacity(value) {
     this.#assertNotDisposed();
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      throw new TypeError("`Material.setOpacity` expects a finite number.");
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+      throw new TypeError(MATERIAL_EXCEPTION_MESSAGES.OPACITY_TYPE);
     }
-    if (value < MIN_OPACITY || value > MAX_OPACITY) {
-      throw new RangeError(`Material.setOpacity expects a value in [${MIN_OPACITY}..${MAX_OPACITY}].`);
+    if (value < MATERIAL_OPACITY.MIN || value > MATERIAL_OPACITY.MAX) {
+      throw new RangeError(MATERIAL_EXCEPTION_MESSAGES.OPACITY_RANGE);
     }
     this.#opacity = value;
   }
@@ -5918,7 +6486,7 @@ var Material = class {
    */
   isTransparent() {
     this.#assertNotDisposed();
-    return this.#opacity < MAX_OPACITY;
+    return this.#opacity < MATERIAL_OPACITY.MAX;
   }
   /**
    * Indicates whether this material has been disposed.
@@ -5976,45 +6544,50 @@ var Material = class {
    */
   #assertNotDisposed() {
     if (this.#isDisposed) {
-      throw new Error("Material has been disposed and can no longer be used.");
+      throw new Error(MATERIAL_EXCEPTION_MESSAGES.INSTANCE_DISPOSED);
     }
   }
 };
 
-// core/material/vertex-color-material.js
-var POSITION_ATTRIBUTE_LOCATION2 = 0;
-var COLOR_ATTRIBUTE_LOCATION2 = 1;
-var MATRIX_UNIFORM_NAME = "u_matrix";
-var OPACITY_UNIFORM_NAME = "u_opacity";
-var VERTEX_SHADER_SOURCE = `#version 300 es
+// core/constants/vertex-color-material.js
+var VERTEX_COLOR_MATERIAL_SHADERS = Object.freeze({
+  VERTEX: `
+#version 300 es
 precision mediump float;
-layout(location = ${POSITION_ATTRIBUTE_LOCATION2}) in vec3 a_position;
-layout(location = ${COLOR_ATTRIBUTE_LOCATION2}) in vec3 a_color;
-uniform mat4 ${MATRIX_UNIFORM_NAME};
+layout(location = ${MATERIAL_ATTRIBUTES.POSITION}) in vec3 a_position;
+layout(location = ${MATERIAL_ATTRIBUTES.COLOR}) in vec3 a_color;
+uniform mat4 ${MATERIAL_UNIFORMS.MATRIX};
 out vec3 v_color;
 
 void main() {
-    gl_Position = ${MATRIX_UNIFORM_NAME} * vec4(a_position, 1.0);
-    v_color = a_color;
+    gl_Position = ${MATERIAL_UNIFORMS.MATRIX} * vec4(a_position, 1.0);
+    v_color     = a_color;
 }
-`;
-var FRAGMENT_SHADER_SOURCE = `#version 300 es
+`,
+  FRAGMENT: `
+#version 300 es
 precision mediump float;
 in vec3 v_color;
-uniform float ${OPACITY_UNIFORM_NAME};
+uniform float ${MATERIAL_UNIFORMS.OPACITY};
 out vec4 outColor;
 
 void main() {
-    outColor = vec4(v_color, ${OPACITY_UNIFORM_NAME});
+    outColor = vec4(v_color, ${MATERIAL_UNIFORMS.OPACITY});
 }
-`;
+`
+});
+
+// core/material/vertex-color-material.js
 var VertexColorMaterial = class extends Material {
   /**
    * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to compile shaders.
    */
   constructor(webglContext) {
-    const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
-    super(webglContext, shaderProgram, { ownsShaderProgram: true });
+    const sources = VERTEX_COLOR_MATERIAL_SHADERS;
+    const shaderProgram = new ShaderProgram(webglContext, sources.VERTEX, sources.FRAGMENT);
+    super(webglContext, shaderProgram, {
+      ownsShaderProgram: MATERIAL_DEFAULTS.OWNS_GENERATED_SHADER_PROGRAM
+    });
   }
   /**
    * Applies per-object uniforms.
@@ -6022,58 +6595,72 @@ var VertexColorMaterial = class extends Material {
    * @param {Float32Array} matrix4 - Transformation matrix passed as `u_matrix`.
    */
   apply(matrix4) {
-    this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME, matrix4);
-    this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME, this.opacity);
+    const shaderProgram = this.shaderProgram;
+    const uniforms = MATERIAL_UNIFORMS;
+    shaderProgram.setMatrix4(uniforms.MATRIX, matrix4);
+    shaderProgram.setFloat(uniforms.OPACITY, this.opacity);
   }
 };
 
-// core/material/solid-color-material.js
-var POSITION_ATTRIBUTE_LOCATION3 = 0;
-var MATRIX_UNIFORM_NAME2 = "u_matrix";
-var COLOR_UNIFORM_NAME = "u_color";
-var OPACITY_UNIFORM_NAME2 = "u_opacity";
-var COLOR_COMPONENT_COUNT3 = 3;
-var DEFAULT_COLOR = new Float32Array([1, 1, 1]);
-var VERTEX_SHADER_SOURCE2 = `#version 300 es
+// core/constants/solid-color-material.js
+var SOLID_COLOR_MATERIAL_SHADERS = Object.freeze({
+  VERTEX: `
+#version 300 es
 precision mediump float;
-layout(location = ${POSITION_ATTRIBUTE_LOCATION3}) in vec3 a_position;
-uniform mat4 ${MATRIX_UNIFORM_NAME2};
+layout(location = ${MATERIAL_ATTRIBUTES.POSITION}) in vec3 a_position;
+uniform mat4 ${MATERIAL_UNIFORMS.MATRIX};
 
 void main() {
-    gl_Position = ${MATRIX_UNIFORM_NAME2} * vec4(a_position, 1.0);
+    gl_Position = ${MATERIAL_UNIFORMS.MATRIX} * vec4(a_position, 1.0);
 }
-`;
-var FRAGMENT_SHADER_SOURCE2 = `#version 300 es
+`,
+  FRAGMENT: `
+#version 300 es
 precision mediump float;
-uniform vec3  ${COLOR_UNIFORM_NAME};
-uniform float ${OPACITY_UNIFORM_NAME2};
+uniform vec3  ${MATERIAL_UNIFORMS.COLOR};
+uniform float ${MATERIAL_UNIFORMS.OPACITY};
 out vec4 outColor;
 
 void main() {
-    outColor = vec4(${COLOR_UNIFORM_NAME}, ${OPACITY_UNIFORM_NAME2});
+    outColor = vec4(${MATERIAL_UNIFORMS.COLOR}, ${MATERIAL_UNIFORMS.OPACITY});
 }
-`;
+`
+});
+
+// core/exception-messages/solid-color-material.js
+var SOLID_COLOR_MATERIAL_EXCEPTION_MESSAGES = Object.freeze({
+  OPTIONS_OBJECT: "SolidColorMaterial expects an options object (plain object).",
+  COLOR_TYPE: "SolidColorMaterial.setColor expects a number[] or Float32Array.",
+  COLOR_LENGTH: "SolidColorMaterial.setColor expects exactly 3 components [red, green, blue]."
+});
+
+// core/material/solid-color-material.js
 var SolidColorMaterial = class extends Material {
   /**
-   * Current RGB color stored as Float32Array([r, g, b]).
+   * Current RGB color stored as Float32Array([red, green, blue]).
    *
    * @type {Float32Array}
    * @private
    */
-  #color = new Float32Array(DEFAULT_COLOR);
+  #color = new Float32Array(MATERIAL_DEFAULT_COLOR);
   /**
-   * @param {WebGL2RenderingContext} webglContext         - WebGL2 rendering context used to compile shaders.
-   * @param {SolidColorMaterialOptions} [options]         - Material options.
+   * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to compile shaders.
+   * @param {SolidColorMaterialOptions} [options] - Material options.
    */
   constructor(webglContext, options = {}) {
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError("SolidColorMaterial expects an options object (plain object).");
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
+      throw new TypeError(SOLID_COLOR_MATERIAL_EXCEPTION_MESSAGES.OPTIONS_OBJECT);
     }
-    const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE2, FRAGMENT_SHADER_SOURCE2);
-    super(webglContext, shaderProgram, { ownsShaderProgram: true });
-    const { color } = options;
-    if (color !== void 0) {
-      this.setColor(color);
+    const sources = SOLID_COLOR_MATERIAL_SHADERS;
+    const shaderProgram = new ShaderProgram(webglContext, sources.VERTEX, sources.FRAGMENT);
+    super(webglContext, shaderProgram, {
+      ownsShaderProgram: MATERIAL_DEFAULTS.OWNS_GENERATED_SHADER_PROGRAM
+    });
+    try {
+      this.#initialize(options);
+    } catch (error) {
+      shaderProgram.dispose();
+      throw error;
     }
   }
   /**
@@ -6082,25 +6669,25 @@ var SolidColorMaterial = class extends Material {
    * @param {Float32Array} matrix4 - Transformation matrix passed as u_matrix.
    */
   apply(matrix4) {
-    this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME2, matrix4);
-    this.shaderProgram.setVector3(COLOR_UNIFORM_NAME, this.#color);
-    this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME2, this.opacity);
+    const shaderProgram = this.shaderProgram;
+    const uniforms = MATERIAL_UNIFORMS;
+    shaderProgram.setMatrix4(uniforms.MATRIX, matrix4);
+    shaderProgram.setVector3(uniforms.COLOR, this.#color);
+    shaderProgram.setFloat(uniforms.OPACITY, this.opacity);
   }
   /**
    * Sets the RGB color.
    *
-   * @param {Float32Array | number[]} color - [r, g, b] in 0..1 range.
+   * @param {Float32Array | number[]} color - [red, green, blue] in [0..1] range.
    */
   setColor(color) {
     if (!Array.isArray(color) && !(color instanceof Float32Array)) {
-      throw new TypeError("SolidColorMaterial.setColor expects a number[] or Float32Array.");
+      throw new TypeError(SOLID_COLOR_MATERIAL_EXCEPTION_MESSAGES.COLOR_TYPE);
     }
-    if (color.length !== COLOR_COMPONENT_COUNT3) {
-      throw new TypeError("SolidColorMaterial.setColor expects exactly 3 components [r, g, b].");
+    if (color.length !== MATH_LAYOUT.VECTOR3_ELEMENT_COUNT) {
+      throw new TypeError(SOLID_COLOR_MATERIAL_EXCEPTION_MESSAGES.COLOR_LENGTH);
     }
-    this.#color[0] = color[0];
-    this.#color[1] = color[1];
-    this.#color[2] = color[2];
+    this.#color.set(color);
   }
   /**
    * Returns the internal color buffer.
@@ -6111,41 +6698,64 @@ var SolidColorMaterial = class extends Material {
   get color() {
     return this.#color;
   }
+  /**
+   * Applies the initial settings after the shader program has been created.
+   *
+   * @param {SolidColorMaterialOptions} options - Initial material settings.
+   * @private
+   */
+  #initialize(options) {
+    const { color } = options;
+    if (color !== void 0) {
+      this.setColor(color);
+    }
+  }
 };
 
-// core/material/textured-material.js
-var POSITION_ATTRIBUTE_LOCATION4 = 0;
-var UV_ATTRIBUTE_LOCATION2 = 2;
-var DEFAULT_TEXTURE_UNIT_INDEX2 = 0;
-var MIN_TEXTURE_UNIT_INDEX3 = 0;
-var MATRIX_UNIFORM_NAME3 = "u_matrix";
-var DIFFUSE_TEXTURE_UNIFORM_NAME = "u_diffuseTexture";
-var OPACITY_UNIFORM_NAME3 = "u_opacity";
-var VERTEX_SHADER_SOURCE3 = `#version 300 es
+// core/constants/textured-material.js
+var TEXTURED_MATERIAL_UNIFORMS = Object.freeze({ DIFFUSE_TEXTURE: "u_diffuseTexture" });
+var TEXTURED_MATERIAL_SHADERS = Object.freeze({
+  VERTEX: `
+#version 300 es
 precision mediump float;
-layout(location = ${POSITION_ATTRIBUTE_LOCATION4}) in vec3 a_position;
-layout(location = ${UV_ATTRIBUTE_LOCATION2}) in vec2 a_uv;
-uniform mat4 ${MATRIX_UNIFORM_NAME3};
+layout(location = ${MATERIAL_ATTRIBUTES.POSITION}) in vec3 a_position;
+layout(location = ${MATERIAL_ATTRIBUTES.UV}) in vec2 a_uv;
+uniform mat4 ${MATERIAL_UNIFORMS.MATRIX};
 out vec2 v_uv;
 
 void main() {
-    gl_Position = ${MATRIX_UNIFORM_NAME3} * vec4(a_position, 1.0);
-    v_uv = a_uv;
+    gl_Position = ${MATERIAL_UNIFORMS.MATRIX} * vec4(a_position, 1.0);
+    v_uv        = a_uv;
 }
-`;
-var FRAGMENT_SHADER_SOURCE3 = `#version 300 es
+`,
+  FRAGMENT: `#version 300 es
 precision mediump float;
 in vec2 v_uv;
-uniform sampler2D ${DIFFUSE_TEXTURE_UNIFORM_NAME};
-uniform float ${OPACITY_UNIFORM_NAME3};
+uniform sampler2D ${TEXTURED_MATERIAL_UNIFORMS.DIFFUSE_TEXTURE};
+uniform float ${MATERIAL_UNIFORMS.OPACITY};
 out vec4 outColor;
 
 void main() {
-    vec4 sampledColor = texture(${DIFFUSE_TEXTURE_UNIFORM_NAME}, v_uv);
-    outColor = vec4(sampledColor.rgb, sampledColor.a * ${OPACITY_UNIFORM_NAME3});
+    vec4 sampledColor = texture(${TEXTURED_MATERIAL_UNIFORMS.DIFFUSE_TEXTURE}, v_uv);
+    outColor          = vec4(sampledColor.rgb, sampledColor.a * ${MATERIAL_UNIFORMS.OPACITY});
 }
-`;
-var TexturedMaterial = class extends Material {
+`
+});
+
+// core/exception-messages/textured-material.js
+var TEXTURED_MATERIAL_EXCEPTION_MESSAGES = Object.freeze({
+  OPTIONS_OBJECT: "TexturedMaterial expects options as an object.",
+  TEXTURE_TYPE: "`TexturedMaterial` expects `options.texture` as `Texture2D`.",
+  TEXTURE_UNIT_TYPE: "`TexturedMaterial` expects `options.textureUnitIndex` as a non-negative integer.",
+  TEXTURE_OWNERSHIP_TYPE: "`TexturedMaterial` expects `options.ownsTexture` as boolean.",
+  PROGRAM_OWNERSHIP_TYPE: "`TexturedMaterial` expects `options.ownsShaderProgram` as boolean.",
+  REPLACEMENT_TEXTURE_TYPE: "`TexturedMaterial.setDiffuseTexture` expects texture as `Texture2D`.",
+  REPLACEMENT_OPTIONS_OBJECT: "`TexturedMaterial.setDiffuseTexture` expects options as an object.",
+  REPLACEMENT_OWNERSHIP_TYPE: "`TexturedMaterial.setDiffuseTexture` expects options.ownsTexture as boolean."
+});
+
+// core/material/textured-material.js
+var TexturedMaterial = class _TexturedMaterial extends Material {
   /**
    * Diffuse texture bound to the shader sampler.
    *
@@ -6167,49 +6777,41 @@ var TexturedMaterial = class extends Material {
    * @type {boolean}
    * @private
    */
-  #ownsDiffuseTexture = false;
+  #ownsDiffuseTexture = MATERIAL_DEFAULTS.OWNS_TEXTURE;
   /**
    * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to create shaders and upload uniforms.
    * @param {TexturedMaterialOptions} [options]   - Optional configuration for the material.
    */
   constructor(webglContext, options = {}) {
-    if (options === null || typeof options !== "object") {
-      throw new TypeError("TexturedMaterial expects options as an object.");
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT) {
+      throw new TypeError(TEXTURED_MATERIAL_EXCEPTION_MESSAGES.OPTIONS_OBJECT);
     }
-    const {
-      texture,
-      textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX2,
-      ownsTexture = false,
-      ownsShaderProgram = true
-    } = options;
-    if (texture !== void 0 && !(texture instanceof Texture2D)) {
-      throw new TypeError("`TexturedMaterial` expects `options.texture` as `Texture2D`.");
-    }
-    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < MIN_TEXTURE_UNIT_INDEX3) {
-      throw new TypeError("`TexturedMaterial` expects `options.textureUnitIndex` as a non-negative integer.");
-    }
-    if (typeof ownsTexture !== "boolean") {
-      throw new TypeError("`TexturedMaterial` expects `options.ownsTexture` as boolean.");
-    }
-    if (typeof ownsShaderProgram !== "boolean") {
-      throw new TypeError("`TexturedMaterial` expects `options.ownsShaderProgram` as boolean.");
-    }
-    const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE3, FRAGMENT_SHADER_SOURCE3);
+    const sources = TEXTURED_MATERIAL_SHADERS;
+    const settings = _TexturedMaterial.#resolveOptions(options);
+    const shaderProgram = new ShaderProgram(webglContext, sources.VERTEX, sources.FRAGMENT);
+    const { texture, textureUnitIndex, ownsTexture, ownsShaderProgram } = settings;
     super(webglContext, shaderProgram, { ownsShaderProgram });
-    this.#diffuseTexture = texture || new Texture2D(webglContext);
-    this.#textureUnitIndex = textureUnitIndex;
-    this.#ownsDiffuseTexture = ownsTexture || !texture;
+    try {
+      this.#diffuseTexture = texture || new Texture2D(webglContext);
+      this.#textureUnitIndex = textureUnitIndex;
+      this.#ownsDiffuseTexture = ownsTexture || !texture;
+    } catch (error) {
+      shaderProgram.dispose();
+      throw error;
+    }
   }
   /**
    * Uploads uniforms and binds the texture for a draw call.
    *
-   * @param {Float32Array} matrix4 - Model-View-Projection matrix (4x4).
+   * @param {Float32Array} matrix4 - 'Model-View-Projection' matrix (4x4).
    */
   apply(matrix4) {
     this.use();
-    this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME3, matrix4);
-    this.shaderProgram.setTexture2D(DIFFUSE_TEXTURE_UNIFORM_NAME, this.#diffuseTexture, this.#textureUnitIndex);
-    this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME3, this.opacity);
+    const shaderProgram = this.shaderProgram;
+    const uniforms = MATERIAL_UNIFORMS;
+    shaderProgram.setMatrix4(uniforms.MATRIX, matrix4);
+    shaderProgram.setTexture2D(TEXTURED_MATERIAL_UNIFORMS.DIFFUSE_TEXTURE, this.#diffuseTexture, this.#textureUnitIndex);
+    shaderProgram.setFloat(uniforms.OPACITY, this.opacity);
   }
   /**
    * Returns the current diffuse texture.
@@ -6228,16 +6830,16 @@ var TexturedMaterial = class extends Material {
    */
   setDiffuseTexture(texture, options = {}) {
     if (!(texture instanceof Texture2D)) {
-      throw new TypeError("`TexturedMaterial.setDiffuseTexture` expects texture as `Texture2D`.");
+      throw new TypeError(TEXTURED_MATERIAL_EXCEPTION_MESSAGES.REPLACEMENT_TEXTURE_TYPE);
     }
-    if (options === null || typeof options !== "object") {
-      throw new TypeError("`TexturedMaterial.setDiffuseTexture` expects options as an object.");
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT) {
+      throw new TypeError(TEXTURED_MATERIAL_EXCEPTION_MESSAGES.REPLACEMENT_OPTIONS_OBJECT);
     }
-    const { ownsTexture = false } = options;
-    if (typeof ownsTexture !== "boolean") {
-      throw new TypeError("`TexturedMaterial.setDiffuseTexture` expects options.ownsTexture as boolean.");
+    const { ownsTexture = MATERIAL_DEFAULTS.OWNS_TEXTURE } = options;
+    if (typeof ownsTexture !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+      throw new TypeError(TEXTURED_MATERIAL_EXCEPTION_MESSAGES.REPLACEMENT_OWNERSHIP_TYPE);
     }
-    if (this.#ownsDiffuseTexture) {
+    if (this.#ownsDiffuseTexture && texture !== this.#diffuseTexture) {
       this.#diffuseTexture.dispose();
     }
     this.#diffuseTexture = texture;
@@ -6256,46 +6858,81 @@ var TexturedMaterial = class extends Material {
     }
     super.dispose();
   }
+  /**
+   * Resolves and validates ownership and texture options before allocation.
+   *
+   * @param {TexturedMaterialOptions} options - Material options.
+   * @returns {TexturedMaterialOptions}       - Resolved settings.
+   * @private
+   */
+  static #resolveOptions(options) {
+    const {
+      texture,
+      textureUnitIndex = MATERIAL_TEXTURE_UNITS.DEFAULT,
+      ownsTexture = MATERIAL_DEFAULTS.OWNS_TEXTURE,
+      ownsShaderProgram = MATERIAL_DEFAULTS.OWNS_GENERATED_SHADER_PROGRAM
+    } = options;
+    if (texture !== void 0 && !(texture instanceof Texture2D)) {
+      throw new TypeError(TEXTURED_MATERIAL_EXCEPTION_MESSAGES.TEXTURE_TYPE);
+    }
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < MATERIAL_TEXTURE_UNITS.MIN) {
+      throw new TypeError(TEXTURED_MATERIAL_EXCEPTION_MESSAGES.TEXTURE_UNIT_TYPE);
+    }
+    if (typeof ownsTexture !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+      throw new TypeError(TEXTURED_MATERIAL_EXCEPTION_MESSAGES.TEXTURE_OWNERSHIP_TYPE);
+    }
+    if (typeof ownsShaderProgram !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+      throw new TypeError(TEXTURED_MATERIAL_EXCEPTION_MESSAGES.PROGRAM_OWNERSHIP_TYPE);
+    }
+    return { texture, textureUnitIndex, ownsTexture, ownsShaderProgram };
+  }
 };
 
-// core/material/normal-material.js
-var POSITION_ATTRIBUTE_LOCATION5 = 0;
-var NORMAL_ATTRIBUTE_LOCATION2 = 3;
-var MATRIX_UNIFORM_NAME4 = "u_matrix";
-var OPACITY_UNIFORM_NAME4 = "u_opacity";
-var NORMAL_COLOR_SCALE = 0.5;
-var NORMAL_COLOR_BIAS = 0.5;
-var VERTEX_SHADER_SOURCE4 = `#version 300 es
+// core/constants/normal-material.js
+var NORMAL_MATERIAL_VALUES = Object.freeze({
+  NORMAL_COLOR_SCALE: 0.5,
+  NORMAL_COLOR_BIAS: 0.5
+});
+var NORMAL_MATERIAL_SHADERS = Object.freeze({
+  VERTEX: `
+#version 300 es
 precision mediump float;
-layout(location = ${POSITION_ATTRIBUTE_LOCATION5}) in vec3 a_position;
-layout(location = ${NORMAL_ATTRIBUTE_LOCATION2}) in vec3 a_normal;
-uniform mat4 ${MATRIX_UNIFORM_NAME4};
+layout(location = ${MATERIAL_ATTRIBUTES.POSITION}) in vec3 a_position;
+layout(location = ${MATERIAL_ATTRIBUTES.NORMAL}) in vec3 a_normal;
+uniform mat4 ${MATERIAL_UNIFORMS.MATRIX};
 out vec3 v_normal;
 
 void main() {
-    gl_Position = ${MATRIX_UNIFORM_NAME4} * vec4(a_position, 1.0);
-    v_normal = a_normal;
+    gl_Position = ${MATERIAL_UNIFORMS.MATRIX} * vec4(a_position, 1.0);
+    v_normal    = a_normal;
 }
-`;
-var FRAGMENT_SHADER_SOURCE4 = `#version 300 es
+`,
+  FRAGMENT: `
+#version 300 es
 precision mediump float;
 in vec3 v_normal;
-uniform float ${OPACITY_UNIFORM_NAME4};
+uniform float ${MATERIAL_UNIFORMS.OPACITY};
 out vec4 outColor;
 
 void main() {
     vec3 normalizedNormal = normalize(v_normal);
-    vec3 normalColor = (normalizedNormal * ${NORMAL_COLOR_SCALE}) + ${NORMAL_COLOR_BIAS};
-    outColor = vec4(normalColor, ${OPACITY_UNIFORM_NAME4});
+    vec3 normalColor      = (normalizedNormal * ${NORMAL_MATERIAL_VALUES.NORMAL_COLOR_SCALE}) + ${NORMAL_MATERIAL_VALUES.NORMAL_COLOR_BIAS};
+    outColor              = vec4(normalColor, ${MATERIAL_UNIFORMS.OPACITY});
 }
-`;
+`
+});
+
+// core/material/normal-material.js
 var NormalMaterial = class extends Material {
   /**
    * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to compile shaders.
    */
   constructor(webglContext) {
-    const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE4, FRAGMENT_SHADER_SOURCE4);
-    super(webglContext, shaderProgram, { ownsShaderProgram: true });
+    const sources = NORMAL_MATERIAL_SHADERS;
+    const shaderProgram = new ShaderProgram(webglContext, sources.VERTEX, sources.FRAGMENT);
+    super(webglContext, shaderProgram, {
+      ownsShaderProgram: MATERIAL_DEFAULTS.OWNS_GENERATED_SHADER_PROGRAM
+    });
   }
   /**
    * Applies per-object uniforms.
@@ -6303,39 +6940,12 @@ var NormalMaterial = class extends Material {
    * @param {Float32Array} matrix4 - Transformation matrix passed as `u_matrix`.
    */
   apply(matrix4) {
-    this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME4, matrix4);
-    this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME4, this.opacity);
+    const shaderProgram = this.shaderProgram;
+    const uniforms = MATERIAL_UNIFORMS;
+    shaderProgram.setMatrix4(uniforms.MATRIX, matrix4);
+    shaderProgram.setFloat(uniforms.OPACITY, this.opacity);
   }
 };
-
-// core/constants/ecmascript-types.js
-var ECMASCRIPT_TYPEOF_RESULTS = Object.freeze({
-  UNDEFINED: "undefined",
-  OBJECT: "object",
-  BOOLEAN: "boolean",
-  NUMBER: "number",
-  BIGINT: "bigint",
-  STRING: "string",
-  SYMBOL: "symbol",
-  FUNCTION: "function"
-});
-
-// core/exception-messages/directional-light-material.js
-var DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES = Object.freeze({
-  WEBGL_CONTEXT_TYPE: "`DirectionalLightMaterial` expects a WebGL2RenderingContext.",
-  SHADER_PROGRAM_TYPE: "`DirectionalLightMaterial` expects a ShaderProgram instance.",
-  OWNS_SHADER_PROGRAM_TYPE: '`DirectionalLightMaterial` option "ownsShaderProgram" must be a boolean.',
-  LIGHT_DIRECTION_LENGTH: "`DirectionalLightMaterial.setLightDirection` expects a non-zero finite vector.",
-  AMBIENT_STRENGTH_TYPE: "`DirectionalLightMaterial.setAmbientStrength` expects a finite number.",
-  DIRECTIONAL_STRENGTH_TYPE: "`DirectionalLightMaterial.setDirectionalStrength` expects a finite number.",
-  DIRECTIONAL_ENABLED_TYPE: "`DirectionalLightMaterial.setDirectionalEnabled` expects a boolean.",
-  LIGHTING_ENABLED_TYPE: "`DirectionalLightMaterial.setLightingEnabled` expects a boolean or a finite number.",
-  LIGHTING_ENABLED_RANGE: "`DirectionalLightMaterial.setLightingEnabled` expects a value in [0..1].",
-  VECTOR3_TYPE: "{methodName} expects a number[] or Float32Array.",
-  VECTOR3_COMPONENTS: "{methodName} expects exactly 3 components [x, y, z].",
-  VECTOR3_COMPONENTS_FINITE: "{methodName} expects all components to be finite numbers.",
-  OPTIONS_OBJECT: "{methodName} expects an options object (plain object)."
-});
 
 // core/constants/light.js
 var LIGHT_DEFAULTS = Object.freeze({ ENABLED: true });
@@ -6364,31 +6974,54 @@ var LIGHT_DIRECTIONAL_DEFAULT_NORMALIZED_DIRECTION = Object.freeze([
 
 // core/constants/directional-light-material.js
 var DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES = Object.freeze({
-  POSITION_LOCATION: 0,
-  NORMAL_LOCATION: 3
+  POSITION_LOCATION: MATERIAL_ATTRIBUTES.POSITION,
+  NORMAL_LOCATION: MATERIAL_ATTRIBUTES.NORMAL
 });
 var DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS = Object.freeze({
-  FINAL_MATRIX: "u_matrix",
+  FINAL_MATRIX: MATERIAL_UNIFORMS.MATRIX,
   WORLD_INVERSE_TRANSPOSE_MATRIX: "u_worldInverseTranspose",
   WORLD_MATRIX: "u_worldMatrix",
-  COLOR: "u_color",
+  COLOR: MATERIAL_UNIFORMS.COLOR,
   LIGHT_DIRECTION: "u_lightDirection",
   CAMERA_POSITION: "u_cameraPosition",
   AMBIENT_STRENGTH: "u_ambientStrength",
   DIRECTIONAL_STRENGTH: "u_directionalStrength",
   LIGHTING_ENABLED: "u_lightingEnabled",
-  OPACITY: "u_opacity"
+  OPACITY: MATERIAL_UNIFORMS.OPACITY
 });
 var DIRECTIONAL_LIGHT_MATERIAL_DEFAULT_COLOR = Object.freeze([0.85, 0.85, 0.85]);
 var DIRECTIONAL_LIGHT_MATERIAL_LIGHTING = Object.freeze({
-  DEFAULT_LIGHTING_ENABLED: 1,
-  FLOAT_FALSE: 0,
-  FLOAT_TRUE: 1,
-  MIN_LIGHTING_ENABLED: 0,
-  MAX_LIGHTING_ENABLED: 1,
+  DEFAULT_LIGHTING_ENABLED: MATERIAL_BOOLEAN_FLOATS.TRUE,
+  FLOAT_FALSE: MATERIAL_BOOLEAN_FLOATS.FALSE,
+  FLOAT_TRUE: MATERIAL_BOOLEAN_FLOATS.TRUE,
+  MIN_LIGHTING_ENABLED: MATERIAL_BOOLEAN_FLOATS.FALSE,
+  MAX_LIGHTING_ENABLED: MATERIAL_BOOLEAN_FLOATS.TRUE,
   LIGHTING_ENABLED_THRESHOLD: 0.5
 });
-var DIRECTIONAL_LIGHT_MATERIAL_VECTOR3_ELEMENT_COUNT = 3;
+var DIRECTIONAL_LIGHT_MATERIAL_VECTOR3_ELEMENT_COUNT = MATH_LAYOUT.VECTOR3_ELEMENT_COUNT;
+var DIRECTIONAL_LIGHT_MATERIAL_CONTEXTS = Object.freeze({
+  CONSTRUCTOR: "`DirectionalLightMaterial`",
+  COLOR: "`DirectionalLightMaterial.setColor`",
+  LIGHT_DIRECTION: "`DirectionalLightMaterial.setLightDirection`"
+});
+var DIRECTIONAL_LIGHT_MATERIAL_METHOD_TOKEN = "{methodName}";
+
+// core/exception-messages/directional-light-material.js
+var DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES = Object.freeze({
+  WEBGL_CONTEXT_TYPE: "`DirectionalLightMaterial` expects a WebGL2RenderingContext.",
+  SHADER_PROGRAM_TYPE: "`DirectionalLightMaterial` expects a ShaderProgram instance.",
+  OWNS_SHADER_PROGRAM_TYPE: '`DirectionalLightMaterial` option "ownsShaderProgram" must be a boolean.',
+  LIGHT_DIRECTION_LENGTH: "`DirectionalLightMaterial.setLightDirection` expects a non-zero finite vector.",
+  AMBIENT_STRENGTH_TYPE: "`DirectionalLightMaterial.setAmbientStrength` expects a finite number.",
+  DIRECTIONAL_STRENGTH_TYPE: "`DirectionalLightMaterial.setDirectionalStrength` expects a finite number.",
+  DIRECTIONAL_ENABLED_TYPE: "`DirectionalLightMaterial.setDirectionalEnabled` expects a boolean.",
+  LIGHTING_ENABLED_TYPE: "`DirectionalLightMaterial.setLightingEnabled` expects a boolean or a finite number.",
+  LIGHTING_ENABLED_RANGE: "`DirectionalLightMaterial.setLightingEnabled` expects a value in [0..1].",
+  VECTOR3_TYPE: "{methodName} expects a number[] or Float32Array.",
+  VECTOR3_COMPONENTS: "{methodName} expects exactly 3 components [x, y, z].",
+  VECTOR3_COMPONENTS_FINITE: "{methodName} expects all components to be finite numbers.",
+  OPTIONS_OBJECT: "{methodName} expects an options object (plain object)."
+});
 
 // core/material/directional-light-material.js
 var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material {
@@ -6442,38 +7075,20 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
     if (!(shaderProgram instanceof ShaderProgram)) {
       throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.SHADER_PROGRAM_TYPE);
     }
-    _DirectionalLightMaterial.#assertPlainObject("`DirectionalLightMaterial`", options);
-    _DirectionalLightMaterial.#assertPlainObject("`DirectionalLightMaterial`", materialOptions);
-    const { ownsShaderProgram = true } = materialOptions;
+    _DirectionalLightMaterial.#assertPlainObject(DIRECTIONAL_LIGHT_MATERIAL_CONTEXTS.CONSTRUCTOR, options);
+    _DirectionalLightMaterial.#assertPlainObject(DIRECTIONAL_LIGHT_MATERIAL_CONTEXTS.CONSTRUCTOR, materialOptions);
+    const { ownsShaderProgram = MATERIAL_DEFAULTS.OWNS_GENERATED_SHADER_PROGRAM } = materialOptions;
     if (typeof ownsShaderProgram !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
       throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.OWNS_SHADER_PROGRAM_TYPE);
     }
     super(webglContext, shaderProgram, { ownsShaderProgram });
-    this.#color.set(DIRECTIONAL_LIGHT_MATERIAL_DEFAULT_COLOR);
-    this.setLightDirection(LIGHT_DIRECTIONAL_DEFAULT_DIRECTION);
-    this.#ambientStrength = LIGHT_AMBIENT.DEFAULT_STRENGTH;
-    this.#directionalStrength = LIGHT_DIRECTIONAL.DEFAULT_DIRECTIONAL_STRENGTH;
-    const {
-      color,
-      lightDirection,
-      ambientStrength,
-      directionalStrength,
-      lightingEnabled
-    } = options;
-    if (color !== void 0) {
-      this.setColor(color);
-    }
-    if (lightDirection !== void 0) {
-      this.setLightDirection(lightDirection);
-    }
-    if (ambientStrength !== void 0) {
-      this.setAmbientStrength(ambientStrength);
-    }
-    if (directionalStrength !== void 0) {
-      this.setDirectionalStrength(directionalStrength);
-    }
-    if (lightingEnabled !== void 0) {
-      this.setLightingEnabled(lightingEnabled);
+    try {
+      this.#initialize(options);
+    } catch (error) {
+      if (ownsShaderProgram) {
+        shaderProgram.dispose();
+      }
+      throw error;
     }
   }
   /**
@@ -6491,14 +7106,16 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
    * @param {Float32Array} cameraPosition              - Camera position, world space.
    */
   apply(finalMatrix, worldMatrix, worldInverseTransposeMatrix, cameraPosition) {
-    this.shaderProgram.setMatrix4(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX, finalMatrix);
-    this.shaderProgram.setMatrix4(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX, worldInverseTransposeMatrix);
-    this.shaderProgram.setVector3(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR, this.#color);
-    this.shaderProgram.setVector3(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION, this.#lightDirection);
-    this.shaderProgram.setFloat(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH, this.#ambientStrength);
-    this.shaderProgram.setFloat(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH, this.#directionalStrength);
-    this.shaderProgram.setFloat(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED, this.#lightingEnabled);
-    this.shaderProgram.setFloat(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY, this.opacity);
+    const shaderProgram = this.shaderProgram;
+    const uniforms = DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS;
+    shaderProgram.setMatrix4(uniforms.FINAL_MATRIX, finalMatrix);
+    shaderProgram.setMatrix4(uniforms.WORLD_INVERSE_TRANSPOSE_MATRIX, worldInverseTransposeMatrix);
+    shaderProgram.setVector3(uniforms.COLOR, this.#color);
+    shaderProgram.setVector3(uniforms.LIGHT_DIRECTION, this.#lightDirection);
+    shaderProgram.setFloat(uniforms.AMBIENT_STRENGTH, this.#ambientStrength);
+    shaderProgram.setFloat(uniforms.DIRECTIONAL_STRENGTH, this.#directionalStrength);
+    shaderProgram.setFloat(uniforms.LIGHTING_ENABLED, this.#lightingEnabled);
+    shaderProgram.setFloat(uniforms.OPACITY, this.opacity);
     this.applyAdditionalUniforms(worldMatrix, cameraPosition);
   }
   /**
@@ -6519,10 +7136,8 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
    * @param {Float32Array | number[]} color - [red, green, blue] in [0..1] range.
    */
   setColor(color) {
-    _DirectionalLightMaterial.assertVector3("`DirectionalLightMaterial.setColor`", color);
-    this.#color[0] = color[0];
-    this.#color[1] = color[1];
-    this.#color[2] = color[2];
+    _DirectionalLightMaterial.assertVector3(DIRECTIONAL_LIGHT_MATERIAL_CONTEXTS.COLOR, color);
+    this.#color.set(color);
   }
   /**
    * Sets the light direction (world space). The direction is normalized internally.
@@ -6530,18 +7145,18 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
    * @param {Float32Array | number[]} direction - [x, y, z] direction vector (non-zero).
    */
   setLightDirection(direction) {
-    _DirectionalLightMaterial.assertVector3("`DirectionalLightMaterial.setLightDirection`", direction);
-    const directionX = direction[0];
-    const directionY = direction[1];
-    const directionZ = direction[2];
+    _DirectionalLightMaterial.assertVector3(DIRECTIONAL_LIGHT_MATERIAL_CONTEXTS.LIGHT_DIRECTION, direction);
+    const directionX = direction[MATH_VECTOR3_INDEXES.X];
+    const directionY = direction[MATH_VECTOR3_INDEXES.Y];
+    const directionZ = direction[MATH_VECTOR3_INDEXES.Z];
     const directionLengthSquared = directionX * directionX + directionY * directionY + directionZ * directionZ;
     if (!Number.isFinite(directionLengthSquared) || directionLengthSquared <= LIGHT_DIRECTIONAL.MIN_DIRECTION_LENGTH_SQUARED) {
       throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.LIGHT_DIRECTION_LENGTH);
     }
     const inverseDirectionLength = LIGHT_DIRECTIONAL.INVERSE_LENGTH_NUMERATOR / Math.sqrt(directionLengthSquared);
-    this.#lightDirection[0] = directionX * inverseDirectionLength;
-    this.#lightDirection[1] = directionY * inverseDirectionLength;
-    this.#lightDirection[2] = directionZ * inverseDirectionLength;
+    this.#lightDirection[MATH_VECTOR3_INDEXES.X] = directionX * inverseDirectionLength;
+    this.#lightDirection[MATH_VECTOR3_INDEXES.Y] = directionY * inverseDirectionLength;
+    this.#lightDirection[MATH_VECTOR3_INDEXES.Z] = directionZ * inverseDirectionLength;
   }
   /**
    * Sets ambient strength multiplier.
@@ -6559,7 +7174,7 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
    *
    * @param {number} value - Directional strength multiplier.
    * @returns {void}
-   * @throws {TypeError} When the value is invalid.
+   * @throws {TypeError}     When the value is invalid.
    */
   setDirectionalStrength(value) {
     if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
@@ -6572,25 +7187,27 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
    *
    * @param {boolean} enabled - Whether directional lighting should be enabled.
    * @returns {void}
-   * @throws {TypeError} When the value is invalid.
+   * @throws {TypeError}        When the value is invalid.
    */
   setDirectionalEnabled(enabled) {
     if (typeof enabled !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
       throw new TypeError(DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.DIRECTIONAL_ENABLED_TYPE);
     }
-    this.#directionalStrength = enabled ? LIGHT_DIRECTIONAL.DEFAULT_DIRECTIONAL_STRENGTH : LIGHT_DIRECTIONAL.MIN_DIRECTIONAL_STRENGTH;
+    const light = LIGHT_DIRECTIONAL;
+    this.#directionalStrength = enabled ? light.DEFAULT_DIRECTIONAL_STRENGTH : light.MIN_DIRECTIONAL_STRENGTH;
   }
   /**
    * Sets lighting enabled state.
    *
    * @param {boolean | number} enabled - Boolean or a [0..1] numeric flag.
    * @returns {void}
-   * @throws {TypeError}  When the value type is invalid.
-   * @throws {RangeError} When the value is outside [0..1].
+   * @throws {TypeError}                 When the value type is invalid.
+   * @throws {RangeError}                When the value is outside [0..1].
    */
   setLightingEnabled(enabled) {
     if (typeof enabled === ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
-      this.#lightingEnabled = enabled ? DIRECTIONAL_LIGHT_MATERIAL_LIGHTING.FLOAT_TRUE : DIRECTIONAL_LIGHT_MATERIAL_LIGHTING.FLOAT_FALSE;
+      const floatFlags = MATERIAL_BOOLEAN_FLOATS;
+      this.#lightingEnabled = enabled ? floatFlags.TRUE : floatFlags.FALSE;
       return;
     }
     if (typeof enabled !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(enabled)) {
@@ -6646,7 +7263,7 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
    * @private
    */
   static #formatExceptionMessage(messageTemplate, methodName) {
-    return messageTemplate.replace("{methodName}", methodName);
+    return messageTemplate.replace(DIRECTIONAL_LIGHT_MATERIAL_METHOD_TOKEN, () => methodName);
   }
   /**
    * Validates a vector3-like input.
@@ -6667,7 +7284,7 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
         methodName
       ));
     }
-    if (!Number.isFinite(vector3[0]) || !Number.isFinite(vector3[1]) || !Number.isFinite(vector3[2])) {
+    if (!Number.isFinite(vector3[MATH_VECTOR3_INDEXES.X]) || !Number.isFinite(vector3[MATH_VECTOR3_INDEXES.Y]) || !Number.isFinite(vector3[MATH_VECTOR3_INDEXES.Z])) {
       throw new TypeError(_DirectionalLightMaterial.#formatExceptionMessage(
         DIRECTIONAL_LIGHT_MATERIAL_EXCEPTION_MESSAGES.VECTOR3_COMPONENTS_FINITE,
         methodName
@@ -6689,10 +7306,53 @@ var DirectionalLightMaterial = class _DirectionalLightMaterial extends Material 
       ));
     }
   }
+  /**
+   * Initializes common colors and lighting before applying option overrides.
+   *
+   * @param {DirectionalLightMaterialOptions} options - Initial lighting settings.
+   * @private
+   */
+  #initialize(options) {
+    this.#color.set(DIRECTIONAL_LIGHT_MATERIAL_DEFAULT_COLOR);
+    this.setLightDirection(LIGHT_DIRECTIONAL_DEFAULT_DIRECTION);
+    this.#applyOptions(options);
+  }
+  /**
+   * Applies only the lighting values supplied by the caller.
+   *
+   * @param {DirectionalLightMaterialOptions} options - Initial lighting settings.
+   * @private
+   */
+  #applyOptions(options) {
+    const {
+      color,
+      lightDirection,
+      ambientStrength,
+      directionalStrength,
+      lightingEnabled
+    } = options;
+    if (color !== void 0) {
+      this.setColor(color);
+    }
+    if (lightDirection !== void 0) {
+      this.setLightDirection(lightDirection);
+    }
+    if (ambientStrength !== void 0) {
+      this.setAmbientStrength(ambientStrength);
+    }
+    if (directionalStrength !== void 0) {
+      this.setDirectionalStrength(directionalStrength);
+    }
+    if (lightingEnabled !== void 0) {
+      this.setLightingEnabled(lightingEnabled);
+    }
+  }
 };
 
-// core/material/lambert-material.js
-var VERTEX_SHADER_SOURCE5 = `#version 300 es
+// core/constants/lambert-material.js
+var LAMBERT_MATERIAL_SHADERS = Object.freeze({
+  VERTEX: `
+#version 300 es
 precision mediump float;
 layout(location = ${DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.POSITION_LOCATION}) in vec3 a_position;
 layout(location = ${DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.NORMAL_LOCATION}) in vec3 a_normal;
@@ -6704,8 +7364,9 @@ void main() {
     gl_Position = ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX} * vec4(a_position, 1.0);
     v_normal    = (${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX} * vec4(a_normal, 0.0)).xyz;
 }
-`;
-var FRAGMENT_SHADER_SOURCE5 = `#version 300 es
+`,
+  FRAGMENT: `
+#version 300 es
 precision mediump float;
 in vec3 v_normal;
 uniform vec3  ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR};
@@ -6729,7 +7390,15 @@ void main() {
     float light_intensity   = mix(1.0, lit_intensity, ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED});
     outColor                = vec4(${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR} * light_intensity, ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY});
 }
-`;
+`
+});
+
+// core/exception-messages/lambert-material.js
+var LAMBERT_MATERIAL_EXCEPTION_MESSAGES = Object.freeze({
+  OPTIONS_OBJECT: "`LambertMaterial` expects an options object (plain object)."
+});
+
+// core/material/lambert-material.js
 var LambertMaterial = class extends DirectionalLightMaterial {
   /**
    * Creates a new `LambertMaterial`.
@@ -6738,22 +7407,21 @@ var LambertMaterial = class extends DirectionalLightMaterial {
    * @param {LambertMaterialOptions} [options]    - Material options.
    */
   constructor(webglContext, options = {}) {
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError("`LambertMaterial` expects an options object (plain object).");
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
+      throw new TypeError(LAMBERT_MATERIAL_EXCEPTION_MESSAGES.OPTIONS_OBJECT);
     }
-    const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE5, FRAGMENT_SHADER_SOURCE5);
-    super(webglContext, shaderProgram, options, { ownsShaderProgram: true });
+    const sources = LAMBERT_MATERIAL_SHADERS;
+    const shaderProgram = new ShaderProgram(webglContext, sources.VERTEX, sources.FRAGMENT);
+    super(webglContext, shaderProgram, options, {
+      ownsShaderProgram: MATERIAL_DEFAULTS.OWNS_GENERATED_SHADER_PROGRAM
+    });
   }
 };
 
-// core/material/phong-material.js
-var SPECULAR_COLOR_UNIFORM_NAME = "u_specularColor";
-var SPECULAR_STRENGTH_UNIFORM_NAME = "u_specularStrength";
-var SHININESS_UNIFORM_NAME = "u_shininess";
-var DEFAULT_SPECULAR_COLOR = new Float32Array([1, 1, 1]);
-var DEFAULT_SPECULAR_STRENGTH = 1;
-var DEFAULT_SHININESS = 16;
-var VERTEX_SHADER_SOURCE6 = `#version 300 es
+// core/constants/phong-material.js
+var PHONG_MATERIAL_SHADERS = Object.freeze({
+  VERTEX: `
+#version 300 es
 precision mediump float;
 layout(location = ${DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.POSITION_LOCATION}) in vec3 a_position;
 layout(location = ${DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.NORMAL_LOCATION}) in vec3 a_normal;
@@ -6768,20 +7436,21 @@ void main() {
     v_worldPosition = (${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX} * vec4(a_position, 1.0)).xyz;
     v_normal        = (${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX} * vec4(a_normal, 0.0)).xyz;
 }
-`;
-var FRAGMENT_SHADER_SOURCE6 = `#version 300 es
+`,
+  FRAGMENT: `
+#version 300 es
 precision mediump float;
 in vec3 v_worldPosition;
 in vec3 v_normal;
 uniform vec3  ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR};
-uniform vec3  ${SPECULAR_COLOR_UNIFORM_NAME};
+uniform vec3  ${MATERIAL_UNIFORMS.SPECULAR_COLOR};
 uniform vec3  ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION};
 uniform vec3  ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION};
 uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH};
 uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH};
 uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED};
-uniform float ${SPECULAR_STRENGTH_UNIFORM_NAME};
-uniform float ${SHININESS_UNIFORM_NAME};
+uniform float ${MATERIAL_UNIFORMS.SPECULAR_STRENGTH};
+uniform float ${MATERIAL_UNIFORMS.SHININESS};
 uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY};
 out vec4 outColor;
 
@@ -6801,19 +7470,30 @@ void main() {
     if (diffuse_intensity > 0.0) {
         vec3 reflection_direction = reflect(-light_direction, surface_normal);
         float specular_base       = max(dot(view_direction, reflection_direction), 0.0);
-        specular_intensity        = pow(specular_base, ${SHININESS_UNIFORM_NAME});
+        specular_intensity        = pow(specular_base, ${MATERIAL_UNIFORMS.SHININESS});
     }
 
     vec3 ambient  = ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR} * ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH};
     vec3 diffuse  = ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR} * (diffuse_intensity * lighting_enabled);
-    vec3 specular = ${SPECULAR_COLOR_UNIFORM_NAME}
-        * (specular_intensity * ${SPECULAR_STRENGTH_UNIFORM_NAME}
+    vec3 specular = ${MATERIAL_UNIFORMS.SPECULAR_COLOR}
+        * (specular_intensity * ${MATERIAL_UNIFORMS.SPECULAR_STRENGTH}
         * ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH} * lighting_enabled);
 
     vec3 rgb = ambient + diffuse + specular;
     outColor = vec4(rgb, ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY});
 }
-`;
+`
+});
+var PHONG_MATERIAL_COLOR_CONTEXT = "`PhongMaterial.setSpecularColor`";
+
+// core/exception-messages/phong-material.js
+var PHONG_MATERIAL_EXCEPTION_MESSAGES = Object.freeze({
+  OPTIONS_OBJECT: "`PhongMaterial` expects an options object (plain object).",
+  SPECULAR_STRENGTH_TYPE: "`PhongMaterial.setSpecularStrength` expects a finite number.",
+  SHININESS_TYPE: "`PhongMaterial.setShininess` expects a finite number."
+});
+
+// core/material/phong-material.js
 var PhongMaterial = class extends DirectionalLightMaterial {
   /**
    * Specular color (RGB).
@@ -6828,14 +7508,14 @@ var PhongMaterial = class extends DirectionalLightMaterial {
    * @type {number}
    * @private
    */
-  #specularStrength = DEFAULT_SPECULAR_STRENGTH;
+  #specularStrength = MATERIAL_SPECULAR_DEFAULTS.STRENGTH;
   /**
    * Shininess exponent (specular power).
    *
    * @type {number}
    * @private
    */
-  #shininess = DEFAULT_SHININESS;
+  #shininess = MATERIAL_SPECULAR_DEFAULTS.SHININESS;
   /**
    * Creates a new `PhongMaterial`.
    *
@@ -6843,23 +7523,19 @@ var PhongMaterial = class extends DirectionalLightMaterial {
    * @param {PhongMaterialOptions} [options]      - Material options.
    */
   constructor(webglContext, options = {}) {
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError("`PhongMaterial` expects an options object (plain object).");
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
+      throw new TypeError(PHONG_MATERIAL_EXCEPTION_MESSAGES.OPTIONS_OBJECT);
     }
-    const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE6, FRAGMENT_SHADER_SOURCE6);
-    super(webglContext, shaderProgram, options, { ownsShaderProgram: true });
-    this.#specularColor.set(DEFAULT_SPECULAR_COLOR);
-    this.#specularStrength = DEFAULT_SPECULAR_STRENGTH;
-    this.#shininess = DEFAULT_SHININESS;
-    const { specularColor, specularStrength, shininess } = options;
-    if (specularColor !== void 0) {
-      this.setSpecularColor(specularColor);
-    }
-    if (specularStrength !== void 0) {
-      this.setSpecularStrength(specularStrength);
-    }
-    if (shininess !== void 0) {
-      this.setShininess(shininess);
+    const sources = PHONG_MATERIAL_SHADERS;
+    const shaderProgram = new ShaderProgram(webglContext, sources.VERTEX, sources.FRAGMENT);
+    super(webglContext, shaderProgram, options, {
+      ownsShaderProgram: MATERIAL_DEFAULTS.OWNS_GENERATED_SHADER_PROGRAM
+    });
+    try {
+      this.#initialize(options);
+    } catch (error) {
+      shaderProgram.dispose();
+      throw error;
     }
   }
   /**
@@ -6870,11 +7546,14 @@ var PhongMaterial = class extends DirectionalLightMaterial {
    * @protected
    */
   applyAdditionalUniforms(worldMatrix, cameraPosition) {
-    this.shaderProgram.setMatrix4(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX, worldMatrix);
-    this.shaderProgram.setVector3(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION, cameraPosition);
-    this.shaderProgram.setVector3(SPECULAR_COLOR_UNIFORM_NAME, this.#specularColor);
-    this.shaderProgram.setFloat(SPECULAR_STRENGTH_UNIFORM_NAME, this.#specularStrength);
-    this.shaderProgram.setFloat(SHININESS_UNIFORM_NAME, this.#shininess);
+    const shaderProgram = this.shaderProgram;
+    const lightUniforms = DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS;
+    const sharedUniforms = MATERIAL_UNIFORMS;
+    shaderProgram.setMatrix4(lightUniforms.WORLD_MATRIX, worldMatrix);
+    shaderProgram.setVector3(lightUniforms.CAMERA_POSITION, cameraPosition);
+    shaderProgram.setVector3(sharedUniforms.SPECULAR_COLOR, this.#specularColor);
+    shaderProgram.setFloat(sharedUniforms.SPECULAR_STRENGTH, this.#specularStrength);
+    shaderProgram.setFloat(sharedUniforms.SHININESS, this.#shininess);
   }
   /**
    * Sets the specular RGB-color.
@@ -6882,10 +7561,8 @@ var PhongMaterial = class extends DirectionalLightMaterial {
    * @param {Float32Array | number[]} color - [red, green, blue] in [0..1] range.
    */
   setSpecularColor(color) {
-    DirectionalLightMaterial.assertVector3("`PhongMaterial.setSpecularColor`", color);
-    this.#specularColor[0] = color[0];
-    this.#specularColor[1] = color[1];
-    this.#specularColor[2] = color[2];
+    DirectionalLightMaterial.assertVector3(PHONG_MATERIAL_COLOR_CONTEXT, color);
+    this.#specularColor.set(color);
   }
   /**
    * Sets specular strength multiplier.
@@ -6893,8 +7570,8 @@ var PhongMaterial = class extends DirectionalLightMaterial {
    * @param {number} value - Specular multiplier.
    */
   setSpecularStrength(value) {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      throw new TypeError("`PhongMaterial.setSpecularStrength` expects a finite number.");
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+      throw new TypeError(PHONG_MATERIAL_EXCEPTION_MESSAGES.SPECULAR_STRENGTH_TYPE);
     }
     this.#specularStrength = value;
   }
@@ -6904,8 +7581,8 @@ var PhongMaterial = class extends DirectionalLightMaterial {
    * @param {number} value - Shininess exponent.
    */
   setShininess(value) {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      throw new TypeError("`PhongMaterial.setShininess` expects a finite number.");
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+      throw new TypeError(PHONG_MATERIAL_EXCEPTION_MESSAGES.SHININESS_TYPE);
     }
     this.#shininess = value;
   }
@@ -6929,62 +7606,89 @@ var PhongMaterial = class extends DirectionalLightMaterial {
   get shininess() {
     return this.#shininess;
   }
+  /**
+   * Applies the initial settings after the shader program has been created.
+   *
+   * @param {PhongMaterialOptions} options - Initial material settings.
+   * @private
+   */
+  #initialize(options) {
+    this.#specularColor.set(MATERIAL_DEFAULT_COLOR);
+    const { specularColor, specularStrength, shininess } = options;
+    if (specularColor !== void 0) {
+      this.setSpecularColor(specularColor);
+    }
+    if (specularStrength !== void 0) {
+      this.setSpecularStrength(specularStrength);
+    }
+    if (shininess !== void 0) {
+      this.setShininess(shininess);
+    }
+  }
 };
 
-// core/material/points-material.js
-var POSITION_ATTRIBUTE_LOCATION6 = 0;
-var COLOR_ATTRIBUTE_LOCATION3 = 1;
-var MATRIX_UNIFORM_NAME5 = "u_matrix";
-var COLOR_UNIFORM_NAME2 = "u_color";
-var POINT_SIZE_UNIFORM_NAME = "u_pointSize";
-var OPACITY_UNIFORM_NAME5 = "u_opacity";
-var USE_VERTEX_COLOR_UNIFORM_NAME = "u_useVertexColor";
-var COLOR_COMPONENT_COUNT4 = 3;
-var COLOR_COMPONENT_RED_INDEX = 0;
-var COLOR_COMPONENT_GREEN_INDEX = 1;
-var COLOR_COMPONENT_BLUE_INDEX = 2;
-var DEFAULT_COLOR2 = new Float32Array([1, 1, 1]);
-var DEFAULT_POINT_SIZE = 6;
-var MIN_POINT_SIZE = 0;
-var DEFAULT_USE_VERTEX_COLORS = false;
-var FLOAT_FALSE = 0;
-var FLOAT_TRUE = 1;
-var POINT_COORD_CENTER = 0.5;
-var POINT_COORD_RADIUS = 0.5;
-var POSITION_W_COMPONENT = 1;
-var VERTEX_SHADER_SOURCE7 = `#version 300 es
+// core/constants/points-material.js
+var POINTS_MATERIAL_DEFAULTS = Object.freeze({
+  POINT_SIZE: 6,
+  USE_VERTEX_COLORS: false
+});
+var POINTS_MATERIAL_UNIFORMS = Object.freeze({
+  POINT_SIZE: "u_pointSize",
+  USE_VERTEX_COLOR: "u_useVertexColor"
+});
+var POINTS_MATERIAL_VALUES = Object.freeze({
+  POINT_COORD_CENTER: 0.5,
+  POINT_COORD_RADIUS: 0.5
+});
+var POINTS_MATERIAL_SHADERS = Object.freeze({
+  VERTEX: `
+#version 300 es
 precision mediump float;
-layout(location = ${POSITION_ATTRIBUTE_LOCATION6}) in vec3 a_position;
-layout(location = ${COLOR_ATTRIBUTE_LOCATION3}) in vec3 a_color;
-uniform mat4 ${MATRIX_UNIFORM_NAME5};
-uniform vec3 ${COLOR_UNIFORM_NAME2};
-uniform float ${POINT_SIZE_UNIFORM_NAME};
-uniform float ${USE_VERTEX_COLOR_UNIFORM_NAME};
+layout(location = ${MATERIAL_ATTRIBUTES.POSITION}) in vec3 a_position;
+layout(location = ${MATERIAL_ATTRIBUTES.COLOR}) in vec3 a_color;
+uniform mat4 ${MATERIAL_UNIFORMS.MATRIX};
+uniform vec3 ${MATERIAL_UNIFORMS.COLOR};
+uniform float ${POINTS_MATERIAL_UNIFORMS.POINT_SIZE};
+uniform float ${POINTS_MATERIAL_UNIFORMS.USE_VERTEX_COLOR};
 out vec3 v_color;
 
 void main() {
-    gl_Position  = ${MATRIX_UNIFORM_NAME5} * vec4(a_position, ${POSITION_W_COMPONENT});
-    gl_PointSize = ${POINT_SIZE_UNIFORM_NAME};
-    v_color      = mix(${COLOR_UNIFORM_NAME2}, a_color, ${USE_VERTEX_COLOR_UNIFORM_NAME});
+    gl_Position  = ${MATERIAL_UNIFORMS.MATRIX} * vec4(a_position, ${MATH_COMMON_VALUES.UNIT});
+    gl_PointSize = ${POINTS_MATERIAL_UNIFORMS.POINT_SIZE};
+    v_color      = mix(${MATERIAL_UNIFORMS.COLOR}, a_color, ${POINTS_MATERIAL_UNIFORMS.USE_VERTEX_COLOR});
 }
-`;
-var FRAGMENT_SHADER_SOURCE7 = `#version 300 es
+`,
+  FRAGMENT: `
+#version 300 es
 precision mediump float;
 in vec3 v_color;
-uniform float ${OPACITY_UNIFORM_NAME5};
+uniform float ${MATERIAL_UNIFORMS.OPACITY};
 out vec4 outColor;
 
 void main() {
-    vec2 centered = gl_PointCoord - vec2(${POINT_COORD_CENTER}, ${POINT_COORD_CENTER});
+    vec2 centered = gl_PointCoord - vec2(${POINTS_MATERIAL_VALUES.POINT_COORD_CENTER}, ${POINTS_MATERIAL_VALUES.POINT_COORD_CENTER});
     float dist    = length(centered);
 
-    if (dist > ${POINT_COORD_RADIUS}) {
+    if (dist > ${POINTS_MATERIAL_VALUES.POINT_COORD_RADIUS}) {
         discard;
     }
 
-    outColor = vec4(v_color, ${OPACITY_UNIFORM_NAME5});
+    outColor = vec4(v_color, ${MATERIAL_UNIFORMS.OPACITY});
 }
-`;
+`
+});
+
+// core/exception-messages/points-material.js
+var POINTS_MATERIAL_EXCEPTION_MESSAGES = Object.freeze({
+  OPTIONS_OBJECT: "`PointsMaterial` expects an options object (plain object).",
+  COLOR_TYPE: "`PointsMaterial.setColor` expects a number[] or `Float32Array`.",
+  COLOR_LENGTH: "`PointsMaterial.setColor` expects exactly 3 components [red, green, blue].",
+  POINT_SIZE_TYPE: "`PointsMaterial.setPointSize` expects a finite number.",
+  POINT_SIZE_RANGE: "`PointsMaterial.setPointSize` expects a positive size.",
+  VERTEX_COLORS_TYPE: "`PointsMaterial.setUseVertexColors` expects a boolean."
+});
+
+// core/material/points-material.js
 var PointsMaterial = class extends Material {
   /**
    * Current RGB color stored as Float32Array([red, green, blue]).
@@ -6992,43 +7696,42 @@ var PointsMaterial = class extends Material {
    * @type {Float32Array}
    * @private
    */
-  #color = new Float32Array(DEFAULT_COLOR2);
+  #color = new Float32Array(MATERIAL_DEFAULT_COLOR);
   /**
    * Point size in pixels.
    *
    * @type {number}
    * @private
    */
-  #pointSize = DEFAULT_POINT_SIZE;
+  #pointSize = POINTS_MATERIAL_DEFAULTS.POINT_SIZE;
   /**
    * Flag controlling vertex color usage.
    *
    * @type {boolean}
    * @private
    */
-  #useVertexColors = DEFAULT_USE_VERTEX_COLORS;
+  #useVertexColors = POINTS_MATERIAL_DEFAULTS.USE_VERTEX_COLORS;
   /**
    * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context used to compile shaders.
    * @param {PointsMaterialOptions} [options]     - Material options.
-   * @throws {TypeError}  When inputs are invalid.
-   * @throws {RangeError} When numeric inputs are out of range.
+   * @throws {TypeError}                            When inputs are invalid.
+   * @throws {RangeError}                           When numeric inputs are out of range.
    */
   constructor(webglContext, options = {}) {
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError("`PointsMaterial` expects an options object (plain object).");
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
+      throw new TypeError(POINTS_MATERIAL_EXCEPTION_MESSAGES.OPTIONS_OBJECT);
     }
-    const shaderProgram = new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE7, FRAGMENT_SHADER_SOURCE7);
-    super(webglContext, shaderProgram, { ownsShaderProgram: true });
-    const {
-      color,
-      pointSize = DEFAULT_POINT_SIZE,
-      useVertexColors = DEFAULT_USE_VERTEX_COLORS
-    } = options;
-    if (color !== void 0) {
-      this.setColor(color);
+    const sources = POINTS_MATERIAL_SHADERS;
+    const shaderProgram = new ShaderProgram(webglContext, sources.VERTEX, sources.FRAGMENT);
+    super(webglContext, shaderProgram, {
+      ownsShaderProgram: MATERIAL_DEFAULTS.OWNS_GENERATED_SHADER_PROGRAM
+    });
+    try {
+      this.#initialize(options);
+    } catch (error) {
+      shaderProgram.dispose();
+      throw error;
     }
-    this.setPointSize(pointSize);
-    this.setUseVertexColors(useVertexColors);
   }
   /**
    * Applies per-object uniforms.
@@ -7036,42 +7739,44 @@ var PointsMaterial = class extends Material {
    * @param {Float32Array} matrix4 - Transformation matrix passed as `u_matrix`.
    */
   apply(matrix4) {
-    this.shaderProgram.setMatrix4(MATRIX_UNIFORM_NAME5, matrix4);
-    this.shaderProgram.setVector3(COLOR_UNIFORM_NAME2, this.#color);
-    this.shaderProgram.setFloat(POINT_SIZE_UNIFORM_NAME, this.#pointSize);
-    this.shaderProgram.setFloat(USE_VERTEX_COLOR_UNIFORM_NAME, this.#useVertexColors ? FLOAT_TRUE : FLOAT_FALSE);
-    this.shaderProgram.setFloat(OPACITY_UNIFORM_NAME5, this.opacity);
+    const shaderProgram = this.shaderProgram;
+    const uniforms = MATERIAL_UNIFORMS;
+    const pointUniforms = POINTS_MATERIAL_UNIFORMS;
+    const floatFlags = MATERIAL_BOOLEAN_FLOATS;
+    shaderProgram.setMatrix4(uniforms.MATRIX, matrix4);
+    shaderProgram.setVector3(uniforms.COLOR, this.#color);
+    shaderProgram.setFloat(pointUniforms.POINT_SIZE, this.#pointSize);
+    shaderProgram.setFloat(pointUniforms.USE_VERTEX_COLOR, this.#useVertexColors ? floatFlags.TRUE : floatFlags.FALSE);
+    shaderProgram.setFloat(uniforms.OPACITY, this.opacity);
   }
   /**
    * Sets the RGB color.
    *
    * @param {Float32Array | number[]} color - [red, green, blue] in [0..1] range.
-   * @throws {TypeError} When color is invalid.
+   * @throws {TypeError}                      When color is invalid.
    */
   setColor(color) {
     if (!Array.isArray(color) && !(color instanceof Float32Array)) {
-      throw new TypeError("`PointsMaterial.setColor` expects a number[] or `Float32Array`.");
+      throw new TypeError(POINTS_MATERIAL_EXCEPTION_MESSAGES.COLOR_TYPE);
     }
-    if (color.length !== COLOR_COMPONENT_COUNT4) {
-      throw new TypeError("`PointsMaterial.setColor` expects exactly 3 components [red, green, blue].");
+    if (color.length !== MATH_LAYOUT.VECTOR3_ELEMENT_COUNT) {
+      throw new TypeError(POINTS_MATERIAL_EXCEPTION_MESSAGES.COLOR_LENGTH);
     }
-    this.#color[COLOR_COMPONENT_RED_INDEX] = color[COLOR_COMPONENT_RED_INDEX];
-    this.#color[COLOR_COMPONENT_GREEN_INDEX] = color[COLOR_COMPONENT_GREEN_INDEX];
-    this.#color[COLOR_COMPONENT_BLUE_INDEX] = color[COLOR_COMPONENT_BLUE_INDEX];
+    this.#color.set(color);
   }
   /**
    * Sets point size in pixels.
    *
    * @param {number} size - Point size (> 0).
-   * @throws {TypeError}  When size is not a finite number.
-   * @throws {RangeError} When size is not positive.
+   * @throws {TypeError}    When size is not a finite number.
+   * @throws {RangeError}   When size is not positive.
    */
   setPointSize(size) {
-    if (typeof size !== "number" || !Number.isFinite(size)) {
-      throw new TypeError("`PointsMaterial.setPointSize` expects a finite number.");
+    if (typeof size !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(size)) {
+      throw new TypeError(POINTS_MATERIAL_EXCEPTION_MESSAGES.POINT_SIZE_TYPE);
     }
-    if (size <= MIN_POINT_SIZE) {
-      throw new RangeError("`PointsMaterial.setPointSize` expects a positive size.");
+    if (size <= MATH_COMMON_VALUES.ZERO) {
+      throw new RangeError(POINTS_MATERIAL_EXCEPTION_MESSAGES.POINT_SIZE_RANGE);
     }
     this.#pointSize = size;
   }
@@ -7079,11 +7784,11 @@ var PointsMaterial = class extends Material {
    * Enables or disables vertex colors.
    *
    * @param {boolean} enabled - When true, uses vertex colors.
-   * @throws {TypeError} When enabled is not a boolean.
+   * @throws {TypeError}        When enabled is not a boolean.
    */
   setUseVertexColors(enabled) {
-    if (typeof enabled !== "boolean") {
-      throw new TypeError("`PointsMaterial.setUseVertexColors` expects a boolean.");
+    if (typeof enabled !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+      throw new TypeError(POINTS_MATERIAL_EXCEPTION_MESSAGES.VERTEX_COLORS_TYPE);
     }
     this.#useVertexColors = enabled;
   }
@@ -7105,158 +7810,157 @@ var PointsMaterial = class extends Material {
   get useVertexColors() {
     return this.#useVertexColors;
   }
+  /**
+   * Applies the initial settings after the shader program has been created.
+   *
+   * @param {PointsMaterialOptions} options - Initial material settings.
+   * @private
+   */
+  #initialize(options) {
+    const {
+      color,
+      pointSize = POINTS_MATERIAL_DEFAULTS.POINT_SIZE,
+      useVertexColors = POINTS_MATERIAL_DEFAULTS.USE_VERTEX_COLORS
+    } = options;
+    if (color !== void 0) {
+      this.setColor(color);
+    }
+    this.setPointSize(pointSize);
+    this.setUseVertexColors(useVertexColors);
+  }
 };
 
-// core/material/mtl-standard-material.js
-var UV_ATTRIBUTE_LOCATION3 = 2;
-var DIFFUSE_MAP_UNIFORM_NAME = "u_diffuseMap";
-var AMBIENT_MAP_UNIFORM_NAME = "u_ambientMap";
-var SPECULAR_MAP_UNIFORM_NAME = "u_specularMap";
-var ALPHA_MAP_UNIFORM_NAME = "u_alphaMap";
-var BUMP_MAP_UNIFORM_NAME = "u_bumpMap";
-var DISPLACEMENT_MAP_UNIFORM_NAME = "u_displacementMap";
-var REFLECTION_MAP_UNIFORM_NAME = "u_reflectionMap";
-var AMBIENT_COLOR_UNIFORM_NAME = "u_ambientColor";
-var SPECULAR_COLOR_UNIFORM_NAME2 = "u_specularColor";
-var EMISSIVE_COLOR_UNIFORM_NAME = "u_emissiveColor";
-var SPECULAR_STRENGTH_UNIFORM_NAME2 = "u_specularStrength";
-var SHININESS_UNIFORM_NAME2 = "u_shininess";
-var SPECULAR_ENABLED_UNIFORM_NAME = "u_useSpecular";
-var OPTICAL_DENSITY_UNIFORM_NAME = "u_opticalDensity";
-var BUMP_MULTIPLIER_UNIFORM_NAME = "u_bumpMultiplier";
-var DISPLACEMENT_SCALE_UNIFORM_NAME = "u_displacementScale";
-var DIFFUSE_UV_OFFSET_UNIFORM_NAME = "u_diffuseUvOffset";
-var DIFFUSE_UV_SCALE_UNIFORM_NAME = "u_diffuseUvScale";
-var AMBIENT_UV_OFFSET_UNIFORM_NAME = "u_ambientUvOffset";
-var AMBIENT_UV_SCALE_UNIFORM_NAME = "u_ambientUvScale";
-var SPECULAR_UV_OFFSET_UNIFORM_NAME = "u_specularUvOffset";
-var SPECULAR_UV_SCALE_UNIFORM_NAME = "u_specularUvScale";
-var ALPHA_UV_OFFSET_UNIFORM_NAME = "u_alphaUvOffset";
-var ALPHA_UV_SCALE_UNIFORM_NAME = "u_alphaUvScale";
-var BUMP_UV_OFFSET_UNIFORM_NAME = "u_bumpUvOffset";
-var BUMP_UV_SCALE_UNIFORM_NAME = "u_bumpUvScale";
-var DISPLACEMENT_UV_OFFSET_UNIFORM_NAME = "u_displacementUvOffset";
-var DISPLACEMENT_UV_SCALE_UNIFORM_NAME = "u_displacementUvScale";
-var REFLECTION_UV_OFFSET_UNIFORM_NAME = "u_reflectionUvOffset";
-var REFLECTION_UV_SCALE_UNIFORM_NAME = "u_reflectionUvScale";
-var USE_DIFFUSE_MAP_UNIFORM_NAME = "u_useDiffuseMap";
-var USE_AMBIENT_MAP_UNIFORM_NAME = "u_useAmbientMap";
-var USE_SPECULAR_MAP_UNIFORM_NAME = "u_useSpecularMap";
-var USE_ALPHA_MAP_UNIFORM_NAME = "u_useAlphaMap";
-var USE_BUMP_MAP_UNIFORM_NAME = "u_useBumpMap";
-var USE_DISPLACEMENT_MAP_UNIFORM_NAME = "u_useDisplacementMap";
-var USE_REFLECTION_MAP_UNIFORM_NAME = "u_useReflectionMap";
-var LIGHTING_ENABLED_THRESHOLD = 0.5;
-var DEFAULT_DIFFUSE_COLOR = new Float32Array([1, 1, 1]);
-var DEFAULT_AMBIENT_COLOR = new Float32Array([1, 1, 1]);
-var DEFAULT_SPECULAR_COLOR2 = new Float32Array([1, 1, 1]);
-var DEFAULT_EMISSIVE_COLOR = new Float32Array([0, 0, 0]);
-var DEFAULT_SHININESS2 = 16;
-var DEFAULT_SPECULAR_STRENGTH2 = 1;
-var DEFAULT_OPTICAL_DENSITY = 1;
-var DEFAULT_BUMP_MULTIPLIER = 1;
-var DEFAULT_DISPLACEMENT_SCALE = 0.1;
-var DEFAULT_UV_OFFSET = new Float32Array([0, 0]);
-var DEFAULT_UV_SCALE = new Float32Array([1, 1]);
-var FLOAT_FALSE2 = 0;
-var FLOAT_TRUE2 = 1;
-var DEFAULT_DIFFUSE_TEXTURE_UNIT = 0;
-var DEFAULT_AMBIENT_TEXTURE_UNIT = 1;
-var DEFAULT_SPECULAR_TEXTURE_UNIT = 2;
-var DEFAULT_ALPHA_TEXTURE_UNIT = 3;
-var DEFAULT_BUMP_TEXTURE_UNIT = 4;
-var DEFAULT_DISPLACEMENT_TEXTURE_UNIT = 5;
-var DEFAULT_REFLECTION_TEXTURE_UNIT = 6;
-var ZERO_VALUE10 = 0;
-var ERROR_OPTIONS_OBJECT = "`MtlStandardMaterial` expects an options object (plain object).";
-var ERROR_SHININESS_TYPE = "`MtlStandardMaterial.setShininess` expects a finite number.";
-var ERROR_SPECULAR_STRENGTH_TYPE = "`MtlStandardMaterial.setSpecularStrength` expects a finite number.";
-var ERROR_SPECULAR_ENABLED_TYPE = "`MtlStandardMaterial.setSpecularEnabled` expects a boolean.";
-var ERROR_OPTICAL_DENSITY_TYPE = "`MtlStandardMaterial.setOpticalDensity` expects a finite number.";
-var ERROR_BUMP_MULTIPLIER_TYPE = "`MtlStandardMaterial.setBumpMultiplier` expects a finite number.";
-var ERROR_DISPLACEMENT_SCALE_TYPE = "`MtlStandardMaterial.setDisplacementScale` expects a finite number.";
-var ERROR_EXPECTS_TEXTURE_SUFFIX = " expects texture as Texture2D.";
-var ERROR_EXPECTS_OPTIONS_OBJECT_SUFFIX = " expects options as a plain object.";
-var ERROR_EXPECTS_TEXTURE_UNIT_INDEX_SUFFIX = " expects options.textureUnitIndex as a non-negative integer.";
-var ERROR_EXPECTS_VECTOR2_TYPE_SUFFIX = " expects a number[] or Float32Array.";
-var ERROR_EXPECTS_VECTOR2_COMPONENTS_SUFFIX = " expects exactly 2 components.";
-var ERROR_EXPECTS_VECTOR3_COMPONENTS_SUFFIX = " expects exactly 3 components.";
-var VERTEX_SHADER_SOURCE8 = `#version 300 es
+// core/constants/mtl-standard-material.js
+var MTL_STANDARD_MATERIAL_DEFAULTS = Object.freeze({
+  EMISSIVE_COLOR: Object.freeze([0, 0, 0]),
+  OPTICAL_DENSITY: 1,
+  BUMP_MULTIPLIER: 1,
+  DISPLACEMENT_SCALE: 0.1,
+  UV_OFFSET: Object.freeze([0, 0]),
+  UV_SCALE: Object.freeze([1, 1]),
+  DIFFUSE_TEXTURE_UNIT: 0,
+  AMBIENT_TEXTURE_UNIT: 1,
+  SPECULAR_TEXTURE_UNIT: 2,
+  ALPHA_TEXTURE_UNIT: 3,
+  BUMP_TEXTURE_UNIT: 4,
+  DISPLACEMENT_TEXTURE_UNIT: 5,
+  REFLECTION_TEXTURE_UNIT: 6
+});
+var MTL_STANDARD_MATERIAL_UNIFORMS = Object.freeze({
+  DIFFUSE_MAP: "u_diffuseMap",
+  AMBIENT_MAP: "u_ambientMap",
+  SPECULAR_MAP: "u_specularMap",
+  ALPHA_MAP: "u_alphaMap",
+  BUMP_MAP: "u_bumpMap",
+  DISPLACEMENT_MAP: "u_displacementMap",
+  REFLECTION_MAP: "u_reflectionMap",
+  AMBIENT_COLOR: "u_ambientColor",
+  EMISSIVE_COLOR: "u_emissiveColor",
+  SPECULAR_ENABLED: "u_useSpecular",
+  OPTICAL_DENSITY: "u_opticalDensity",
+  BUMP_MULTIPLIER: "u_bumpMultiplier",
+  DISPLACEMENT_SCALE: "u_displacementScale",
+  DIFFUSE_UV_OFFSET: "u_diffuseUvOffset",
+  DIFFUSE_UV_SCALE: "u_diffuseUvScale",
+  AMBIENT_UV_OFFSET: "u_ambientUvOffset",
+  AMBIENT_UV_SCALE: "u_ambientUvScale",
+  SPECULAR_UV_OFFSET: "u_specularUvOffset",
+  SPECULAR_UV_SCALE: "u_specularUvScale",
+  ALPHA_UV_OFFSET: "u_alphaUvOffset",
+  ALPHA_UV_SCALE: "u_alphaUvScale",
+  BUMP_UV_OFFSET: "u_bumpUvOffset",
+  BUMP_UV_SCALE: "u_bumpUvScale",
+  DISPLACEMENT_UV_OFFSET: "u_displacementUvOffset",
+  DISPLACEMENT_UV_SCALE: "u_displacementUvScale",
+  REFLECTION_UV_OFFSET: "u_reflectionUvOffset",
+  REFLECTION_UV_SCALE: "u_reflectionUvScale",
+  USE_DIFFUSE_MAP: "u_useDiffuseMap",
+  USE_AMBIENT_MAP: "u_useAmbientMap",
+  USE_SPECULAR_MAP: "u_useSpecularMap",
+  USE_ALPHA_MAP: "u_useAlphaMap",
+  USE_BUMP_MAP: "u_useBumpMap",
+  USE_DISPLACEMENT_MAP: "u_useDisplacementMap",
+  USE_REFLECTION_MAP: "u_useReflectionMap"
+});
+var MTL_STANDARD_MATERIAL_SHADERS = Object.freeze({
+  VERTEX: `
+#version 300 es
 precision mediump float;
 layout(location = ${DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.POSITION_LOCATION}) in vec3 a_position;
 layout(location = ${DIRECTIONAL_LIGHT_MATERIAL_ATTRIBUTES.NORMAL_LOCATION}) in vec3 a_normal;
-layout(location = ${UV_ATTRIBUTE_LOCATION3}) in vec2 a_uv;
+layout(location = ${MATERIAL_ATTRIBUTES.UV}) in vec2 a_uv;
 uniform mat4 ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX};
 uniform mat4 ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX};
 uniform mat4 ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX};
-uniform sampler2D ${DISPLACEMENT_MAP_UNIFORM_NAME};
-uniform float ${USE_DISPLACEMENT_MAP_UNIFORM_NAME};
-uniform float ${DISPLACEMENT_SCALE_UNIFORM_NAME};
-uniform vec2 ${DISPLACEMENT_UV_OFFSET_UNIFORM_NAME};
-uniform vec2 ${DISPLACEMENT_UV_SCALE_UNIFORM_NAME};
+uniform sampler2D ${MTL_STANDARD_MATERIAL_UNIFORMS.DISPLACEMENT_MAP};
+uniform float ${MTL_STANDARD_MATERIAL_UNIFORMS.USE_DISPLACEMENT_MAP};
+uniform float ${MTL_STANDARD_MATERIAL_UNIFORMS.DISPLACEMENT_SCALE};
+uniform vec2 ${MTL_STANDARD_MATERIAL_UNIFORMS.DISPLACEMENT_UV_OFFSET};
+uniform vec2 ${MTL_STANDARD_MATERIAL_UNIFORMS.DISPLACEMENT_UV_SCALE};
 out vec3 v_worldPosition;
 out vec3 v_normal;
 out vec2 v_uv;
 
 void main() {
-    vec2 disp_uv = (a_uv * ${DISPLACEMENT_UV_SCALE_UNIFORM_NAME}) + ${DISPLACEMENT_UV_OFFSET_UNIFORM_NAME};
+    vec2 disp_uv = (a_uv * ${MTL_STANDARD_MATERIAL_UNIFORMS.DISPLACEMENT_UV_SCALE}) + ${MTL_STANDARD_MATERIAL_UNIFORMS.DISPLACEMENT_UV_OFFSET};
     float displacement = 0.0;
 
-    if (${USE_DISPLACEMENT_MAP_UNIFORM_NAME} > 0.5) {
-        displacement = texture(${DISPLACEMENT_MAP_UNIFORM_NAME}, disp_uv).r * ${DISPLACEMENT_SCALE_UNIFORM_NAME};
+    if (${MTL_STANDARD_MATERIAL_UNIFORMS.USE_DISPLACEMENT_MAP} > 0.5) {
+        displacement = texture(${MTL_STANDARD_MATERIAL_UNIFORMS.DISPLACEMENT_MAP}, disp_uv).r * ${MTL_STANDARD_MATERIAL_UNIFORMS.DISPLACEMENT_SCALE};
     }
 
     vec3 displaced_position = a_position + (a_normal * displacement);
-    gl_Position     = ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX} * vec4(displaced_position, 1.0);
-    v_worldPosition = (${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX} * vec4(displaced_position, 1.0)).xyz;
-    v_normal        = (${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX} * vec4(a_normal, 0.0)).xyz;
-    v_uv = a_uv;
+    gl_Position             = ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.FINAL_MATRIX} * vec4(displaced_position, 1.0);
+    v_worldPosition         = (${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX} * vec4(displaced_position, 1.0)).xyz;
+    v_normal                = (${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_INVERSE_TRANSPOSE_MATRIX} * vec4(a_normal, 0.0)).xyz;
+    v_uv                    = a_uv;
 }
-`;
-var FRAGMENT_SHADER_SOURCE8 = `#version 300 es
+`,
+  FRAGMENT: `
+#version 300 es
 precision mediump float;
 in vec3 v_worldPosition;
 in vec3 v_normal;
 in vec2 v_uv;
 uniform vec3 ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR};
-uniform vec3 ${AMBIENT_COLOR_UNIFORM_NAME};
-uniform vec3 ${SPECULAR_COLOR_UNIFORM_NAME2};
-uniform vec3 ${EMISSIVE_COLOR_UNIFORM_NAME};
+uniform vec3 ${MTL_STANDARD_MATERIAL_UNIFORMS.AMBIENT_COLOR};
+uniform vec3 ${MATERIAL_UNIFORMS.SPECULAR_COLOR};
+uniform vec3 ${MTL_STANDARD_MATERIAL_UNIFORMS.EMISSIVE_COLOR};
 uniform vec3 ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHT_DIRECTION};
 uniform vec3 ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION};
 uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH};
 uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH};
 uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED};
-uniform float ${SPECULAR_STRENGTH_UNIFORM_NAME2};
-uniform float ${SHININESS_UNIFORM_NAME2};
-uniform float ${SPECULAR_ENABLED_UNIFORM_NAME};
+uniform float ${MATERIAL_UNIFORMS.SPECULAR_STRENGTH};
+uniform float ${MATERIAL_UNIFORMS.SHININESS};
+uniform float ${MTL_STANDARD_MATERIAL_UNIFORMS.SPECULAR_ENABLED};
 uniform float ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY};
-uniform float ${OPTICAL_DENSITY_UNIFORM_NAME};
-uniform float ${BUMP_MULTIPLIER_UNIFORM_NAME};
-uniform sampler2D ${DIFFUSE_MAP_UNIFORM_NAME};
-uniform sampler2D ${AMBIENT_MAP_UNIFORM_NAME};
-uniform sampler2D ${SPECULAR_MAP_UNIFORM_NAME};
-uniform sampler2D ${ALPHA_MAP_UNIFORM_NAME};
-uniform sampler2D ${BUMP_MAP_UNIFORM_NAME};
-uniform sampler2D ${REFLECTION_MAP_UNIFORM_NAME};
-uniform vec2 ${DIFFUSE_UV_OFFSET_UNIFORM_NAME};
-uniform vec2 ${DIFFUSE_UV_SCALE_UNIFORM_NAME};
-uniform vec2 ${AMBIENT_UV_OFFSET_UNIFORM_NAME};
-uniform vec2 ${AMBIENT_UV_SCALE_UNIFORM_NAME};
-uniform vec2 ${SPECULAR_UV_OFFSET_UNIFORM_NAME};
-uniform vec2 ${SPECULAR_UV_SCALE_UNIFORM_NAME};
-uniform vec2 ${ALPHA_UV_OFFSET_UNIFORM_NAME};
-uniform vec2 ${ALPHA_UV_SCALE_UNIFORM_NAME};
-uniform vec2 ${BUMP_UV_OFFSET_UNIFORM_NAME};
-uniform vec2 ${BUMP_UV_SCALE_UNIFORM_NAME};
-uniform vec2 ${REFLECTION_UV_OFFSET_UNIFORM_NAME};
-uniform vec2 ${REFLECTION_UV_SCALE_UNIFORM_NAME};
-uniform float ${USE_DIFFUSE_MAP_UNIFORM_NAME};
-uniform float ${USE_AMBIENT_MAP_UNIFORM_NAME};
-uniform float ${USE_SPECULAR_MAP_UNIFORM_NAME};
-uniform float ${USE_ALPHA_MAP_UNIFORM_NAME};
-uniform float ${USE_BUMP_MAP_UNIFORM_NAME};
-uniform float ${USE_REFLECTION_MAP_UNIFORM_NAME};
+uniform float ${MTL_STANDARD_MATERIAL_UNIFORMS.OPTICAL_DENSITY};
+uniform float ${MTL_STANDARD_MATERIAL_UNIFORMS.BUMP_MULTIPLIER};
+uniform sampler2D ${MTL_STANDARD_MATERIAL_UNIFORMS.DIFFUSE_MAP};
+uniform sampler2D ${MTL_STANDARD_MATERIAL_UNIFORMS.AMBIENT_MAP};
+uniform sampler2D ${MTL_STANDARD_MATERIAL_UNIFORMS.SPECULAR_MAP};
+uniform sampler2D ${MTL_STANDARD_MATERIAL_UNIFORMS.ALPHA_MAP};
+uniform sampler2D ${MTL_STANDARD_MATERIAL_UNIFORMS.BUMP_MAP};
+uniform sampler2D ${MTL_STANDARD_MATERIAL_UNIFORMS.REFLECTION_MAP};
+uniform vec2 ${MTL_STANDARD_MATERIAL_UNIFORMS.DIFFUSE_UV_OFFSET};
+uniform vec2 ${MTL_STANDARD_MATERIAL_UNIFORMS.DIFFUSE_UV_SCALE};
+uniform vec2 ${MTL_STANDARD_MATERIAL_UNIFORMS.AMBIENT_UV_OFFSET};
+uniform vec2 ${MTL_STANDARD_MATERIAL_UNIFORMS.AMBIENT_UV_SCALE};
+uniform vec2 ${MTL_STANDARD_MATERIAL_UNIFORMS.SPECULAR_UV_OFFSET};
+uniform vec2 ${MTL_STANDARD_MATERIAL_UNIFORMS.SPECULAR_UV_SCALE};
+uniform vec2 ${MTL_STANDARD_MATERIAL_UNIFORMS.ALPHA_UV_OFFSET};
+uniform vec2 ${MTL_STANDARD_MATERIAL_UNIFORMS.ALPHA_UV_SCALE};
+uniform vec2 ${MTL_STANDARD_MATERIAL_UNIFORMS.BUMP_UV_OFFSET};
+uniform vec2 ${MTL_STANDARD_MATERIAL_UNIFORMS.BUMP_UV_SCALE};
+uniform vec2 ${MTL_STANDARD_MATERIAL_UNIFORMS.REFLECTION_UV_OFFSET};
+uniform vec2 ${MTL_STANDARD_MATERIAL_UNIFORMS.REFLECTION_UV_SCALE};
+uniform float ${MTL_STANDARD_MATERIAL_UNIFORMS.USE_DIFFUSE_MAP};
+uniform float ${MTL_STANDARD_MATERIAL_UNIFORMS.USE_AMBIENT_MAP};
+uniform float ${MTL_STANDARD_MATERIAL_UNIFORMS.USE_SPECULAR_MAP};
+uniform float ${MTL_STANDARD_MATERIAL_UNIFORMS.USE_ALPHA_MAP};
+uniform float ${MTL_STANDARD_MATERIAL_UNIFORMS.USE_BUMP_MAP};
+uniform float ${MTL_STANDARD_MATERIAL_UNIFORMS.USE_REFLECTION_MAP};
 out vec4 outColor;
 
 vec2 apply_uv(vec2 base_uv, vec2 offset, vec2 scale) {
@@ -7264,8 +7968,8 @@ vec2 apply_uv(vec2 base_uv, vec2 offset, vec2 scale) {
 }
 
 vec3 compute_bump_normal(vec3 normal, vec2 uv) {
-    vec3 tangent_normal = texture(${BUMP_MAP_UNIFORM_NAME}, uv).xyz * 2.0 - 1.0;
-    tangent_normal.xy  *= ${BUMP_MULTIPLIER_UNIFORM_NAME};
+    vec3 tangent_normal = texture(${MTL_STANDARD_MATERIAL_UNIFORMS.BUMP_MAP}, uv).xyz * 2.0 - 1.0;
+    tangent_normal.xy  *= ${MTL_STANDARD_MATERIAL_UNIFORMS.BUMP_MULTIPLIER};
     tangent_normal      = normalize(tangent_normal);
 
     vec3 dp1       = dFdx(v_worldPosition);
@@ -7294,38 +7998,38 @@ void main() {
     vec3 diffuse_color     = ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.COLOR};
     vec3 diffuse_map_color = vec3(1.0);
 
-    if (${USE_DIFFUSE_MAP_UNIFORM_NAME} > 0.5) {
-        vec2 diff_uv = apply_uv(v_uv, ${DIFFUSE_UV_OFFSET_UNIFORM_NAME}, ${DIFFUSE_UV_SCALE_UNIFORM_NAME});
-        diffuse_map_color = texture(${DIFFUSE_MAP_UNIFORM_NAME}, diff_uv).rgb;
-        diffuse_color *= diffuse_map_color;
+    if (${MTL_STANDARD_MATERIAL_UNIFORMS.USE_DIFFUSE_MAP} > 0.5) {
+        vec2 diff_uv      = apply_uv(v_uv, ${MTL_STANDARD_MATERIAL_UNIFORMS.DIFFUSE_UV_OFFSET}, ${MTL_STANDARD_MATERIAL_UNIFORMS.DIFFUSE_UV_SCALE});
+        diffuse_map_color = texture(${MTL_STANDARD_MATERIAL_UNIFORMS.DIFFUSE_MAP}, diff_uv).rgb;
+        diffuse_color    *= diffuse_map_color;
     }
 
     float alpha = ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.OPACITY};
 
-    if (${USE_ALPHA_MAP_UNIFORM_NAME} > 0.5) {
-        vec2 alpha_uv = apply_uv(v_uv, ${ALPHA_UV_OFFSET_UNIFORM_NAME}, ${ALPHA_UV_SCALE_UNIFORM_NAME});
-        alpha *= texture(${ALPHA_MAP_UNIFORM_NAME}, alpha_uv).r;
+    if (${MTL_STANDARD_MATERIAL_UNIFORMS.USE_ALPHA_MAP} > 0.5) {
+        vec2 alpha_uv = apply_uv(v_uv, ${MTL_STANDARD_MATERIAL_UNIFORMS.ALPHA_UV_OFFSET}, ${MTL_STANDARD_MATERIAL_UNIFORMS.ALPHA_UV_SCALE});
+        alpha        *= texture(${MTL_STANDARD_MATERIAL_UNIFORMS.ALPHA_MAP}, alpha_uv).r;
     }
 
-    if (${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED} <= ${LIGHTING_ENABLED_THRESHOLD}) {
+    if (${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.LIGHTING_ENABLED} <= ${DIRECTIONAL_LIGHT_MATERIAL_LIGHTING.LIGHTING_ENABLED_THRESHOLD}) {
         vec3 unlit_color = diffuse_color;
 
-        if (${USE_DIFFUSE_MAP_UNIFORM_NAME} > 0.5) {
+        if (${MTL_STANDARD_MATERIAL_UNIFORMS.USE_DIFFUSE_MAP} > 0.5) {
             unlit_color = diffuse_map_color;
         }
 
-        vec3 rgb = unlit_color + ${EMISSIVE_COLOR_UNIFORM_NAME};
+        vec3 rgb = unlit_color + ${MTL_STANDARD_MATERIAL_UNIFORMS.EMISSIVE_COLOR};
         outColor = vec4(rgb, alpha);
         return;
     }
 
     vec3 normal         = normalize(v_normal);
     vec3 view_dir       = normalize(${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION} - v_worldPosition);
-    vec3 ambient_tint   = ${AMBIENT_COLOR_UNIFORM_NAME};
-    vec3 specular_color = ${SPECULAR_COLOR_UNIFORM_NAME2};
+    vec3 ambient_tint   = ${MTL_STANDARD_MATERIAL_UNIFORMS.AMBIENT_COLOR};
+    vec3 specular_color = ${MATERIAL_UNIFORMS.SPECULAR_COLOR};
 
-    if (${USE_BUMP_MAP_UNIFORM_NAME} > 0.5) {
-        vec2 bump_uv = apply_uv(v_uv, ${BUMP_UV_OFFSET_UNIFORM_NAME}, ${BUMP_UV_SCALE_UNIFORM_NAME});
+    if (${MTL_STANDARD_MATERIAL_UNIFORMS.USE_BUMP_MAP} > 0.5) {
+        vec2 bump_uv = apply_uv(v_uv, ${MTL_STANDARD_MATERIAL_UNIFORMS.BUMP_UV_OFFSET}, ${MTL_STANDARD_MATERIAL_UNIFORMS.BUMP_UV_SCALE});
         normal = compute_bump_normal(normal, bump_uv);
     }
 
@@ -7333,14 +8037,14 @@ void main() {
         normal = -normal;
     }
 
-    if (${USE_AMBIENT_MAP_UNIFORM_NAME} > 0.5) {
-        vec2 amb_uv   = apply_uv(v_uv, ${AMBIENT_UV_OFFSET_UNIFORM_NAME}, ${AMBIENT_UV_SCALE_UNIFORM_NAME});
-        ambient_tint *= texture(${AMBIENT_MAP_UNIFORM_NAME}, amb_uv).rgb;
+    if (${MTL_STANDARD_MATERIAL_UNIFORMS.USE_AMBIENT_MAP} > 0.5) {
+        vec2 amb_uv   = apply_uv(v_uv, ${MTL_STANDARD_MATERIAL_UNIFORMS.AMBIENT_UV_OFFSET}, ${MTL_STANDARD_MATERIAL_UNIFORMS.AMBIENT_UV_SCALE});
+        ambient_tint *= texture(${MTL_STANDARD_MATERIAL_UNIFORMS.AMBIENT_MAP}, amb_uv).rgb;
     }
 
-    if (${USE_SPECULAR_MAP_UNIFORM_NAME} > 0.5) {
-        vec2 spec_uv    = apply_uv(v_uv, ${SPECULAR_UV_OFFSET_UNIFORM_NAME}, ${SPECULAR_UV_SCALE_UNIFORM_NAME});
-        specular_color *= texture(${SPECULAR_MAP_UNIFORM_NAME}, spec_uv).rgb;
+    if (${MTL_STANDARD_MATERIAL_UNIFORMS.USE_SPECULAR_MAP} > 0.5) {
+        vec2 spec_uv    = apply_uv(v_uv, ${MTL_STANDARD_MATERIAL_UNIFORMS.SPECULAR_UV_OFFSET}, ${MTL_STANDARD_MATERIAL_UNIFORMS.SPECULAR_UV_SCALE});
+        specular_color *= texture(${MTL_STANDARD_MATERIAL_UNIFORMS.SPECULAR_MAP}, spec_uv).rgb;
     }
 
     float specular_intensity = 0.0;
@@ -7350,191 +8054,176 @@ void main() {
     vec3 ambient = diffuse_color * ambient_tint * ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.AMBIENT_STRENGTH};
     vec3 diffuse = diffuse_color * (diffuse_intensity * ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH});
 
-    if (${SPECULAR_ENABLED_UNIFORM_NAME} > 0.5 && diffuse_intensity > 0.0) {
+    if (${MTL_STANDARD_MATERIAL_UNIFORMS.SPECULAR_ENABLED} > 0.5 && diffuse_intensity > 0.0) {
         vec3 reflection_direction = reflect(-light_direction, normal);
-        float specular_base = max(dot(view_dir, reflection_direction), 0.0);
-        specular_intensity = pow(specular_base, ${SHININESS_UNIFORM_NAME2});
+        float specular_base       = max(dot(view_dir, reflection_direction), 0.0);
+        specular_intensity        = pow(specular_base, ${MATERIAL_UNIFORMS.SHININESS});
     }
 
-    vec3 specular = specular_color * (specular_intensity * ${SPECULAR_STRENGTH_UNIFORM_NAME2}
+    vec3 specular = specular_color
+        * (specular_intensity * ${MATERIAL_UNIFORMS.SPECULAR_STRENGTH}
         * ${DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.DIRECTIONAL_STRENGTH});
 
-    vec3 emissive = ${EMISSIVE_COLOR_UNIFORM_NAME};
+    vec3 emissive = ${MTL_STANDARD_MATERIAL_UNIFORMS.EMISSIVE_COLOR};
     vec3 rgb      = ambient + diffuse + specular + emissive;
 
-    if (${USE_REFLECTION_MAP_UNIFORM_NAME} > 0.5) {
+    if (${MTL_STANDARD_MATERIAL_UNIFORMS.USE_REFLECTION_MAP} > 0.5) {
         vec2 refl_uv        = compute_reflection_uv(normal, view_dir);
-        vec2 refl_uv_scaled = apply_uv(refl_uv, ${REFLECTION_UV_OFFSET_UNIFORM_NAME}, ${REFLECTION_UV_SCALE_UNIFORM_NAME});
-        vec3 refl_color     = texture(${REFLECTION_MAP_UNIFORM_NAME}, refl_uv_scaled).rgb;
-        float refl_strength = clamp(${OPTICAL_DENSITY_UNIFORM_NAME} - 1.0, 0.0, 1.0);
+        vec2 refl_uv_scaled = apply_uv(refl_uv, ${MTL_STANDARD_MATERIAL_UNIFORMS.REFLECTION_UV_OFFSET}, ${MTL_STANDARD_MATERIAL_UNIFORMS.REFLECTION_UV_SCALE});
+        vec3 refl_color     = texture(${MTL_STANDARD_MATERIAL_UNIFORMS.REFLECTION_MAP}, refl_uv_scaled).rgb;
+        float refl_strength = clamp(${MTL_STANDARD_MATERIAL_UNIFORMS.OPTICAL_DENSITY} - 1.0, 0.0, 1.0);
         rgb                 = mix(rgb, refl_color, refl_strength);
     }
 
     outColor = vec4(rgb, alpha);
 }
-`;
+`
+});
+var MTL_STANDARD_MATERIAL_MAP_INDEXES = Object.freeze({
+  DIFFUSE: 0,
+  AMBIENT: 1,
+  SPECULAR: 2,
+  ALPHA: 3,
+  BUMP: 4,
+  DISPLACEMENT: 5,
+  REFLECTION: 6
+});
+var MTL_STANDARD_MATERIAL_MAPS = Object.freeze([
+  Object.freeze({
+    CONTEXT: "`MtlStandardMaterial.setDiffuseMap`",
+    TEXTURE_UNIT: MTL_STANDARD_MATERIAL_DEFAULTS.DIFFUSE_TEXTURE_UNIT,
+    SAMPLER: MTL_STANDARD_MATERIAL_UNIFORMS.DIFFUSE_MAP,
+    UV_OFFSET: MTL_STANDARD_MATERIAL_UNIFORMS.DIFFUSE_UV_OFFSET,
+    UV_SCALE: MTL_STANDARD_MATERIAL_UNIFORMS.DIFFUSE_UV_SCALE,
+    ENABLED: MTL_STANDARD_MATERIAL_UNIFORMS.USE_DIFFUSE_MAP
+  }),
+  Object.freeze({
+    CONTEXT: "`MtlStandardMaterial.setAmbientMap`",
+    TEXTURE_UNIT: MTL_STANDARD_MATERIAL_DEFAULTS.AMBIENT_TEXTURE_UNIT,
+    SAMPLER: MTL_STANDARD_MATERIAL_UNIFORMS.AMBIENT_MAP,
+    UV_OFFSET: MTL_STANDARD_MATERIAL_UNIFORMS.AMBIENT_UV_OFFSET,
+    UV_SCALE: MTL_STANDARD_MATERIAL_UNIFORMS.AMBIENT_UV_SCALE,
+    ENABLED: MTL_STANDARD_MATERIAL_UNIFORMS.USE_AMBIENT_MAP
+  }),
+  Object.freeze({
+    CONTEXT: "`MtlStandardMaterial.setSpecularMap`",
+    TEXTURE_UNIT: MTL_STANDARD_MATERIAL_DEFAULTS.SPECULAR_TEXTURE_UNIT,
+    SAMPLER: MTL_STANDARD_MATERIAL_UNIFORMS.SPECULAR_MAP,
+    UV_OFFSET: MTL_STANDARD_MATERIAL_UNIFORMS.SPECULAR_UV_OFFSET,
+    UV_SCALE: MTL_STANDARD_MATERIAL_UNIFORMS.SPECULAR_UV_SCALE,
+    ENABLED: MTL_STANDARD_MATERIAL_UNIFORMS.USE_SPECULAR_MAP
+  }),
+  Object.freeze({
+    CONTEXT: "`MtlStandardMaterial.setAlphaMap`",
+    TEXTURE_UNIT: MTL_STANDARD_MATERIAL_DEFAULTS.ALPHA_TEXTURE_UNIT,
+    SAMPLER: MTL_STANDARD_MATERIAL_UNIFORMS.ALPHA_MAP,
+    UV_OFFSET: MTL_STANDARD_MATERIAL_UNIFORMS.ALPHA_UV_OFFSET,
+    UV_SCALE: MTL_STANDARD_MATERIAL_UNIFORMS.ALPHA_UV_SCALE,
+    ENABLED: MTL_STANDARD_MATERIAL_UNIFORMS.USE_ALPHA_MAP
+  }),
+  Object.freeze({
+    CONTEXT: "`MtlStandardMaterial.setBumpMap`",
+    TEXTURE_UNIT: MTL_STANDARD_MATERIAL_DEFAULTS.BUMP_TEXTURE_UNIT,
+    SAMPLER: MTL_STANDARD_MATERIAL_UNIFORMS.BUMP_MAP,
+    UV_OFFSET: MTL_STANDARD_MATERIAL_UNIFORMS.BUMP_UV_OFFSET,
+    UV_SCALE: MTL_STANDARD_MATERIAL_UNIFORMS.BUMP_UV_SCALE,
+    ENABLED: MTL_STANDARD_MATERIAL_UNIFORMS.USE_BUMP_MAP
+  }),
+  Object.freeze({
+    CONTEXT: "`MtlStandardMaterial.setDisplacementMap`",
+    TEXTURE_UNIT: MTL_STANDARD_MATERIAL_DEFAULTS.DISPLACEMENT_TEXTURE_UNIT,
+    SAMPLER: MTL_STANDARD_MATERIAL_UNIFORMS.DISPLACEMENT_MAP,
+    UV_OFFSET: MTL_STANDARD_MATERIAL_UNIFORMS.DISPLACEMENT_UV_OFFSET,
+    UV_SCALE: MTL_STANDARD_MATERIAL_UNIFORMS.DISPLACEMENT_UV_SCALE,
+    ENABLED: MTL_STANDARD_MATERIAL_UNIFORMS.USE_DISPLACEMENT_MAP
+  }),
+  Object.freeze({
+    CONTEXT: "`MtlStandardMaterial.setReflectionMap`",
+    TEXTURE_UNIT: MTL_STANDARD_MATERIAL_DEFAULTS.REFLECTION_TEXTURE_UNIT,
+    SAMPLER: MTL_STANDARD_MATERIAL_UNIFORMS.REFLECTION_MAP,
+    UV_OFFSET: MTL_STANDARD_MATERIAL_UNIFORMS.REFLECTION_UV_OFFSET,
+    UV_SCALE: MTL_STANDARD_MATERIAL_UNIFORMS.REFLECTION_UV_SCALE,
+    ENABLED: MTL_STANDARD_MATERIAL_UNIFORMS.USE_REFLECTION_MAP
+  })
+]);
+var MTL_STANDARD_MATERIAL_CONTEXTS = Object.freeze({
+  AMBIENT_COLOR: "`MtlStandardMaterial.setAmbientColor`",
+  SPECULAR_COLOR: "`MtlStandardMaterial.setSpecularColor`",
+  EMISSIVE_COLOR: "`MtlStandardMaterial.setEmissiveColor`",
+  UV_OFFSET: " options.uvOffset",
+  UV_SCALE: " options.uvScale"
+});
+
+// core/exception-messages/mtl-standard-material.js
+var MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES = Object.freeze({
+  OPTIONS_OBJECT: "`MtlStandardMaterial` expects an options object (plain object).",
+  SHININESS_TYPE: "`MtlStandardMaterial.setShininess` expects a finite number.",
+  SPECULAR_STRENGTH_TYPE: "`MtlStandardMaterial.setSpecularStrength` expects a finite number.",
+  SPECULAR_ENABLED_TYPE: "`MtlStandardMaterial.setSpecularEnabled` expects a boolean.",
+  OPTICAL_DENSITY_TYPE: "`MtlStandardMaterial.setOpticalDensity` expects a finite number.",
+  BUMP_MULTIPLIER_TYPE: "`MtlStandardMaterial.setBumpMultiplier` expects a finite number.",
+  DISPLACEMENT_SCALE_TYPE: "`MtlStandardMaterial.setDisplacementScale` expects a finite number.",
+  EXPECTS_TEXTURE_SUFFIX: " expects texture as Texture2D.",
+  EXPECTS_OPTIONS_OBJECT_SUFFIX: " expects options as a plain object.",
+  EXPECTS_TEXTURE_UNIT_INDEX_SUFFIX: " expects options.textureUnitIndex as a non-negative integer.",
+  EXPECTS_VECTOR2_TYPE_SUFFIX: " expects a number[] or Float32Array.",
+  EXPECTS_VECTOR2_COMPONENTS_SUFFIX: " expects exactly 2 components.",
+  EXPECTS_VECTOR3_COMPONENTS_SUFFIX: " expects exactly 3 components."
+});
+
+// core/material/mtl-standard-material.js
 var MtlStandardMaterial = class _MtlStandardMaterial extends DirectionalLightMaterial {
   /**
-   * Fallback texture used, when a map is not assigned.
+   * Placeholder texture shared by map slots until a texture is assigned.
+   * External map textures remain owned by the caller.
    *
    * @type {Texture2D}
    * @private
    */
   #fallbackTexture;
   /**
-   * Diffuse texture.
+   * Per-instance texture references, UV buffers and map usage flags.
+   * The descriptors are shared, but mutable map state is never shared.
    *
-   * @type {Texture2D}
+   * @type {Object[]}
    * @private
    */
-  #diffuseTexture;
-  /**
-   * Ambient texture.
-   *
-   * @type {Texture2D}
-   * @private
-   */
-  #ambientTexture;
-  /**
-   * Specular texture.
-   *
-   * @type {Texture2D}
-   * @private
-   */
-  #specularTexture;
-  /**
-   * Alpha texture.
-   *
-   * @type {Texture2D}
-   * @private
-   */
-  #alphaTexture;
-  /**
-   * Bump texture.
-   *
-   * @type {Texture2D}
-   * @private
-   */
-  #bumpTexture;
-  /**
-   * Displacement texture.
-   *
-   * @type {Texture2D}
-   * @private
-   */
-  #displacementTexture;
-  /**
-   * Reflection texture.
-   *
-   * @type {Texture2D}
-   * @private
-   */
-  #reflectionTexture;
-  /**
-   * Diffuse texture unit index.
-   *
-   * @type {number}
-   * @private
-   */
-  #diffuseTextureUnit = DEFAULT_DIFFUSE_TEXTURE_UNIT;
-  /**
-   * Ambient texture unit index.
-   *
-   * @type {number}
-   * @private
-   */
-  #ambientTextureUnit = DEFAULT_AMBIENT_TEXTURE_UNIT;
-  /**
-   * Specular texture unit index.
-   *
-   * @type {number}
-   * @private
-   */
-  #specularTextureUnit = DEFAULT_SPECULAR_TEXTURE_UNIT;
-  /**
-   * Alpha texture unit index.
-   *
-   * @type {number}
-   * @private
-   */
-  #alphaTextureUnit = DEFAULT_ALPHA_TEXTURE_UNIT;
-  /**
-   * Bump texture unit index.
-   *
-   * @type {number}
-   * @private
-   */
-  #bumpTextureUnit = DEFAULT_BUMP_TEXTURE_UNIT;
-  /**
-   * Displacement texture unit index.
-   *
-   * @type {number}
-   * @private
-   */
-  #displacementTextureUnit = DEFAULT_DISPLACEMENT_TEXTURE_UNIT;
-  /**
-   * Reflection texture unit index.
-   *
-   * @type {number}
-   * @private
-   */
-  #reflectionTextureUnit = DEFAULT_REFLECTION_TEXTURE_UNIT;
+  #maps;
   /**
    * Ambient color.
    *
    * @type {Float32Array}
    * @private
    */
-  #ambientColor = new Float32Array(DEFAULT_AMBIENT_COLOR);
+  #ambientColor = new Float32Array(MATERIAL_DEFAULT_COLOR);
   /**
    * Specular color.
    *
    * @type {Float32Array}
    * @private
    */
-  #specularColor = new Float32Array(DEFAULT_SPECULAR_COLOR2);
+  #specularColor = new Float32Array(MATERIAL_DEFAULT_COLOR);
   /**
    * Emissive color.
    *
    * @type {Float32Array}
    * @private
    */
-  #emissiveColor = new Float32Array(DEFAULT_EMISSIVE_COLOR);
+  #emissiveColor = new Float32Array(MTL_STANDARD_MATERIAL_DEFAULTS.EMISSIVE_COLOR);
   /**
    * Shininess exponent.
    *
    * @type {number}
    * @private
    */
-  #shininess = DEFAULT_SHININESS2;
+  #shininess = MATERIAL_SPECULAR_DEFAULTS.SHININESS;
   /**
    * Specular strength multiplier.
    *
    * @type {number}
    * @private
    */
-  #specularStrength = DEFAULT_SPECULAR_STRENGTH2;
-  /**
-   * Optical density value.
-   *
-   * @type {number}
-   * @private
-   */
-  #opticalDensity = DEFAULT_OPTICAL_DENSITY;
-  /**
-   * Bump multiplier.
-   *
-   * @type {number}
-   * @private
-   */
-  #bumpMultiplier = DEFAULT_BUMP_MULTIPLIER;
-  /**
-   * Displacement scale factor.
-   *
-   * @type {number}
-   * @private
-   */
-  #displacementScale = DEFAULT_DISPLACEMENT_SCALE;
+  #specularStrength = MATERIAL_SPECULAR_DEFAULTS.STRENGTH;
   /**
    * Flag, controlling the specular lighting.
    *
@@ -7543,194 +8232,269 @@ var MtlStandardMaterial = class _MtlStandardMaterial extends DirectionalLightMat
    */
   #specularEnabled = true;
   /**
-   * Diffuse UV-offset.
+   * Optical density value.
    *
-   * @type {Float32Array}
+   * @type {number}
    * @private
    */
-  #diffuseUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
+  #opticalDensity = MTL_STANDARD_MATERIAL_DEFAULTS.OPTICAL_DENSITY;
   /**
-   * Diffuse UV-scale.
+   * Bump multiplier.
    *
-   * @type {Float32Array}
+   * @type {number}
    * @private
    */
-  #diffuseUvScale = new Float32Array(DEFAULT_UV_SCALE);
+  #bumpMultiplier = MTL_STANDARD_MATERIAL_DEFAULTS.BUMP_MULTIPLIER;
   /**
-   * Ambient UV-offset.
+   * Displacement scale factor.
    *
-   * @type {Float32Array}
+   * @type {number}
    * @private
    */
-  #ambientUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
+  #displacementScale = MTL_STANDARD_MATERIAL_DEFAULTS.DISPLACEMENT_SCALE;
   /**
-   * Ambient UV-scale.
+   * Creates a material with its own program and fallback texture.
    *
-   * @type {Float32Array}
-   * @private
-   */
-  #ambientUvScale = new Float32Array(DEFAULT_UV_SCALE);
-  /**
-   * Specular UV-offset.
-   *
-   * @type {Float32Array}
-   * @private
-   */
-  #specularUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
-  /**
-   * Specular UV-scale.
-   *
-   * @type {Float32Array}
-   * @private
-   */
-  #specularUvScale = new Float32Array(DEFAULT_UV_SCALE);
-  /**
-   * Alpha UV-offset.
-   *
-   * @type {Float32Array}
-   * @private
-   */
-  #alphaUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
-  /**
-   * Alpha UV-scale.
-   *
-   * @type {Float32Array}
-   * @private
-   */
-  #alphaUvScale = new Float32Array(DEFAULT_UV_SCALE);
-  /**
-   * Bump UV-offset.
-   *
-   * @type {Float32Array}
-   * @private
-   */
-  #bumpUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
-  /**
-   * Bump UV-scale.
-   *
-   * @type {Float32Array}
-   * @private
-   */
-  #bumpUvScale = new Float32Array(DEFAULT_UV_SCALE);
-  /**
-   * Displacement UV-offset.
-   *
-   * @type {Float32Array}
-   * @private
-   */
-  #displacementUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
-  /**
-   * Displacement UV-scale.
-   *
-   * @type {Float32Array}
-   * @private
-   */
-  #displacementUvScale = new Float32Array(DEFAULT_UV_SCALE);
-  /**
-   * Reflection UV-offset.
-   *
-   * @type {Float32Array}
-   * @private
-   */
-  #reflectionUvOffset = new Float32Array(DEFAULT_UV_OFFSET);
-  /**
-   * Reflection UV-scale.
-   *
-   * @type {Float32Array}
-   * @private
-   */
-  #reflectionUvScale = new Float32Array(DEFAULT_UV_SCALE);
-  /**
-   * Flag, indicating the diffuse map usage.
-   *
-   * @type {boolean}
-   * @private
-   */
-  #useDiffuseMap = false;
-  /**
-   * Flag, indicating the ambient map usage.
-   *
-   * @type {boolean}
-   * @private
-   */
-  #useAmbientMap = false;
-  /**
-   * Flag, indicating the specular map usage.
-   *
-   * @type {boolean}
-   * @private
-   */
-  #useSpecularMap = false;
-  /**
-   * Flag, indicating the alpha map usage.
-   *
-   * @type {boolean}
-   * @private
-   */
-  #useAlphaMap = false;
-  /**
-   * Flag, indicating the bump map usage.
-   *
-   * @type {boolean}
-   * @private
-   */
-  #useBumpMap = false;
-  /**
-   * Flag, indicating the displacement map usage.
-   *
-   * @type {boolean}
-   * @private
-   */
-  #useDisplacementMap = false;
-  /**
-   * Flag, indicating the reflection map usage.
-   *
-   * @type {boolean}
-   * @private
-   */
-  #useReflectionMap = false;
-  /**
-   * Creates a new MTL standard material.
-   *
-   * @param {WebGL2RenderingContext} webglContext  - WebGL2 rendering context, used to compile the shaders.
-   * @param {MtlStandardMaterialOptions} [options] - Material options.
+   * @param {WebGL2RenderingContext} webglContext  - WebGL2 rendering context.
+   * @param {MtlStandardMaterialOptions} [options] - Material settings.
    */
   constructor(webglContext, options = {}) {
     if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
-      throw new TypeError(ERROR_OPTIONS_OBJECT);
+      throw new TypeError(MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.OPTIONS_OBJECT);
     }
-    const {
-      diffuseColor,
-      ambientColor,
-      specularColor,
-      emissiveColor,
+    const { diffuseColor, lightDirection, ambientStrength } = options;
+    const sources = MTL_STANDARD_MATERIAL_SHADERS;
+    const shaderProgram = new ShaderProgram(webglContext, sources.VERTEX, sources.FRAGMENT);
+    const lightOptions = {
+      color: diffuseColor || MATERIAL_DEFAULT_COLOR,
       lightDirection,
-      ambientStrength,
-      shininess,
-      specularStrength,
-      opticalDensity
-    } = options;
-    super(
-      webglContext,
-      new ShaderProgram(webglContext, VERTEX_SHADER_SOURCE8, FRAGMENT_SHADER_SOURCE8),
-      {
-        color: diffuseColor || DEFAULT_DIFFUSE_COLOR,
-        lightDirection,
-        ambientStrength
-      },
-      { ownsShaderProgram: true }
-    );
+      ambientStrength
+    };
+    super(webglContext, shaderProgram, lightOptions, {
+      ownsShaderProgram: MATERIAL_DEFAULTS.OWNS_GENERATED_SHADER_PROGRAM
+    });
+    try {
+      this.#initialize(webglContext, options);
+    } catch (error) {
+      this.#fallbackTexture?.dispose();
+      super.dispose();
+      throw error;
+    }
+  }
+  /**
+   * Uploads the material-specific uniforms in the existing order.
+   *
+   * @param {Float32Array} worldMatrix    - World matrix.
+   * @param {Float32Array} cameraPosition - Camera position.
+   * @protected
+   */
+  applyAdditionalUniforms(worldMatrix, cameraPosition) {
+    const shaderProgram = this.shaderProgram;
+    const uniforms = DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS;
+    shaderProgram.setMatrix4(uniforms.WORLD_MATRIX, worldMatrix);
+    shaderProgram.setVector3(uniforms.CAMERA_POSITION, cameraPosition);
+    this.#applyShadingUniforms(shaderProgram);
+    this.#applySurfaceUniforms(shaderProgram);
+    this.#applyUvTransforms(shaderProgram);
+    this.#applyMapFlags(shaderProgram);
+    this.#applyTextures(shaderProgram);
+  }
+  /**
+   * Sets the ambient color.
+   *
+   * @param {Float32Array | number[]} color - RGB color in [0..1] range.
+   */
+  setAmbientColor(color) {
+    _MtlStandardMaterial.#assertVector3(MTL_STANDARD_MATERIAL_CONTEXTS.AMBIENT_COLOR, color);
+    this.#ambientColor.set(color);
+  }
+  /**
+   * Sets the specular color.
+   *
+   * @param {Float32Array | number[]} color - RGB color in [0..1] range.
+   */
+  setSpecularColor(color) {
+    _MtlStandardMaterial.#assertVector3(MTL_STANDARD_MATERIAL_CONTEXTS.SPECULAR_COLOR, color);
+    this.#specularColor.set(color);
+  }
+  /**
+   * Sets the emissive color.
+   *
+   * @param {Float32Array | number[]} color - RGB color in [0..1] range.
+   */
+  setEmissiveColor(color) {
+    _MtlStandardMaterial.#assertVector3(MTL_STANDARD_MATERIAL_CONTEXTS.EMISSIVE_COLOR, color);
+    this.#emissiveColor.set(color);
+  }
+  /**
+   * Sets the shininess exponent.
+   *
+   * @param {number} value - Shininess exponent.
+   */
+  setShininess(value) {
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+      throw new TypeError(MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.SHININESS_TYPE);
+    }
+    this.#shininess = value;
+  }
+  /**
+   * Sets the specular strength multiplier.
+   *
+   * @param {number} value - Specular strength.
+   */
+  setSpecularStrength(value) {
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+      throw new TypeError(MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.SPECULAR_STRENGTH_TYPE);
+    }
+    this.#specularStrength = value;
+  }
+  /**
+   * Enables or disables specular term.
+   *
+   * @param {boolean} enabled - Specular usage flag.
+   */
+  setSpecularEnabled(enabled) {
+    if (typeof enabled !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
+      throw new TypeError(MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.SPECULAR_ENABLED_TYPE);
+    }
+    this.#specularEnabled = enabled;
+  }
+  /**
+   * Sets optical density value.
+   *
+   * @param {number} value - Optical density.
+   */
+  setOpticalDensity(value) {
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+      throw new TypeError(MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.OPTICAL_DENSITY_TYPE);
+    }
+    this.#opticalDensity = value;
+  }
+  /**
+   * Sets bump multiplier value.
+   *
+   * @param {number} value - Bump multiplier.
+   */
+  setBumpMultiplier(value) {
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+      throw new TypeError(MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.BUMP_MULTIPLIER_TYPE);
+    }
+    this.#bumpMultiplier = value;
+  }
+  /**
+   * Sets displacement scale.
+   *
+   * @param {number} value - Displacement scale factor.
+   */
+  setDisplacementScale(value) {
+    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
+      throw new TypeError(MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.DISPLACEMENT_SCALE_TYPE);
+    }
+    this.#displacementScale = value;
+  }
+  /**
+   * Sets a diffuse texture and its UV-transform.
+   *
+   * @param {Texture2D} texture                       - Diffuse texture.
+   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+   */
+  setDiffuseMap(texture, options = {}) {
+    this.#setMap(MTL_STANDARD_MATERIAL_MAP_INDEXES.DIFFUSE, texture, options);
+  }
+  /**
+   * Sets an ambient texture and its UV-transform.
+   *
+   * @param {Texture2D} texture                       - Ambient texture.
+   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+   */
+  setAmbientMap(texture, options = {}) {
+    this.#setMap(MTL_STANDARD_MATERIAL_MAP_INDEXES.AMBIENT, texture, options);
+  }
+  /**
+   * Sets a specular texture and its UV-transform.
+   *
+   * @param {Texture2D} texture                       - Specular texture.
+   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+   */
+  setSpecularMap(texture, options = {}) {
+    this.#setMap(MTL_STANDARD_MATERIAL_MAP_INDEXES.SPECULAR, texture, options);
+  }
+  /**
+   * Sets an alpha texture and its UV-transform.
+   *
+   * @param {Texture2D} texture                       - Alpha texture.
+   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+   */
+  setAlphaMap(texture, options = {}) {
+    this.#setMap(MTL_STANDARD_MATERIAL_MAP_INDEXES.ALPHA, texture, options);
+  }
+  /**
+   * Sets a bump texture and its UV-transform.
+   *
+   * @param {Texture2D} texture                       - Bump texture.
+   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+   */
+  setBumpMap(texture, options = {}) {
+    this.#setMap(MTL_STANDARD_MATERIAL_MAP_INDEXES.BUMP, texture, options);
+  }
+  /**
+   * Sets a displacement texture and its UV-transform.
+   *
+   * @param {Texture2D} texture                       - Displacement texture.
+   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+   */
+  setDisplacementMap(texture, options = {}) {
+    this.#setMap(MTL_STANDARD_MATERIAL_MAP_INDEXES.DISPLACEMENT, texture, options);
+  }
+  /**
+   * Sets a reflection texture and its UV-transform.
+   *
+   * @param {Texture2D} texture                       - Reflection texture.
+   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
+   */
+  setReflectionMap(texture, options = {}) {
+    this.#setMap(MTL_STANDARD_MATERIAL_MAP_INDEXES.REFLECTION, texture, options);
+  }
+  /**
+   * Releases the fallback texture and program, leaving external maps intact.
+   */
+  dispose() {
+    if (this.isDisposed) {
+      return;
+    }
+    this.#fallbackTexture.dispose();
+    super.dispose();
+  }
+  /**
+   * Allocates per-map state and applies the initial shading options.
+   *
+   * @param {WebGL2RenderingContext} webglContext - Texture allocation context.
+   * @param {MtlStandardMaterialOptions} options  - Initial material settings.
+   * @private
+   */
+  #initialize(webglContext, options) {
     this.#fallbackTexture = new Texture2D(webglContext);
-    this.#diffuseTexture = this.#fallbackTexture;
-    this.#ambientTexture = this.#fallbackTexture;
-    this.#specularTexture = this.#fallbackTexture;
-    this.#alphaTexture = this.#fallbackTexture;
-    this.#bumpTexture = this.#fallbackTexture;
-    this.#displacementTexture = this.#fallbackTexture;
-    this.#reflectionTexture = this.#fallbackTexture;
-    this.setAmbientColor(ambientColor || DEFAULT_AMBIENT_COLOR);
-    this.setSpecularColor(specularColor || DEFAULT_SPECULAR_COLOR2);
-    this.setEmissiveColor(emissiveColor || DEFAULT_EMISSIVE_COLOR);
+    this.#maps = MTL_STANDARD_MATERIAL_MAPS.map((descriptor) => ({
+      descriptor,
+      texture: this.#fallbackTexture,
+      textureUnitIndex: descriptor.TEXTURE_UNIT,
+      uvOffset: new Float32Array(MTL_STANDARD_MATERIAL_DEFAULTS.UV_OFFSET),
+      uvScale: new Float32Array(MTL_STANDARD_MATERIAL_DEFAULTS.UV_SCALE),
+      enabled: false
+    }));
+    this.#applyOptions(options);
+  }
+  /**
+   * Applies initial colors and optional specular settings.
+   *
+   * @param {MtlStandardMaterialOptions} options - Initial material settings.
+   * @private
+   */
+  #applyOptions(options) {
+    const { ambientColor, specularColor, emissiveColor, shininess, specularStrength, opticalDensity } = options;
+    this.setAmbientColor(ambientColor || MATERIAL_DEFAULT_COLOR);
+    this.setSpecularColor(specularColor || MATERIAL_DEFAULT_COLOR);
+    this.setEmissiveColor(emissiveColor || MTL_STANDARD_MATERIAL_DEFAULTS.EMISSIVE_COLOR);
     if (shininess !== void 0) {
       this.setShininess(shininess);
     }
@@ -7742,331 +8506,116 @@ var MtlStandardMaterial = class _MtlStandardMaterial extends DirectionalLightMat
     }
   }
   /**
-   * Uploads per-object uniforms specific to the standard material.
+   * Uploads colors and specular settings without creating temporary buffers.
    *
-   * @param {Float32Array} worldMatrix    - World matrix.
-   * @param {Float32Array} cameraPosition - Camera position.
-   * @protected
-   */
-  applyAdditionalUniforms(worldMatrix, cameraPosition) {
-    this.shaderProgram.setMatrix4(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.WORLD_MATRIX, worldMatrix);
-    this.shaderProgram.setVector3(DIRECTIONAL_LIGHT_MATERIAL_UNIFORMS.CAMERA_POSITION, cameraPosition);
-    this.shaderProgram.setVector3(AMBIENT_COLOR_UNIFORM_NAME, this.#ambientColor);
-    this.shaderProgram.setVector3(SPECULAR_COLOR_UNIFORM_NAME2, this.#specularColor);
-    this.shaderProgram.setVector3(EMISSIVE_COLOR_UNIFORM_NAME, this.#emissiveColor);
-    this.shaderProgram.setFloat(SPECULAR_STRENGTH_UNIFORM_NAME2, this.#specularStrength);
-    this.shaderProgram.setFloat(SHININESS_UNIFORM_NAME2, this.#shininess);
-    this.shaderProgram.setFloat(SPECULAR_ENABLED_UNIFORM_NAME, this.#specularEnabled ? FLOAT_TRUE2 : FLOAT_FALSE2);
-    this.shaderProgram.setFloat(OPTICAL_DENSITY_UNIFORM_NAME, this.#opticalDensity);
-    this.shaderProgram.setFloat(BUMP_MULTIPLIER_UNIFORM_NAME, this.#bumpMultiplier);
-    this.shaderProgram.setFloat(DISPLACEMENT_SCALE_UNIFORM_NAME, this.#displacementScale);
-    this.shaderProgram.setVector2(DIFFUSE_UV_OFFSET_UNIFORM_NAME, this.#diffuseUvOffset);
-    this.shaderProgram.setVector2(DIFFUSE_UV_SCALE_UNIFORM_NAME, this.#diffuseUvScale);
-    this.shaderProgram.setVector2(AMBIENT_UV_OFFSET_UNIFORM_NAME, this.#ambientUvOffset);
-    this.shaderProgram.setVector2(AMBIENT_UV_SCALE_UNIFORM_NAME, this.#ambientUvScale);
-    this.shaderProgram.setVector2(SPECULAR_UV_OFFSET_UNIFORM_NAME, this.#specularUvOffset);
-    this.shaderProgram.setVector2(SPECULAR_UV_SCALE_UNIFORM_NAME, this.#specularUvScale);
-    this.shaderProgram.setVector2(ALPHA_UV_OFFSET_UNIFORM_NAME, this.#alphaUvOffset);
-    this.shaderProgram.setVector2(ALPHA_UV_SCALE_UNIFORM_NAME, this.#alphaUvScale);
-    this.shaderProgram.setVector2(BUMP_UV_OFFSET_UNIFORM_NAME, this.#bumpUvOffset);
-    this.shaderProgram.setVector2(BUMP_UV_SCALE_UNIFORM_NAME, this.#bumpUvScale);
-    this.shaderProgram.setVector2(DISPLACEMENT_UV_OFFSET_UNIFORM_NAME, this.#displacementUvOffset);
-    this.shaderProgram.setVector2(DISPLACEMENT_UV_SCALE_UNIFORM_NAME, this.#displacementUvScale);
-    this.shaderProgram.setVector2(REFLECTION_UV_OFFSET_UNIFORM_NAME, this.#reflectionUvOffset);
-    this.shaderProgram.setVector2(REFLECTION_UV_SCALE_UNIFORM_NAME, this.#reflectionUvScale);
-    this.shaderProgram.setFloat(USE_DIFFUSE_MAP_UNIFORM_NAME, this.#useDiffuseMap ? FLOAT_TRUE2 : FLOAT_FALSE2);
-    this.shaderProgram.setFloat(USE_AMBIENT_MAP_UNIFORM_NAME, this.#useAmbientMap ? FLOAT_TRUE2 : FLOAT_FALSE2);
-    this.shaderProgram.setFloat(USE_SPECULAR_MAP_UNIFORM_NAME, this.#useSpecularMap ? FLOAT_TRUE2 : FLOAT_FALSE2);
-    this.shaderProgram.setFloat(USE_ALPHA_MAP_UNIFORM_NAME, this.#useAlphaMap ? FLOAT_TRUE2 : FLOAT_FALSE2);
-    this.shaderProgram.setFloat(USE_BUMP_MAP_UNIFORM_NAME, this.#useBumpMap ? FLOAT_TRUE2 : FLOAT_FALSE2);
-    this.shaderProgram.setFloat(USE_DISPLACEMENT_MAP_UNIFORM_NAME, this.#useDisplacementMap ? FLOAT_TRUE2 : FLOAT_FALSE2);
-    this.shaderProgram.setFloat(USE_REFLECTION_MAP_UNIFORM_NAME, this.#useReflectionMap ? FLOAT_TRUE2 : FLOAT_FALSE2);
-    this.shaderProgram.setTexture2D(DIFFUSE_MAP_UNIFORM_NAME, this.#diffuseTexture, this.#diffuseTextureUnit);
-    this.shaderProgram.setTexture2D(AMBIENT_MAP_UNIFORM_NAME, this.#ambientTexture, this.#ambientTextureUnit);
-    this.shaderProgram.setTexture2D(SPECULAR_MAP_UNIFORM_NAME, this.#specularTexture, this.#specularTextureUnit);
-    this.shaderProgram.setTexture2D(ALPHA_MAP_UNIFORM_NAME, this.#alphaTexture, this.#alphaTextureUnit);
-    this.shaderProgram.setTexture2D(BUMP_MAP_UNIFORM_NAME, this.#bumpTexture, this.#bumpTextureUnit);
-    this.shaderProgram.setTexture2D(DISPLACEMENT_MAP_UNIFORM_NAME, this.#displacementTexture, this.#displacementTextureUnit);
-    this.shaderProgram.setTexture2D(REFLECTION_MAP_UNIFORM_NAME, this.#reflectionTexture, this.#reflectionTextureUnit);
-  }
-  /**
-   * Sets the ambient color.
-   *
-   * @param {Float32Array | number[]} color - RGB color in [0..1] range.
-   */
-  setAmbientColor(color) {
-    _MtlStandardMaterial.#assertVector3("`MtlStandardMaterial.setAmbientColor`", color);
-    this.#ambientColor.set(color);
-  }
-  /**
-   * Sets the specular color.
-   *
-   * @param {Float32Array | number[]} color - RGB color in [0..1] range.
-   */
-  setSpecularColor(color) {
-    _MtlStandardMaterial.#assertVector3("`MtlStandardMaterial.setSpecularColor`", color);
-    this.#specularColor.set(color);
-  }
-  /**
-   * Sets the emissive color.
-   *
-   * @param {Float32Array | number[]} color - RGB color in [0..1] range.
-   */
-  setEmissiveColor(color) {
-    _MtlStandardMaterial.#assertVector3("`MtlStandardMaterial.setEmissiveColor`", color);
-    this.#emissiveColor.set(color);
-  }
-  /**
-   * Sets the shininess exponent.
-   *
-   * @param {number} value - Shininess exponent.
-   */
-  setShininess(value) {
-    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
-      throw new TypeError(ERROR_SHININESS_TYPE);
-    }
-    this.#shininess = value;
-  }
-  /**
-   * Sets the specular strength multiplier.
-   *
-   * @param {number} value - Specular strength.
-   */
-  setSpecularStrength(value) {
-    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
-      throw new TypeError(ERROR_SPECULAR_STRENGTH_TYPE);
-    }
-    this.#specularStrength = value;
-  }
-  /**
-   * Enables or disables specular term.
-   *
-   * @param {boolean} enabled - Specular usage flag.
-   */
-  setSpecularEnabled(enabled) {
-    if (typeof enabled !== ECMASCRIPT_TYPEOF_RESULTS.BOOLEAN) {
-      throw new TypeError(ERROR_SPECULAR_ENABLED_TYPE);
-    }
-    this.#specularEnabled = enabled;
-  }
-  /**
-   * Sets optical density value.
-   *
-   * @param {number} value - Optical density.
-   */
-  setOpticalDensity(value) {
-    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
-      throw new TypeError(ERROR_OPTICAL_DENSITY_TYPE);
-    }
-    this.#opticalDensity = value;
-  }
-  /**
-   * Sets bump multiplier value.
-   *
-   * @param {number} value - Bump multiplier.
-   */
-  setBumpMultiplier(value) {
-    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
-      throw new TypeError(ERROR_BUMP_MULTIPLIER_TYPE);
-    }
-    this.#bumpMultiplier = value;
-  }
-  /**
-   * Sets displacement scale.
-   *
-   * @param {number} value - Displacement scale factor.
-   */
-  setDisplacementScale(value) {
-    if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
-      throw new TypeError(ERROR_DISPLACEMENT_SCALE_TYPE);
-    }
-    this.#displacementScale = value;
-  }
-  /**
-   * Sets a diffuse texture and its UV-transform.
-   *
-   * @param {Texture2D} texture                       - Diffuse texture.
-   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
-   */
-  setDiffuseMap(texture, options = {}) {
-    this.#setMap(
-      "`MtlStandardMaterial.setDiffuseMap`",
-      texture,
-      options,
-      (map) => {
-        this.#diffuseTexture = map.texture;
-        this.#diffuseTextureUnit = map.textureUnitIndex;
-        this.#useDiffuseMap = true;
-        this.#diffuseUvOffset.set(map.uvOffset);
-        this.#diffuseUvScale.set(map.uvScale);
-      }
-    );
-  }
-  /**
-   * Sets an ambient texture and its UV-transform.
-   *
-   * @param {Texture2D} texture                       - Ambient texture.
-   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
-   */
-  setAmbientMap(texture, options = {}) {
-    this.#setMap(
-      "`MtlStandardMaterial.setAmbientMap`",
-      texture,
-      options,
-      (map) => {
-        this.#ambientTexture = map.texture;
-        this.#ambientTextureUnit = map.textureUnitIndex;
-        this.#useAmbientMap = true;
-        this.#ambientUvOffset.set(map.uvOffset);
-        this.#ambientUvScale.set(map.uvScale);
-      }
-    );
-  }
-  /**
-   * Sets a specular texture and its UV-transform.
-   *
-   * @param {Texture2D} texture                       - Specular texture.
-   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
-   */
-  setSpecularMap(texture, options = {}) {
-    this.#setMap(
-      "`MtlStandardMaterial.setSpecularMap`",
-      texture,
-      options,
-      (map) => {
-        this.#specularTexture = map.texture;
-        this.#specularTextureUnit = map.textureUnitIndex;
-        this.#useSpecularMap = true;
-        this.#specularUvOffset.set(map.uvOffset);
-        this.#specularUvScale.set(map.uvScale);
-      }
-    );
-  }
-  /**
-   * Sets an alpha texture and its UV-transform.
-   *
-   * @param {Texture2D} texture                       - Alpha texture.
-   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
-   */
-  setAlphaMap(texture, options = {}) {
-    this.#setMap(
-      "`MtlStandardMaterial.setAlphaMap`",
-      texture,
-      options,
-      (map) => {
-        this.#alphaTexture = map.texture;
-        this.#alphaTextureUnit = map.textureUnitIndex;
-        this.#useAlphaMap = true;
-        this.#alphaUvOffset.set(map.uvOffset);
-        this.#alphaUvScale.set(map.uvScale);
-      }
-    );
-  }
-  /**
-   * Sets a bump texture and its UV-transform.
-   *
-   * @param {Texture2D} texture                       - Bump texture.
-   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
-   */
-  setBumpMap(texture, options = {}) {
-    this.#setMap(
-      "`MtlStandardMaterial.setBumpMap`",
-      texture,
-      options,
-      (map) => {
-        this.#bumpTexture = map.texture;
-        this.#bumpTextureUnit = map.textureUnitIndex;
-        this.#useBumpMap = true;
-        this.#bumpUvOffset.set(map.uvOffset);
-        this.#bumpUvScale.set(map.uvScale);
-      }
-    );
-  }
-  /**
-   * Sets a displacement texture and its UV-transform.
-   *
-   * @param {Texture2D} texture                       - Displacement texture.
-   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
-   */
-  setDisplacementMap(texture, options = {}) {
-    this.#setMap(
-      "`MtlStandardMaterial.setDisplacementMap`",
-      texture,
-      options,
-      (map) => {
-        this.#displacementTexture = map.texture;
-        this.#displacementTextureUnit = map.textureUnitIndex;
-        this.#useDisplacementMap = true;
-        this.#displacementUvOffset.set(map.uvOffset);
-        this.#displacementUvScale.set(map.uvScale);
-      }
-    );
-  }
-  /**
-   * Sets a reflection texture and its UV-transform.
-   *
-   * @param {Texture2D} texture                       - Reflection texture.
-   * @param {MtlStandardMaterialMapOptions} [options] - Map options.
-   */
-  setReflectionMap(texture, options = {}) {
-    this.#setMap(
-      "`MtlStandardMaterial.setReflectionMap`",
-      texture,
-      options,
-      (map) => {
-        this.#reflectionTexture = map.texture;
-        this.#reflectionTextureUnit = map.textureUnitIndex;
-        this.#useReflectionMap = true;
-        this.#reflectionUvOffset.set(map.uvOffset);
-        this.#reflectionUvScale.set(map.uvScale);
-      }
-    );
-  }
-  /**
-   * Disposes resources, owned by this material.
-   */
-  dispose() {
-    if (this.isDisposed) {
-      return;
-    }
-    if (this.#fallbackTexture) {
-      this.#fallbackTexture.dispose();
-    }
-    super.dispose();
-  }
-  /**
-   * Validates and applies the map options for a texture assignment.
-   *
-   * @param {string} context                        - Error context.
-   * @param {Texture2D} texture                     - Map texture.
-   * @param {MtlStandardMaterialMapOptions} options - Map options.
-   * @param {function(Object): void} apply          - Apply callback.
-   * @returns {void}
+   * @param {ShaderProgram} shaderProgram - Active material program.
    * @private
    */
-  #setMap(context, texture, options, apply) {
+  #applyShadingUniforms(shaderProgram) {
+    const uniforms = MTL_STANDARD_MATERIAL_UNIFORMS;
+    const sharedUniforms = MATERIAL_UNIFORMS;
+    const floatFlags = MATERIAL_BOOLEAN_FLOATS;
+    shaderProgram.setVector3(uniforms.AMBIENT_COLOR, this.#ambientColor);
+    shaderProgram.setVector3(sharedUniforms.SPECULAR_COLOR, this.#specularColor);
+    shaderProgram.setVector3(uniforms.EMISSIVE_COLOR, this.#emissiveColor);
+    shaderProgram.setFloat(sharedUniforms.SPECULAR_STRENGTH, this.#specularStrength);
+    shaderProgram.setFloat(sharedUniforms.SHININESS, this.#shininess);
+    shaderProgram.setFloat(uniforms.SPECULAR_ENABLED, this.#specularEnabled ? floatFlags.TRUE : floatFlags.FALSE);
+  }
+  /**
+   * Uploads optical and surface detail settings.
+   *
+   * @param {ShaderProgram} shaderProgram - Active material program.
+   * @private
+   */
+  #applySurfaceUniforms(shaderProgram) {
+    const uniforms = MTL_STANDARD_MATERIAL_UNIFORMS;
+    shaderProgram.setFloat(uniforms.OPTICAL_DENSITY, this.#opticalDensity);
+    shaderProgram.setFloat(uniforms.BUMP_MULTIPLIER, this.#bumpMultiplier);
+    shaderProgram.setFloat(uniforms.DISPLACEMENT_SCALE, this.#displacementScale);
+  }
+  /**
+   * Uploads each map's independent UV buffers.
+   *
+   * @param {ShaderProgram} shaderProgram - Active material program.
+   * @private
+   */
+  #applyUvTransforms(shaderProgram) {
+    for (const map of this.#maps) {
+      shaderProgram.setVector2(map.descriptor.UV_OFFSET, map.uvOffset);
+      shaderProgram.setVector2(map.descriptor.UV_SCALE, map.uvScale);
+    }
+  }
+  /**
+   * Uploads the enabled flag for every texture map.
+   *
+   * @param {ShaderProgram} shaderProgram - Active material program.
+   * @private
+   */
+  #applyMapFlags(shaderProgram) {
+    const floatFlags = MATERIAL_BOOLEAN_FLOATS;
+    for (const map of this.#maps) {
+      shaderProgram.setFloat(map.descriptor.ENABLED, map.enabled ? floatFlags.TRUE : floatFlags.FALSE);
+    }
+  }
+  /**
+   * Binds all map textures in their established sampler order.
+   *
+   * @param {ShaderProgram} shaderProgram - Active material program.
+   * @private
+   */
+  #applyTextures(shaderProgram) {
+    for (const map of this.#maps) {
+      shaderProgram.setTexture2D(map.descriptor.SAMPLER, map.texture, map.textureUnitIndex);
+    }
+  }
+  /**
+   * Validates a replacement before changing any map state.
+   * Omitted texture units preserve the slot's current assignment.
+   *
+   * @param {number} index                          - Map slot index.
+   * @param {Texture2D} texture                     - Externally owned texture.
+   * @param {MtlStandardMaterialMapOptions} options - Map settings.
+   * @private
+   */
+  #setMap(index, texture, options) {
+    const map = this.#maps[index];
+    const context = map.descriptor.CONTEXT;
     if (!(texture instanceof Texture2D)) {
-      throw new TypeError(context + ERROR_EXPECTS_TEXTURE_SUFFIX);
+      throw new TypeError(context + MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.EXPECTS_TEXTURE_SUFFIX);
     }
     if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
-      throw new TypeError(context + ERROR_EXPECTS_OPTIONS_OBJECT_SUFFIX);
+      throw new TypeError(context + MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.EXPECTS_OPTIONS_OBJECT_SUFFIX);
     }
+    const settings = _MtlStandardMaterial.#resolveMapOptions(context, options, map.textureUnitIndex);
+    map.texture = texture;
+    map.textureUnitIndex = settings.textureUnitIndex;
+    map.enabled = true;
+    map.uvOffset.set(settings.uvOffset);
+    map.uvScale.set(settings.uvScale);
+  }
+  /**
+   * Resolves a map's texture unit and UV transforms.
+   *
+   * @param {string} context                        - Method name for errors.
+   * @param {MtlStandardMaterialMapOptions} options - Map settings.
+   * @param {number} defaultTextureUnit             - Current texture unit.
+   * @returns {MtlStandardMaterialMapOptions}       - Validated map settings.
+   * @private
+   */
+  static #resolveMapOptions(context, options, defaultTextureUnit) {
     const {
-      textureUnitIndex = DEFAULT_DIFFUSE_TEXTURE_UNIT,
-      uvOffset = DEFAULT_UV_OFFSET,
-      uvScale = DEFAULT_UV_SCALE
+      textureUnitIndex = defaultTextureUnit,
+      uvOffset = MTL_STANDARD_MATERIAL_DEFAULTS.UV_OFFSET,
+      uvScale = MTL_STANDARD_MATERIAL_DEFAULTS.UV_SCALE
     } = options;
-    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE10) {
-      throw new TypeError(context + ERROR_EXPECTS_TEXTURE_UNIT_INDEX_SUFFIX);
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < MATERIAL_TEXTURE_UNITS.MIN) {
+      throw new TypeError(context + MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.EXPECTS_TEXTURE_UNIT_INDEX_SUFFIX);
     }
-    _MtlStandardMaterial.#assertVector2(`${context} options.uvOffset`, uvOffset);
-    _MtlStandardMaterial.#assertVector2(`${context} options.uvScale`, uvScale);
-    apply({
-      texture,
-      textureUnitIndex,
-      uvOffset,
-      uvScale
-    });
+    const contexts = MTL_STANDARD_MATERIAL_CONTEXTS;
+    _MtlStandardMaterial.#assertVector2(context + contexts.UV_OFFSET, uvOffset);
+    _MtlStandardMaterial.#assertVector2(context + contexts.UV_SCALE, uvScale);
+    return { textureUnitIndex, uvOffset, uvScale };
   }
   /**
    * Validates the `vector2` arrays.
@@ -8078,10 +8627,10 @@ var MtlStandardMaterial = class _MtlStandardMaterial extends DirectionalLightMat
    */
   static #assertVector2(context, value) {
     if (!Array.isArray(value) && !(value instanceof Float32Array)) {
-      throw new TypeError(context + ERROR_EXPECTS_VECTOR2_TYPE_SUFFIX);
+      throw new TypeError(context + MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.EXPECTS_VECTOR2_TYPE_SUFFIX);
     }
-    if (value.length !== DEFAULT_UV_OFFSET.length) {
-      throw new TypeError(context + ERROR_EXPECTS_VECTOR2_COMPONENTS_SUFFIX);
+    if (value.length !== MTL_STANDARD_MATERIAL_DEFAULTS.UV_OFFSET.length) {
+      throw new TypeError(context + MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.EXPECTS_VECTOR2_COMPONENTS_SUFFIX);
     }
   }
   /**
@@ -8094,74 +8643,137 @@ var MtlStandardMaterial = class _MtlStandardMaterial extends DirectionalLightMat
    */
   static #assertVector3(context, value) {
     if (!Array.isArray(value) && !(value instanceof Float32Array)) {
-      throw new TypeError(context + ERROR_EXPECTS_VECTOR2_TYPE_SUFFIX);
+      throw new TypeError(context + MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.EXPECTS_VECTOR2_TYPE_SUFFIX);
     }
     if (value.length !== DIRECTIONAL_LIGHT_MATERIAL_VECTOR3_ELEMENT_COUNT) {
-      throw new TypeError(context + ERROR_EXPECTS_VECTOR3_COMPONENTS_SUFFIX);
+      throw new TypeError(context + MTL_STANDARD_MATERIAL_EXCEPTION_MESSAGES.EXPECTS_VECTOR3_COMPONENTS_SUFFIX);
     }
   }
 };
 
+// core/constants/object3d.js
+var OBJECT3D_CHILDREN = Object.freeze({
+  NOT_FOUND_INDEX: -1,
+  SINGLE_REMOVE_COUNT: 1
+});
+
 // core/scene/object3d.js
-var CHILD_NOT_FOUND_INDEX = -1;
-var SINGLE_CHILD_REMOVE_COUNT = 1;
-var MATRIX_4x4_ELEMENT_COUNT2 = 16;
 var Object3D = class _Object3D {
-  /** @type {Vector3} */
+  /**
+   * Local position relative to the parent.
+   *
+   * @type {Vector3}
+   */
   #position;
-  /** @type {Vector3} */
+  /**
+   * Local Euler rotation relative to the parent, in radians.
+   *
+   * @type {Vector3}
+   */
   #rotation;
-  /** @type {Vector3} */
+  /**
+   * Local scale relative to the parent.
+   *
+   * @type {Vector3}
+   */
   #scale;
-  /** @type {Object3D | null} */
+  /**
+   * Parent object in the scene graph.
+   *
+   * @type {Object3D | null}
+   */
   #parent;
-  /** @type {Object3D[]} */
+  /**
+   * Child objects in the scene graph.
+   *
+   * @type {Object3D[]}
+   */
   #children;
-  /** @type {Float32Array} */
+  /**
+   * Cached local transformation matrix.
+   *
+   * Rebuilt only when position, rotation or scale changes.
+   *
+   * @type {Float32Array}
+   */
   #localMatrix;
-  /** @type {Float32Array} */
+  /**
+   * Cached world transformation matrix.
+   *
+   * Rebuilt when the local transformation, parent relation or an ancestor's world transformation changes.
+   *
+   * @type {Float32Array}
+   */
   #worldMatrix;
-  /** @type {boolean} */
+  /**
+   * Indicates that the cached local matrix must be rebuilt.
+   *
+   * @type {boolean}
+   */
   #isLocalMatrixDirty = true;
-  /** @type {boolean} */
+  /**
+   * Indicates that the cached world matrix must be rebuilt.
+   *
+   * @type {boolean}
+   */
   #isWorldMatrixDirty = true;
+  /**
+   * Creates an Object3D with the default local transformation.
+   */
   constructor() {
     this.#parent = null;
     this.#children = [];
-    this.#localMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT2);
-    this.#worldMatrix = new Float32Array(MATRIX_4x4_ELEMENT_COUNT2);
+    this.#localMatrix = new Float32Array(MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
+    this.#worldMatrix = new Float32Array(MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
     _Object3D.#setIdentityMatrix(this.#localMatrix);
     _Object3D.#setIdentityMatrix(this.#worldMatrix);
     this.#position = Vector3.createZero(() => this.#markTransformDirty());
     this.#rotation = Vector3.createZero(() => this.#markTransformDirty());
     this.#scale = Vector3.createUnitScale(() => this.#markTransformDirty());
   }
-  /** @returns {Vector3} */
+  /**
+   * @returns {Vector3} - Local position relative to the parent.
+   */
   get position() {
     return this.#position;
   }
-  /** @returns {Vector3} */
+  /**
+   * @returns {Vector3} - Local Euler rotation relative to the parent, in radians.
+   */
   get rotation() {
     return this.#rotation;
   }
-  /** @returns {Vector3} */
+  /**
+   * @returns {Vector3} - Local scale relative to the parent.
+   */
   get scale() {
     return this.#scale;
   }
-  /** @returns {Object3D | null} */
+  /**
+   * @returns {Object3D | null} - Parent object or null for a root object.
+   */
   get parent() {
     return this.#parent;
   }
-  /** @returns {Object3D[]} */
+  /**
+   * @returns {Object3D[]} - Child objects.
+   */
   get children() {
     return this.#children;
   }
-  /** @returns {Float32Array} */
+  /**
+   * @returns {Float32Array} - Cached world transformation matrix.
+   */
   get worldMatrix() {
     return this.#worldMatrix;
   }
   /**
-   * @param {Object3D} child - Child node to attach to this object (reparented, if it already has a parent).
+   * Attaches a child to this object.
+   *
+   * Reparents the child when it already belongs to another parent.
+   *
+   * @param {Object3D} child - Child object to attach.
+   * @throws {TypeError}     - If the child is not an Object3D instance.
    */
   add(child) {
     if (!(child instanceof _Object3D)) {
@@ -8178,27 +8790,32 @@ var Object3D = class _Object3D {
     this.#children.push(child);
   }
   /**
-   * @param {Object3D} child - Child node to detach from this object (no-op if the child is not attached here).
+   * Detaches a child from this object.
+   *
+   * Does nothing when the child is not attached.
+   *
+   * @param {Object3D} child - Child object to detach.
+   * @throws {TypeError}     - If the child is not an Object3D instance.
    */
   remove(child) {
     if (!(child instanceof _Object3D)) {
       throw new TypeError("Object3D.remove expects an Object3D instance.");
     }
     const index = this.#children.indexOf(child);
-    if (index === CHILD_NOT_FOUND_INDEX) {
+    if (index === OBJECT3D_CHILDREN.NOT_FOUND_INDEX) {
       return;
     }
-    this.#children.splice(index, SINGLE_CHILD_REMOVE_COUNT);
+    this.#children.splice(index, OBJECT3D_CHILDREN.SINGLE_REMOVE_COUNT);
     child.#parent = null;
     child.#isWorldMatrixDirty = true;
   }
   /**
-   * Updates world matrices.
+   * Updates world matrices for this object and its descendants.
    *
    * @param {Float32Array | null | Object} inputMatrix            - Parent world matrix or options object.
-   * @param {Float32Array | null} [inputMatrix.parentWorldMatrix] - Parent world matrix override (root, when null).
+   * @param {Float32Array | null} [inputMatrix.parentWorldMatrix] - Parent world matrix override, or null for the root.
    * @returns {void}
-   * @throws {TypeError} When inputs are invalid.
+   * @throws {TypeError} - If the resolved parent world matrix is invalid.
    */
   updateWorldMatrix(inputMatrix) {
     let resolvedParentWorldMatrix = inputMatrix;
@@ -8211,7 +8828,10 @@ var Object3D = class _Object3D {
     this.#updateWorldMatrixRecursive(resolvedParentWorldMatrix, false);
   }
   /**
-   * @param {function(Object3D): void} callback - Visitor function called for this object and all descendants (depth-first).
+   * Visits this object and all descendants in depth-first order.
+   *
+   * @param {function(Object3D): void} callback - Visitor callback.
+   * @throws {TypeError}                        - If the callback is not a function.
    */
   traverse(callback) {
     if (typeof callback !== "function") {
@@ -8222,14 +8842,20 @@ var Object3D = class _Object3D {
       this.#children[index].traverse(callback);
     }
   }
-  /** @private */
+  /**
+   * Marks the cached local and world matrices for recomputation.
+   *
+   * @private
+   */
   #markTransformDirty() {
     this.#isLocalMatrixDirty = true;
     this.#isWorldMatrixDirty = true;
   }
   /**
+   * Updates the cached world matrix and propagates changes to descendants.
+   *
    * @param {Float32Array | null} parentWorldMatrix - Parent world matrix, or null for the root.
-   * @param {boolean} parentWorldDirty              - Whether the parent world matrix was recomputed in this update pass.
+   * @param {boolean} parentWorldDirty              - Whether the parent world matrix changed in this update pass.
    * @private
    */
   #updateWorldMatrixRecursive(parentWorldMatrix, parentWorldDirty) {
@@ -8252,65 +8878,38 @@ var Object3D = class _Object3D {
     }
   }
   /**
-   * Recomputes local matrix into existing buffer (no allocations).
+   * Rebuilds the cached local transformation matrix.
    *
    * @private
    */
   #updateLocalMatrix() {
-    const positionX = this.#position.x;
-    const positionY = this.#position.y;
-    const positionZ = this.#position.z;
-    const rotationX = this.#rotation.x;
-    const rotationY = this.#rotation.y;
-    const rotationZ = this.#rotation.z;
-    const scaleX = this.#scale.x;
-    const scaleY = this.#scale.y;
-    const scaleZ = this.#scale.z;
-    const cosX = Math.cos(rotationX);
-    const sinX = Math.sin(rotationX);
-    const cosY = Math.cos(rotationY);
-    const sinY = Math.sin(rotationY);
-    const cosZ = Math.cos(rotationZ);
-    const sinZ = Math.sin(rotationZ);
-    const rot00 = cosZ * cosY;
-    const rot01 = cosZ * sinY * sinX - sinZ * cosX;
-    const rot02 = cosZ * sinY * cosX + sinZ * sinX;
-    const rot10 = sinZ * cosY;
-    const rot11 = sinZ * sinY * sinX + cosZ * cosX;
-    const rot12 = sinZ * sinY * cosX - cosZ * sinX;
-    const rot20 = -sinY;
-    const rot21 = cosY * sinX;
-    const rot22 = cosY * cosX;
-    const out = this.#localMatrix;
-    out[0] = rot00 * scaleX;
-    out[1] = rot10 * scaleX;
-    out[2] = rot20 * scaleX;
-    out[3] = 0;
-    out[4] = rot01 * scaleY;
-    out[5] = rot11 * scaleY;
-    out[6] = rot21 * scaleY;
-    out[7] = 0;
-    out[8] = rot02 * scaleZ;
-    out[9] = rot12 * scaleZ;
-    out[10] = rot22 * scaleZ;
-    out[11] = 0;
-    out[12] = positionX;
-    out[13] = positionY;
-    out[14] = positionZ;
-    out[15] = 1;
+    Matrix4.writeTransformationTo(
+      this.#localMatrix,
+      this.#position.x,
+      this.#position.y,
+      this.#position.z,
+      this.#rotation.x,
+      this.#rotation.y,
+      this.#rotation.z,
+      this.#scale.x,
+      this.#scale.y,
+      this.#scale.z
+    );
   }
   /**
-   * @param {Float32Array} out - Output 4x4 matrix buffer that will be overwritten with the identity matrix.
+   * Writes an identity matrix into an existing buffer.
+   *
+   * Used to keep matrix caches valid before the first update.
+   *
+   * @param {Float32Array} out - Output 4x4 matrix buffer.
    * @private
    */
   static #setIdentityMatrix(out) {
-    for (let index = 0; index < MATRIX_4x4_ELEMENT_COUNT2; index += 1) {
-      out[index] = 0;
-    }
-    out[0] = 1;
-    out[5] = 1;
-    out[10] = 1;
-    out[15] = 1;
+    out.fill(MATH_MATRIX_VALUES.ZERO);
+    out[0] = MATH_MATRIX_VALUES.UNIT;
+    out[5] = MATH_MATRIX_VALUES.UNIT;
+    out[10] = MATH_MATRIX_VALUES.UNIT;
+    out[15] = MATH_MATRIX_VALUES.UNIT;
   }
 };
 
@@ -8797,39 +9396,47 @@ var PerspectiveCamera = class extends Camera {
    */
   #far;
   /**
-   * Cached projection matrix buffer.
-   * The buffer is reused between frames to avoid allocations.
+   * Cached perspective projection matrix.
+   *
+   * Reused between calls to avoid allocations.
    *
    * @type {Float32Array}
    * @private
    */
   #projectionMatrix;
   /**
-   * When true, projection matrix must be recomputed.
+   * Indicates that the cached projection matrix must be rebuilt.
    *
    * @type {boolean}
    * @private
    */
   #isProjectionMatrixDirty = true;
   /**
+   * Creates a perspective camera.
+   *
    * @param {number} fieldOfViewRadians - Vertical field of view in radians.
    * @param {number} aspectRatio        - Viewport aspect ratio (width / height).
-   * @param {number} near               - Distance to the near clipping plane (must be greater, than 0).
-   * @param {number} far                - Distance to the far clipping plane (must be greater, than near).
+   * @param {number} near               - Distance to the near clipping plane, must be greater than 0.
+   * @param {number} far                - Distance to the far clipping plane, must be greater than near.
+   * @throws {TypeError}                - If any argument is not a finite number.
+   * @throws {RangeError}               - If the field of view, aspect ratio or clipping distances are invalid.
    */
   constructor(fieldOfViewRadians, aspectRatio, near, far) {
     super();
-    if (typeof fieldOfViewRadians !== "number") {
+    if (typeof fieldOfViewRadians !== "number" || !Number.isFinite(fieldOfViewRadians)) {
       throw new TypeError("`PerspectiveCamera` expects `fieldOfViewRadians` as a number.");
     }
-    if (typeof aspectRatio !== "number") {
+    if (typeof aspectRatio !== "number" || !Number.isFinite(aspectRatio)) {
       throw new TypeError("`PerspectiveCamera` expects `aspectRatio` as a number.");
     }
-    if (typeof near !== "number") {
+    if (typeof near !== "number" || !Number.isFinite(near)) {
       throw new TypeError("`PerspectiveCamera` expects `near` as a number.");
     }
-    if (typeof far !== "number") {
+    if (typeof far !== "number" || !Number.isFinite(far)) {
       throw new TypeError("`PerspectiveCamera` expects `far` as a number.");
+    }
+    if (fieldOfViewRadians <= MATH_CAMERA_LIMITS.MINIMUM_FIELD_OF_VIEW_RADIANS || fieldOfViewRadians >= MATH_CAMERA_LIMITS.MAXIMUM_FIELD_OF_VIEW_RADIANS) {
+      throw new RangeError("`PerspectiveCamera` expects `0 < fieldOfViewRadians < Math.PI`.");
     }
     if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
       throw new RangeError("`PerspectiveCamera` expects a positive `aspect ratio`.");
@@ -8844,12 +9451,15 @@ var PerspectiveCamera = class extends Camera {
     this.#projectionMatrix = new Float32Array(MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
   }
   /**
-   * Updates the aspect ratio and marks projection cache as dirty.
+   * Updates the viewport aspect ratio and invalidates the projection cache, when the value changes.
    *
    * @param {number} aspectRatio - New viewport aspect ratio (canvas width divided by canvas height).
+   * @returns {void}
+   * @throws {TypeError}  - If the aspect ratio is not a finite number.
+   * @throws {RangeError} - If the aspect ratio is not positive.
    */
   setAspectRatio(aspectRatio) {
-    if (typeof aspectRatio !== "number") {
+    if (typeof aspectRatio !== "number" || !Number.isFinite(aspectRatio)) {
       throw new TypeError("`PerspectiveCamera.setAspectRatio` expects `aspectRatio` as a number.");
     }
     if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
@@ -8862,7 +9472,7 @@ var PerspectiveCamera = class extends Camera {
     this.#isProjectionMatrixDirty = true;
   }
   /**
-   * Returns the projection matrix for this camera. The returned matrix is cached and reused between calls.
+   * Returns the cached projection matrix, rebuilding it when needed.
    *
    * @returns {Float32Array} - Cached projection matrix.
    */
@@ -10565,7 +11175,7 @@ var FpsCounter = class _FpsCounter {
 
 // core/debug/light-gizmo.js
 var DEFAULT_VISIBLE = true;
-var ZERO_VALUE11 = 0;
+var ZERO_VALUE3 = 0;
 var VISIBLE_OPACITY = 1;
 var HIDDEN_OPACITY = 0;
 var MARKER_HALF_SIZE = 0.4;
@@ -10654,14 +11264,14 @@ var LightGizmo = class extends Object3D {
   #buildMarker(webglContext) {
     const markerMaterial = new SolidColorMaterial(webglContext, { color: MARKER_COLOR });
     this.#materials.push(markerMaterial);
-    const xStart = new Vector3(-MARKER_HALF_SIZE, ZERO_VALUE11, ZERO_VALUE11);
-    const xEnd = new Vector3(MARKER_HALF_SIZE, ZERO_VALUE11, ZERO_VALUE11);
+    const xStart = new Vector3(-MARKER_HALF_SIZE, ZERO_VALUE3, ZERO_VALUE3);
+    const xEnd = new Vector3(MARKER_HALF_SIZE, ZERO_VALUE3, ZERO_VALUE3);
     this.add(this.#createLine(webglContext, markerMaterial, [xStart, xEnd]));
-    const yStart = new Vector3(ZERO_VALUE11, -MARKER_HALF_SIZE, ZERO_VALUE11);
-    const yEnd = new Vector3(ZERO_VALUE11, MARKER_HALF_SIZE, ZERO_VALUE11);
+    const yStart = new Vector3(ZERO_VALUE3, -MARKER_HALF_SIZE, ZERO_VALUE3);
+    const yEnd = new Vector3(ZERO_VALUE3, MARKER_HALF_SIZE, ZERO_VALUE3);
     this.add(this.#createLine(webglContext, markerMaterial, [yStart, yEnd]));
-    const zStart = new Vector3(ZERO_VALUE11, ZERO_VALUE11, -MARKER_HALF_SIZE);
-    const zEnd = new Vector3(ZERO_VALUE11, ZERO_VALUE11, MARKER_HALF_SIZE);
+    const zStart = new Vector3(ZERO_VALUE3, ZERO_VALUE3, -MARKER_HALF_SIZE);
+    const zEnd = new Vector3(ZERO_VALUE3, ZERO_VALUE3, MARKER_HALF_SIZE);
     this.add(this.#createLine(webglContext, markerMaterial, [zStart, zEnd]));
   }
   /**
@@ -10676,13 +11286,13 @@ var LightGizmo = class extends Object3D {
   #buildArrow(webglContext) {
     const arrowMaterial = new SolidColorMaterial(webglContext, { color: ARROW_COLOR });
     this.#materials.push(arrowMaterial);
-    const shaftStart = new Vector3(ZERO_VALUE11, ZERO_VALUE11, ZERO_VALUE11);
-    const shaftEnd = new Vector3(ZERO_VALUE11, ZERO_VALUE11, -ARROW_LENGTH);
+    const shaftStart = new Vector3(ZERO_VALUE3, ZERO_VALUE3, ZERO_VALUE3);
+    const shaftEnd = new Vector3(ZERO_VALUE3, ZERO_VALUE3, -ARROW_LENGTH);
     this.add(this.#createLine(webglContext, arrowMaterial, [shaftStart, shaftEnd]));
     const headBaseZ = -ARROW_LENGTH + ARROW_HEAD_LENGTH;
-    const headLeft = new Vector3(-ARROW_HEAD_HALF_WIDTH, ZERO_VALUE11, headBaseZ);
-    const headTip = new Vector3(ZERO_VALUE11, ZERO_VALUE11, -ARROW_LENGTH);
-    const headRight = new Vector3(ARROW_HEAD_HALF_WIDTH, ZERO_VALUE11, headBaseZ);
+    const headLeft = new Vector3(-ARROW_HEAD_HALF_WIDTH, ZERO_VALUE3, headBaseZ);
+    const headTip = new Vector3(ZERO_VALUE3, ZERO_VALUE3, -ARROW_LENGTH);
+    const headRight = new Vector3(ARROW_HEAD_HALF_WIDTH, ZERO_VALUE3, headBaseZ);
     this.add(this.#createLine(webglContext, arrowMaterial, [headLeft, headTip, headRight]));
   }
   /**
@@ -10715,7 +11325,7 @@ var AXIS_HEAD_HALF_WIDTH = 0.25;
 var AXIS_PICK_THICKNESS = 0.35;
 var AXIS_PICK_LENGTH = AXIS_LENGTH;
 var AXIS_PICK_CENTER_DIVISOR = 2;
-var ZERO_VALUE12 = 0;
+var ZERO_VALUE4 = 0;
 var AXIS_X = "x";
 var AXIS_Y = "y";
 var AXIS_Z = "z";
@@ -10984,7 +11594,7 @@ var TransformGizmo = class extends Object3D {
   #buildAxis(webglContext, axis, color, dir, headOrtho) {
     const material = new SolidColorMaterial(webglContext, { color });
     this.#axisMaterials.set(axis, material);
-    const start = new Vector3(ZERO_VALUE12, ZERO_VALUE12, ZERO_VALUE12);
+    const start = new Vector3(ZERO_VALUE4, ZERO_VALUE4, ZERO_VALUE4);
     const end = new Vector3(
       dir[0] * AXIS_LENGTH,
       dir[1] * AXIS_LENGTH,
@@ -11098,14 +11708,14 @@ var TransformGizmo = class extends Object3D {
 };
 
 // core/loaders/obj-mtl/obj-geometry-builder.js
-var POSITION_COMPONENT_COUNT6 = 3;
-var UV_COMPONENT_COUNT2 = 2;
-var NORMAL_COMPONENT_COUNT2 = 3;
-var COLOR_COMPONENT_COUNT5 = 3;
+var POSITION_COMPONENT_COUNT = 3;
+var UV_COMPONENT_COUNT = 2;
+var NORMAL_COMPONENT_COUNT = 3;
+var COLOR_COMPONENT_COUNT = 3;
 var DEFAULT_UV = [0, 0];
 var DEFAULT_NORMAL = [0, 0, 1];
 var OBJ_INDEX_NOT_PROVIDED = -1;
-var ZERO_VALUE13 = 0;
+var ZERO_VALUE5 = 0;
 var FIRST_INDEX = 0;
 var SECOND_INDEX = 1;
 var THIRD_INDEX = 2;
@@ -11219,7 +11829,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
     const normals = [];
     const colors = parsedData.hasVertexColors ? [] : null;
     const indices = [];
-    if (chunk.smoothingGroup === ZERO_VALUE13) {
+    if (chunk.smoothingGroup === ZERO_VALUE5) {
       this.#appendFlatGeometry(chunk, parsedData, positions, uvs, normals, colors, indices);
     } else {
       this.#appendSmoothGeometry(chunk, parsedData, positions, uvs, normals, colors, indices);
@@ -11280,7 +11890,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
     const uvs = parsedData.uvs;
     const normals = parsedData.normals;
     const colors = parsedData.colors;
-    let vertexIndex = ZERO_VALUE13;
+    let vertexIndex = ZERO_VALUE5;
     for (const triangle of chunk.triangles) {
       const faceNormal = this.#computeFaceNormal(triangle, positions);
       for (const vertex of triangle) {
@@ -11336,7 +11946,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
         const positionIndex = vertex.positionIndex;
         const uvIndex = vertex.uvIndex;
         const normalIndex = vertex.normalIndex;
-        const nextIndex = positionsOut.length / POSITION_COMPONENT_COUNT6;
+        const nextIndex = positionsOut.length / POSITION_COMPONENT_COUNT;
         vertexMap.set(key, nextIndex);
         _ObjGeometryBuilder.#appendPosition(positions, positionIndex, positionsOut);
         _ObjGeometryBuilder.#appendUv(uvs, uvIndex, uvsOut);
@@ -11374,7 +11984,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
           continue;
         }
         const key = _ObjGeometryBuilder.#buildVertexKey(vertex);
-        const current = accumulators.get(key) || [ZERO_VALUE13, ZERO_VALUE13, ZERO_VALUE13];
+        const current = accumulators.get(key) || [ZERO_VALUE5, ZERO_VALUE5, ZERO_VALUE5];
         current[COMPONENT_INDEX_X] += faceNormal[COMPONENT_INDEX_X];
         current[COMPONENT_INDEX_Y] += faceNormal[COMPONENT_INDEX_Y];
         current[COMPONENT_INDEX_Z] += faceNormal[COMPONENT_INDEX_Z];
@@ -11383,7 +11993,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
     }
     for (const [key, normal] of accumulators.entries()) {
       const length = Math.hypot(normal[COMPONENT_INDEX_X], normal[COMPONENT_INDEX_Y], normal[COMPONENT_INDEX_Z]);
-      if (length > ZERO_VALUE13) {
+      if (length > ZERO_VALUE5) {
         normal[COMPONENT_INDEX_X] /= length;
         normal[COMPONENT_INDEX_Y] /= length;
         normal[COMPONENT_INDEX_Z] /= length;
@@ -11423,7 +12033,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
     const ny = abz * acx - abx * acz;
     const nz = abx * acy - aby * acx;
     const length = Math.hypot(nx, ny, nz);
-    if (length > ZERO_VALUE13) {
+    if (length > ZERO_VALUE5) {
       return [nx / length, ny / length, nz / length];
     }
     return DEFAULT_NORMAL;
@@ -11438,7 +12048,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
    * @private
    */
   static #appendPosition(sourcePositions, index, target) {
-    const baseIndex = index * POSITION_COMPONENT_COUNT6;
+    const baseIndex = index * POSITION_COMPONENT_COUNT;
     target.push(
       sourcePositions[baseIndex + COMPONENT_INDEX_X],
       sourcePositions[baseIndex + COMPONENT_INDEX_Y],
@@ -11455,8 +12065,8 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
    * @private
    */
   static #appendUv(sourceUvs, index, target) {
-    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE13 && index * UV_COMPONENT_COUNT2 < sourceUvs.length) {
-      const baseIndex = index * UV_COMPONENT_COUNT2;
+    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE5 && index * UV_COMPONENT_COUNT < sourceUvs.length) {
+      const baseIndex = index * UV_COMPONENT_COUNT;
       target.push(sourceUvs[baseIndex + COMPONENT_INDEX_X], sourceUvs[baseIndex + COMPONENT_INDEX_Y]);
       return;
     }
@@ -11472,8 +12082,8 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
    * @private
    */
   static #appendNormal(sourceNormals, index, target) {
-    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE13 && index * NORMAL_COMPONENT_COUNT2 < sourceNormals.length) {
-      const baseIndex = index * NORMAL_COMPONENT_COUNT2;
+    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE5 && index * NORMAL_COMPONENT_COUNT < sourceNormals.length) {
+      const baseIndex = index * NORMAL_COMPONENT_COUNT;
       target.push(
         sourceNormals[baseIndex + COMPONENT_INDEX_X],
         sourceNormals[baseIndex + COMPONENT_INDEX_Y],
@@ -11497,7 +12107,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
    * @private
    */
   static #appendColor(sourceColors, index, target) {
-    const baseIndex = index * COLOR_COMPONENT_COUNT5;
+    const baseIndex = index * COLOR_COMPONENT_COUNT;
     target.push(
       sourceColors[baseIndex + COMPONENT_INDEX_X],
       sourceColors[baseIndex + COMPONENT_INDEX_Y],
@@ -11524,7 +12134,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
    * @private
    */
   static #getPositionComponent(positions, index, component) {
-    return positions[index * POSITION_COMPONENT_COUNT6 + component];
+    return positions[index * POSITION_COMPONENT_COUNT + component];
   }
   /**
    * Builds Vector3 positions from indices.
@@ -11537,7 +12147,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
   static #buildVectorPositions(indices, positions) {
     const result = [];
     for (const index of indices) {
-      const baseIndex = index * POSITION_COMPONENT_COUNT6;
+      const baseIndex = index * POSITION_COMPONENT_COUNT;
       const x = positions[baseIndex + COMPONENT_INDEX_X];
       const y = positions[baseIndex + COMPONENT_INDEX_Y];
       const z = positions[baseIndex + COMPONENT_INDEX_Z];
@@ -11643,17 +12253,17 @@ var MtlTextureCache = class _MtlTextureCache {
 };
 
 // core/loaders/obj-mtl/obj-material-factory.js
-var DEFAULT_TEXTURE_UNIT_INDEX3 = 0;
-var DEFAULT_OPACITY2 = 1;
+var DEFAULT_TEXTURE_UNIT_INDEX = 0;
+var DEFAULT_OPACITY = 1;
 var DEFAULT_AMBIENT_STRENGTH = 0.2;
-var COLOR_COMPONENT_COUNT6 = 3;
-var DEFAULT_DIFFUSE_COLOR2 = new Float32Array([1, 1, 1]);
-var DEFAULT_SHININESS3 = 16;
-var DEFAULT_SPECULAR_STRENGTH3 = 1;
-var DEFAULT_OPTICAL_DENSITY2 = 1;
+var COLOR_COMPONENT_COUNT2 = 3;
+var DEFAULT_DIFFUSE_COLOR = new Float32Array([1, 1, 1]);
+var DEFAULT_SHININESS = 16;
+var DEFAULT_SPECULAR_STRENGTH = 1;
+var DEFAULT_OPTICAL_DENSITY = 1;
 var MIN_SHININESS = 1;
 var MAX_SHININESS = 128;
-var ZERO_VALUE14 = 0;
+var ZERO_VALUE6 = 0;
 var AMBIENT_COLOR_EPSILON = 1e-4;
 var FIRST_INDEX2 = 0;
 var SECOND_INDEX2 = 1;
@@ -11695,7 +12305,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
    * @type {Float32Array}
    * @private
    */
-  #defaultColor = new Float32Array(DEFAULT_DIFFUSE_COLOR2);
+  #defaultColor = new Float32Array(DEFAULT_DIFFUSE_COLOR);
   /**
    * Texture cache, used for loading the textures.
    *
@@ -11716,18 +12326,18 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
       throw new TypeError(ERROR_OPTIONS_TYPE3);
     }
     const {
-      textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX3,
+      textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX,
       defaultColor,
       textureCache
     } = options;
-    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE14) {
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE6) {
       throw new TypeError(ERROR_TEXTURE_UNIT_INDEX_TYPE);
     }
     if (defaultColor !== void 0) {
       if (!Array.isArray(defaultColor) && !(defaultColor instanceof Float32Array)) {
         throw new TypeError(ERROR_DEFAULT_COLOR_TYPE);
       }
-      if (defaultColor.length !== COLOR_COMPONENT_COUNT6) {
+      if (defaultColor.length !== COLOR_COMPONENT_COUNT2) {
         throw new TypeError(ERROR_DEFAULT_COLOR_LENGTH);
       }
       this.#defaultColor.set(defaultColor);
@@ -11753,7 +12363,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
     if (!Array.isArray(textures)) {
       throw new TypeError(ERROR_TEXTURES_OUTPUT_TYPE);
     }
-    const opacity = definition ? definition.opacity : DEFAULT_OPACITY2;
+    const opacity = definition ? definition.opacity : DEFAULT_OPACITY;
     if (definition && this.#requiresStandardMaterial(definition, textureUrls)) {
       this.#assertTextureUnitsAvailable(definition, textureUrls);
       const ambientColor = _ObjMaterialFactory.#resolveAmbientColor(definition);
@@ -11766,8 +12376,8 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
       });
       material.setOpacity(opacity);
       material.setShininess(_ObjMaterialFactory.#clampShininess(definition.specularExponent));
-      material.setSpecularStrength(DEFAULT_SPECULAR_STRENGTH3);
-      material.setOpticalDensity(definition.opticalDensity ?? DEFAULT_OPTICAL_DENSITY2);
+      material.setSpecularStrength(DEFAULT_SPECULAR_STRENGTH);
+      material.setOpticalDensity(definition.opticalDensity ?? DEFAULT_OPTICAL_DENSITY);
       material.setSpecularEnabled(_ObjMaterialFactory.#isSpecularEnabled(definition));
       if (textureUrls && definition.diffuseMap && textureUrls.diffuse) {
         const texture = await this.#textureCache.getTexture(textureUrls.diffuse, textures, {
@@ -11849,7 +12459,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
     }
     if (this.#hasSpecularInfo(definition)) {
       const diffuseColor = definition ? definition.diffuseColor : this.#defaultColor;
-      const specularColor = definition ? definition.specularColor : new Float32Array(COLOR_COMPONENT_COUNT6);
+      const specularColor = definition ? definition.specularColor : new Float32Array(COLOR_COMPONENT_COUNT2);
       const shininess = _ObjMaterialFactory.#clampShininess(definition ? definition.specularExponent : null);
       const material = new PhongMaterial(this.#webglContext, {
         color: diffuseColor,
@@ -11883,7 +12493,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
       return true;
     }
     const specular = definition.specularColor;
-    return Boolean(specular && (specular[FIRST_INDEX2] > ZERO_VALUE14 || specular[SECOND_INDEX2] > ZERO_VALUE14 || specular[THIRD_INDEX2] > ZERO_VALUE14));
+    return Boolean(specular && (specular[FIRST_INDEX2] > ZERO_VALUE6 || specular[SECOND_INDEX2] > ZERO_VALUE6 || specular[THIRD_INDEX2] > ZERO_VALUE6));
   }
   /**
    * Resolves the ambient color, applying fallback to diffuse the color, when needed.
@@ -11912,7 +12522,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
    * @private
    */
   static #isColorNearZero(color) {
-    if (!color || typeof color.length !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || color.length < COLOR_COMPONENT_COUNT6) {
+    if (!color || typeof color.length !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || color.length < COLOR_COMPONENT_COUNT2) {
       return true;
     }
     return Math.abs(color[FIRST_INDEX2]) <= AMBIENT_COLOR_EPSILON && Math.abs(color[SECOND_INDEX2]) <= AMBIENT_COLOR_EPSILON && Math.abs(color[THIRD_INDEX2]) <= AMBIENT_COLOR_EPSILON;
@@ -11926,7 +12536,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
    */
   static #clampShininess(value) {
     if (typeof value !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(value)) {
-      return DEFAULT_SHININESS3;
+      return DEFAULT_SHININESS;
     }
     return Math.min(Math.max(value, MIN_SHININESS), MAX_SHININESS);
   }
@@ -11974,7 +12584,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
    */
   #assertTextureUnitsAvailable(definition, textureUrls) {
     const maxUnits = this.#webglContext.getParameter(this.#webglContext.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
-    if (!Number.isInteger(maxUnits) || maxUnits <= ZERO_VALUE14) {
+    if (!Number.isInteger(maxUnits) || maxUnits <= ZERO_VALUE6) {
       throw new Error(ERROR_TEXTURE_UNITS_LIMIT);
     }
     const usesDiffuse = Boolean(textureUrls && definition.diffuseMap && textureUrls.diffuse);
@@ -11984,7 +12594,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
     const usesBump = Boolean(textureUrls && definition.bumpMap && textureUrls.bump);
     const usesDisplacement = Boolean(textureUrls && definition.displacementMap && textureUrls.displacement);
     const usesReflection = Boolean(textureUrls && definition.reflectionMap && textureUrls.reflection);
-    let maxOffset = ZERO_VALUE14;
+    let maxOffset = ZERO_VALUE6;
     if (usesDiffuse) {
       maxOffset = Math.max(maxOffset, TEXTURE_UNIT_DIFFUSE);
     }
@@ -12073,15 +12683,15 @@ var QUOTE_TOKEN2 = '"';
 var NOT_FOUND_INDEX = -1;
 var FACE_MIN_VERTEX_COUNT = 3;
 var LINE_MIN_VERTEX_COUNT2 = 2;
-var POSITION_COMPONENT_COUNT7 = 3;
-var UV_COMPONENT_COUNT3 = 2;
-var NORMAL_COMPONENT_COUNT3 = 3;
-var COLOR_COMPONENT_COUNT7 = 3;
+var POSITION_COMPONENT_COUNT2 = 3;
+var UV_COMPONENT_COUNT2 = 2;
+var NORMAL_COMPONENT_COUNT2 = 3;
+var COLOR_COMPONENT_COUNT3 = 3;
 var FIRST_INDEX3 = 0;
 var SECOND_INDEX4 = 1;
 var THIRD_INDEX3 = 2;
 var FOURTH_INDEX = 3;
-var COLOR_START_INDEX = POSITION_COMPONENT_COUNT7 + SECOND_INDEX4;
+var COLOR_START_INDEX = POSITION_COMPONENT_COUNT2 + SECOND_INDEX4;
 var DEFAULT_SMOOTHING_GROUP = 0;
 var SMOOTHING_OFF_TOKEN = "off";
 var SMOOTHING_ON_TOKEN = "on";
@@ -12279,9 +12889,9 @@ var ObjParser = class _ObjParser {
    * @private
    */
   #parseVertex(parts) {
-    const position = _ObjParser.#parseFloatTriplet(parts, POSITION_COMPONENT_COUNT7);
+    const position = _ObjParser.#parseFloatTriplet(parts, POSITION_COMPONENT_COUNT2);
     this.#positions.push(...position);
-    if (parts.length >= COLOR_START_INDEX + COLOR_COMPONENT_COUNT7) {
+    if (parts.length >= COLOR_START_INDEX + COLOR_COMPONENT_COUNT3) {
       if (!this.#hasVertexColors) {
         this.#hasVertexColors = true;
         this.#fillMissingColors();
@@ -12314,7 +12924,7 @@ var ObjParser = class _ObjParser {
    * @private
    */
   #parseNormal(parts) {
-    const normal = _ObjParser.#parseFloatTriplet(parts, NORMAL_COMPONENT_COUNT3);
+    const normal = _ObjParser.#parseFloatTriplet(parts, NORMAL_COMPONENT_COUNT2);
     this.#normals.push(...normal);
   }
   /**
@@ -12478,9 +13088,9 @@ var ObjParser = class _ObjParser {
    */
   #resolveFaceVertex(vertexData) {
     const indices = vertexData.split(OBJ_FACE_ATTRIBUTE_SEPARATOR);
-    const positionIndex = _ObjParser.#parseIndex(indices[FIRST_INDEX3], this.#positions.length / POSITION_COMPONENT_COUNT7);
-    const uvIndex = _ObjParser.#parseIndex(indices[SECOND_INDEX4], this.#uvs.length / UV_COMPONENT_COUNT3);
-    const normalIndex = _ObjParser.#parseIndex(indices[THIRD_INDEX3], this.#normals.length / NORMAL_COMPONENT_COUNT3);
+    const positionIndex = _ObjParser.#parseIndex(indices[FIRST_INDEX3], this.#positions.length / POSITION_COMPONENT_COUNT2);
+    const uvIndex = _ObjParser.#parseIndex(indices[SECOND_INDEX4], this.#uvs.length / UV_COMPONENT_COUNT2);
+    const normalIndex = _ObjParser.#parseIndex(indices[THIRD_INDEX3], this.#normals.length / NORMAL_COMPONENT_COUNT2);
     if (positionIndex === OBJ_INDEX_NOT_PROVIDED2) {
       throw new Error(ERROR_MISSING_POSITION_INDEX);
     }
@@ -12499,7 +13109,7 @@ var ObjParser = class _ObjParser {
    */
   #resolveVertexPositionIndex(vertexData) {
     const indices = vertexData.split(OBJ_FACE_ATTRIBUTE_SEPARATOR);
-    return _ObjParser.#parseIndex(indices[FIRST_INDEX3], this.#positions.length / POSITION_COMPONENT_COUNT7);
+    return _ObjParser.#parseIndex(indices[FIRST_INDEX3], this.#positions.length / POSITION_COMPONENT_COUNT2);
   }
   /**
    * Creates or returns a parsed object entry.
@@ -12577,9 +13187,9 @@ var ObjParser = class _ObjParser {
    * @private
    */
   #fillMissingColors() {
-    const vertexCount = this.#positions.length / POSITION_COMPONENT_COUNT7;
+    const vertexCount = this.#positions.length / POSITION_COMPONENT_COUNT2;
     const defaultColor = _ObjParser.#getDefaultVertexColor();
-    for (let index = this.#colors.length / COLOR_COMPONENT_COUNT7; index < vertexCount; index += NEXT_FACE_VERTEX_OFFSET) {
+    for (let index = this.#colors.length / COLOR_COMPONENT_COUNT3; index < vertexCount; index += NEXT_FACE_VERTEX_OFFSET) {
       this.#colors.push(...defaultColor);
     }
   }
@@ -12743,7 +13353,7 @@ var MTL_MAP_OPTION_TYPE = "-type";
 var DEFAULT_MAP_OFFSET = new Float32Array([0, 0]);
 var DEFAULT_MAP_SCALE = new Float32Array([1, 1]);
 var DEFAULT_MAP_CLAMP = false;
-var DEFAULT_BUMP_MULTIPLIER2 = 1;
+var DEFAULT_BUMP_MULTIPLIER = 1;
 var CLAMP_ON_TOKEN = "on";
 var CLAMP_OFF_TOKEN = "off";
 var CLAMP_ON_NUMERIC_TOKEN = "1";
@@ -12756,13 +13366,13 @@ var MTL_MAP_MM_COMPONENTS = 2;
 var MTL_MAP_TEXRES_COMPONENTS = 1;
 var MTL_MAP_TYPE_COMPONENTS = 1;
 var MTL_MAP_SCALAR_COMPONENTS = 1;
-var COLOR_COMPONENT_COUNT8 = 3;
-var DEFAULT_OPACITY3 = 1;
-var DEFAULT_DIFFUSE_COLOR3 = new Float32Array([1, 1, 1]);
-var DEFAULT_SPECULAR_COLOR3 = new Float32Array([0, 0, 0]);
-var DEFAULT_AMBIENT_COLOR2 = new Float32Array([0, 0, 0]);
-var DEFAULT_EMISSIVE_COLOR2 = new Float32Array([0, 0, 0]);
-var ZERO_VALUE15 = 0;
+var COLOR_COMPONENT_COUNT4 = 3;
+var DEFAULT_OPACITY2 = 1;
+var DEFAULT_DIFFUSE_COLOR2 = new Float32Array([1, 1, 1]);
+var DEFAULT_SPECULAR_COLOR = new Float32Array([0, 0, 0]);
+var DEFAULT_AMBIENT_COLOR = new Float32Array([0, 0, 0]);
+var DEFAULT_EMISSIVE_COLOR = new Float32Array([0, 0, 0]);
+var ZERO_VALUE7 = 0;
 var EMPTY_STRING3 = "";
 var SPACE_SEPARATOR3 = " ";
 var LINE_SPLIT_REGEX2 = /\s+/u;
@@ -12809,10 +13419,10 @@ var MtlParser = class _MtlParser {
           }
           currentMaterial = {
             name,
-            diffuseColor: new Float32Array(DEFAULT_DIFFUSE_COLOR3),
-            ambientColor: new Float32Array(DEFAULT_AMBIENT_COLOR2),
-            specularColor: new Float32Array(DEFAULT_SPECULAR_COLOR3),
-            emissiveColor: new Float32Array(DEFAULT_EMISSIVE_COLOR2),
+            diffuseColor: new Float32Array(DEFAULT_DIFFUSE_COLOR2),
+            ambientColor: new Float32Array(DEFAULT_AMBIENT_COLOR),
+            specularColor: new Float32Array(DEFAULT_SPECULAR_COLOR),
+            emissiveColor: new Float32Array(DEFAULT_EMISSIVE_COLOR),
             diffuseMap: null,
             ambientMap: null,
             specularMap: null,
@@ -12823,7 +13433,7 @@ var MtlParser = class _MtlParser {
             specularExponent: null,
             opticalDensity: null,
             illuminationModel: null,
-            opacity: DEFAULT_OPACITY3
+            opacity: DEFAULT_OPACITY2
           };
           materials.set(name, currentMaterial);
           break;
@@ -12832,7 +13442,7 @@ var MtlParser = class _MtlParser {
           if (!currentMaterial) {
             break;
           }
-          const color = _MtlParser.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT8);
+          const color = _MtlParser.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT4);
           currentMaterial.ambientColor.set(color);
           break;
         }
@@ -12840,7 +13450,7 @@ var MtlParser = class _MtlParser {
           if (!currentMaterial) {
             break;
           }
-          const color = _MtlParser.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT8);
+          const color = _MtlParser.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT4);
           currentMaterial.diffuseColor.set(color);
           break;
         }
@@ -12848,7 +13458,7 @@ var MtlParser = class _MtlParser {
           if (!currentMaterial) {
             break;
           }
-          const color = _MtlParser.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT8);
+          const color = _MtlParser.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT4);
           currentMaterial.specularColor.set(color);
           break;
         }
@@ -12856,7 +13466,7 @@ var MtlParser = class _MtlParser {
           if (!currentMaterial) {
             break;
           }
-          const color = _MtlParser.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT8);
+          const color = _MtlParser.#parseFloatTriplet(parts, COLOR_COMPONENT_COUNT4);
           currentMaterial.emissiveColor.set(color);
           break;
         }
@@ -12956,7 +13566,7 @@ var MtlParser = class _MtlParser {
           }
           const value = _MtlParser.#parseFloatValue(parts[SECOND_INDEX5]);
           if (value !== null) {
-            currentMaterial.opacity = DEFAULT_OPACITY3 - value;
+            currentMaterial.opacity = DEFAULT_OPACITY2 - value;
           }
           break;
         }
@@ -12976,7 +13586,7 @@ var MtlParser = class _MtlParser {
    */
   static #parseFloatTriplet(parts, expected) {
     if (parts.length <= expected) {
-      return [ZERO_VALUE15, ZERO_VALUE15, ZERO_VALUE15];
+      return [ZERO_VALUE7, ZERO_VALUE7, ZERO_VALUE7];
     }
     return [
       Number.parseFloat(parts[SECOND_INDEX5]),
@@ -13039,7 +13649,7 @@ var MtlParser = class _MtlParser {
             index += MTL_MAP_SCALAR_COMPONENTS + SECOND_INDEX5;
             break;
           case MTL_MAP_OPTION_BUMP_MULTIPLIER:
-            mapData.bumpMultiplier = _MtlParser.#parseFloatValue(tokens[index + SECOND_INDEX5]) ?? DEFAULT_BUMP_MULTIPLIER2;
+            mapData.bumpMultiplier = _MtlParser.#parseFloatValue(tokens[index + SECOND_INDEX5]) ?? DEFAULT_BUMP_MULTIPLIER;
             index += MTL_MAP_SCALAR_COMPONENTS + SECOND_INDEX5;
             break;
           case MTL_MAP_OPTION_BLENDU:
@@ -13116,7 +13726,7 @@ var MtlParser = class _MtlParser {
       offset: new Float32Array(DEFAULT_MAP_OFFSET),
       scale: new Float32Array(DEFAULT_MAP_SCALE),
       clamp: DEFAULT_MAP_CLAMP,
-      bumpMultiplier: DEFAULT_BUMP_MULTIPLIER2
+      bumpMultiplier: DEFAULT_BUMP_MULTIPLIER
     };
   }
   /**
@@ -13223,9 +13833,9 @@ var MtlParser = class _MtlParser {
 };
 
 // core/loaders/obj-mtl/obj-mtl-loader.js
-var DEFAULT_TEXTURE_UNIT_INDEX4 = 0;
-var DEFAULT_DIFFUSE_COLOR4 = new Float32Array([1, 1, 1]);
-var DEFAULT_OPACITY4 = 1;
+var DEFAULT_TEXTURE_UNIT_INDEX2 = 0;
+var DEFAULT_DIFFUSE_COLOR3 = new Float32Array([1, 1, 1]);
+var DEFAULT_OPACITY3 = 1;
 var EMPTY_STRING4 = "";
 var DEFAULT_BASE_URL = EMPTY_STRING4;
 var PATH_SEPARATOR2 = "/";
@@ -13238,8 +13848,8 @@ var QUOTE_TOKEN4 = '"';
 var NOT_FOUND_INDEX3 = -1;
 var SECOND_INDEX6 = 1;
 var BASE_PATH_SLICE_OFFSET = 1;
-var ZERO_VALUE16 = 0;
-var COLOR_COMPONENT_COUNT9 = 3;
+var ZERO_VALUE8 = 0;
+var COLOR_COMPONENT_COUNT5 = 3;
 var ENTRY_TYPE_MESH2 = "mesh";
 var ENTRY_TYPE_POINTS2 = "points";
 var ENTRY_TYPE_LINE2 = "line";
@@ -13292,7 +13902,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
    * @type {Float32Array}
    * @private
    */
-  #defaultColor = new Float32Array(DEFAULT_DIFFUSE_COLOR4);
+  #defaultColor = new Float32Array(DEFAULT_DIFFUSE_COLOR3);
   /**
    * OBJ parser instance.
    *
@@ -13341,17 +13951,17 @@ var ObjMtlLoader = class _ObjMtlLoader {
       throw new TypeError(ERROR_OPTIONS_TYPE4);
     }
     const {
-      textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX4,
+      textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX2,
       defaultColor
     } = options;
-    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE16) {
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE8) {
       throw new TypeError(ERROR_TEXTURE_UNIT_INDEX_TYPE2);
     }
     if (defaultColor !== void 0) {
       if (!Array.isArray(defaultColor) && !(defaultColor instanceof Float32Array)) {
         throw new TypeError(ERROR_DEFAULT_COLOR_TYPE2);
       }
-      if (defaultColor.length !== COLOR_COMPONENT_COUNT9) {
+      if (defaultColor.length !== COLOR_COMPONENT_COUNT5) {
         throw new TypeError(ERROR_DEFAULT_COLOR_LENGTH2);
       }
       this.#defaultColor.set(defaultColor);
@@ -13415,7 +14025,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
         console.warn(`${WARNING_MTL_LOAD_FAILED_PREFIX}${resolvedMtlUrl}${WARNING_MTL_LOAD_FAILED_REASON_PREFIX}${errorMessage}`);
       }
     }
-    if (!mtlUrl && objData.materialLibraries.length > ZERO_VALUE16) {
+    if (!mtlUrl && objData.materialLibraries.length > ZERO_VALUE8) {
       for (const library of objData.materialLibraries) {
         if (!library) {
           continue;
@@ -13522,7 +14132,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
     const missingMaterialWarnings = /* @__PURE__ */ new Set();
     const missingDiffuseWarnings = /* @__PURE__ */ new Set();
     const availableMaterials = Array.from(mtlData.keys());
-    const availablePreview = availableMaterials.slice(ZERO_VALUE16, WARNING_MTL_AVAILABLE_LIMIT);
+    const availablePreview = availableMaterials.slice(ZERO_VALUE8, WARNING_MTL_AVAILABLE_LIMIT);
     for (const entry of buildResult.entries) {
       const materialDefinition = mtlData.get(entry.materialName) || null;
       const textureUrls = _ObjMtlLoader.#resolveTextureUrls(materialDefinition, textureBaseUrl, assetUrlMap);
@@ -13568,7 +14178,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
       if (entry.entryType === ENTRY_TYPE_POINTS2) {
         const color = materialDefinition ? materialDefinition.diffuseColor : this.#defaultColor;
         const material = new PointsMaterial(this.#webglContext, { color });
-        material.setOpacity(materialDefinition ? materialDefinition.opacity : DEFAULT_OPACITY4);
+        material.setOpacity(materialDefinition ? materialDefinition.opacity : DEFAULT_OPACITY3);
         const points = new Points(entry.geometry, material);
         entry.parent.add(points);
         meshes.push(points);
@@ -13578,7 +14188,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
       if (entry.entryType === ENTRY_TYPE_LINE2) {
         const color = materialDefinition ? materialDefinition.diffuseColor : this.#defaultColor;
         const material = new SolidColorMaterial(this.#webglContext, { color });
-        material.setOpacity(materialDefinition ? materialDefinition.opacity : DEFAULT_OPACITY4);
+        material.setOpacity(materialDefinition ? materialDefinition.opacity : DEFAULT_OPACITY3);
         const line = new Line(entry.geometry, material);
         entry.parent.add(line);
         meshes.push(line);
@@ -13638,7 +14248,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
     if (lastSlashIndex === NOT_FOUND_INDEX3) {
       return DEFAULT_BASE_URL;
     }
-    return url.slice(ZERO_VALUE16, lastSlashIndex + BASE_PATH_SLICE_OFFSET);
+    return url.slice(ZERO_VALUE8, lastSlashIndex + BASE_PATH_SLICE_OFFSET);
   }
   /**
    * Resolves a relative path against a base URL.

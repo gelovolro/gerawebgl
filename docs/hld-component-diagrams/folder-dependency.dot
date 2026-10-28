@@ -32,6 +32,8 @@ digraph FolderDependencies {
     "engine" -> "material";
     "engine" -> "render";
     "engine" -> "scene";
+    "exception-messages" -> "constants";
+    "geometry" -> "constants";
     "geometry" -> "math";
     "interaction" -> "math";
     "interaction" -> "scene";
@@ -60,5 +62,9 @@ digraph FolderDependencies {
     "scene" -> "geometry";
     "scene" -> "material";
     "scene" -> "math";
+    "shader" -> "constants";
+    "shader" -> "exception-messages";
     "shader" -> "texture";
+    "texture" -> "constants";
+    "texture" -> "exception-messages";
 }
