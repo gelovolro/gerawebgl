@@ -38,3 +38,12 @@ export const CATMULL_ROM_EXPECTED_VALUES = Object.freeze({
 
 // Expected tangent normalization threshold, used by 'CatmullRomCurve3' tests
 export const CATMULL_ROM_EXPECTED_TANGENT_EPSILON = 1e-8;
+
+// Expected default options, used by 'Path3D' tests
+export const PATH3D_EXPECTED_DEFAULTS = Object.freeze({
+    MIN_POINTS : 2,
+    LOOP       : false
+});
+
+// Expected tangent normalization threshold, used by 'Path3D' tests
+export const PATH3D_EXPECTED_TANGENT_EPSILON = 1e-8;

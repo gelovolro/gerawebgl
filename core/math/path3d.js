@@ -1,53 +1,15 @@
-import { Vector3 } from './vector3.js';
+import * as Path3DConstants   from '../constants/path3d.js';
+import { MATH_COMMON_VALUES } from '../constants/math.js';
+import { Vector3 }            from './vector3.js';
 
 /**
- * Minimum point count for a path.
+ * Reusable data for the current path segment.
  *
- * @type {number}
+ * @typedef {Object} Path3DSegment
+ * @property {Vector3} start     - Segment start point.
+ * @property {Vector3} end       - Segment end point.
+ * @property {number}  parameter - Local segment parameter.
  */
-const MIN_POINT_COUNT = 2;
-
-/**
- * Default loop flag.
- *
- * @type {boolean}
- */
-const DEFAULT_LOOP = false;
-
-/**
- * Start index for segment traversal.
- *
- * @type {number}
- */
-const SEGMENT_START_INDEX = 0;
-
-/**
- * Segment index increment.
- *
- * @type {number}
- */
-const SEGMENT_INDEX_INCREMENT = 1;
-
-/**
- * Zero value constant.
- *
- * @type {number}
- */
-const ZERO_VALUE = 0;
-
-/**
- * One value constant.
- *
- * @type {number}
- */
-const ONE_VALUE = 1;
-
-/**
- * Epsilon used for safe normalization.
- *
- * @type {number}
- */
-const NORMALIZE_EPSILON = 1e-8;
 
 /**
  * Path built from 3D points.
@@ -96,19 +58,27 @@ export class Path3D {
     #loop;
 
     /**
+     * Reusable segment data, avoiding allocations during animation updates.
+     *
+     * @type {Path3DSegment}
+     * @private
+     */
+    #segment;
+
+    /**
      * @param {Vector3[]} points             - Path points.
      * @param {Object} [options]             - Optional options.
      * @param {boolean} [options.loop=false] - Whether the path is looped.
-     * @throws {TypeError}  When inputs are invalid.
-     * @throws {RangeError} When points are insufficient.
+     * @throws {TypeError}                     When inputs are invalid.
+     * @throws {RangeError}                    When points are insufficient.
      */
     constructor(points, options = {}) {
         if (!Array.isArray(points)) {
             throw new TypeError('`Path3D` expects `points` as an array of `Vector3`.');
         }
 
-        if (points.length < MIN_POINT_COUNT) {
-            throw new RangeError('`Path3D` expects at least the 2 points.');
+        if (points.length < Path3DConstants.PATH3D_DEFAULTS.MIN_POINTS) {
+            throw new RangeError('`Path3D` expects at least two points.');
         }
 
         for (const point of points) {
@@ -121,7 +91,7 @@ export class Path3D {
             throw new TypeError('`Path3D` expects options as a plain object.');
         }
 
-        const { loop = DEFAULT_LOOP } = options;
+        const { loop = Path3DConstants.PATH3D_DEFAULTS.LOOP } = options;
 
         if (typeof loop !== 'boolean') {
             throw new TypeError('`Path3D` option `loop` must be a boolean.');
@@ -130,39 +100,45 @@ export class Path3D {
         this.#points            = points.slice();
         this.#loop              = loop;
         this.#segmentLengths    = new Float32Array(this.#getSegmentCount());
-        this.#cumulativeLengths = new Float32Array(this.#segmentLengths.length + ONE_VALUE);
-        this.#totalLength       = ZERO_VALUE;
+        this.#cumulativeLengths = new Float32Array(this.#segmentLengths.length + MATH_COMMON_VALUES.UNIT);
+        this.#totalLength       = MATH_COMMON_VALUES.ZERO;
+        this.#segment           = {
+            start     : this.#points[MATH_COMMON_VALUES.ZERO],
+            end       : this.#points[MATH_COMMON_VALUES.UNIT],
+            parameter : MATH_COMMON_VALUES.ZERO
+        };
+
         this.#recalculateLengths();
     }
 
     /**
-     * @returns {Vector3[]}
+     * @returns {Vector3[]} - Control point references used by the path.
      */
     get points() {
         return this.#points;
     }
 
     /**
-     * @returns {boolean}
+     * @returns {boolean} - Whether the path connects its last point to the first.
      */
     get loop() {
         return this.#loop;
     }
 
     /**
-     * @returns {number}
+     * @returns {number} - Cached total length of the path.
      */
     get totalLength() {
         return this.#totalLength;
     }
 
     /**
-     * Returns a point at normalized position along the path (arc-length parameterization).
+     * Returns an interpolated point at a normalized distance along the path.
      *
      * @param {number} pathParameter - Normalized path parameter in [0..1].
      * @param {Vector3} [out]        - Optional output vector.
-     * @returns {Vector3}
-     * @throws {TypeError} When inputs are invalid.
+     * @returns {Vector3}            - Interpolated point written to `out`.
+     * @throws {TypeError}             When inputs are invalid.
      */
     getPointAt(pathParameter, out = new Vector3()) {
         if (typeof pathParameter !== 'number' || !Number.isFinite(pathParameter)) {
@@ -173,33 +149,24 @@ export class Path3D {
             throw new TypeError('`Path3D.getPointAt` expects `out` as a `Vector3`.');
         }
 
-        if (this.#totalLength <= ZERO_VALUE) {
-            return out.copyFrom(this.#points[ZERO_VALUE]);
+        if (this.#totalLength <= MATH_COMMON_VALUES.ZERO) {
+            return out.copyFrom(this.#points[MATH_COMMON_VALUES.ZERO]);
         }
 
-        const normalizedPathParameter = this.#normalizePathParameter(pathParameter);
-        const targetLength            = normalizedPathParameter * this.#totalLength;
-        const segmentData             = this.#findSegmentAtLength(targetLength);
-        const pointA                  = this.#points[segmentData.index];
-        const pointB                  = this.#getNextPoint(segmentData.index);
-
-        const segmentParameter = segmentData.length <= ZERO_VALUE
-            ? ZERO_VALUE
-            : (targetLength - segmentData.cumulativeLength) / segmentData.length;
-
-        const x = pointA.x + (pointB.x - pointA.x) * segmentParameter;
-        const y = pointA.y + (pointB.y - pointA.y) * segmentParameter;
-        const z = pointA.z + (pointB.z - pointA.z) * segmentParameter;
+        const { start, end, parameter } = this.#resolveSegment(pathParameter);
+        const x = start.x + (end.x - start.x) * parameter;
+        const y = start.y + (end.y - start.y) * parameter;
+        const z = start.z + (end.z - start.z) * parameter;
         return out.set(x, y, z);
     }
 
     /**
-     * Returns a normalized tangent at normalized position along the path (arc-length parameterization).
+     * Returns a normalized tangent at a normalized distance along the path.
      *
      * @param {number} pathParameter - Normalized path parameter in [0..1].
      * @param {Vector3} [out]        - Optional output vector.
-     * @returns {Vector3}
-     * @throws {TypeError} When inputs are invalid.
+     * @returns {Vector3}            - Normalized tangent written to `out`, or zero for a degenerate segment.
+     * @throws {TypeError}             When inputs are invalid.
      */
     getTangentAt(pathParameter, out = new Vector3()) {
         if (typeof pathParameter !== 'number' || !Number.isFinite(pathParameter)) {
@@ -210,127 +177,151 @@ export class Path3D {
             throw new TypeError('`Path3D.getTangentAt` expects `out` as a `Vector3`.');
         }
 
-        // Normalize the path parameter and resolve the corresponding segment by arc-length:
-        const normalizedPathParameter = this.#normalizePathParameter(pathParameter);
-        const targetLength            = normalizedPathParameter * this.#totalLength;
-        const segmentData             = this.#findSegmentAtLength(targetLength);
-        const pointA                  = this.#points[segmentData.index];
-        const pointB                  = this.#getNextPoint(segmentData.index);
+        const { start, end } = this.#resolveSegment(pathParameter);
+        const deltaX = end.x - start.x;
+        const deltaY = end.y - start.y;
+        const deltaZ = end.z - start.z;
+        const length = Math.sqrt((deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ));
 
-        // Compute the raw segment direction vector as a delta between the segment endpoints:
-        const deltaX = pointB.x - pointA.x;
-        const deltaY = pointB.y - pointA.y;
-        const deltaZ = pointB.z - pointA.z;
-
-        // Normalize the direction vector to produce a unit tangent:
-        const tangentLength = Math.sqrt((deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ));
-
-        if (tangentLength <= NORMALIZE_EPSILON) {
-            return out.set(ZERO_VALUE, ZERO_VALUE, ZERO_VALUE);
+        if (length <= Path3DConstants.PATH3D_TANGENT.EPSILON) {
+            return out.set(MATH_COMMON_VALUES.ZERO, MATH_COMMON_VALUES.ZERO, MATH_COMMON_VALUES.ZERO);
         }
 
-        return out.set(deltaX / tangentLength, deltaY / tangentLength, deltaZ / tangentLength);
+        return out.set(deltaX / length, deltaY / length, deltaZ / length);
     }
 
     /**
-     * @returns {number}
+     * Resolves the segment at the normalized path parameter.
+     *
+     * @param {number} pathParameter - Finite path parameter.
+     * @returns {Path3DSegment}      - Reused segment data with local interpolation parameter.
+     * @private
+     */
+    #resolveSegment(pathParameter) {
+        const normalizedParameter = this.#normalizePathParameter(pathParameter);
+        const targetLength        = normalizedParameter * this.#totalLength;
+        const segmentIndex        = this.#findSegmentAtLength(targetLength);
+        const segmentLength       = this.#segmentLengths[segmentIndex];
+        const cumulativeLength    = this.#cumulativeLengths[segmentIndex];
+
+        const segmentParameter = segmentLength <= MATH_COMMON_VALUES.ZERO
+            ? MATH_COMMON_VALUES.ZERO
+            : (targetLength - cumulativeLength) / segmentLength;
+
+        const segment = this.#segment;
+        segment.start     = this.#points[segmentIndex];
+        segment.end       = this.#getNextPoint(segmentIndex);
+        segment.parameter = segmentParameter;
+        return segment;
+    }
+
+    /**
+     * @returns {number} - Number of segments in the path.
      * @private
      */
     #getSegmentCount() {
-        return this.#loop ? this.#points.length : (this.#points.length - ONE_VALUE);
+        return this.#loop ? this.#points.length : (this.#points.length - MATH_COMMON_VALUES.UNIT);
     }
 
     /**
-     * @param {number} length - Target length along the path.
-     * @returns {{index: number, length: number, cumulativeLength: number}}
+     * Resolves the segment containing the specified cumulative length.
+     *
+     * @param {number} length - Target distance along the path.
+     * @returns {number}      - Index of the containing segment.
      * @private
      */
     #findSegmentAtLength(length) {
         const segmentCount = this.#segmentLengths.length;
 
-        for (let index = SEGMENT_START_INDEX; index < segmentCount; index += SEGMENT_INDEX_INCREMENT) {
+        for (
+            let index = Path3DConstants.PATH3D_SEGMENTS.START_INDEX;
+            index < segmentCount;
+            index += Path3DConstants.PATH3D_SEGMENTS.INDEX_INCREMENT
+        ) {
             const segmentLength    = this.#segmentLengths[index];
             const cumulativeLength = this.#cumulativeLengths[index];
 
             if (length <= cumulativeLength + segmentLength) {
-                return {
-                    index,
-                    length : segmentLength,
-                    cumulativeLength
-                };
+                return index;
             }
         }
 
-        const lastIndex = segmentCount - ONE_VALUE;
-
-        return {
-            index            : lastIndex,
-            length           : this.#segmentLengths[lastIndex],
-            cumulativeLength : this.#cumulativeLengths[lastIndex]
-        };
+        return segmentCount - MATH_COMMON_VALUES.UNIT;
     }
 
     /**
+     * Returns the next control point, wrapping for closed paths.
+     *
      * @param {number} index - Segment start index.
-     * @returns {Vector3}
+     * @returns {Vector3}    - Next point for the selected segment.
      * @private
      */
     #getNextPoint(index) {
         if (this.#loop) {
-            const nextIndex = (index + ONE_VALUE) % this.#points.length;
+            const nextIndex = (index + MATH_COMMON_VALUES.UNIT) % this.#points.length;
             return this.#points[nextIndex];
         }
 
-        return this.#points[Math.min(index + ONE_VALUE, this.#points.length - ONE_VALUE)];
+        return this.#points[Math.min(index + MATH_COMMON_VALUES.UNIT, this.#points.length - MATH_COMMON_VALUES.UNIT)];
     }
 
     /**
-     * @param {number} pathParameter - Path parameter to normalize.
-     * @returns {number}
+     * Clamps or wraps the normalized path parameter.
+     *
+     * @param {number} pathParameter - Finite path parameter.
+     * @returns {number}             - Normalized parameter in [0..1].
      * @private
      */
     #normalizePathParameter(pathParameter) {
         if (this.#loop) {
-            const wrapped = pathParameter - Math.floor(pathParameter);
-            return wrapped < ZERO_VALUE ? wrapped + ONE_VALUE : wrapped;
+            return pathParameter - Math.floor(pathParameter);
         }
 
-        if (pathParameter <= ZERO_VALUE) {
-            return ZERO_VALUE;
+        if (pathParameter <= MATH_COMMON_VALUES.ZERO) {
+            return MATH_COMMON_VALUES.ZERO;
         }
 
-        if (pathParameter >= ONE_VALUE) {
-            return ONE_VALUE;
+        if (pathParameter >= MATH_COMMON_VALUES.UNIT) {
+            return MATH_COMMON_VALUES.UNIT;
         }
 
         return pathParameter;
     }
 
     /**
+     * Rebuilds the cached segment lengths and total path length.
+     *
+     * @returns {void}
      * @private
      */
     #recalculateLengths() {
-        const segmentCount                  = this.#segmentLengths.length;
-        let cumulativeLength                = ZERO_VALUE;
-        this.#cumulativeLengths[ZERO_VALUE] = cumulativeLength;
+        const segmentCount   = this.#segmentLengths.length;
+        let cumulativeLength = MATH_COMMON_VALUES.ZERO;
+        this.#cumulativeLengths[MATH_COMMON_VALUES.ZERO] = cumulativeLength;
 
-        for (let index = SEGMENT_START_INDEX; index < segmentCount; index += SEGMENT_INDEX_INCREMENT) {
+        for (
+            let index = Path3DConstants.PATH3D_SEGMENTS.START_INDEX;
+            index < segmentCount;
+            index += Path3DConstants.PATH3D_SEGMENTS.INDEX_INCREMENT
+        ) {
             const pointA = this.#points[index];
             const pointB = this.#getNextPoint(index);
             const length = Path3D.#distance(pointA, pointB);
 
             this.#segmentLengths[index] = length;
             cumulativeLength += length;
-            this.#cumulativeLengths[index + ONE_VALUE] = cumulativeLength;
+            this.#cumulativeLengths[index + MATH_COMMON_VALUES.UNIT] = cumulativeLength;
         }
 
         this.#totalLength = cumulativeLength;
     }
 
     /**
+     * Computes the Euclidean distance without extra vector allocations.
+     *
      * @param {Vector3} pointA - First point.
      * @param {Vector3} pointB - Second point.
-     * @returns {number}
+     * @returns {number}       - Distance between the points.
      * @private
      */
     static #distance(pointA, pointB) {
