@@ -47,3 +47,23 @@ export const PATH3D_EXPECTED_DEFAULTS = Object.freeze({
 
 // Expected tangent normalization threshold, used by 'Path3D' tests
 export const PATH3D_EXPECTED_TANGENT_EPSILON = 1e-8;
+
+// Expected vector layout, used by 'Vector3Math' constants tests
+export const VECTOR3_MATH_EXPECTED_LAYOUT = Object.freeze({
+    COMPONENT_COUNT : 3,
+    X_INDEX         : 0,
+    Y_INDEX         : 1,
+    Z_INDEX         : 2
+});
+
+// Expected vector math numeric values
+export const VECTOR3_MATH_EXPECTED_VALUES = Object.freeze({
+    ZERO : 0.0,
+    ONE  : 1.0
+});
+
+// Expected comparison and normalization tolerances
+export const VECTOR3_MATH_EXPECTED_TOLERANCES = Object.freeze({
+    DEFAULT_EPSILON      : 1e-6,
+    MIN_NORMALIZE_LENGTH : 1e-8
+});
