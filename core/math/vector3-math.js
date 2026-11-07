@@ -1,60 +1,5 @@
-import { Vector3 } from './vector3.js';
-
-/**
- * Number of components in a 3D vector.
- *
- * @type {number}
- */
-const VECTOR3_COMPONENT_COUNT = 3;
-
-/**
- * Component index for X.
- *
- * @type {number}
- */
-const VECTOR3_X_INDEX = 0;
-
-/**
- * Component index for Y.
- *
- * @type {number}
- */
-const VECTOR3_Y_INDEX = 1;
-
-/**
- * Component index for Z.
- *
- * @type {number}
- */
-const VECTOR3_Z_INDEX = 2;
-
-/**
- * Zero value constant.
- *
- * @type {number}
- */
-const ZERO_VALUE = 0;
-
-/**
- * One value constant.
- *
- * @type {number}
- */
-const ONE_VALUE = 1;
-
-/**
- * Default epsilon for approximate comparisons.
- *
- * @type {number}
- */
-const DEFAULT_EPSILON = 1e-6;
-
-/**
- * Minimum length for safe normalization.
- *
- * @type {number}
- */
-const MIN_NORMALIZE_LENGTH = 1e-8;
+import * as Vector3MathConstants from '../constants/vector3-math.js';
+import { Vector3 }               from './vector3.js';
 
 /**
  * 3D vector math utilities.
@@ -67,9 +12,9 @@ export class Vector3Math {
      * @param {Vector3 | Float32Array} outputVector - Output vector.
      * @param {Vector3 | Float32Array} firstVector  - First vector.
      * @param {Vector3 | Float32Array} secondVector - Second vector.
-     * @returns {Vector3 | Float32Array}
-     * @throws {TypeError}  When any vector is invalid.
-     * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+     * @returns {Vector3 | Float32Array}            - The supplied output vector.
+     * @throws {TypeError}                            When any vector is invalid.
+     * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
      */
     static add(outputVector, firstVector, secondVector) {
         Vector3Math.#assertVector3Like(outputVector, 'outputVector');
@@ -88,9 +33,9 @@ export class Vector3Math {
      * @param {Vector3 | Float32Array} outputVector - Output vector.
      * @param {Vector3 | Float32Array} firstVector  - First vector.
      * @param {Vector3 | Float32Array} secondVector - Second vector.
-     * @returns {Vector3 | Float32Array}
-     * @throws {TypeError}  When any vector is invalid.
-     * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+     * @returns {Vector3 | Float32Array}            - The supplied output vector.
+     * @throws {TypeError}                            When any vector is invalid.
+     * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
      */
     static sub(outputVector, firstVector, secondVector) {
         Vector3Math.#assertVector3Like(outputVector, 'outputVector');
@@ -109,15 +54,15 @@ export class Vector3Math {
      * @param {Vector3 | Float32Array} outputVector - Output vector.
      * @param {Vector3 | Float32Array} inputVector  - Input vector.
      * @param {number} scalar                       - Scalar multiplier.
-     * @returns {Vector3 | Float32Array}
-     * @throws {TypeError}  When vectors or scalar are invalid.
-     * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+     * @returns {Vector3 | Float32Array}            - The supplied output vector.
+     * @throws {TypeError}                            When vectors or scalar are invalid.
+     * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
      */
     static scale(outputVector, inputVector, scalar) {
         Vector3Math.#assertVector3Like(outputVector, 'outputVector');
         Vector3Math.#assertVector3Like(inputVector, 'inputVector');
 
-        if (typeof scalar !== 'number' || !Number.isFinite(scalar)) {
+        if (!Vector3Math.#isFiniteNumber(scalar)) {
             throw new TypeError('`Vector3Math.scale` expects `scalar` as a finite number.');
         }
 
@@ -131,9 +76,9 @@ export class Vector3Math {
      * Computes vector length.
      *
      * @param {Vector3 | Float32Array} inputVector - Input vector.
-     * @returns {number}
-     * @throws {TypeError}  When vector is invalid.
-     * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+     * @returns {number}                           - Euclidean vector length.
+     * @throws {TypeError}                           When vector is invalid.
+     * @throws {RangeError}                          When a `Float32Array` does not contain exactly three elements.
      */
     static length(inputVector) {
         Vector3Math.#assertVector3Like(inputVector, 'inputVector');
@@ -149,9 +94,9 @@ export class Vector3Math {
      *
      * @param {Vector3 | Float32Array} firstVector  - First vector.
      * @param {Vector3 | Float32Array} secondVector - Second vector.
-     * @returns {number}
-     * @throws {TypeError}  When vectors are invalid.
-     * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+     * @returns {number}                            - Euclidean distance between vectors.
+     * @throws {TypeError}                            When vectors are invalid.
+     * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
      */
     static distance(firstVector, secondVector) {
         Vector3Math.#assertVector3Like(firstVector, 'firstVector');
@@ -168,9 +113,9 @@ export class Vector3Math {
      *
      * @param {Vector3 | Float32Array} outputVector - Output vector.
      * @param {Vector3 | Float32Array} inputVector  - Input vector.
-     * @returns {Vector3 | Float32Array}
-     * @throws {TypeError}  When vectors are invalid.
-     * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+     * @returns {Vector3 | Float32Array}            - The supplied output vector.
+     * @throws {TypeError}                            When vectors are invalid.
+     * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
      */
     static normalize(outputVector, inputVector) {
         Vector3Math.#assertVector3Like(outputVector, 'outputVector');
@@ -178,11 +123,12 @@ export class Vector3Math {
 
         const vectorLength = Vector3Math.length(inputVector);
 
-        if (vectorLength <= MIN_NORMALIZE_LENGTH) {
-            return Vector3Math.#write(outputVector, ZERO_VALUE, ZERO_VALUE, ZERO_VALUE);
+        if (vectorLength <= Vector3MathConstants.VECTOR3_MATH_TOLERANCES.MIN_NORMALIZE_LENGTH) {
+            const zero = Vector3MathConstants.VECTOR3_MATH_VALUES.ZERO;
+            return Vector3Math.#write(outputVector, zero, zero, zero);
         }
 
-        const inverseLength = ONE_VALUE / vectorLength;
+        const inverseLength = Vector3MathConstants.VECTOR3_MATH_VALUES.ONE / vectorLength;
         return Vector3Math.scale(outputVector, inputVector, inverseLength);
     }
 
@@ -191,17 +137,19 @@ export class Vector3Math {
      *
      * @param {Vector3 | Float32Array} firstVector  - First vector.
      * @param {Vector3 | Float32Array} secondVector - Second vector.
-     * @returns {number}
-     * @throws {TypeError}  When vectors are invalid.
-     * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+     * @returns {number}                            - Dot product of the input vectors.
+     * @throws {TypeError}                            When vectors are invalid.
+     * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
      */
     static dot(firstVector, secondVector) {
         Vector3Math.#assertVector3Like(firstVector, 'firstVector');
         Vector3Math.#assertVector3Like(secondVector, 'secondVector');
 
-        return (Vector3Math.#getX(firstVector) * Vector3Math.#getX(secondVector))
-            + (Vector3Math.#getY(firstVector) * Vector3Math.#getY(secondVector))
-            + (Vector3Math.#getZ(firstVector) * Vector3Math.#getZ(secondVector));
+        return (
+            (Vector3Math.#getX(firstVector) * Vector3Math.#getX(secondVector)) +
+            (Vector3Math.#getY(firstVector) * Vector3Math.#getY(secondVector)) +
+            (Vector3Math.#getZ(firstVector) * Vector3Math.#getZ(secondVector))
+        );
     }
 
     /**
@@ -210,9 +158,9 @@ export class Vector3Math {
      * @param {Vector3 | Float32Array} outputVector - Output vector.
      * @param {Vector3 | Float32Array} firstVector  - First vector.
      * @param {Vector3 | Float32Array} secondVector - Second vector.
-     * @returns {Vector3 | Float32Array}
-     * @throws {TypeError}  When vectors are invalid.
-     * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+     * @returns {Vector3 | Float32Array}            - The supplied output vector.
+     * @throws {TypeError}                            When vectors are invalid.
+     * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
      */
     static cross(outputVector, firstVector, secondVector) {
         Vector3Math.#assertVector3Like(outputVector, 'outputVector');
@@ -239,16 +187,16 @@ export class Vector3Math {
      * @param {Vector3 | Float32Array} startVector  - Start vector.
      * @param {Vector3 | Float32Array} endVector    - End vector.
      * @param {number} interpolationFactor          - Interpolation factor in [0..1].
-     * @returns {Vector3 | Float32Array}
-     * @throws {TypeError}  When vectors or interpolation factor are invalid.
-     * @throws {RangeError} When Float32Array vectors are not `length 3`.
+     * @returns {Vector3 | Float32Array}            - The supplied output vector.
+     * @throws {TypeError}                            When vectors or interpolation factor are invalid.
+     * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
      */
     static lerp(outputVector, startVector, endVector, interpolationFactor) {
         Vector3Math.#assertVector3Like(outputVector, 'outputVector');
         Vector3Math.#assertVector3Like(startVector, 'startVector');
         Vector3Math.#assertVector3Like(endVector, 'endVector');
 
-        if (typeof interpolationFactor !== 'number' || !Number.isFinite(interpolationFactor)) {
+        if (!Vector3Math.#isFiniteNumber(interpolationFactor)) {
             throw new TypeError('`Vector3Math.lerp` expects `interpolationFactor` as a finite number.');
         }
 
@@ -265,15 +213,15 @@ export class Vector3Math {
      * @param {Vector3 | Float32Array} inputVector  - Input vector.
      * @param {number} min                          - Minimum component value.
      * @param {number} max                          - Maximum component value.
-     * @returns {Vector3 | Float32Array}
-     * @throws {TypeError}  When vectors or bounds are invalid.
-     * @throws {RangeError} When Float32Array vectors are not `length 3`.
+     * @returns {Vector3 | Float32Array}            - The supplied output vector.
+     * @throws {TypeError}                            When vectors or bounds are invalid.
+     * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
      */
     static clamp(outputVector, inputVector, min, max) {
         Vector3Math.#assertVector3Like(outputVector, 'outputVector');
         Vector3Math.#assertVector3Like(inputVector, 'inputVector');
 
-        if (typeof min !== 'number' || typeof max !== 'number' || !Number.isFinite(min) || !Number.isFinite(max)) {
+        if (!Vector3Math.#isFiniteNumber(min) || !Vector3Math.#isFiniteNumber(max)) {
             throw new TypeError('`Vector3Math.clamp` expects `min` and `max` as finite numbers.');
         }
 
@@ -289,21 +237,32 @@ export class Vector3Math {
      * @param {Vector3 | Float32Array} firstVector  - First vector.
      * @param {Vector3 | Float32Array} secondVector - Second vector.
      * @param {number} [epsilon = 1e-6]             - Tolerance.
-     * @returns {boolean}
-     * @throws {TypeError}  When vectors or epsilon are invalid.
-     * @throws {RangeError} When Float32Array vectors are not `length 3`.
+     * @returns {boolean}                           - Whether the vectors are approximately equal.
+     * @throws {TypeError}                            When vectors or epsilon are invalid.
+     * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
      */
-    static approxEquals(firstVector, secondVector, epsilon = DEFAULT_EPSILON) {
+    static approxEquals(firstVector, secondVector, epsilon = Vector3MathConstants.VECTOR3_MATH_TOLERANCES.DEFAULT_EPSILON) {
         Vector3Math.#assertVector3Like(firstVector, 'firstVector');
         Vector3Math.#assertVector3Like(secondVector, 'secondVector');
 
-        if (typeof epsilon !== 'number' || !Number.isFinite(epsilon)) {
+        if (!Vector3Math.#isFiniteNumber(epsilon)) {
             throw new TypeError('`Vector3Math.approxEquals` expects `epsilon` as a finite number.');
         }
 
         return Math.abs(Vector3Math.#getX(firstVector) - Vector3Math.#getX(secondVector)) <= epsilon
             && Math.abs(Vector3Math.#getY(firstVector) - Vector3Math.#getY(secondVector)) <= epsilon
             && Math.abs(Vector3Math.#getZ(firstVector) - Vector3Math.#getZ(secondVector)) <= epsilon;
+    }
+
+    /**
+     * Checks that a scalar is a finite number.
+     *
+     * @param {unknown} value - Value to check.
+     * @returns {boolean}     - Whether the value is a finite number.
+     * @private
+     */
+    static #isFiniteNumber(value) {
+        return typeof value === 'number' && Number.isFinite(value);
     }
 
     /**
@@ -316,36 +275,42 @@ export class Vector3Math {
             throw new TypeError(`\`Vector3Math\` expects \`${argumentName}\` as Vector3 or Float32Array.`);
         }
 
-        if (vector instanceof Float32Array && vector.length !== VECTOR3_COMPONENT_COUNT) {
+        if (vector instanceof Float32Array && vector.length !== Vector3MathConstants.VECTOR3_MATH_LAYOUT.COMPONENT_COUNT) {
             throw new RangeError('`Vector3Math` expects Float32Array(3) vectors.');
         }
     }
 
     /**
      * @param {Vector3 | Float32Array} vector - Input vector.
-     * @returns {number}
+     * @returns {number}                      - X component of the vector.
      * @private
      */
     static #getX(vector) {
-        return vector instanceof Vector3 ? vector.x : vector[VECTOR3_X_INDEX];
+        return vector instanceof Vector3
+            ? vector.x
+            : vector[Vector3MathConstants.VECTOR3_MATH_LAYOUT.X_INDEX];
     }
 
     /**
      * @param {Vector3 | Float32Array} vector - Input vector.
-     * @returns {number}
+     * @returns {number}                      - Y component of the vector.
      * @private
      */
     static #getY(vector) {
-        return vector instanceof Vector3 ? vector.y : vector[VECTOR3_Y_INDEX];
+        return vector instanceof Vector3
+            ? vector.y
+            : vector[Vector3MathConstants.VECTOR3_MATH_LAYOUT.Y_INDEX];
     }
 
     /**
      * @param {Vector3 | Float32Array} vector - Input vector.
-     * @returns {number}
+     * @returns {number}                      - Z component of the vector.
      * @private
      */
     static #getZ(vector) {
-        return vector instanceof Vector3 ? vector.z : vector[VECTOR3_Z_INDEX];
+        return vector instanceof Vector3
+            ? vector.z
+            : vector[Vector3MathConstants.VECTOR3_MATH_LAYOUT.Z_INDEX];
     }
 
     /**
@@ -353,7 +318,7 @@ export class Vector3Math {
      * @param {number} x                            - X component.
      * @param {number} y                            - Y component.
      * @param {number} z                            - Z component.
-     * @returns {Vector3 | Float32Array}
+     * @returns {Vector3 | Float32Array}            - The supplied output vector.
      * @private
      */
     static #write(outputVector, x, y, z) {
@@ -362,9 +327,9 @@ export class Vector3Math {
             return outputVector;
         }
 
-        outputVector[VECTOR3_X_INDEX] = x;
-        outputVector[VECTOR3_Y_INDEX] = y;
-        outputVector[VECTOR3_Z_INDEX] = z;
+        outputVector[Vector3MathConstants.VECTOR3_MATH_LAYOUT.X_INDEX] = x;
+        outputVector[Vector3MathConstants.VECTOR3_MATH_LAYOUT.Y_INDEX] = y;
+        outputVector[Vector3MathConstants.VECTOR3_MATH_LAYOUT.Z_INDEX] = z;
         return outputVector;
     }
 }

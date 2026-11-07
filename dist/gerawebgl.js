@@ -1155,15 +1155,23 @@ var Vector3 = class _Vector3 {
   }
 };
 
+// core/constants/vector3-math.js
+var VECTOR3_MATH_LAYOUT = Object.freeze({
+  COMPONENT_COUNT: MATH_LAYOUT.VECTOR3_ELEMENT_COUNT,
+  X_INDEX: MATH_VECTOR3_INDEXES.X,
+  Y_INDEX: MATH_VECTOR3_INDEXES.Y,
+  Z_INDEX: MATH_VECTOR3_INDEXES.Z
+});
+var VECTOR3_MATH_VALUES = Object.freeze({
+  ZERO: MATH_COMMON_VALUES.ZERO,
+  ONE: MATH_COMMON_VALUES.UNIT
+});
+var VECTOR3_MATH_TOLERANCES = Object.freeze({
+  DEFAULT_EPSILON: 1e-6,
+  MIN_NORMALIZE_LENGTH: 1e-8
+});
+
 // core/math/vector3-math.js
-var VECTOR3_COMPONENT_COUNT = 3;
-var VECTOR3_X_INDEX = 0;
-var VECTOR3_Y_INDEX = 1;
-var VECTOR3_Z_INDEX = 2;
-var ZERO_VALUE = 0;
-var ONE_VALUE = 1;
-var DEFAULT_EPSILON = 1e-6;
-var MIN_NORMALIZE_LENGTH = 1e-8;
 var Vector3Math = class _Vector3Math {
   /**
    * Adds two vectors.
@@ -1171,9 +1179,9 @@ var Vector3Math = class _Vector3Math {
    * @param {Vector3 | Float32Array} outputVector - Output vector.
    * @param {Vector3 | Float32Array} firstVector  - First vector.
    * @param {Vector3 | Float32Array} secondVector - Second vector.
-   * @returns {Vector3 | Float32Array}
-   * @throws {TypeError}  When any vector is invalid.
-   * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+   * @returns {Vector3 | Float32Array}            - The supplied output vector.
+   * @throws {TypeError}                            When any vector is invalid.
+   * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
    */
   static add(outputVector, firstVector, secondVector) {
     _Vector3Math.#assertVector3Like(outputVector, "outputVector");
@@ -1190,9 +1198,9 @@ var Vector3Math = class _Vector3Math {
    * @param {Vector3 | Float32Array} outputVector - Output vector.
    * @param {Vector3 | Float32Array} firstVector  - First vector.
    * @param {Vector3 | Float32Array} secondVector - Second vector.
-   * @returns {Vector3 | Float32Array}
-   * @throws {TypeError}  When any vector is invalid.
-   * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+   * @returns {Vector3 | Float32Array}            - The supplied output vector.
+   * @throws {TypeError}                            When any vector is invalid.
+   * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
    */
   static sub(outputVector, firstVector, secondVector) {
     _Vector3Math.#assertVector3Like(outputVector, "outputVector");
@@ -1209,14 +1217,14 @@ var Vector3Math = class _Vector3Math {
    * @param {Vector3 | Float32Array} outputVector - Output vector.
    * @param {Vector3 | Float32Array} inputVector  - Input vector.
    * @param {number} scalar                       - Scalar multiplier.
-   * @returns {Vector3 | Float32Array}
-   * @throws {TypeError}  When vectors or scalar are invalid.
-   * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+   * @returns {Vector3 | Float32Array}            - The supplied output vector.
+   * @throws {TypeError}                            When vectors or scalar are invalid.
+   * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
    */
   static scale(outputVector, inputVector, scalar) {
     _Vector3Math.#assertVector3Like(outputVector, "outputVector");
     _Vector3Math.#assertVector3Like(inputVector, "inputVector");
-    if (typeof scalar !== "number" || !Number.isFinite(scalar)) {
+    if (!_Vector3Math.#isFiniteNumber(scalar)) {
       throw new TypeError("`Vector3Math.scale` expects `scalar` as a finite number.");
     }
     const x = _Vector3Math.#getX(inputVector) * scalar;
@@ -1228,9 +1236,9 @@ var Vector3Math = class _Vector3Math {
    * Computes vector length.
    *
    * @param {Vector3 | Float32Array} inputVector - Input vector.
-   * @returns {number}
-   * @throws {TypeError}  When vector is invalid.
-   * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+   * @returns {number}                           - Euclidean vector length.
+   * @throws {TypeError}                           When vector is invalid.
+   * @throws {RangeError}                          When a `Float32Array` does not contain exactly three elements.
    */
   static length(inputVector) {
     _Vector3Math.#assertVector3Like(inputVector, "inputVector");
@@ -1244,9 +1252,9 @@ var Vector3Math = class _Vector3Math {
    *
    * @param {Vector3 | Float32Array} firstVector  - First vector.
    * @param {Vector3 | Float32Array} secondVector - Second vector.
-   * @returns {number}
-   * @throws {TypeError}  When vectors are invalid.
-   * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+   * @returns {number}                            - Euclidean distance between vectors.
+   * @throws {TypeError}                            When vectors are invalid.
+   * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
    */
   static distance(firstVector, secondVector) {
     _Vector3Math.#assertVector3Like(firstVector, "firstVector");
@@ -1261,18 +1269,19 @@ var Vector3Math = class _Vector3Math {
    *
    * @param {Vector3 | Float32Array} outputVector - Output vector.
    * @param {Vector3 | Float32Array} inputVector  - Input vector.
-   * @returns {Vector3 | Float32Array}
-   * @throws {TypeError}  When vectors are invalid.
-   * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+   * @returns {Vector3 | Float32Array}            - The supplied output vector.
+   * @throws {TypeError}                            When vectors are invalid.
+   * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
    */
   static normalize(outputVector, inputVector) {
     _Vector3Math.#assertVector3Like(outputVector, "outputVector");
     _Vector3Math.#assertVector3Like(inputVector, "inputVector");
     const vectorLength = _Vector3Math.length(inputVector);
-    if (vectorLength <= MIN_NORMALIZE_LENGTH) {
-      return _Vector3Math.#write(outputVector, ZERO_VALUE, ZERO_VALUE, ZERO_VALUE);
+    if (vectorLength <= VECTOR3_MATH_TOLERANCES.MIN_NORMALIZE_LENGTH) {
+      const zero = VECTOR3_MATH_VALUES.ZERO;
+      return _Vector3Math.#write(outputVector, zero, zero, zero);
     }
-    const inverseLength = ONE_VALUE / vectorLength;
+    const inverseLength = VECTOR3_MATH_VALUES.ONE / vectorLength;
     return _Vector3Math.scale(outputVector, inputVector, inverseLength);
   }
   /**
@@ -1280,9 +1289,9 @@ var Vector3Math = class _Vector3Math {
    *
    * @param {Vector3 | Float32Array} firstVector  - First vector.
    * @param {Vector3 | Float32Array} secondVector - Second vector.
-   * @returns {number}
-   * @throws {TypeError}  When vectors are invalid.
-   * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+   * @returns {number}                            - Dot product of the input vectors.
+   * @throws {TypeError}                            When vectors are invalid.
+   * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
    */
   static dot(firstVector, secondVector) {
     _Vector3Math.#assertVector3Like(firstVector, "firstVector");
@@ -1295,9 +1304,9 @@ var Vector3Math = class _Vector3Math {
    * @param {Vector3 | Float32Array} outputVector - Output vector.
    * @param {Vector3 | Float32Array} firstVector  - First vector.
    * @param {Vector3 | Float32Array} secondVector - Second vector.
-   * @returns {Vector3 | Float32Array}
-   * @throws {TypeError}  When vectors are invalid.
-   * @throws {RangeError} When `Float32Array` vectors are not `length 3`.
+   * @returns {Vector3 | Float32Array}            - The supplied output vector.
+   * @throws {TypeError}                            When vectors are invalid.
+   * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
    */
   static cross(outputVector, firstVector, secondVector) {
     _Vector3Math.#assertVector3Like(outputVector, "outputVector");
@@ -1321,15 +1330,15 @@ var Vector3Math = class _Vector3Math {
    * @param {Vector3 | Float32Array} startVector  - Start vector.
    * @param {Vector3 | Float32Array} endVector    - End vector.
    * @param {number} interpolationFactor          - Interpolation factor in [0..1].
-   * @returns {Vector3 | Float32Array}
-   * @throws {TypeError}  When vectors or interpolation factor are invalid.
-   * @throws {RangeError} When Float32Array vectors are not `length 3`.
+   * @returns {Vector3 | Float32Array}            - The supplied output vector.
+   * @throws {TypeError}                            When vectors or interpolation factor are invalid.
+   * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
    */
   static lerp(outputVector, startVector, endVector, interpolationFactor) {
     _Vector3Math.#assertVector3Like(outputVector, "outputVector");
     _Vector3Math.#assertVector3Like(startVector, "startVector");
     _Vector3Math.#assertVector3Like(endVector, "endVector");
-    if (typeof interpolationFactor !== "number" || !Number.isFinite(interpolationFactor)) {
+    if (!_Vector3Math.#isFiniteNumber(interpolationFactor)) {
       throw new TypeError("`Vector3Math.lerp` expects `interpolationFactor` as a finite number.");
     }
     const x = _Vector3Math.#getX(startVector) + (_Vector3Math.#getX(endVector) - _Vector3Math.#getX(startVector)) * interpolationFactor;
@@ -1344,14 +1353,14 @@ var Vector3Math = class _Vector3Math {
    * @param {Vector3 | Float32Array} inputVector  - Input vector.
    * @param {number} min                          - Minimum component value.
    * @param {number} max                          - Maximum component value.
-   * @returns {Vector3 | Float32Array}
-   * @throws {TypeError}  When vectors or bounds are invalid.
-   * @throws {RangeError} When Float32Array vectors are not `length 3`.
+   * @returns {Vector3 | Float32Array}            - The supplied output vector.
+   * @throws {TypeError}                            When vectors or bounds are invalid.
+   * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
    */
   static clamp(outputVector, inputVector, min, max) {
     _Vector3Math.#assertVector3Like(outputVector, "outputVector");
     _Vector3Math.#assertVector3Like(inputVector, "inputVector");
-    if (typeof min !== "number" || typeof max !== "number" || !Number.isFinite(min) || !Number.isFinite(max)) {
+    if (!_Vector3Math.#isFiniteNumber(min) || !_Vector3Math.#isFiniteNumber(max)) {
       throw new TypeError("`Vector3Math.clamp` expects `min` and `max` as finite numbers.");
     }
     const x = Math.max(min, Math.min(max, _Vector3Math.#getX(inputVector)));
@@ -1365,17 +1374,27 @@ var Vector3Math = class _Vector3Math {
    * @param {Vector3 | Float32Array} firstVector  - First vector.
    * @param {Vector3 | Float32Array} secondVector - Second vector.
    * @param {number} [epsilon = 1e-6]             - Tolerance.
-   * @returns {boolean}
-   * @throws {TypeError}  When vectors or epsilon are invalid.
-   * @throws {RangeError} When Float32Array vectors are not `length 3`.
+   * @returns {boolean}                           - Whether the vectors are approximately equal.
+   * @throws {TypeError}                            When vectors or epsilon are invalid.
+   * @throws {RangeError}                           When a `Float32Array` does not contain exactly three elements.
    */
-  static approxEquals(firstVector, secondVector, epsilon = DEFAULT_EPSILON) {
+  static approxEquals(firstVector, secondVector, epsilon = VECTOR3_MATH_TOLERANCES.DEFAULT_EPSILON) {
     _Vector3Math.#assertVector3Like(firstVector, "firstVector");
     _Vector3Math.#assertVector3Like(secondVector, "secondVector");
-    if (typeof epsilon !== "number" || !Number.isFinite(epsilon)) {
+    if (!_Vector3Math.#isFiniteNumber(epsilon)) {
       throw new TypeError("`Vector3Math.approxEquals` expects `epsilon` as a finite number.");
     }
     return Math.abs(_Vector3Math.#getX(firstVector) - _Vector3Math.#getX(secondVector)) <= epsilon && Math.abs(_Vector3Math.#getY(firstVector) - _Vector3Math.#getY(secondVector)) <= epsilon && Math.abs(_Vector3Math.#getZ(firstVector) - _Vector3Math.#getZ(secondVector)) <= epsilon;
+  }
+  /**
+   * Checks that a scalar is a finite number.
+   *
+   * @param {unknown} value - Value to check.
+   * @returns {boolean}     - Whether the value is a finite number.
+   * @private
+   */
+  static #isFiniteNumber(value) {
+    return typeof value === "number" && Number.isFinite(value);
   }
   /**
    * @param {Vector3 | Float32Array} vector - Vector to validate.
@@ -1386,40 +1405,40 @@ var Vector3Math = class _Vector3Math {
     if (!(vector instanceof Vector3) && !(vector instanceof Float32Array)) {
       throw new TypeError(`\`Vector3Math\` expects \`${argumentName}\` as Vector3 or Float32Array.`);
     }
-    if (vector instanceof Float32Array && vector.length !== VECTOR3_COMPONENT_COUNT) {
+    if (vector instanceof Float32Array && vector.length !== VECTOR3_MATH_LAYOUT.COMPONENT_COUNT) {
       throw new RangeError("`Vector3Math` expects Float32Array(3) vectors.");
     }
   }
   /**
    * @param {Vector3 | Float32Array} vector - Input vector.
-   * @returns {number}
+   * @returns {number}                      - X component of the vector.
    * @private
    */
   static #getX(vector) {
-    return vector instanceof Vector3 ? vector.x : vector[VECTOR3_X_INDEX];
+    return vector instanceof Vector3 ? vector.x : vector[VECTOR3_MATH_LAYOUT.X_INDEX];
   }
   /**
    * @param {Vector3 | Float32Array} vector - Input vector.
-   * @returns {number}
+   * @returns {number}                      - Y component of the vector.
    * @private
    */
   static #getY(vector) {
-    return vector instanceof Vector3 ? vector.y : vector[VECTOR3_Y_INDEX];
+    return vector instanceof Vector3 ? vector.y : vector[VECTOR3_MATH_LAYOUT.Y_INDEX];
   }
   /**
    * @param {Vector3 | Float32Array} vector - Input vector.
-   * @returns {number}
+   * @returns {number}                      - Z component of the vector.
    * @private
    */
   static #getZ(vector) {
-    return vector instanceof Vector3 ? vector.z : vector[VECTOR3_Z_INDEX];
+    return vector instanceof Vector3 ? vector.z : vector[VECTOR3_MATH_LAYOUT.Z_INDEX];
   }
   /**
    * @param {Vector3 | Float32Array} outputVector - Output vector.
    * @param {number} x                            - X component.
    * @param {number} y                            - Y component.
    * @param {number} z                            - Z component.
-   * @returns {Vector3 | Float32Array}
+   * @returns {Vector3 | Float32Array}            - The supplied output vector.
    * @private
    */
   static #write(outputVector, x, y, z) {
@@ -1427,9 +1446,9 @@ var Vector3Math = class _Vector3Math {
       outputVector.set(x, y, z);
       return outputVector;
     }
-    outputVector[VECTOR3_X_INDEX] = x;
-    outputVector[VECTOR3_Y_INDEX] = y;
-    outputVector[VECTOR3_Z_INDEX] = z;
+    outputVector[VECTOR3_MATH_LAYOUT.X_INDEX] = x;
+    outputVector[VECTOR3_MATH_LAYOUT.Y_INDEX] = y;
+    outputVector[VECTOR3_MATH_LAYOUT.Z_INDEX] = z;
     return outputVector;
   }
 };
@@ -1757,14 +1776,18 @@ var CatmullRomCurve3 = class _CatmullRomCurve3 extends Curve3 {
   }
 };
 
+// core/constants/path3d.js
+var PATH3D_DEFAULTS = Object.freeze({
+  MIN_POINTS: 2,
+  LOOP: false
+});
+var PATH3D_SEGMENTS = Object.freeze({
+  START_INDEX: MATH_COMMON_VALUES.ZERO,
+  INDEX_INCREMENT: MATH_COMMON_VALUES.UNIT
+});
+var PATH3D_TANGENT = Object.freeze({ EPSILON: 1e-8 });
+
 // core/math/path3d.js
-var MIN_POINT_COUNT = 2;
-var DEFAULT_LOOP = false;
-var SEGMENT_START_INDEX = 0;
-var SEGMENT_INDEX_INCREMENT = 1;
-var ZERO_VALUE2 = 0;
-var ONE_VALUE2 = 1;
-var NORMALIZE_EPSILON = 1e-8;
 var Path3D = class _Path3D {
   /**
    * Internal copy of path points, used for sampling and interpolation.
@@ -1802,18 +1825,25 @@ var Path3D = class _Path3D {
    */
   #loop;
   /**
+   * Reusable segment data, avoiding allocations during animation updates.
+   *
+   * @type {Path3DSegment}
+   * @private
+   */
+  #segment;
+  /**
    * @param {Vector3[]} points             - Path points.
    * @param {Object} [options]             - Optional options.
    * @param {boolean} [options.loop=false] - Whether the path is looped.
-   * @throws {TypeError}  When inputs are invalid.
-   * @throws {RangeError} When points are insufficient.
+   * @throws {TypeError}                     When inputs are invalid.
+   * @throws {RangeError}                    When points are insufficient.
    */
   constructor(points, options = {}) {
     if (!Array.isArray(points)) {
       throw new TypeError("`Path3D` expects `points` as an array of `Vector3`.");
     }
-    if (points.length < MIN_POINT_COUNT) {
-      throw new RangeError("`Path3D` expects at least the 2 points.");
+    if (points.length < PATH3D_DEFAULTS.MIN_POINTS) {
+      throw new RangeError("`Path3D` expects at least two points.");
     }
     for (const point of points) {
       if (!(point instanceof Vector3)) {
@@ -1823,42 +1853,47 @@ var Path3D = class _Path3D {
     if (options === null || typeof options !== "object" || Array.isArray(options)) {
       throw new TypeError("`Path3D` expects options as a plain object.");
     }
-    const { loop = DEFAULT_LOOP } = options;
+    const { loop = PATH3D_DEFAULTS.LOOP } = options;
     if (typeof loop !== "boolean") {
       throw new TypeError("`Path3D` option `loop` must be a boolean.");
     }
     this.#points = points.slice();
     this.#loop = loop;
     this.#segmentLengths = new Float32Array(this.#getSegmentCount());
-    this.#cumulativeLengths = new Float32Array(this.#segmentLengths.length + ONE_VALUE2);
-    this.#totalLength = ZERO_VALUE2;
+    this.#cumulativeLengths = new Float32Array(this.#segmentLengths.length + MATH_COMMON_VALUES.UNIT);
+    this.#totalLength = MATH_COMMON_VALUES.ZERO;
+    this.#segment = {
+      start: this.#points[MATH_COMMON_VALUES.ZERO],
+      end: this.#points[MATH_COMMON_VALUES.UNIT],
+      parameter: MATH_COMMON_VALUES.ZERO
+    };
     this.#recalculateLengths();
   }
   /**
-   * @returns {Vector3[]}
+   * @returns {Vector3[]} - Control point references used by the path.
    */
   get points() {
     return this.#points;
   }
   /**
-   * @returns {boolean}
+   * @returns {boolean} - Whether the path connects its last point to the first.
    */
   get loop() {
     return this.#loop;
   }
   /**
-   * @returns {number}
+   * @returns {number} - Cached total length of the path.
    */
   get totalLength() {
     return this.#totalLength;
   }
   /**
-   * Returns a point at normalized position along the path (arc-length parameterization).
+   * Returns an interpolated point at a normalized distance along the path.
    *
    * @param {number} pathParameter - Normalized path parameter in [0..1].
    * @param {Vector3} [out]        - Optional output vector.
-   * @returns {Vector3}
-   * @throws {TypeError} When inputs are invalid.
+   * @returns {Vector3}            - Interpolated point written to `out`.
+   * @throws {TypeError}             When inputs are invalid.
    */
   getPointAt(pathParameter, out = new Vector3()) {
     if (typeof pathParameter !== "number" || !Number.isFinite(pathParameter)) {
@@ -1867,27 +1902,22 @@ var Path3D = class _Path3D {
     if (!(out instanceof Vector3)) {
       throw new TypeError("`Path3D.getPointAt` expects `out` as a `Vector3`.");
     }
-    if (this.#totalLength <= ZERO_VALUE2) {
-      return out.copyFrom(this.#points[ZERO_VALUE2]);
+    if (this.#totalLength <= MATH_COMMON_VALUES.ZERO) {
+      return out.copyFrom(this.#points[MATH_COMMON_VALUES.ZERO]);
     }
-    const normalizedPathParameter = this.#normalizePathParameter(pathParameter);
-    const targetLength = normalizedPathParameter * this.#totalLength;
-    const segmentData = this.#findSegmentAtLength(targetLength);
-    const pointA = this.#points[segmentData.index];
-    const pointB = this.#getNextPoint(segmentData.index);
-    const segmentParameter = segmentData.length <= ZERO_VALUE2 ? ZERO_VALUE2 : (targetLength - segmentData.cumulativeLength) / segmentData.length;
-    const x = pointA.x + (pointB.x - pointA.x) * segmentParameter;
-    const y = pointA.y + (pointB.y - pointA.y) * segmentParameter;
-    const z = pointA.z + (pointB.z - pointA.z) * segmentParameter;
+    const { start, end, parameter } = this.#resolveSegment(pathParameter);
+    const x = start.x + (end.x - start.x) * parameter;
+    const y = start.y + (end.y - start.y) * parameter;
+    const z = start.z + (end.z - start.z) * parameter;
     return out.set(x, y, z);
   }
   /**
-   * Returns a normalized tangent at normalized position along the path (arc-length parameterization).
+   * Returns a normalized tangent at a normalized distance along the path.
    *
    * @param {number} pathParameter - Normalized path parameter in [0..1].
    * @param {Vector3} [out]        - Optional output vector.
-   * @returns {Vector3}
-   * @throws {TypeError} When inputs are invalid.
+   * @returns {Vector3}            - Normalized tangent written to `out`, or zero for a degenerate segment.
+   * @throws {TypeError}             When inputs are invalid.
    */
   getTangentAt(pathParameter, out = new Vector3()) {
     if (typeof pathParameter !== "number" || !Number.isFinite(pathParameter)) {
@@ -1896,103 +1926,120 @@ var Path3D = class _Path3D {
     if (!(out instanceof Vector3)) {
       throw new TypeError("`Path3D.getTangentAt` expects `out` as a `Vector3`.");
     }
-    const normalizedPathParameter = this.#normalizePathParameter(pathParameter);
-    const targetLength = normalizedPathParameter * this.#totalLength;
-    const segmentData = this.#findSegmentAtLength(targetLength);
-    const pointA = this.#points[segmentData.index];
-    const pointB = this.#getNextPoint(segmentData.index);
-    const deltaX = pointB.x - pointA.x;
-    const deltaY = pointB.y - pointA.y;
-    const deltaZ = pointB.z - pointA.z;
-    const tangentLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
-    if (tangentLength <= NORMALIZE_EPSILON) {
-      return out.set(ZERO_VALUE2, ZERO_VALUE2, ZERO_VALUE2);
+    const { start, end } = this.#resolveSegment(pathParameter);
+    const deltaX = end.x - start.x;
+    const deltaY = end.y - start.y;
+    const deltaZ = end.z - start.z;
+    const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
+    if (length <= PATH3D_TANGENT.EPSILON) {
+      return out.set(MATH_COMMON_VALUES.ZERO, MATH_COMMON_VALUES.ZERO, MATH_COMMON_VALUES.ZERO);
     }
-    return out.set(deltaX / tangentLength, deltaY / tangentLength, deltaZ / tangentLength);
+    return out.set(deltaX / length, deltaY / length, deltaZ / length);
   }
   /**
-   * @returns {number}
+   * Resolves the segment at the normalized path parameter.
+   *
+   * @param {number} pathParameter - Finite path parameter.
+   * @returns {Path3DSegment}      - Reused segment data with local interpolation parameter.
+   * @private
+   */
+  #resolveSegment(pathParameter) {
+    const normalizedParameter = this.#normalizePathParameter(pathParameter);
+    const targetLength = normalizedParameter * this.#totalLength;
+    const segmentIndex = this.#findSegmentAtLength(targetLength);
+    const segmentLength = this.#segmentLengths[segmentIndex];
+    const cumulativeLength = this.#cumulativeLengths[segmentIndex];
+    const segmentParameter = segmentLength <= MATH_COMMON_VALUES.ZERO ? MATH_COMMON_VALUES.ZERO : (targetLength - cumulativeLength) / segmentLength;
+    const segment = this.#segment;
+    segment.start = this.#points[segmentIndex];
+    segment.end = this.#getNextPoint(segmentIndex);
+    segment.parameter = segmentParameter;
+    return segment;
+  }
+  /**
+   * @returns {number} - Number of segments in the path.
    * @private
    */
   #getSegmentCount() {
-    return this.#loop ? this.#points.length : this.#points.length - ONE_VALUE2;
+    return this.#loop ? this.#points.length : this.#points.length - MATH_COMMON_VALUES.UNIT;
   }
   /**
-   * @param {number} length - Target length along the path.
-   * @returns {{index: number, length: number, cumulativeLength: number}}
+   * Resolves the segment containing the specified cumulative length.
+   *
+   * @param {number} length - Target distance along the path.
+   * @returns {number}      - Index of the containing segment.
    * @private
    */
   #findSegmentAtLength(length) {
     const segmentCount = this.#segmentLengths.length;
-    for (let index = SEGMENT_START_INDEX; index < segmentCount; index += SEGMENT_INDEX_INCREMENT) {
+    for (let index = PATH3D_SEGMENTS.START_INDEX; index < segmentCount; index += PATH3D_SEGMENTS.INDEX_INCREMENT) {
       const segmentLength = this.#segmentLengths[index];
       const cumulativeLength = this.#cumulativeLengths[index];
       if (length <= cumulativeLength + segmentLength) {
-        return {
-          index,
-          length: segmentLength,
-          cumulativeLength
-        };
+        return index;
       }
     }
-    const lastIndex = segmentCount - ONE_VALUE2;
-    return {
-      index: lastIndex,
-      length: this.#segmentLengths[lastIndex],
-      cumulativeLength: this.#cumulativeLengths[lastIndex]
-    };
+    return segmentCount - MATH_COMMON_VALUES.UNIT;
   }
   /**
+   * Returns the next control point, wrapping for closed paths.
+   *
    * @param {number} index - Segment start index.
-   * @returns {Vector3}
+   * @returns {Vector3}    - Next point for the selected segment.
    * @private
    */
   #getNextPoint(index) {
     if (this.#loop) {
-      const nextIndex = (index + ONE_VALUE2) % this.#points.length;
+      const nextIndex = (index + MATH_COMMON_VALUES.UNIT) % this.#points.length;
       return this.#points[nextIndex];
     }
-    return this.#points[Math.min(index + ONE_VALUE2, this.#points.length - ONE_VALUE2)];
+    return this.#points[Math.min(index + MATH_COMMON_VALUES.UNIT, this.#points.length - MATH_COMMON_VALUES.UNIT)];
   }
   /**
-   * @param {number} pathParameter - Path parameter to normalize.
-   * @returns {number}
+   * Clamps or wraps the normalized path parameter.
+   *
+   * @param {number} pathParameter - Finite path parameter.
+   * @returns {number}             - Normalized parameter in [0..1].
    * @private
    */
   #normalizePathParameter(pathParameter) {
     if (this.#loop) {
-      const wrapped = pathParameter - Math.floor(pathParameter);
-      return wrapped < ZERO_VALUE2 ? wrapped + ONE_VALUE2 : wrapped;
+      return pathParameter - Math.floor(pathParameter);
     }
-    if (pathParameter <= ZERO_VALUE2) {
-      return ZERO_VALUE2;
+    if (pathParameter <= MATH_COMMON_VALUES.ZERO) {
+      return MATH_COMMON_VALUES.ZERO;
     }
-    if (pathParameter >= ONE_VALUE2) {
-      return ONE_VALUE2;
+    if (pathParameter >= MATH_COMMON_VALUES.UNIT) {
+      return MATH_COMMON_VALUES.UNIT;
     }
     return pathParameter;
   }
   /**
+   * Rebuilds the cached segment lengths and total path length.
+   *
+   * @returns {void}
    * @private
    */
   #recalculateLengths() {
     const segmentCount = this.#segmentLengths.length;
-    let cumulativeLength = ZERO_VALUE2;
-    this.#cumulativeLengths[ZERO_VALUE2] = cumulativeLength;
-    for (let index = SEGMENT_START_INDEX; index < segmentCount; index += SEGMENT_INDEX_INCREMENT) {
+    let cumulativeLength = MATH_COMMON_VALUES.ZERO;
+    this.#cumulativeLengths[MATH_COMMON_VALUES.ZERO] = cumulativeLength;
+    for (let index = PATH3D_SEGMENTS.START_INDEX; index < segmentCount; index += PATH3D_SEGMENTS.INDEX_INCREMENT) {
       const pointA = this.#points[index];
       const pointB = this.#getNextPoint(index);
       const length = _Path3D.#distance(pointA, pointB);
       this.#segmentLengths[index] = length;
       cumulativeLength += length;
-      this.#cumulativeLengths[index + ONE_VALUE2] = cumulativeLength;
+      this.#cumulativeLengths[index + MATH_COMMON_VALUES.UNIT] = cumulativeLength;
     }
     this.#totalLength = cumulativeLength;
   }
   /**
+   * Computes the Euclidean distance without extra vector allocations.
+   *
    * @param {Vector3} pointA - First point.
    * @param {Vector3} pointB - Second point.
-   * @returns {number}
+   * @returns {number}       - Distance between the points.
    * @private
    */
   static #distance(pointA, pointB) {
@@ -11175,7 +11222,7 @@ var FpsCounter = class _FpsCounter {
 
 // core/debug/light-gizmo.js
 var DEFAULT_VISIBLE = true;
-var ZERO_VALUE3 = 0;
+var ZERO_VALUE = 0;
 var VISIBLE_OPACITY = 1;
 var HIDDEN_OPACITY = 0;
 var MARKER_HALF_SIZE = 0.4;
@@ -11264,14 +11311,14 @@ var LightGizmo = class extends Object3D {
   #buildMarker(webglContext) {
     const markerMaterial = new SolidColorMaterial(webglContext, { color: MARKER_COLOR });
     this.#materials.push(markerMaterial);
-    const xStart = new Vector3(-MARKER_HALF_SIZE, ZERO_VALUE3, ZERO_VALUE3);
-    const xEnd = new Vector3(MARKER_HALF_SIZE, ZERO_VALUE3, ZERO_VALUE3);
+    const xStart = new Vector3(-MARKER_HALF_SIZE, ZERO_VALUE, ZERO_VALUE);
+    const xEnd = new Vector3(MARKER_HALF_SIZE, ZERO_VALUE, ZERO_VALUE);
     this.add(this.#createLine(webglContext, markerMaterial, [xStart, xEnd]));
-    const yStart = new Vector3(ZERO_VALUE3, -MARKER_HALF_SIZE, ZERO_VALUE3);
-    const yEnd = new Vector3(ZERO_VALUE3, MARKER_HALF_SIZE, ZERO_VALUE3);
+    const yStart = new Vector3(ZERO_VALUE, -MARKER_HALF_SIZE, ZERO_VALUE);
+    const yEnd = new Vector3(ZERO_VALUE, MARKER_HALF_SIZE, ZERO_VALUE);
     this.add(this.#createLine(webglContext, markerMaterial, [yStart, yEnd]));
-    const zStart = new Vector3(ZERO_VALUE3, ZERO_VALUE3, -MARKER_HALF_SIZE);
-    const zEnd = new Vector3(ZERO_VALUE3, ZERO_VALUE3, MARKER_HALF_SIZE);
+    const zStart = new Vector3(ZERO_VALUE, ZERO_VALUE, -MARKER_HALF_SIZE);
+    const zEnd = new Vector3(ZERO_VALUE, ZERO_VALUE, MARKER_HALF_SIZE);
     this.add(this.#createLine(webglContext, markerMaterial, [zStart, zEnd]));
   }
   /**
@@ -11286,13 +11333,13 @@ var LightGizmo = class extends Object3D {
   #buildArrow(webglContext) {
     const arrowMaterial = new SolidColorMaterial(webglContext, { color: ARROW_COLOR });
     this.#materials.push(arrowMaterial);
-    const shaftStart = new Vector3(ZERO_VALUE3, ZERO_VALUE3, ZERO_VALUE3);
-    const shaftEnd = new Vector3(ZERO_VALUE3, ZERO_VALUE3, -ARROW_LENGTH);
+    const shaftStart = new Vector3(ZERO_VALUE, ZERO_VALUE, ZERO_VALUE);
+    const shaftEnd = new Vector3(ZERO_VALUE, ZERO_VALUE, -ARROW_LENGTH);
     this.add(this.#createLine(webglContext, arrowMaterial, [shaftStart, shaftEnd]));
     const headBaseZ = -ARROW_LENGTH + ARROW_HEAD_LENGTH;
-    const headLeft = new Vector3(-ARROW_HEAD_HALF_WIDTH, ZERO_VALUE3, headBaseZ);
-    const headTip = new Vector3(ZERO_VALUE3, ZERO_VALUE3, -ARROW_LENGTH);
-    const headRight = new Vector3(ARROW_HEAD_HALF_WIDTH, ZERO_VALUE3, headBaseZ);
+    const headLeft = new Vector3(-ARROW_HEAD_HALF_WIDTH, ZERO_VALUE, headBaseZ);
+    const headTip = new Vector3(ZERO_VALUE, ZERO_VALUE, -ARROW_LENGTH);
+    const headRight = new Vector3(ARROW_HEAD_HALF_WIDTH, ZERO_VALUE, headBaseZ);
     this.add(this.#createLine(webglContext, arrowMaterial, [headLeft, headTip, headRight]));
   }
   /**
@@ -11325,7 +11372,7 @@ var AXIS_HEAD_HALF_WIDTH = 0.25;
 var AXIS_PICK_THICKNESS = 0.35;
 var AXIS_PICK_LENGTH = AXIS_LENGTH;
 var AXIS_PICK_CENTER_DIVISOR = 2;
-var ZERO_VALUE4 = 0;
+var ZERO_VALUE2 = 0;
 var AXIS_X = "x";
 var AXIS_Y = "y";
 var AXIS_Z = "z";
@@ -11594,7 +11641,7 @@ var TransformGizmo = class extends Object3D {
   #buildAxis(webglContext, axis, color, dir, headOrtho) {
     const material = new SolidColorMaterial(webglContext, { color });
     this.#axisMaterials.set(axis, material);
-    const start = new Vector3(ZERO_VALUE4, ZERO_VALUE4, ZERO_VALUE4);
+    const start = new Vector3(ZERO_VALUE2, ZERO_VALUE2, ZERO_VALUE2);
     const end = new Vector3(
       dir[0] * AXIS_LENGTH,
       dir[1] * AXIS_LENGTH,
@@ -11715,7 +11762,7 @@ var COLOR_COMPONENT_COUNT = 3;
 var DEFAULT_UV = [0, 0];
 var DEFAULT_NORMAL = [0, 0, 1];
 var OBJ_INDEX_NOT_PROVIDED = -1;
-var ZERO_VALUE5 = 0;
+var ZERO_VALUE3 = 0;
 var FIRST_INDEX = 0;
 var SECOND_INDEX = 1;
 var THIRD_INDEX = 2;
@@ -11829,7 +11876,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
     const normals = [];
     const colors = parsedData.hasVertexColors ? [] : null;
     const indices = [];
-    if (chunk.smoothingGroup === ZERO_VALUE5) {
+    if (chunk.smoothingGroup === ZERO_VALUE3) {
       this.#appendFlatGeometry(chunk, parsedData, positions, uvs, normals, colors, indices);
     } else {
       this.#appendSmoothGeometry(chunk, parsedData, positions, uvs, normals, colors, indices);
@@ -11890,7 +11937,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
     const uvs = parsedData.uvs;
     const normals = parsedData.normals;
     const colors = parsedData.colors;
-    let vertexIndex = ZERO_VALUE5;
+    let vertexIndex = ZERO_VALUE3;
     for (const triangle of chunk.triangles) {
       const faceNormal = this.#computeFaceNormal(triangle, positions);
       for (const vertex of triangle) {
@@ -11984,7 +12031,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
           continue;
         }
         const key = _ObjGeometryBuilder.#buildVertexKey(vertex);
-        const current = accumulators.get(key) || [ZERO_VALUE5, ZERO_VALUE5, ZERO_VALUE5];
+        const current = accumulators.get(key) || [ZERO_VALUE3, ZERO_VALUE3, ZERO_VALUE3];
         current[COMPONENT_INDEX_X] += faceNormal[COMPONENT_INDEX_X];
         current[COMPONENT_INDEX_Y] += faceNormal[COMPONENT_INDEX_Y];
         current[COMPONENT_INDEX_Z] += faceNormal[COMPONENT_INDEX_Z];
@@ -11993,7 +12040,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
     }
     for (const [key, normal] of accumulators.entries()) {
       const length = Math.hypot(normal[COMPONENT_INDEX_X], normal[COMPONENT_INDEX_Y], normal[COMPONENT_INDEX_Z]);
-      if (length > ZERO_VALUE5) {
+      if (length > ZERO_VALUE3) {
         normal[COMPONENT_INDEX_X] /= length;
         normal[COMPONENT_INDEX_Y] /= length;
         normal[COMPONENT_INDEX_Z] /= length;
@@ -12033,7 +12080,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
     const ny = abz * acx - abx * acz;
     const nz = abx * acy - aby * acx;
     const length = Math.hypot(nx, ny, nz);
-    if (length > ZERO_VALUE5) {
+    if (length > ZERO_VALUE3) {
       return [nx / length, ny / length, nz / length];
     }
     return DEFAULT_NORMAL;
@@ -12065,7 +12112,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
    * @private
    */
   static #appendUv(sourceUvs, index, target) {
-    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE5 && index * UV_COMPONENT_COUNT < sourceUvs.length) {
+    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE3 && index * UV_COMPONENT_COUNT < sourceUvs.length) {
       const baseIndex = index * UV_COMPONENT_COUNT;
       target.push(sourceUvs[baseIndex + COMPONENT_INDEX_X], sourceUvs[baseIndex + COMPONENT_INDEX_Y]);
       return;
@@ -12082,7 +12129,7 @@ var ObjGeometryBuilder = class _ObjGeometryBuilder {
    * @private
    */
   static #appendNormal(sourceNormals, index, target) {
-    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE5 && index * NORMAL_COMPONENT_COUNT < sourceNormals.length) {
+    if (index !== OBJ_INDEX_NOT_PROVIDED && index >= ZERO_VALUE3 && index * NORMAL_COMPONENT_COUNT < sourceNormals.length) {
       const baseIndex = index * NORMAL_COMPONENT_COUNT;
       target.push(
         sourceNormals[baseIndex + COMPONENT_INDEX_X],
@@ -12263,7 +12310,7 @@ var DEFAULT_SPECULAR_STRENGTH = 1;
 var DEFAULT_OPTICAL_DENSITY = 1;
 var MIN_SHININESS = 1;
 var MAX_SHININESS = 128;
-var ZERO_VALUE6 = 0;
+var ZERO_VALUE4 = 0;
 var AMBIENT_COLOR_EPSILON = 1e-4;
 var FIRST_INDEX2 = 0;
 var SECOND_INDEX2 = 1;
@@ -12330,7 +12377,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
       defaultColor,
       textureCache
     } = options;
-    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE6) {
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE4) {
       throw new TypeError(ERROR_TEXTURE_UNIT_INDEX_TYPE);
     }
     if (defaultColor !== void 0) {
@@ -12493,7 +12540,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
       return true;
     }
     const specular = definition.specularColor;
-    return Boolean(specular && (specular[FIRST_INDEX2] > ZERO_VALUE6 || specular[SECOND_INDEX2] > ZERO_VALUE6 || specular[THIRD_INDEX2] > ZERO_VALUE6));
+    return Boolean(specular && (specular[FIRST_INDEX2] > ZERO_VALUE4 || specular[SECOND_INDEX2] > ZERO_VALUE4 || specular[THIRD_INDEX2] > ZERO_VALUE4));
   }
   /**
    * Resolves the ambient color, applying fallback to diffuse the color, when needed.
@@ -12584,7 +12631,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
    */
   #assertTextureUnitsAvailable(definition, textureUrls) {
     const maxUnits = this.#webglContext.getParameter(this.#webglContext.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
-    if (!Number.isInteger(maxUnits) || maxUnits <= ZERO_VALUE6) {
+    if (!Number.isInteger(maxUnits) || maxUnits <= ZERO_VALUE4) {
       throw new Error(ERROR_TEXTURE_UNITS_LIMIT);
     }
     const usesDiffuse = Boolean(textureUrls && definition.diffuseMap && textureUrls.diffuse);
@@ -12594,7 +12641,7 @@ var ObjMaterialFactory = class _ObjMaterialFactory {
     const usesBump = Boolean(textureUrls && definition.bumpMap && textureUrls.bump);
     const usesDisplacement = Boolean(textureUrls && definition.displacementMap && textureUrls.displacement);
     const usesReflection = Boolean(textureUrls && definition.reflectionMap && textureUrls.reflection);
-    let maxOffset = ZERO_VALUE6;
+    let maxOffset = ZERO_VALUE4;
     if (usesDiffuse) {
       maxOffset = Math.max(maxOffset, TEXTURE_UNIT_DIFFUSE);
     }
@@ -13372,7 +13419,7 @@ var DEFAULT_DIFFUSE_COLOR2 = new Float32Array([1, 1, 1]);
 var DEFAULT_SPECULAR_COLOR = new Float32Array([0, 0, 0]);
 var DEFAULT_AMBIENT_COLOR = new Float32Array([0, 0, 0]);
 var DEFAULT_EMISSIVE_COLOR = new Float32Array([0, 0, 0]);
-var ZERO_VALUE7 = 0;
+var ZERO_VALUE5 = 0;
 var EMPTY_STRING3 = "";
 var SPACE_SEPARATOR3 = " ";
 var LINE_SPLIT_REGEX2 = /\s+/u;
@@ -13586,7 +13633,7 @@ var MtlParser = class _MtlParser {
    */
   static #parseFloatTriplet(parts, expected) {
     if (parts.length <= expected) {
-      return [ZERO_VALUE7, ZERO_VALUE7, ZERO_VALUE7];
+      return [ZERO_VALUE5, ZERO_VALUE5, ZERO_VALUE5];
     }
     return [
       Number.parseFloat(parts[SECOND_INDEX5]),
@@ -13848,7 +13895,7 @@ var QUOTE_TOKEN4 = '"';
 var NOT_FOUND_INDEX3 = -1;
 var SECOND_INDEX6 = 1;
 var BASE_PATH_SLICE_OFFSET = 1;
-var ZERO_VALUE8 = 0;
+var ZERO_VALUE6 = 0;
 var COLOR_COMPONENT_COUNT5 = 3;
 var ENTRY_TYPE_MESH2 = "mesh";
 var ENTRY_TYPE_POINTS2 = "points";
@@ -13954,7 +14001,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
       textureUnitIndex = DEFAULT_TEXTURE_UNIT_INDEX2,
       defaultColor
     } = options;
-    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE8) {
+    if (!Number.isInteger(textureUnitIndex) || textureUnitIndex < ZERO_VALUE6) {
       throw new TypeError(ERROR_TEXTURE_UNIT_INDEX_TYPE2);
     }
     if (defaultColor !== void 0) {
@@ -14025,7 +14072,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
         console.warn(`${WARNING_MTL_LOAD_FAILED_PREFIX}${resolvedMtlUrl}${WARNING_MTL_LOAD_FAILED_REASON_PREFIX}${errorMessage}`);
       }
     }
-    if (!mtlUrl && objData.materialLibraries.length > ZERO_VALUE8) {
+    if (!mtlUrl && objData.materialLibraries.length > ZERO_VALUE6) {
       for (const library of objData.materialLibraries) {
         if (!library) {
           continue;
@@ -14132,7 +14179,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
     const missingMaterialWarnings = /* @__PURE__ */ new Set();
     const missingDiffuseWarnings = /* @__PURE__ */ new Set();
     const availableMaterials = Array.from(mtlData.keys());
-    const availablePreview = availableMaterials.slice(ZERO_VALUE8, WARNING_MTL_AVAILABLE_LIMIT);
+    const availablePreview = availableMaterials.slice(ZERO_VALUE6, WARNING_MTL_AVAILABLE_LIMIT);
     for (const entry of buildResult.entries) {
       const materialDefinition = mtlData.get(entry.materialName) || null;
       const textureUrls = _ObjMtlLoader.#resolveTextureUrls(materialDefinition, textureBaseUrl, assetUrlMap);
@@ -14248,7 +14295,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
     if (lastSlashIndex === NOT_FOUND_INDEX3) {
       return DEFAULT_BASE_URL;
     }
-    return url.slice(ZERO_VALUE8, lastSlashIndex + BASE_PATH_SLICE_OFFSET);
+    return url.slice(ZERO_VALUE6, lastSlashIndex + BASE_PATH_SLICE_OFFSET);
   }
   /**
    * Resolves a relative path against a base URL.
