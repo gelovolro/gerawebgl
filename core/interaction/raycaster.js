@@ -1,295 +1,10 @@
-import { Matrix4 } from '../math/matrix4.js';
-import { Scene }   from '../scene/scene.js';
-import { Camera }  from '../scene/camera.js';
-import { Mesh }    from '../scene/mesh.js';
-
-/**
- * Base value for boolean defaults.
- *
- * @type {boolean}
- */
-const DEFAULT_RECURSIVE = true;
-
-/**
- * Default filter value.
- *
- * @type {null}
- */
-const DEFAULT_FILTER = null;
-
-/**
- * Default sorting flag for raycast results.
- *
- * @type {boolean}
- */
-const DEFAULT_SORT = true;
-
-/**
- * Minimum NDC value for the near plane.
- *
- * @type {number}
- */
-const NDC_NEAR = -1.0;
-
-/**
- * Maximum NDC value for the far plane.
- *
- * @type {number}
- */
-const NDC_FAR = 1.0;
-
-/**
- * Clip-space `W component` for unprojection.
- *
- * @type {number}
- */
-const CLIP_W = 1.0;
-
-/**
- * Zero component value.
- *
- * @type {number}
- */
-const ZERO_COMPONENT = 0.0;
-
-/**
- * One component value.
- *
- * @type {number}
- */
-const ONE_COMPONENT = 1.0;
-
-/**
- * Matrix element indices for the 4x4 matrices.
- *
- * @type {number}
- */
-const MATRIX_INDEX_00 = 0;
-const MATRIX_INDEX_01 = 1;
-const MATRIX_INDEX_02 = 2;
-const MATRIX_INDEX_03 = 3;
-const MATRIX_INDEX_10 = 4;
-const MATRIX_INDEX_11 = 5;
-const MATRIX_INDEX_12 = 6;
-const MATRIX_INDEX_13 = 7;
-const MATRIX_INDEX_20 = 8;
-const MATRIX_INDEX_21 = 9;
-const MATRIX_INDEX_22 = 10;
-const MATRIX_INDEX_23 = 11;
-const MATRIX_INDEX_30 = 12;
-const MATRIX_INDEX_31 = 13;
-const MATRIX_INDEX_32 = 14;
-const MATRIX_INDEX_33 = 15;
-
-/**
- * Loop start index.
- *
- * @type {number}
- */
-const LOOP_START_INDEX = 0;
-
-/**
- * Loop increment value.
- *
- * @type {number}
- */
-const LOOP_INCREMENT = 1;
-
-/**
- * Index for X component in arrays.
- *
- * @type {number}
- */
-const VECTOR_INDEX_X = 0;
-
-/**
- * Index for Y component in arrays.
- *
- * @type {number}
- */
-const VECTOR_INDEX_Y = 1;
-
-/**
- * Index for Z component in arrays.
- *
- * @type {number}
- */
-const VECTOR_INDEX_Z = 2;
-
-/**
- * Range array index: min.
- *
- * @type {number}
- */
-const RANGE_MIN_INDEX = 0;
-
-/**
- * Range array index: max.
- *
- * @type {number}
- */
-const RANGE_MAX_INDEX = 1;
-
-/**
- * Minimum ray parameter value.
- *
- * @type {number}
- */
-const RAY_T_MIN = 0.0;
-
-/**
- * Maximum ray parameter initial value.
- *
- * @type {number}
- */
-const RAY_T_MAX_INIT = Number.POSITIVE_INFINITY;
-
-/**
- * Epsilon used for ray direction checks.
- *
- * @type {number}
- */
-const RAY_DIRECTION_EPSILON = 1e-8;
-
-/**
- * Inverse numerator used in direction inverse computations.
- *
- * @type {number}
- */
-const INVERSE_DIRECTION_NUMERATOR = 1.0;
-
-/**
- * Component key for X.
- *
- * @type {string}
- */
-const COMPONENT_X = 'x';
-
-/**
- * Component key for Y.
- *
- * @type {string}
- */
-const COMPONENT_Y = 'y';
-
-/**
- * Component key for Z.
- *
- * @type {string}
- */
-const COMPONENT_Z = 'z';
-
-/**
- * Intersection object key.
- *
- * @type {string}
- */
-const INTERSECTION_OBJECT_KEY = 'object';
-
-/**
- * Intersection distance key.
- *
- * @type {string}
- */
-const INTERSECTION_DISTANCE_KEY = 'distance';
-
-/**
- * Intersection point key.
- *
- * @type {string}
- */
-const INTERSECTION_POINT_KEY = 'point';
-
-/**
- * Raycast options key: recursive.
- *
- * @type {string}
- */
-const OPTION_RECURSIVE_KEY = 'recursive';
-
-/**
- * Raycast options key: filter.
- *
- * @type {string}
- */
-const OPTION_FILTER_KEY = 'filter';
-
-/**
- * Raycast options key: sort.
- *
- * @type {string}
- */
-const OPTION_SORT_KEY = 'sort';
-
-/**
- * Mouse NDC key: x.
- *
- * @type {string}
- */
-const MOUSE_NDC_X_KEY = 'x';
-
-/**
- * Mouse NDC key: y.
- *
- * @type {string}
- */
-const MOUSE_NDC_Y_KEY = 'y';
-
-/**
- * Error message: invalid scene.
- *
- * @type {string}
- */
-const ERROR_SCENE_TYPE = '`Raycaster.raycast` expects scene as a `Scene` instance.';
-
-/**
- * Error message: invalid camera.
- *
- * @type {string}
- */
-const ERROR_CAMERA_TYPE = '`Raycaster.raycast` expects camera as a `Camera` instance.';
-
-/**
- * Error message: invalid mouse ndc object.
- *
- * @type {string}
- */
-const ERROR_MOUSE_NDC_TYPE = '`Raycaster.raycast` expects `mouseNdc` as an object with numeric x/y.';
-
-/**
- * Error message: invalid options object.
- *
- * @type {string}
- */
-const ERROR_OPTIONS_TYPE = '`Raycaster.raycast` expects options as a plain object.';
-
-/**
- * Error message: invalid recursive option.
- *
- * @type {string}
- */
-const ERROR_OPTION_RECURSIVE_TYPE = '`Raycaster.raycast` option recursive must be a boolean.';
-
-/**
- * Error message: invalid filter option.
- *
- * @type {string}
- */
-const ERROR_OPTION_FILTER_TYPE = '`Raycaster.raycast` option filter must be a function or null.';
-
-/**
- * Error message: invalid sort option.
- *
- * @type {string}
- */
-const ERROR_OPTION_SORT_TYPE = '`Raycaster.raycast` option sort must be a boolean.';
-
-/**
- * Error message: invalid unproject W component.
- *
- * @type {string}
- */
-const ERROR_UNPROJECT_W_ZERO = '`Raycaster.raycast` failed to unproject, `W component` is zero.';
+import * as RaycasterConstants       from '../constants/raycaster.js';
+import { MATH_COMMON_VALUES }        from '../constants/math.js';
+import { ECMASCRIPT_TYPEOF_RESULTS } from '../constants/ecmascript-types.js';
+import { Matrix4 }                   from '../math/matrix4.js';
+import { Scene }                     from '../scene/scene.js';
+import { Camera }                    from '../scene/camera.js';
+import { Mesh }                      from '../scene/mesh.js';
 
 /**
  * @typedef {Object} RaycastPoint
@@ -301,15 +16,15 @@ const ERROR_UNPROJECT_W_ZERO = '`Raycaster.raycast` failed to unproject, `W comp
 /**
  * @typedef {Object} Intersection
  * @property {Mesh} object        - Intersected mesh.
- * @property {number} distance    - Distance from ray origin to the intersection point.
+ * @property {number} distance    - Distance from the ray origin to the hit point.
  * @property {RaycastPoint} point - Intersection point in world space.
  */
 
 /**
  * @typedef {Object} RaycastOptions
- * @property {boolean} [recursive=true]                     - When true, traverses all descendants of the scene.
+ * @property {boolean} [recursive=true]                     - Whether to traverse descendants.
  * @property {function(Mesh): boolean | null} [filter=null] - Optional mesh filter.
- * @property {boolean} [sort=true]                          - When true, sorts intersections by distance.
+ * @property {boolean} [sort=true]                          - Whether to sort hits by distance.
  */
 
 /**
@@ -319,98 +34,126 @@ const ERROR_UNPROJECT_W_ZERO = '`Raycaster.raycast` failed to unproject, `W comp
  */
 
 /**
- * Raycaster performs raycasting against scene meshes using their local AABB.
+ * Tests ray intersections against the local axis-aligned bounding boxes of scene meshes.
  */
 export class Raycaster {
     /**
-     * Performs a raycast against the given scene and returns intersections.
+     * Casts a ray through a point in normalized device coordinates.
      *
      * @param {Scene} scene                     - Scene to query.
-     * @param {Camera} camera                   - Camera used to build the ray.
-     * @param {{x: number, y: number}} mouseNdc - Mouse coordinates in NDC space [-1..1].
-     * @param {RaycastOptions} [options]        - Optional raycast settings.
-     * @returns {Intersection[]}                - Intersection list.
+     * @param {Camera} camera                   - Camera defining the ray.
+     * @param {{x: number, y: number}} mouseNdc - Normalized device coordinates.
+     * @param {RaycastOptions} [options]        - Raycast options.
+     * @returns {Intersection[]}                - Bounding-box intersections.
      */
     raycast(scene, camera, mouseNdc, options = {}) {
-        if (!(scene instanceof Scene)) {
-            throw new TypeError(ERROR_SCENE_TYPE);
-        }
+        const { recursive, filter, sort } = Raycaster.#validateArguments(scene, camera, mouseNdc, options);
 
-        if (!(camera instanceof Camera)) {
-            throw new TypeError(ERROR_CAMERA_TYPE);
-        }
-
-        if (mouseNdc === null || typeof mouseNdc !== 'object' || Array.isArray(mouseNdc)) {
-            throw new TypeError(ERROR_MOUSE_NDC_TYPE);
-        }
-
-        if (typeof mouseNdc[MOUSE_NDC_X_KEY] !== 'number' || typeof mouseNdc[MOUSE_NDC_Y_KEY] !== 'number') {
-            throw new TypeError(ERROR_MOUSE_NDC_TYPE);
-        }
-
-        if (options === null || typeof options !== 'object' || Array.isArray(options)) {
-            throw new TypeError(ERROR_OPTIONS_TYPE);
-        }
-
-        const recursive  = OPTION_RECURSIVE_KEY in options ? options[OPTION_RECURSIVE_KEY] : DEFAULT_RECURSIVE;
-        const filter     = OPTION_FILTER_KEY in options ? options[OPTION_FILTER_KEY] : DEFAULT_FILTER;
-        const shouldSort = OPTION_SORT_KEY in options ? options[OPTION_SORT_KEY] : DEFAULT_SORT;
-
-        if (typeof recursive !== 'boolean') {
-            throw new TypeError(ERROR_OPTION_RECURSIVE_TYPE);
-        }
-
-        if (filter !== null && typeof filter !== 'function') {
-            throw new TypeError(ERROR_OPTION_FILTER_TYPE);
-        }
-
-        if (typeof shouldSort !== 'boolean') {
-            throw new TypeError(ERROR_OPTION_SORT_TYPE);
+        if (!Number.isFinite(mouseNdc.x) || !Number.isFinite(mouseNdc.y)) {
+            return [];
         }
 
         scene.updateWorldMatrix({ parentWorldMatrix: null });
 
-        const viewMatrix                  = camera.getViewMatrix();
-        const projectionMatrix            = camera.getProjectionMatrix();
-        const viewProjectionMatrix        = Matrix4.multiply(projectionMatrix, viewMatrix);
-        const inverseViewProjectionMatrix = Matrix4.invert(viewProjectionMatrix);
-        const ray = Raycaster.#createRay(inverseViewProjectionMatrix, mouseNdc[MOUSE_NDC_X_KEY], mouseNdc[MOUSE_NDC_Y_KEY]);
-        const intersections = [];
+        const viewProjectionMatrix = Matrix4.multiply(camera.getProjectionMatrix(), camera.getViewMatrix());
+        const inverseMatrix        = Matrix4.invert(viewProjectionMatrix);
+        const ray                  = Raycaster.#createRay(inverseMatrix, mouseNdc.x, mouseNdc.y);
+        const intersections        = [];
+
+        if (ray.direction.x === MATH_COMMON_VALUES.ZERO &&
+            ray.direction.y === MATH_COMMON_VALUES.ZERO &&
+            ray.direction.z === MATH_COMMON_VALUES.ZERO) {
+            return [];
+        }
 
         if (recursive) {
             scene.traverse((object) => Raycaster.#collectIntersection(object, ray, filter, intersections));
         } else {
-            const children = scene.children;
-
-            for (let index = LOOP_START_INDEX; index < children.length; index += LOOP_INCREMENT) {
-                Raycaster.#collectIntersection(children[index], ray, filter, intersections);
+            for (const object of scene.children) {
+                Raycaster.#collectIntersection(object, ray, filter, intersections);
             }
         }
 
-        if (shouldSort) {
-            intersections.sort((left, right) => left[INTERSECTION_DISTANCE_KEY] - right[INTERSECTION_DISTANCE_KEY]);
+        if (sort) {
+            intersections.sort((left, right) => left.distance - right.distance);
         }
 
         return intersections;
     }
 
     /**
-     * @param {Object} object                - Scene object.
-     * @param {Object} ray                   - Ray data with origin/direction.
-     * @param {Function | null} filter       - Optional mesh filter.
-     * @param {Intersection[]} intersections - Output array.
+     * Validates raycast input and resolves its default options.
+     *
+     * @param {Scene} scene            - Scene argument.
+     * @param {Camera} camera          - Camera argument.
+     * @param {Object} mouseNdc        - Mouse coordinates.
+     * @param {RaycastOptions} options - Raycast options.
+     * @returns {RaycastOptions}       - Validated option values.
      * @private
      */
-    static #collectIntersection(object, ray, filter, intersections) {
-        if (!(object instanceof Mesh)) {
-            return;
+    static #validateArguments(scene, camera, mouseNdc, options) {
+        const errors = RaycasterConstants.RAYCASTER_ERRORS;
+        const types  = ECMASCRIPT_TYPEOF_RESULTS;
+
+        if (!(scene instanceof Scene)) {
+            throw new TypeError(errors.SCENE_TYPE);
         }
 
-        if (object.isDisposed) {
-            return;
+        if (!(camera instanceof Camera)) {
+            throw new TypeError(errors.CAMERA_TYPE);
         }
 
-        if (filter && filter(object) === false) {
+        if (mouseNdc === null
+            || typeof mouseNdc !== types.OBJECT
+            || Array.isArray(mouseNdc)
+            || typeof mouseNdc.x !== types.NUMBER
+            || typeof mouseNdc.y !== types.NUMBER) {
+            throw new TypeError(errors.MOUSE_NDC_TYPE);
+        }
+
+        if (options === null || typeof options !== types.OBJECT || Array.isArray(options)) {
+            throw new TypeError(errors.OPTIONS_TYPE);
+        }
+
+        const optionsPrototype = Object.getPrototypeOf(options);
+
+        if (optionsPrototype !== Object.prototype && optionsPrototype !== null) {
+            throw new TypeError(errors.OPTIONS_TYPE);
+        }
+
+        const defaults   = RaycasterConstants.RAYCASTER_DEFAULTS;
+        const optionKeys = RaycasterConstants.RAYCASTER_OPTION_KEYS;
+        const recursive  = optionKeys.RECURSIVE in options ? options[optionKeys.RECURSIVE] : defaults.RECURSIVE;
+        const filter     = optionKeys.FILTER in options ? options[optionKeys.FILTER] : defaults.FILTER;
+        const sort       = optionKeys.SORT in options ? options[optionKeys.SORT] : defaults.SORT;
+
+        if (typeof recursive !== types.BOOLEAN) {
+            throw new TypeError(errors.RECURSIVE_TYPE);
+        }
+
+        if (filter !== null && typeof filter !== types.FUNCTION) {
+            throw new TypeError(errors.FILTER_TYPE);
+        }
+
+        if (typeof sort !== types.BOOLEAN) {
+            throw new TypeError(errors.SORT_TYPE);
+        }
+
+        return { recursive, filter, sort };
+    }
+
+    /**
+     * Collects an intersection if the object is an eligible mesh and its bounds are hit.
+     *
+     * @param {Object} object          - Scene graph node.
+     * @param {Ray} ray                - Ray in world space.
+     * @param {Function | null} filter - Optional mesh filter.
+     * @param {Intersection[]} output  - Intersection results.
+     * @returns {void}
+     * @private
+     */
+    static #collectIntersection(object, ray, filter, output) {
+        if (!(object instanceof Mesh) || object.isDisposed || (filter && filter(object) === false)) {
             return;
         }
 
@@ -418,279 +161,219 @@ export class Raycaster {
         const boundingBoxMin     = geometry.getBoundingBoxMin();
         const boundingBoxMax     = geometry.getBoundingBoxMax();
         const inverseWorldMatrix = Matrix4.invert(object.worldMatrix);
-        const localOrigin        = Raycaster.#transformPoint(inverseWorldMatrix, ray.origin, ONE_COMPONENT);
-        const localDirection     = Raycaster.#transformPoint(inverseWorldMatrix, ray.direction, ZERO_COMPONENT);
-        const hitDistance        = Raycaster.#intersectRayAabb(localOrigin, localDirection, boundingBoxMin, boundingBoxMax);
+        const localOrigin        = Raycaster.#transformPoint(inverseWorldMatrix, ray.origin, RaycasterConstants.RAYCASTER_NDC.W);
+        const localDirection     = Raycaster.#transformPoint(inverseWorldMatrix, ray.direction, MATH_COMMON_VALUES.ZERO);
+        const parameter          = Raycaster.#intersectRayAabb(
+            localOrigin,
+            localDirection,
+            boundingBoxMin,
+            boundingBoxMax
+        );
 
-        if (hitDistance === null) {
+        if (parameter === null) {
             return;
         }
 
         const localPoint = {
-            [COMPONENT_X] : localOrigin[COMPONENT_X] + (localDirection[COMPONENT_X] * hitDistance),
-            [COMPONENT_Y] : localOrigin[COMPONENT_Y] + (localDirection[COMPONENT_Y] * hitDistance),
-            [COMPONENT_Z] : localOrigin[COMPONENT_Z] + (localDirection[COMPONENT_Z] * hitDistance)
+            x : localOrigin.x + (localDirection.x * parameter),
+            y : localOrigin.y + (localDirection.y * parameter),
+            z : localOrigin.z + (localDirection.z * parameter)
         };
 
-        const worldPoint = Raycaster.#transformPoint(object.worldMatrix, localPoint, ONE_COMPONENT);
-        const distance   = Raycaster.#distanceBetween(ray.origin, worldPoint);
+        const worldPoint = Raycaster.#transformPoint(object.worldMatrix, localPoint, RaycasterConstants.RAYCASTER_NDC.W);
 
-        intersections.push({
-            [INTERSECTION_OBJECT_KEY]   : object,
-            [INTERSECTION_DISTANCE_KEY] : distance,
-            [INTERSECTION_POINT_KEY]    : worldPoint
+        output.push({
+            object,
+            distance : Raycaster.#distanceBetween(ray.origin, worldPoint),
+            point    : worldPoint
         });
     }
 
     /**
-     * @param {Float32Array} inverseViewProjectionMatrix - Inverse view-projection matrix.
-     * @param {number} ndcX                              - Normalized device coordinate X.
-     * @param {number} ndcY                              - Normalized device coordinate Y.
-     * @returns {Ray}                                    - Ray with origin and direction in world space.
+     * Creates a world-space ray from the near and far clip planes.
+     *
+     * @param {Float32Array} inverseMatrix - Inverse view-projection matrix.
+     * @param {number} ndcX                - Horizontal NDC coordinate.
+     * @param {number} ndcY                - Vertical NDC coordinate.
+     * @returns {Ray}                      - Ray with normalized direction.
      * @private
      */
-    static #createRay(inverseViewProjectionMatrix, ndcX, ndcY) {
-        const nearPoint = Raycaster.#unproject(inverseViewProjectionMatrix, ndcX, ndcY, NDC_NEAR);
-        const farPoint  = Raycaster.#unproject(inverseViewProjectionMatrix, ndcX, ndcY, NDC_FAR);
+    static #createRay(inverseMatrix, ndcX, ndcY) {
+        const ndc       = RaycasterConstants.RAYCASTER_NDC;
+        const nearPoint = Raycaster.#unproject(inverseMatrix, ndcX, ndcY, ndc.NEAR);
+        const farPoint  = Raycaster.#unproject(inverseMatrix, ndcX, ndcY, ndc.FAR);
         const direction = Raycaster.#normalizeVector({
-            [COMPONENT_X] : farPoint[COMPONENT_X] - nearPoint[COMPONENT_X],
-            [COMPONENT_Y] : farPoint[COMPONENT_Y] - nearPoint[COMPONENT_Y],
-            [COMPONENT_Z] : farPoint[COMPONENT_Z] - nearPoint[COMPONENT_Z]
+            x : farPoint.x - nearPoint.x,
+            y : farPoint.y - nearPoint.y,
+            z : farPoint.z - nearPoint.z
         });
 
-        return {
-            origin: nearPoint,
-            direction
-        };
+        return { origin: nearPoint, direction };
     }
 
     /**
+     * Converts clip-space coordinates into a world-space point.
+     *
      * @param {Float32Array} matrix - Inverse view-projection matrix.
-     * @param {number} ndcX         - NDC x.
-     * @param {number} ndcY         - NDC y.
-     * @param {number} ndcZ         - NDC z.
-     * @returns {RaycastPoint}      - Unprojected point in world space.
+     * @param {number} ndcX         - Horizontal NDC coordinate.
+     * @param {number} ndcY         - Vertical NDC coordinate.
+     * @param {number} ndcZ         - Depth NDC coordinate.
+     * @returns {RaycastPoint}      - Unprojected point.
      * @private
      */
     static #unproject(matrix, ndcX, ndcY, ndcZ) {
-        // Build the clip-space position from NDC coordinates:
-        const clipX = ndcX;
-        const clipY = ndcY;
-        const clipZ = ndcZ;
-        const clipW = CLIP_W;
+        const indexes = RaycasterConstants.RAYCASTER_MATRIX_INDEXES;
+        const clipW   = RaycasterConstants.RAYCASTER_NDC.W;
+        const point   = { x: ndcX, y: ndcY, z: ndcZ };
+        const world   = Raycaster.#transformPoint(matrix, point, clipW);
 
-        // Compute world-space (homogeneous) using the inverse view-projection matrix:
-        const worldX = (matrix[MATRIX_INDEX_00] * clipX)
-            + (matrix[MATRIX_INDEX_10] * clipY)
-            + (matrix[MATRIX_INDEX_20] * clipZ)
-            + (matrix[MATRIX_INDEX_30] * clipW);
+        const worldW = (matrix[indexes.WX] * ndcX)
+            + (matrix[indexes.WY] * ndcY)
+            + (matrix[indexes.WZ] * ndcZ)
+            + (matrix[indexes.WW] * clipW);
 
-        const worldY = (matrix[MATRIX_INDEX_01] * clipX)
-            + (matrix[MATRIX_INDEX_11] * clipY)
-            + (matrix[MATRIX_INDEX_21] * clipZ)
-            + (matrix[MATRIX_INDEX_31] * clipW);
-
-        const worldZ = (matrix[MATRIX_INDEX_02] * clipX)
-            + (matrix[MATRIX_INDEX_12] * clipY)
-            + (matrix[MATRIX_INDEX_22] * clipZ)
-            + (matrix[MATRIX_INDEX_32] * clipW);
-
-        const worldW = (matrix[MATRIX_INDEX_03] * clipX)
-            + (matrix[MATRIX_INDEX_13] * clipY)
-            + (matrix[MATRIX_INDEX_23] * clipZ)
-            + (matrix[MATRIX_INDEX_33] * clipW);
-
-        if (worldW === ZERO_COMPONENT) {
-            throw new Error(ERROR_UNPROJECT_W_ZERO);
+        if (worldW === MATH_COMMON_VALUES.ZERO) {
+            throw new Error(RaycasterConstants.RAYCASTER_ERRORS.UNPROJECT_W_ZERO);
         }
 
-        // Compute the `reciprocal W` value for perspective divide:
-        const inverseW = ONE_COMPONENT / worldW;
+        const inverseW = RaycasterConstants.RAYCASTER_RAY.INVERSE_NUMERATOR / worldW;
 
         return {
-            [COMPONENT_X] : worldX * inverseW,
-            [COMPONENT_Y] : worldY * inverseW,
-            [COMPONENT_Z] : worldZ * inverseW
+            x : world.x * inverseW,
+            y : world.y * inverseW,
+            z : world.z * inverseW
         };
     }
 
     /**
-     * @param {Float32Array} matrix - Matrix to apply.
-     * @param {RaycastPoint} point  - Point to transform.
-     * @param {number} wComponent   - Homogeneous W component (1 for points, 0 for vectors).
-     * @returns {RaycastPoint}      - Transformed (x, y, z) after applying the 4x4 matrix with the given `W component`.
+     * Multiplies a point or direction by a column-major transformation matrix.
+     *
+     * @param {Float32Array} matrix - Transformation matrix.
+     * @param {RaycastPoint} point  - Source point.
+     * @param {number} w            - Homogeneous component.
+     * @returns {RaycastPoint}      - Transformed point.
      * @private
      */
-    static #transformPoint(matrix, point, wComponent) {
-        const x = point[COMPONENT_X];
-        const y = point[COMPONENT_Y];
-        const z = point[COMPONENT_Z];
+    static #transformPoint(matrix, point, w) {
+        const indexes = RaycasterConstants.RAYCASTER_MATRIX_INDEXES;
 
         return {
-            [COMPONENT_X]: (matrix[MATRIX_INDEX_00] * x)
-                + (matrix[MATRIX_INDEX_10] * y)
-                + (matrix[MATRIX_INDEX_20] * z)
-                + (matrix[MATRIX_INDEX_30] * wComponent),
+            x : (matrix[indexes.XX] * point.x) + (matrix[indexes.XY] * point.y)
+                + (matrix[indexes.XZ] * point.z) + (matrix[indexes.XW] * w),
 
-            [COMPONENT_Y]: (matrix[MATRIX_INDEX_01] * x)
-                + (matrix[MATRIX_INDEX_11] * y)
-                + (matrix[MATRIX_INDEX_21] * z)
-                + (matrix[MATRIX_INDEX_31] * wComponent),
+            y : (matrix[indexes.YX] * point.x) + (matrix[indexes.YY] * point.y)
+                + (matrix[indexes.YZ] * point.z) + (matrix[indexes.YW] * w),
 
-            [COMPONENT_Z]: (matrix[MATRIX_INDEX_02] * x)
-                + (matrix[MATRIX_INDEX_12] * y)
-                + (matrix[MATRIX_INDEX_22] * z)
-                + (matrix[MATRIX_INDEX_32] * wComponent)
+            z : (matrix[indexes.ZX] * point.x) + (matrix[indexes.ZY] * point.y)
+                + (matrix[indexes.ZZ] * point.z) + (matrix[indexes.ZW] * w)
         };
     }
 
     /**
-     * @param {RaycastPoint} vector - Vector to normalize.
-     * @returns {RaycastPoint}      - Normalized vector, returns zero vector when input length is zero.
+     * Returns a normalized direction, or zero for a degenerate ray.
+     *
+     * @param {RaycastPoint} vector - Direction vector.
+     * @returns {RaycastPoint}      - Normalized vector.
      * @private
      */
     static #normalizeVector(vector) {
-        const x      = vector[COMPONENT_X];
-        const y      = vector[COMPONENT_Y];
-        const z      = vector[COMPONENT_Z];
-        const length = Math.sqrt((x * x) + (y * y) + (z * z));
+        const length = Math.sqrt((vector.x * vector.x) + (vector.y * vector.y) + (vector.z * vector.z));
 
-        if (length === ZERO_COMPONENT) {
+        if (length === MATH_COMMON_VALUES.ZERO) {
             return {
-                [COMPONENT_X] : ZERO_COMPONENT,
-                [COMPONENT_Y] : ZERO_COMPONENT,
-                [COMPONENT_Z] : ZERO_COMPONENT
+                x : MATH_COMMON_VALUES.ZERO,
+                y : MATH_COMMON_VALUES.ZERO,
+                z : MATH_COMMON_VALUES.ZERO
             };
         }
 
-        const inverseLength = ONE_COMPONENT / length;
+        const inverseLength = RaycasterConstants.RAYCASTER_RAY.INVERSE_NUMERATOR / length;
 
         return {
-            [COMPONENT_X] : x * inverseLength,
-            [COMPONENT_Y] : y * inverseLength,
-            [COMPONENT_Z] : z * inverseLength
+            x : vector.x * inverseLength,
+            y : vector.y * inverseLength,
+            z : vector.z * inverseLength
         };
     }
 
     /**
-     * @param {RaycastPoint} origin    - Ray origin in local space.
-     * @param {RaycastPoint} direction - Ray direction in local space.
-     * @param {Float32Array} min       - AABB minimum.
-     * @param {Float32Array} max       - AABB maximum.
-     * @returns {number | null}        - Intersection distance parameter along the ray direction, null when the ray misses the AABB.
+     * Intersects a local-space ray with a local axis-aligned bounding box.
+     *
+     * @param {RaycastPoint} origin    - Local ray origin.
+     * @param {RaycastPoint} direction - Local ray direction.
+     * @param {Float32Array} min       - Minimum bounds.
+     * @param {Float32Array} max       - Maximum bounds.
+     * @returns {number | null}        - Ray parameter or null when the bounds are missed.
      * @private
      */
     static #intersectRayAabb(origin, direction, min, max) {
-        // Initialize the running ray-AABB intersection interval:
-        let tMin = RAY_T_MIN;
-        let tMax = RAY_T_MAX_INIT;
+        const ray = RaycasterConstants.RAYCASTER_RAY;
+        let entry = ray.MIN_PARAMETER;
+        let exit  = ray.MAX_PARAMETER;
 
-        // Extract ray origin components:
-        const originX = origin[COMPONENT_X];
-        const originY = origin[COMPONENT_Y];
-        const originZ = origin[COMPONENT_Z];
+        for (const axis of RaycasterConstants.RAYCASTER_AXES) {
+            const range = Raycaster.#getAxisRange(
+                origin[axis.name],
+                direction[axis.name],
+                min[axis.index],
+                max[axis.index]
+            );
 
-        // Extract ray direction components:
-        const directionX = direction[COMPONENT_X];
-        const directionY = direction[COMPONENT_Y];
-        const directionZ = direction[COMPONENT_Z];
+            if (range === null) {
+                return null;
+            }
 
-        // Extract AABB bounds components:
-        const minX = min[VECTOR_INDEX_X];
-        const minY = min[VECTOR_INDEX_Y];
-        const minZ = min[VECTOR_INDEX_Z];
-        const maxX = max[VECTOR_INDEX_X];
-        const maxY = max[VECTOR_INDEX_Y];
-        const maxZ = max[VECTOR_INDEX_Z];
+            entry = Math.max(entry, range.entry);
+            exit  = Math.min(exit, range.exit);
 
-        // Compute the ray intersection range for the X axis slab:
-        const rangeX = Raycaster.#getAxisRange(originX, directionX, minX, maxX);
-
-        // No overlap with the X slab, so no intersection with the AABB:
-        if (!rangeX) {
-            return null;
+            if (entry > exit) {
+                return null;
+            }
         }
 
-        // Intersect the running interval with the X slab interval:
-        tMin = Math.max(tMin, rangeX[RANGE_MIN_INDEX]);
-        tMax = Math.min(tMax, rangeX[RANGE_MAX_INDEX]);
-
-        // If entry exceeds exit, the slabs do not overlap, so no intersection:
-        if (tMin > tMax) {
-            return null;
-        }
-
-        // The same, but for Y:
-        const rangeY = Raycaster.#getAxisRange(originY, directionY, minY, maxY);
-
-        if (!rangeY) {
-            return null;
-        }
-
-        tMin = Math.max(tMin, rangeY[RANGE_MIN_INDEX]);
-        tMax = Math.min(tMax, rangeY[RANGE_MAX_INDEX]);
-
-        if (tMin > tMax) {
-            return null;
-        }
-
-        // The same, but for Z:
-        const rangeZ = Raycaster.#getAxisRange(originZ, directionZ, minZ, maxZ);
-
-        if (!rangeZ) {
-            return null;
-        }
-
-        tMin = Math.max(tMin, rangeZ[RANGE_MIN_INDEX]);
-        tMax = Math.min(tMax, rangeZ[RANGE_MAX_INDEX]);
-
-        if (tMin > tMax) {
-            return null;
-        }
-
-        if (tMax < RAY_T_MIN) {
-            return null;
-        }
-
-        return tMin >= RAY_T_MIN ? tMin : tMax;
+        return entry;
     }
 
     /**
-     * @param {number} origin     - Ray origin component.
-     * @param {number} direction  - Ray direction component.
-     * @param {number} min        - AABB min component.
-     * @param {number} max        - AABB max component.
-     * @returns {number[] | null} - Two-element array for this axis slab, or null if the ray misses the slab.
+     * Returns the entry and exit parameters for a single AABB slab.
+     *
+     * @param {number} origin                          - Ray origin on one axis.
+     * @param {number} direction                       - Ray direction on that axis.
+     * @param {number} min                             - Minimum bound.
+     * @param {number} max                             - Maximum bound.
+     * @returns {{entry: number, exit: number} | null} - Slab interval or null.
      * @private
      */
     static #getAxisRange(origin, direction, min, max) {
-        if (Math.abs(direction) < RAY_DIRECTION_EPSILON) {
-            return (origin < min || origin > max) ? null : [RAY_T_MIN, RAY_T_MAX_INIT];
+        const ray = RaycasterConstants.RAYCASTER_RAY;
+
+        if (Math.abs(direction) < ray.DIRECTION_EPSILON) {
+            return (origin < min || origin > max)
+                ? null
+                : { entry: ray.MIN_PARAMETER, exit: ray.MAX_PARAMETER };
         }
 
-        const inverseDirection = INVERSE_DIRECTION_NUMERATOR / direction;
-        let axisEntry          = (min - origin) * inverseDirection;
-        let axisExit           = (max - origin) * inverseDirection;
+        const inverseDirection = ray.INVERSE_NUMERATOR / direction;
+        const first            = (min - origin) * inverseDirection;
+        const second           = (max - origin) * inverseDirection;
 
-        if (axisEntry > axisExit) {
-            const tempValue = axisEntry;
-            axisEntry       = axisExit;
-            axisExit        = tempValue;
-        }
-
-        return [axisEntry, axisExit];
+        return first > second
+            ? { entry: second, exit: first }
+            : { entry: first, exit: second };
     }
 
     /**
-     * @param {RaycastPoint} from - Start point.
-     * @param {RaycastPoint} to   - End point.
-     * @returns {number}          - Euclidean distance between the two points.
+     * Returns the world-space distance from the ray origin to the intersection.
+     *
+     * @param {RaycastPoint} from - Ray origin.
+     * @param {RaycastPoint} to   - Intersection point.
+     * @returns {number}          - Euclidean distance.
      * @private
      */
     static #distanceBetween(from, to) {
-        const deltaX = to[COMPONENT_X] - from[COMPONENT_X];
-        const deltaY = to[COMPONENT_Y] - from[COMPONENT_Y];
-        const deltaZ = to[COMPONENT_Z] - from[COMPONENT_Z];
+        const deltaX = to.x - from.x;
+        const deltaY = to.y - from.y;
+        const deltaZ = to.z - from.z;
         return Math.sqrt((deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ));
     }
 }
