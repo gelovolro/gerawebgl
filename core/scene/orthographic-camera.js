@@ -1,31 +1,20 @@
-import * as MathConstants from '../constants/math.js';
-import { Camera }         from './camera.js';
-import { Matrix4 }        from '../math/matrix4.js';
+import * as MathConstants               from '../constants/math.js';
+import * as OrthographicCameraConstants from '../constants/orthographic-camera.js';
+import { Matrix4 }                      from '../math/matrix4.js';
+import { Camera }                       from './camera.js';
 
 /**
- * Minimum allowed view size (height in world units).
+ * Orthographic camera supporting two projection configuration modes.
  *
- * @type {number}
- */
-const MINIMUM_VIEW_SIZE = 0.0;
-
-/**
- * Multiplier used to compute half of a value.
+ * 1). In explicit bounds mode, the projection volume is defined by six values:
+ * `left`, `right`, `bottom`, `top`, `near` and `far`.
  *
- * @type {number}
- */
-const HALF_MULTIPLIER = 0.5;
-
-/**
- * Orthographic camera. Supports two configuration modes:
+ * 2). In view-size mode, the projection bounds are calculated automatically
+ * from `viewSize` and `aspectRatio`. The `viewSize` specifies the vertical
+ * extent in world units, while `aspectRatio` determines the horizontal extent.
  *
- * 1) Explicit bounds: (left, right, bottom, top, near, far).
- *
- * 2) View-size mode: `viewSize + aspectRatio` => bounds are computed automatically.
- *
- * Notes:
- * - `viewSize` represents the height of the view volume in world units.
- * - In view-size mode `setAspectRatio()` updates bounds automatically.
+ * The `setAspectRatio()` method updates the projection bounds only in
+ * view-size mode, leaving explicitly configured bounds unchanged.
  */
 export class OrthographicCamera extends Camera {
 
@@ -84,7 +73,7 @@ export class OrthographicCamera extends Camera {
      * @type {number | null}
      * @private
      */
-    #viewSize = null;
+    #viewSize = OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_DEFAULTS.VIEW_SIZE;
 
     /**
      * Aspect ratio used in view-size mode (width / height).
@@ -92,7 +81,7 @@ export class OrthographicCamera extends Camera {
      * @type {number}
      * @private
      */
-    #aspectRatio = 1.0;
+    #aspectRatio = OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_DEFAULTS.ASPECT_RATIO;
 
     /**
      * Cached projection matrix buffer.
@@ -109,7 +98,7 @@ export class OrthographicCamera extends Camera {
      * @type {boolean}
      * @private
      */
-    #isProjectionMatrixDirty = true;
+    #isProjectionMatrixDirty = OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_DEFAULTS.DIRTY;
 
     /**
      * Creates an orthographic camera.
@@ -127,7 +116,13 @@ export class OrthographicCamera extends Camera {
 
         if (leftOrOptions !== null && typeof leftOrOptions === 'object') {
             if (Array.isArray(leftOrOptions) === true) {
-                throw new TypeError('`OrthographicCamera` expects options as a plain object, not an array.');
+                throw new TypeError(OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_ERRORS.OPTIONS_ARRAY);
+            }
+
+            const optionsPrototype = Object.getPrototypeOf(leftOrOptions);
+
+            if (optionsPrototype !== Object.prototype && optionsPrototype !== null) {
+                throw new TypeError(OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_ERRORS.OPTIONS_TYPE);
             }
 
             this.#initFromOptions(leftOrOptions);
@@ -150,15 +145,15 @@ export class OrthographicCamera extends Camera {
      * @param {number} aspectRatio - New viewport aspect ratio (canvas width divided by canvas height).
      */
     setAspectRatio(aspectRatio) {
-        if (typeof aspectRatio !== 'number') {
-            throw new TypeError('`OrthographicCamera.setAspectRatio` expects `aspectRatio` as a number.');
+        if (!Number.isFinite(aspectRatio)) {
+            throw new TypeError(OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_ERRORS.SET_ASPECT_TYPE);
         }
 
         if (aspectRatio <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
-            throw new RangeError('`OrthographicCamera.setAspectRatio` expects `aspectRatio` to be a positive number.');
+            throw new RangeError(OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_ERRORS.SET_ASPECT_RANGE);
         }
 
-        if (this.#viewSize === null) {
+        if (this.#viewSize === OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_DEFAULTS.VIEW_SIZE) {
             return;
         }
 
@@ -166,6 +161,7 @@ export class OrthographicCamera extends Camera {
             return;
         }
 
+        this.#validateViewExtents(this.#viewSize, aspectRatio);
         this.#aspectRatio = aspectRatio;
         this.#recomputeBoundsFromViewSize();
         this.#isProjectionMatrixDirty = true;
@@ -189,6 +185,10 @@ export class OrthographicCamera extends Camera {
                 this.#far
             );
 
+            if (!this.#projectionMatrix.every(Number.isFinite)) {
+                throw new RangeError(OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_ERRORS.PROJECTION_NONFINITE);
+            }
+
             this.#isProjectionMatrixDirty = false;
         }
 
@@ -200,7 +200,7 @@ export class OrthographicCamera extends Camera {
      * @private
      */
     #initFromOptions(options) {
-        const hasViewSize = Object.prototype.hasOwnProperty.call(options, 'viewSize');
+        const hasViewSize = Object.prototype.hasOwnProperty.call(options, OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_OPTION_KEYS.VIEW_SIZE);
 
         if (hasViewSize === true) {
             this.#initFromViewSize(
@@ -233,28 +233,28 @@ export class OrthographicCamera extends Camera {
      * @private
      */
     #initFromBounds(left, right, bottom, top, near, far) {
-        if (typeof left      !== 'number'
-            || typeof right  !== 'number'
-            || typeof bottom !== 'number'
-            || typeof top    !== 'number'
-            || typeof near   !== 'number'
-            || typeof far    !== 'number') {
-            throw new TypeError('`OrthographicCamera` expects numeric arguments in bounds mode.');
+        if (!Number.isFinite(left)
+            || !Number.isFinite(right)
+            || !Number.isFinite(bottom)
+            || !Number.isFinite(top)
+            || !Number.isFinite(near)
+            || !Number.isFinite(far)) {
+            throw new TypeError(OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_ERRORS.BOUNDS_TYPE);
         }
 
         if (left === right) {
-            throw new RangeError('`OrthographicCamera` expects `left !== right`.');
+            throw new RangeError(OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_ERRORS.BOUNDS_WIDTH);
         }
 
         if (bottom === top) {
-            throw new RangeError('`OrthographicCamera` expects `bottom !== top`.');
+            throw new RangeError(OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_ERRORS.BOUNDS_HEIGHT);
         }
 
         if (far <= near) {
-            throw new RangeError('`OrthographicCamera` expects `near < far`.');
+            throw new RangeError(OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_ERRORS.BOUNDS_DEPTH);
         }
 
-        this.#viewSize = null;
+        this.#viewSize = OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_DEFAULTS.VIEW_SIZE;
         this.#left     = left;
         this.#right    = right;
         this.#bottom   = bottom;
@@ -272,44 +272,62 @@ export class OrthographicCamera extends Camera {
      * @private
      */
     #initFromViewSize(viewSize, aspectRatio, near, far) {
-        if (typeof viewSize       !== 'number'
-            || typeof aspectRatio !== 'number'
-            || typeof near        !== 'number'
-            || typeof far         !== 'number') {
-            throw new TypeError('`OrthographicCamera` expects numeric arguments in view-size mode.');
+        if (!Number.isFinite(viewSize)
+            || !Number.isFinite(aspectRatio)
+            || !Number.isFinite(near)
+            || !Number.isFinite(far)) {
+            throw new TypeError(OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_ERRORS.VIEW_SIZE_TYPE);
         }
 
-        if (viewSize <= MINIMUM_VIEW_SIZE) {
-            throw new RangeError('`OrthographicCamera` expects `viewSize` to be a positive number.');
+        if (viewSize <= OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_VALUES.MINIMUM_VIEW_SIZE) {
+            throw new RangeError(OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_ERRORS.VIEW_SIZE);
         }
 
         if (aspectRatio <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
-            throw new RangeError('`OrthographicCamera` expects `aspectRatio` to be a positive number.');
+            throw new RangeError(OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_ERRORS.ASPECT_RATIO);
         }
 
         if (far <= near) {
-            throw new RangeError('`OrthographicCamera` expects `near < far`.');
+            throw new RangeError(OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_ERRORS.VIEW_SIZE_DEPTH);
         }
 
+        this.#validateViewExtents(viewSize, aspectRatio);
         this.#viewSize    = viewSize;
         this.#aspectRatio = aspectRatio;
         this.#near        = near;
         this.#far         = far;
+
         this.#recomputeBoundsFromViewSize();
         this.#isProjectionMatrixDirty = true;
     }
 
     /**
+     * Validates that the view-size mode produces finite horizontal and vertical extents.
+     *
+     * @param {number} viewSize    - View height in world units.
+     * @param {number} aspectRatio - View width-to-height ratio.
+     * @returns {void}
+     * @private
+     */
+    #validateViewExtents(viewSize, aspectRatio) {
+        const halfHeight = viewSize * OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_VALUES.HALF_MULTIPLIER;
+        const halfWidth  = halfHeight * aspectRatio;
+
+        if (!Number.isFinite(halfWidth)
+            || halfHeight <= OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_VALUES.MINIMUM_VIEW_SIZE
+            || halfWidth <= OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_VALUES.MINIMUM_VIEW_SIZE) {
+            throw new RangeError(OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_ERRORS.VIEW_SIZE_EXTENTS);
+        }
+    }
+
+    /**
      * Recomputes `left/right/top/bottom` based on current `viewSize` and `aspectRatio`.
      *
+     * @returns {void}
      * @private
      */
     #recomputeBoundsFromViewSize() {
-        if (this.#viewSize === null) {
-            throw new Error('`OrthographicCamera` internal error: `viewSize` is null in view-size mode.');
-        }
-
-        const halfHeight = this.#viewSize * HALF_MULTIPLIER;
+        const halfHeight = this.#viewSize * OrthographicCameraConstants.ORTHOGRAPHIC_CAMERA_VALUES.HALF_MULTIPLIER;
         const halfWidth  = halfHeight * this.#aspectRatio;
         this.#left       = -halfWidth;
         this.#right      =  halfWidth;
