@@ -1,72 +1,14 @@
-import * as MathConstants from '../constants/math.js';
-import { Camera }         from './camera.js';
-import { Matrix4 }        from '../math/matrix4.js';
+import * as MathConstants              from '../constants/math.js';
+import * as FirstPersonCameraConstants from '../constants/first-person-camera.js';
+import * as PersonCameraConstants      from '../constants/person-camera.js';
+import { Matrix4 }                     from '../math/matrix4.js';
+import { Camera }                      from './camera.js';
 
 /**
- * Default camera field of view divisor used for computing FOV in radians.
+ * Supported person camera mode.
  *
- * @type {number}
+ * @typedef {PersonCameraConstants.PERSON_CAMERA_MODES} PersonCameraMode
  */
-const DEFAULT_FIELD_OF_VIEW_DIVISOR = 4;
-
-/**
- * Default camera field of view in radians.
- *
- * @type {number}
- */
-const DEFAULT_FIELD_OF_VIEW_RADIANS = Math.PI / DEFAULT_FIELD_OF_VIEW_DIVISOR;
-
-/**
- * Default viewport aspect ratio.
- *
- * @type {number}
- */
-const DEFAULT_ASPECT_RATIO = 1.0;
-
-/**
- * Default near clipping plane distance.
- *
- * @type {number}
- */
-const DEFAULT_NEAR = 0.1;
-
-/**
- * Default far clipping plane distance.
- *
- * @type {number}
- */
-const DEFAULT_FAR = 200.0;
-
-/**
- * First-person camera mode - normal (no bobbing).
- *
- * @type {string}
- */
-const FIRST_PERSON_CAMERA_MODE_NORMAL = 'NORMAL';
-
-/**
- * First-person camera mode - bobbing (walking sway).
- *
- * @type {string}
- */
-const FIRST_PERSON_CAMERA_MODE_BOBBING = 'BOBBING';
-
-/**
- * Enum-like dictionary of supported first-person camera modes.
- *
- * @type {{ NORMAL: string, BOBBING: string }}
- */
-const FIRST_PERSON_CAMERA_MODES = Object.freeze({
-    NORMAL  : FIRST_PERSON_CAMERA_MODE_NORMAL,
-    BOBBING : FIRST_PERSON_CAMERA_MODE_BOBBING
-});
-
-/**
- * Supported first-person camera mode values.
- *
- * @type {Set<string>}
- */
-const FIRST_PERSON_CAMERA_MODE_SET = new Set(Object.values(FIRST_PERSON_CAMERA_MODES));
 
 /**
  * Options used by {@link FirstPersonCamera}.
@@ -76,11 +18,15 @@ const FIRST_PERSON_CAMERA_MODE_SET = new Set(Object.values(FIRST_PERSON_CAMERA_M
  * @property {number} [aspectRatio = 1.0]                - Viewport aspect ratio (width / height).
  * @property {number} [near = 0.1]                       - Distance to the near clipping plane.
  * @property {number} [far = 200.0]                      - Distance to the far clipping plane.
- * @property {string} [mode = 'NORMAL']                  - Camera mode, see `FirstPersonCamera.Modes`.
+ * @property {PersonCameraMode} [mode = 0]               - Camera mode, see `FirstPersonCamera.Modes`.
  */
 
 /**
- * Perspective first-person camera with adjustable mode for camera bobbing.
+ * Perspective first-person camera supporting normal and bobbing modes.
+ *
+ * The camera stores the selected mode for controls that apply movement-related
+ * effects. Changing the mode does not change the projection or view transform.
+ * The perspective matrix is cached and updated when the aspect ratio changes.
  */
 export class FirstPersonCamera extends Camera {
 
@@ -117,8 +63,7 @@ export class FirstPersonCamera extends Camera {
     #far;
 
     /**
-     * Cached projection matrix buffer.
-     * The buffer is reused between frames to avoid allocations.
+     * Cached projection matrix buffer reused between calls.
      *
      * @type {Float32Array}
      * @private
@@ -126,65 +71,80 @@ export class FirstPersonCamera extends Camera {
     #projectionMatrix;
 
     /**
-     * When true, projection matrix must be recomputed.
+     * Indicates whether the projection matrix needs to be recomputed.
      *
      * @type {boolean}
      * @private
      */
-    #isProjectionMatrixDirty = true;
+    #isProjectionMatrixDirty = FirstPersonCameraConstants.FIRST_PERSON_CAMERA_DEFAULTS.DIRTY;
 
     /**
      * Current first-person camera mode.
      *
-     * @type {string}
+     * @type {PersonCameraMode}
      * @private
      */
-    #mode = FIRST_PERSON_CAMERA_MODE_NORMAL;
+    #mode;
 
     /**
+     * Creates a first-person perspective camera.
+     *
      * @param {FirstPersonCameraOptions} [options = {}] - Camera options.
+     * @throws {TypeError}                              - If options are not a plain object or a numeric value is not finite.
+     * @throws {RangeError}                             - If projection parameters or camera mode are invalid.
      */
     constructor(options = {}) {
         super();
 
         if (options === null || typeof options !== 'object' || Array.isArray(options)) {
-            throw new TypeError('`FirstPersonCamera` expects `options` as a plain object.');
+            throw new TypeError(FirstPersonCameraConstants.FIRST_PERSON_CAMERA_ERRORS.OPTIONS_TYPE);
+        }
+
+        const optionsPrototype = Object.getPrototypeOf(options);
+
+        if (optionsPrototype !== Object.prototype && optionsPrototype !== null) {
+            throw new TypeError(FirstPersonCameraConstants.FIRST_PERSON_CAMERA_ERRORS.OPTIONS_TYPE);
         }
 
         const {
-            fieldOfViewRadians = DEFAULT_FIELD_OF_VIEW_RADIANS,
-            aspectRatio        = DEFAULT_ASPECT_RATIO,
-            near               = DEFAULT_NEAR,
-            far                = DEFAULT_FAR,
-            mode               = FIRST_PERSON_CAMERA_MODE_NORMAL
+            fieldOfViewRadians = FirstPersonCameraConstants.FIRST_PERSON_CAMERA_DEFAULTS.FIELD_OF_VIEW_RADIANS,
+            aspectRatio        = FirstPersonCameraConstants.FIRST_PERSON_CAMERA_DEFAULTS.ASPECT_RATIO,
+            near               = FirstPersonCameraConstants.FIRST_PERSON_CAMERA_DEFAULTS.NEAR,
+            far                = FirstPersonCameraConstants.FIRST_PERSON_CAMERA_DEFAULTS.FAR,
+            mode               = FirstPersonCameraConstants.FIRST_PERSON_CAMERA_DEFAULTS.MODE
         } = options;
 
-        if (typeof fieldOfViewRadians !== 'number') {
-            throw new TypeError('`FirstPersonCamera` expects `fieldOfViewRadians` as a number.');
+        if (!Number.isFinite(fieldOfViewRadians)) {
+            throw new TypeError(FirstPersonCameraConstants.FIRST_PERSON_CAMERA_ERRORS.FIELD_OF_VIEW_TYPE);
         }
 
-        if (typeof aspectRatio !== 'number') {
-            throw new TypeError('`FirstPersonCamera` expects `aspectRatio` as a number.');
+        if (!Number.isFinite(aspectRatio)) {
+            throw new TypeError(FirstPersonCameraConstants.FIRST_PERSON_CAMERA_ERRORS.ASPECT_RATIO_TYPE);
         }
 
-        if (typeof near !== 'number') {
-            throw new TypeError('`FirstPersonCamera` expects `near` as a number.');
+        if (!Number.isFinite(near)) {
+            throw new TypeError(FirstPersonCameraConstants.FIRST_PERSON_CAMERA_ERRORS.NEAR_TYPE);
         }
 
-        if (typeof far !== 'number') {
-            throw new TypeError('`FirstPersonCamera` expects `far` as a number.');
+        if (!Number.isFinite(far)) {
+            throw new TypeError(FirstPersonCameraConstants.FIRST_PERSON_CAMERA_ERRORS.FAR_TYPE);
+        }
+
+        if (fieldOfViewRadians <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_FIELD_OF_VIEW_RADIANS ||
+            fieldOfViewRadians >= MathConstants.MATH_CAMERA_LIMITS.MAXIMUM_FIELD_OF_VIEW_RADIANS) {
+            throw new RangeError(FirstPersonCameraConstants.FIRST_PERSON_CAMERA_ERRORS.FIELD_OF_VIEW_RANGE);
         }
 
         if (aspectRatio <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
-            throw new RangeError('`FirstPersonCamera` expects `aspectRatio` to be a positive number.');
+            throw new RangeError(FirstPersonCameraConstants.FIRST_PERSON_CAMERA_ERRORS.ASPECT_RATIO_RANGE);
         }
 
         if (near <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
-            throw new RangeError('`FirstPersonCamera` expects `0 < near < far`.');
+            throw new RangeError(FirstPersonCameraConstants.FIRST_PERSON_CAMERA_ERRORS.CLIPPING_PLANES);
         }
 
-        if (!FIRST_PERSON_CAMERA_MODE_SET.has(mode)) {
-            throw new RangeError('`FirstPersonCamera` expects `mode` to be a valid value from `FirstPersonCamera.Modes`.');
+        if (!PersonCameraConstants.PERSON_CAMERA_ALLOWED_MODES.includes(mode)) {
+            throw new RangeError(FirstPersonCameraConstants.FIRST_PERSON_CAMERA_ERRORS.MODE);
         }
 
         this.#fieldOfViewRadians = fieldOfViewRadians;
@@ -198,39 +158,43 @@ export class FirstPersonCamera extends Camera {
     /**
      * Supported first-person camera modes.
      *
-     * @returns {{ NORMAL: string, BOBBING: string }} - Supported mode labels.
+     * @returns {{ NORMAL: PersonCameraMode, BOBBING: PersonCameraMode }} - Supported mode values.
      */
     static get Modes() {
-        return FIRST_PERSON_CAMERA_MODES;
+        return PersonCameraConstants.PERSON_CAMERA_MODES;
     }
 
     /**
      * Current camera mode.
      *
-     * @returns {string}
+     * @returns {PersonCameraMode} - Current mode.
      */
     get mode() {
         return this.#mode;
     }
 
     /**
-     * Updates the camera mode.
+     * Updates the camera mode without changing its projection.
      *
-     * @param {string} mode - New camera mode.
+     * @param {PersonCameraMode} mode - New camera mode.
+     * @returns {void}
+     * @throws {RangeError}           - If the mode is unsupported.
      */
     setMode(mode) {
-        if (!FIRST_PERSON_CAMERA_MODE_SET.has(mode)) {
-            throw new RangeError('`FirstPersonCamera.setMode` expects a valid mode from `FirstPersonCamera.Modes`.');
+        if (!PersonCameraConstants.PERSON_CAMERA_ALLOWED_MODES.includes(mode)) {
+            throw new RangeError(FirstPersonCameraConstants.FIRST_PERSON_CAMERA_ERRORS.SET_MODE);
         }
 
         this.#mode = mode;
     }
 
     /**
-     * @inheritdoc
+     * Returns the cached perspective projection matrix.
+     *
+     * @returns {Float32Array} - Projection matrix buffer.
      */
     getProjectionMatrix() {
-        if (this.#isProjectionMatrixDirty) {
+        if (this.#isProjectionMatrixDirty === true) {
             Matrix4.writePerspectiveTo(
                 this.#projectionMatrix,
                 this.#fieldOfViewRadians,
@@ -246,17 +210,24 @@ export class FirstPersonCamera extends Camera {
     }
 
     /**
-     * Updates the camera aspect ratio.
+     * Updates the camera aspect ratio and invalidates the projection when needed.
      *
-     * @param {number} aspectRatio - New aspect ratio.
+     * @param {number} aspectRatio - New viewport aspect ratio.
+     * @returns {void}
+     * @throws {TypeError}         - If the aspect ratio is not a finite number.
+     * @throws {RangeError}        - If the aspect ratio is not positive.
      */
     setAspectRatio(aspectRatio) {
-        if (typeof aspectRatio !== 'number') {
-            throw new TypeError('`FirstPersonCamera.setAspectRatio` expects `aspectRatio` as a number.');
+        if (!Number.isFinite(aspectRatio)) {
+            throw new TypeError(FirstPersonCameraConstants.FIRST_PERSON_CAMERA_ERRORS.SET_ASPECT_TYPE);
         }
 
         if (aspectRatio <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
-            throw new RangeError('`FirstPersonCamera.setAspectRatio` expects a positive number.');
+            throw new RangeError(FirstPersonCameraConstants.FIRST_PERSON_CAMERA_ERRORS.SET_ASPECT_RANGE);
+        }
+
+        if (aspectRatio === this.#aspectRatio) {
+            return;
         }
 
         this.#aspectRatio = aspectRatio;
