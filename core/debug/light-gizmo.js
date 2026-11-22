@@ -1,5 +1,5 @@
 import { Object3D }           from '../scene/object3d.js';
-import { Line }               from '../scene/line.js';
+import { Mesh }               from '../scene/mesh.js';
 import { Vector3 }            from '../math/vector3.js';
 import { PolylineGeometry }   from '../geometry/polyline-geometry.js';
 import { SolidColorMaterial } from '../material/solid-color-material.js';
@@ -235,11 +235,11 @@ export class LightGizmo extends Object3D {
      * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
      * @param {SolidColorMaterial} material         - Material to use.
      * @param {Vector3[]} positions                 - Line positions.
-     * @returns {Line}
+     * @returns {Mesh}
      * @private
      */
     #createLine(webglContext, material, positions) {
         const geometry = new PolylineGeometry(webglContext, { positions });
-        return new Line(geometry, material);
+        return new Mesh(geometry, material);
     }
 }

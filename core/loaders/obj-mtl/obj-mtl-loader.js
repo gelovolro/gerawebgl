@@ -1,7 +1,5 @@
 import { ECMASCRIPT_TYPEOF_RESULTS } from '../../constants/ecmascript-types.js';
 import { Mesh }                      from '../../scene/mesh.js';
-import { Points }                    from '../../scene/points.js';
-import { Line }                      from '../../scene/line.js';
 import { PointsMaterial }            from '../../material/points-material.js';
 import { SolidColorMaterial }        from '../../material/solid-color-material.js';
 import { ObjGeometryBuilder }        from './obj-geometry-builder.js';
@@ -743,7 +741,7 @@ export class ObjMtlLoader {
                 const material = new PointsMaterial(this.#webglContext, { color });
                 material.setOpacity(materialDefinition ? materialDefinition.opacity : DEFAULT_OPACITY);
  
-                const points = new Points(entry.geometry, material);
+                const points = new Mesh(entry.geometry, material);
                 entry.parent.add(points);
                 meshes.push(points);
                 materials.push(material);
@@ -755,7 +753,7 @@ export class ObjMtlLoader {
                 const material = new SolidColorMaterial(this.#webglContext, { color });
                 material.setOpacity(materialDefinition ? materialDefinition.opacity : DEFAULT_OPACITY);
 
-                const line = new Line(entry.geometry, material);
+                const line = new Mesh(entry.geometry, material);
                 entry.parent.add(line);
                 meshes.push(line);
                 materials.push(material);
