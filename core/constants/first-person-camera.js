@@ -7,8 +7,7 @@ export const FIRST_PERSON_CAMERA_DEFAULTS = Object.freeze({
     ASPECT_RATIO          : MathConstants.MATH_COMMON_VALUES.UNIT,
     NEAR                  : 0.1,
     FAR                   : 200.0,
-    MODE                  : PersonCameraConstants.PERSON_CAMERA_MODES.NORMAL,
-    DIRTY                 : true
+    MODE                  : PersonCameraConstants.PERSON_CAMERA_MODES.NORMAL
 });
 
 // Public validation errors

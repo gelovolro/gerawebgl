@@ -9,8 +9,7 @@ class FirstPersonCameraConstantTestFixtures {
         ASPECT_RATIO          : 1,
         NEAR                  : 0.1,
         FAR                   : 200,
-        MODE                  : 0,
-        DIRTY                 : true
+        MODE                  : 0 // 'NORMAL' camera mode
     });
 
     static EXPECTED_ERRORS = Object.freeze({

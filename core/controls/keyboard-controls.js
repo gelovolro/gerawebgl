@@ -440,7 +440,7 @@ export class KeyboardControls {
     /**
      * Camera mode value, that enables bobbing.
      *
-     * @type {string | null}
+     * @type {number | null}
      * @private
      */
     #bobbingMode;
@@ -701,7 +701,7 @@ export class KeyboardControls {
      * @param {Object} [config]                                   - Internal configuration for derived controls.
      * @param {Function} [config.cameraConstructor = Camera]      - Expected camera constructor for validation.
      * @param {string} [config.controlsName = 'KeyboardControls'] - Controls class name for error messages.
-     * @param {(string|null)} [config.bobbingMode = null]         - Camera mode, that enables bobbing (or null to disable).
+     * @param {(number|null)} [config.bobbingMode = null]         - Camera mode, that enables bobbing (or null to disable).
      */
     constructor(camera, target, element, options = {}, config = {}) {
         if (options === null || typeof options !== 'object' || Array.isArray(options)) {
@@ -734,8 +734,8 @@ export class KeyboardControls {
             throw new TypeError(`\`${controlsName}\` expects \`element\` as an \`HTMLElement\`.`);
         }
 
-        if (bobbingMode !== null && typeof bobbingMode !== 'string') {
-            throw new TypeError('`KeyboardControls` expects `bobbingMode` as a string or null.');
+        if (bobbingMode !== null && !Number.isInteger(bobbingMode)) {
+            throw new TypeError('`KeyboardControls` expects `bobbingMode` as an integer or null.');
         }
 
         const {
@@ -1124,10 +1124,11 @@ export class KeyboardControls {
         let bobbingOffset = INPUT_NONE;
         let bobbingPitch  = INPUT_NONE;
 
-        if (this.#bobbingMode && this.#camera.mode === this.#bobbingMode && isMoving) {
+        if (this.#bobbingMode !== null && this.#camera.mode === this.#bobbingMode && isMoving) {
             const isRunning = this.#actionStates.get(ACTIONS.RUN);
             const frequency = isRunning ? this.#bobbingFrequencyRun : this.#bobbingFrequencyWalk;
             const amplitude = isRunning ? this.#bobbingAmplitudeRun : this.#bobbingAmplitudeWalk;
+
             this.#bobbingPhase  += frequency * deltaSeconds;
             this.#bobbingOffset  = Math.sin(this.#bobbingPhase) * amplitude;
             bobbingOffset        = this.#bobbingOffset;
