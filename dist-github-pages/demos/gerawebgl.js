@@ -9085,42 +9085,6 @@ var Mesh = class extends Object3D {
   }
 };
 
-// core/scene/points.js
-var Points = class extends Mesh {
-  /**
-   * @param {Geometry} geometry - Point geometry.
-   * @param {Material} material - Points material.
-   * @throws {TypeError} When geometry or material are invalid.
-   */
-  constructor(geometry, material) {
-    if (!(geometry instanceof Geometry)) {
-      throw new TypeError("`Points` expects a `Geometry` instance.");
-    }
-    if (!(material instanceof Material)) {
-      throw new TypeError("`Points` expects a `Material` instance.");
-    }
-    super(geometry, material);
-  }
-};
-
-// core/scene/line.js
-var Line = class extends Mesh {
-  /**
-   * @param {Geometry} geometry - Line geometry.
-   * @param {Material} material - Line material.
-   * @throws {TypeError} When geometry or material are invalid.
-   */
-  constructor(geometry, material) {
-    if (!(geometry instanceof Geometry)) {
-      throw new TypeError("`Line` expects a `Geometry` instance.");
-    }
-    if (!(material instanceof Material)) {
-      throw new TypeError("`Line` expects a `Material` instance.");
-    }
-    super(geometry, material);
-  }
-};
-
 // core/scene/scene.js
 var Scene = class extends Object3D {
   constructor() {
@@ -9412,6 +9376,20 @@ var Camera = class extends Object3D {
   }
 };
 
+// core/constants/perspective-camera.js
+var PERSPECTIVE_CAMERA_DEFAULTS = Object.freeze({ DIRTY: true });
+var PERSPECTIVE_CAMERA_ERRORS = Object.freeze({
+  FIELD_OF_VIEW_TYPE: "`PerspectiveCamera` expects `fieldOfViewRadians` as a number.",
+  ASPECT_RATIO_TYPE: "`PerspectiveCamera` expects `aspectRatio` as a number.",
+  NEAR_TYPE: "`PerspectiveCamera` expects `near` as a number.",
+  FAR_TYPE: "`PerspectiveCamera` expects `far` as a number.",
+  FIELD_OF_VIEW_RANGE: "`PerspectiveCamera` expects `0 < fieldOfViewRadians < Math.PI`.",
+  ASPECT_RATIO_RANGE: "`PerspectiveCamera` expects a positive `aspect ratio`.",
+  CLIPPING_PLANES: "`PerspectiveCamera` expects `0 < near < far`.",
+  SET_ASPECT_TYPE: "`PerspectiveCamera.setAspectRatio` expects `aspectRatio` as a number.",
+  SET_ASPECT_RANGE: "`PerspectiveCamera.setAspectRatio` expects a positive number."
+});
+
 // core/scene/perspective-camera.js
 var PerspectiveCamera = class extends Camera {
   /**
@@ -9457,7 +9435,14 @@ var PerspectiveCamera = class extends Camera {
    * @type {boolean}
    * @private
    */
-  #isProjectionMatrixDirty = true;
+  #isProjectionMatrixDirty = PERSPECTIVE_CAMERA_DEFAULTS.DIRTY;
+  /**
+   * Validation messages selected by the concrete camera class.
+   *
+   * @type {Object}
+   * @private
+   */
+  #validationMessages;
   /**
    * Creates a perspective camera.
    *
@@ -9470,26 +9455,27 @@ var PerspectiveCamera = class extends Camera {
    */
   constructor(fieldOfViewRadians, aspectRatio, near, far) {
     super();
-    if (typeof fieldOfViewRadians !== "number" || !Number.isFinite(fieldOfViewRadians)) {
-      throw new TypeError("`PerspectiveCamera` expects `fieldOfViewRadians` as a number.");
+    this.#validationMessages = new.target.validationMessages;
+    if (typeof fieldOfViewRadians !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(fieldOfViewRadians)) {
+      throw new TypeError(this.#validationMessages.FIELD_OF_VIEW_TYPE);
     }
-    if (typeof aspectRatio !== "number" || !Number.isFinite(aspectRatio)) {
-      throw new TypeError("`PerspectiveCamera` expects `aspectRatio` as a number.");
+    if (typeof aspectRatio !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(aspectRatio)) {
+      throw new TypeError(this.#validationMessages.ASPECT_RATIO_TYPE);
     }
-    if (typeof near !== "number" || !Number.isFinite(near)) {
-      throw new TypeError("`PerspectiveCamera` expects `near` as a number.");
+    if (typeof near !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(near)) {
+      throw new TypeError(this.#validationMessages.NEAR_TYPE);
     }
-    if (typeof far !== "number" || !Number.isFinite(far)) {
-      throw new TypeError("`PerspectiveCamera` expects `far` as a number.");
+    if (typeof far !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(far)) {
+      throw new TypeError(this.#validationMessages.FAR_TYPE);
     }
     if (fieldOfViewRadians <= MATH_CAMERA_LIMITS.MINIMUM_FIELD_OF_VIEW_RADIANS || fieldOfViewRadians >= MATH_CAMERA_LIMITS.MAXIMUM_FIELD_OF_VIEW_RADIANS) {
-      throw new RangeError("`PerspectiveCamera` expects `0 < fieldOfViewRadians < Math.PI`.");
+      throw new RangeError(this.#validationMessages.FIELD_OF_VIEW_RANGE);
     }
     if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
-      throw new RangeError("`PerspectiveCamera` expects a positive `aspect ratio`.");
+      throw new RangeError(this.#validationMessages.ASPECT_RATIO_RANGE);
     }
     if (near <= MATH_CAMERA_LIMITS.MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
-      throw new RangeError("`PerspectiveCamera` expects `0 < near < far`.");
+      throw new RangeError(this.#validationMessages.CLIPPING_PLANES);
     }
     this.#fieldOfViewRadians = fieldOfViewRadians;
     this.#aspectRatio = aspectRatio;
@@ -9498,19 +9484,28 @@ var PerspectiveCamera = class extends Camera {
     this.#projectionMatrix = new Float32Array(MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
   }
   /**
+   * Validation messages for the concrete perspective camera type.
+   *
+   * @protected
+   * @returns {Object} - Camera-specific validation messages.
+   */
+  static get validationMessages() {
+    return PERSPECTIVE_CAMERA_ERRORS;
+  }
+  /**
    * Updates the viewport aspect ratio and invalidates the projection cache, when the value changes.
    *
    * @param {number} aspectRatio - New viewport aspect ratio (canvas width divided by canvas height).
    * @returns {void}
-   * @throws {TypeError}  - If the aspect ratio is not a finite number.
-   * @throws {RangeError} - If the aspect ratio is not positive.
+   * @throws {TypeError}         - If the aspect ratio is not a finite number.
+   * @throws {RangeError}        - If the aspect ratio is not positive.
    */
   setAspectRatio(aspectRatio) {
-    if (typeof aspectRatio !== "number" || !Number.isFinite(aspectRatio)) {
-      throw new TypeError("`PerspectiveCamera.setAspectRatio` expects `aspectRatio` as a number.");
+    if (typeof aspectRatio !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(aspectRatio)) {
+      throw new TypeError(this.#validationMessages.SET_ASPECT_TYPE);
     }
     if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
-      throw new RangeError("`PerspectiveCamera.setAspectRatio` expects a positive number.");
+      throw new RangeError(this.#validationMessages.SET_ASPECT_RANGE);
     }
     if (aspectRatio === this.#aspectRatio) {
       return;
@@ -9538,9 +9533,35 @@ var PerspectiveCamera = class extends Camera {
   }
 };
 
+// core/constants/orthographic-camera.js
+var ORTHOGRAPHIC_CAMERA_DEFAULTS = Object.freeze({
+  VIEW_SIZE: null,
+  ASPECT_RATIO: MATH_COMMON_VALUES.UNIT,
+  DIRTY: true
+});
+var ORTHOGRAPHIC_CAMERA_VALUES = Object.freeze({
+  MINIMUM_VIEW_SIZE: MATH_COMMON_VALUES.ZERO,
+  HALF_MULTIPLIER: 0.5
+});
+var ORTHOGRAPHIC_CAMERA_OPTION_KEYS = Object.freeze({ VIEW_SIZE: "viewSize" });
+var ORTHOGRAPHIC_CAMERA_ERRORS = Object.freeze({
+  OPTIONS_ARRAY: "`OrthographicCamera` expects options as a plain object, not an array.",
+  OPTIONS_TYPE: "`OrthographicCamera` expects options as a plain object.",
+  BOUNDS_TYPE: "`OrthographicCamera` expects numeric arguments in bounds mode.",
+  BOUNDS_WIDTH: "`OrthographicCamera` expects `left !== right`.",
+  BOUNDS_HEIGHT: "`OrthographicCamera` expects `bottom !== top`.",
+  BOUNDS_DEPTH: "`OrthographicCamera` expects `near < far`.",
+  VIEW_SIZE_TYPE: "`OrthographicCamera` expects numeric arguments in view-size mode.",
+  VIEW_SIZE: "`OrthographicCamera` expects `viewSize` to be a positive number.",
+  ASPECT_RATIO: "`OrthographicCamera` expects `aspectRatio` to be a positive number.",
+  VIEW_SIZE_DEPTH: "`OrthographicCamera` expects `near < far`.",
+  VIEW_SIZE_EXTENTS: "`OrthographicCamera` expects finite view-size bounds.",
+  SET_ASPECT_TYPE: "`OrthographicCamera.setAspectRatio` expects `aspectRatio` as a number.",
+  SET_ASPECT_RANGE: "`OrthographicCamera.setAspectRatio` expects `aspectRatio` to be a positive number.",
+  PROJECTION_NONFINITE: "`OrthographicCamera.getProjectionMatrix` expects a finite projection matrix."
+});
+
 // core/scene/orthographic-camera.js
-var MINIMUM_VIEW_SIZE = 0;
-var HALF_MULTIPLIER = 0.5;
 var OrthographicCamera = class extends Camera {
   /**
    * Projection bounds: left plane.
@@ -9591,14 +9612,14 @@ var OrthographicCamera = class extends Camera {
    * @type {number | null}
    * @private
    */
-  #viewSize = null;
+  #viewSize = ORTHOGRAPHIC_CAMERA_DEFAULTS.VIEW_SIZE;
   /**
    * Aspect ratio used in view-size mode (width / height).
    *
    * @type {number}
    * @private
    */
-  #aspectRatio = 1;
+  #aspectRatio = ORTHOGRAPHIC_CAMERA_DEFAULTS.ASPECT_RATIO;
   /**
    * Cached projection matrix buffer.
    * Reused between frames to avoid allocations.
@@ -9613,7 +9634,7 @@ var OrthographicCamera = class extends Camera {
    * @type {boolean}
    * @private
    */
-  #isProjectionMatrixDirty = true;
+  #isProjectionMatrixDirty = ORTHOGRAPHIC_CAMERA_DEFAULTS.DIRTY;
   /**
    * Creates an orthographic camera.
    *
@@ -9629,7 +9650,11 @@ var OrthographicCamera = class extends Camera {
     this.#projectionMatrix = new Float32Array(MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
     if (leftOrOptions !== null && typeof leftOrOptions === "object") {
       if (Array.isArray(leftOrOptions) === true) {
-        throw new TypeError("`OrthographicCamera` expects options as a plain object, not an array.");
+        throw new TypeError(ORTHOGRAPHIC_CAMERA_ERRORS.OPTIONS_ARRAY);
+      }
+      const optionsPrototype = Object.getPrototypeOf(leftOrOptions);
+      if (optionsPrototype !== Object.prototype && optionsPrototype !== null) {
+        throw new TypeError(ORTHOGRAPHIC_CAMERA_ERRORS.OPTIONS_TYPE);
       }
       this.#initFromOptions(leftOrOptions);
       return;
@@ -9649,18 +9674,19 @@ var OrthographicCamera = class extends Camera {
    * @param {number} aspectRatio - New viewport aspect ratio (canvas width divided by canvas height).
    */
   setAspectRatio(aspectRatio) {
-    if (typeof aspectRatio !== "number") {
-      throw new TypeError("`OrthographicCamera.setAspectRatio` expects `aspectRatio` as a number.");
+    if (!Number.isFinite(aspectRatio)) {
+      throw new TypeError(ORTHOGRAPHIC_CAMERA_ERRORS.SET_ASPECT_TYPE);
     }
     if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
-      throw new RangeError("`OrthographicCamera.setAspectRatio` expects `aspectRatio` to be a positive number.");
+      throw new RangeError(ORTHOGRAPHIC_CAMERA_ERRORS.SET_ASPECT_RANGE);
     }
-    if (this.#viewSize === null) {
+    if (this.#viewSize === ORTHOGRAPHIC_CAMERA_DEFAULTS.VIEW_SIZE) {
       return;
     }
     if (aspectRatio === this.#aspectRatio) {
       return;
     }
+    this.#validateViewExtents(this.#viewSize, aspectRatio);
     this.#aspectRatio = aspectRatio;
     this.#recomputeBoundsFromViewSize();
     this.#isProjectionMatrixDirty = true;
@@ -9682,6 +9708,9 @@ var OrthographicCamera = class extends Camera {
         this.#near,
         this.#far
       );
+      if (!this.#projectionMatrix.every(Number.isFinite)) {
+        throw new RangeError(ORTHOGRAPHIC_CAMERA_ERRORS.PROJECTION_NONFINITE);
+      }
       this.#isProjectionMatrixDirty = false;
     }
     return this.#projectionMatrix;
@@ -9691,7 +9720,7 @@ var OrthographicCamera = class extends Camera {
    * @private
    */
   #initFromOptions(options) {
-    const hasViewSize = Object.prototype.hasOwnProperty.call(options, "viewSize");
+    const hasViewSize = Object.prototype.hasOwnProperty.call(options, ORTHOGRAPHIC_CAMERA_OPTION_KEYS.VIEW_SIZE);
     if (hasViewSize === true) {
       this.#initFromViewSize(
         options.viewSize,
@@ -9720,19 +9749,19 @@ var OrthographicCamera = class extends Camera {
    * @private
    */
   #initFromBounds(left, right, bottom, top, near, far) {
-    if (typeof left !== "number" || typeof right !== "number" || typeof bottom !== "number" || typeof top !== "number" || typeof near !== "number" || typeof far !== "number") {
-      throw new TypeError("`OrthographicCamera` expects numeric arguments in bounds mode.");
+    if (!Number.isFinite(left) || !Number.isFinite(right) || !Number.isFinite(bottom) || !Number.isFinite(top) || !Number.isFinite(near) || !Number.isFinite(far)) {
+      throw new TypeError(ORTHOGRAPHIC_CAMERA_ERRORS.BOUNDS_TYPE);
     }
     if (left === right) {
-      throw new RangeError("`OrthographicCamera` expects `left !== right`.");
+      throw new RangeError(ORTHOGRAPHIC_CAMERA_ERRORS.BOUNDS_WIDTH);
     }
     if (bottom === top) {
-      throw new RangeError("`OrthographicCamera` expects `bottom !== top`.");
+      throw new RangeError(ORTHOGRAPHIC_CAMERA_ERRORS.BOUNDS_HEIGHT);
     }
     if (far <= near) {
-      throw new RangeError("`OrthographicCamera` expects `near < far`.");
+      throw new RangeError(ORTHOGRAPHIC_CAMERA_ERRORS.BOUNDS_DEPTH);
     }
-    this.#viewSize = null;
+    this.#viewSize = ORTHOGRAPHIC_CAMERA_DEFAULTS.VIEW_SIZE;
     this.#left = left;
     this.#right = right;
     this.#bottom = bottom;
@@ -9749,18 +9778,19 @@ var OrthographicCamera = class extends Camera {
    * @private
    */
   #initFromViewSize(viewSize, aspectRatio, near, far) {
-    if (typeof viewSize !== "number" || typeof aspectRatio !== "number" || typeof near !== "number" || typeof far !== "number") {
-      throw new TypeError("`OrthographicCamera` expects numeric arguments in view-size mode.");
+    if (!Number.isFinite(viewSize) || !Number.isFinite(aspectRatio) || !Number.isFinite(near) || !Number.isFinite(far)) {
+      throw new TypeError(ORTHOGRAPHIC_CAMERA_ERRORS.VIEW_SIZE_TYPE);
     }
-    if (viewSize <= MINIMUM_VIEW_SIZE) {
-      throw new RangeError("`OrthographicCamera` expects `viewSize` to be a positive number.");
+    if (viewSize <= ORTHOGRAPHIC_CAMERA_VALUES.MINIMUM_VIEW_SIZE) {
+      throw new RangeError(ORTHOGRAPHIC_CAMERA_ERRORS.VIEW_SIZE);
     }
     if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
-      throw new RangeError("`OrthographicCamera` expects `aspectRatio` to be a positive number.");
+      throw new RangeError(ORTHOGRAPHIC_CAMERA_ERRORS.ASPECT_RATIO);
     }
     if (far <= near) {
-      throw new RangeError("`OrthographicCamera` expects `near < far`.");
+      throw new RangeError(ORTHOGRAPHIC_CAMERA_ERRORS.VIEW_SIZE_DEPTH);
     }
+    this.#validateViewExtents(viewSize, aspectRatio);
     this.#viewSize = viewSize;
     this.#aspectRatio = aspectRatio;
     this.#near = near;
@@ -9769,15 +9799,28 @@ var OrthographicCamera = class extends Camera {
     this.#isProjectionMatrixDirty = true;
   }
   /**
+   * Validates that the view-size mode produces finite horizontal and vertical extents.
+   *
+   * @param {number} viewSize    - View height in world units.
+   * @param {number} aspectRatio - View width-to-height ratio.
+   * @returns {void}
+   * @private
+   */
+  #validateViewExtents(viewSize, aspectRatio) {
+    const halfHeight = viewSize * ORTHOGRAPHIC_CAMERA_VALUES.HALF_MULTIPLIER;
+    const halfWidth = halfHeight * aspectRatio;
+    if (!Number.isFinite(halfWidth) || halfHeight <= ORTHOGRAPHIC_CAMERA_VALUES.MINIMUM_VIEW_SIZE || halfWidth <= ORTHOGRAPHIC_CAMERA_VALUES.MINIMUM_VIEW_SIZE) {
+      throw new RangeError(ORTHOGRAPHIC_CAMERA_ERRORS.VIEW_SIZE_EXTENTS);
+    }
+  }
+  /**
    * Recomputes `left/right/top/bottom` based on current `viewSize` and `aspectRatio`.
    *
+   * @returns {void}
    * @private
    */
   #recomputeBoundsFromViewSize() {
-    if (this.#viewSize === null) {
-      throw new Error("`OrthographicCamera` internal error: `viewSize` is null in view-size mode.");
-    }
-    const halfHeight = this.#viewSize * HALF_MULTIPLIER;
+    const halfHeight = this.#viewSize * ORTHOGRAPHIC_CAMERA_VALUES.HALF_MULTIPLIER;
     const halfWidth = halfHeight * this.#aspectRatio;
     this.#left = -halfWidth;
     this.#right = halfWidth;
@@ -9786,342 +9829,198 @@ var OrthographicCamera = class extends Camera {
   }
 };
 
-// core/scene/first-person-camera.js
-var DEFAULT_FIELD_OF_VIEW_DIVISOR = 4;
-var DEFAULT_FIELD_OF_VIEW_RADIANS = Math.PI / DEFAULT_FIELD_OF_VIEW_DIVISOR;
-var DEFAULT_ASPECT_RATIO = 1;
-var DEFAULT_NEAR = 0.1;
-var DEFAULT_FAR = 200;
-var FIRST_PERSON_CAMERA_MODE_NORMAL = "NORMAL";
-var FIRST_PERSON_CAMERA_MODE_BOBBING = "BOBBING";
-var FIRST_PERSON_CAMERA_MODES = Object.freeze({
-  NORMAL: FIRST_PERSON_CAMERA_MODE_NORMAL,
-  BOBBING: FIRST_PERSON_CAMERA_MODE_BOBBING
+// core/constants/person-camera.js
+var PERSON_CAMERA_MODES = Object.freeze({
+  NORMAL: 0,
+  BOBBING: 1
 });
-var FIRST_PERSON_CAMERA_MODE_SET = new Set(Object.values(FIRST_PERSON_CAMERA_MODES));
-var FirstPersonCamera = class extends Camera {
+var PERSON_CAMERA_ALLOWED_MODES = Object.freeze(
+  Object.values(PERSON_CAMERA_MODES)
+);
+
+// core/constants/first-person-camera.js
+var FIRST_PERSON_CAMERA_DEFAULTS = Object.freeze({
+  FIELD_OF_VIEW_RADIANS: Math.PI / 4,
+  ASPECT_RATIO: MATH_COMMON_VALUES.UNIT,
+  NEAR: 0.1,
+  FAR: 200,
+  MODE: PERSON_CAMERA_MODES.NORMAL
+});
+var FIRST_PERSON_CAMERA_ERRORS = Object.freeze({
+  OPTIONS_TYPE: "`FirstPersonCamera` expects `options` as a plain object.",
+  FIELD_OF_VIEW_TYPE: "`FirstPersonCamera` expects `fieldOfViewRadians` as a number.",
+  ASPECT_RATIO_TYPE: "`FirstPersonCamera` expects `aspectRatio` as a number.",
+  NEAR_TYPE: "`FirstPersonCamera` expects `near` as a number.",
+  FAR_TYPE: "`FirstPersonCamera` expects `far` as a number.",
+  FIELD_OF_VIEW_RANGE: "`FirstPersonCamera` expects `0 < fieldOfViewRadians < Math.PI`.",
+  ASPECT_RATIO_RANGE: "`FirstPersonCamera` expects `aspectRatio` to be a positive number.",
+  CLIPPING_PLANES: "`FirstPersonCamera` expects `0 < near < far`.",
+  MODE: "`FirstPersonCamera` expects `mode` to be a valid value from `FirstPersonCamera.Modes`.",
+  SET_MODE: "`FirstPersonCamera.setMode` expects a valid mode from `FirstPersonCamera.Modes`.",
+  SET_ASPECT_TYPE: "`FirstPersonCamera.setAspectRatio` expects `aspectRatio` as a number.",
+  SET_ASPECT_RANGE: "`FirstPersonCamera.setAspectRatio` expects a positive number."
+});
+
+// core/scene/person-camera.js
+var PersonCamera = class extends PerspectiveCamera {
   /**
-   * Vertical field of view in radians.
+   * Current operating mode.
    *
-   * @type {number}
+   * @type {PersonCameraMode}
    * @private
    */
-  #fieldOfViewRadians;
+  #mode;
   /**
-   * Viewport aspect ratio (width / height).
-   *
-   * @type {number}
-   * @private
-   */
-  #aspectRatio;
-  /**
-   * Near clipping plane distance.
-   *
-   * @type {number}
-   * @private
-   */
-  #near;
-  /**
-   * Far clipping plane distance.
-   *
-   * @type {number}
-   * @private
-   */
-  #far;
-  /**
-   * Cached projection matrix buffer.
-   * The buffer is reused between frames to avoid allocations.
-   *
-   * @type {Float32Array}
-   * @private
-   */
-  #projectionMatrix;
-  /**
-   * When true, projection matrix must be recomputed.
-   *
-   * @type {boolean}
-   * @private
-   */
-  #isProjectionMatrixDirty = true;
-  /**
-   * Current first-person camera mode.
+   * Error message for invalid updates of the camera mode.
    *
    * @type {string}
    * @private
    */
-  #mode = FIRST_PERSON_CAMERA_MODE_NORMAL;
+  #setModeError;
   /**
-   * @param {FirstPersonCameraOptions} [options = {}] - Camera options.
+   * Initializes a perspective camera with shared mode handling.
+   *
+   * @param {Object} options  - Camera options.
+   * @param {Object} defaults - Defaults for the concrete camera class.
+   * @throws {TypeError}      - If options or projection parameters are invalid.
+   * @throws {RangeError}     - If projection parameters or the mode are out of range.
    */
-  constructor(options = {}) {
-    super();
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError("`FirstPersonCamera` expects `options` as a plain object.");
+  constructor(options, defaults) {
+    const errors = new.target.validationMessages;
+    if (options === null || typeof options !== ECMASCRIPT_TYPEOF_RESULTS.OBJECT || Array.isArray(options)) {
+      throw new TypeError(errors.OPTIONS_TYPE);
+    }
+    const optionsPrototype = Object.getPrototypeOf(options);
+    if (optionsPrototype !== Object.prototype && optionsPrototype !== null) {
+      throw new TypeError(errors.OPTIONS_TYPE);
     }
     const {
-      fieldOfViewRadians = DEFAULT_FIELD_OF_VIEW_RADIANS,
-      aspectRatio = DEFAULT_ASPECT_RATIO,
-      near = DEFAULT_NEAR,
-      far = DEFAULT_FAR,
-      mode = FIRST_PERSON_CAMERA_MODE_NORMAL
+      fieldOfViewRadians = defaults.FIELD_OF_VIEW_RADIANS,
+      aspectRatio = defaults.ASPECT_RATIO,
+      near = defaults.NEAR,
+      far = defaults.FAR,
+      mode = defaults.MODE
     } = options;
-    if (typeof fieldOfViewRadians !== "number") {
-      throw new TypeError("`FirstPersonCamera` expects `fieldOfViewRadians` as a number.");
+    super(fieldOfViewRadians, aspectRatio, near, far);
+    if (!PERSON_CAMERA_ALLOWED_MODES.includes(mode)) {
+      throw new RangeError(errors.MODE);
     }
-    if (typeof aspectRatio !== "number") {
-      throw new TypeError("`FirstPersonCamera` expects `aspectRatio` as a number.");
-    }
-    if (typeof near !== "number") {
-      throw new TypeError("`FirstPersonCamera` expects `near` as a number.");
-    }
-    if (typeof far !== "number") {
-      throw new TypeError("`FirstPersonCamera` expects `far` as a number.");
-    }
-    if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
-      throw new RangeError("`FirstPersonCamera` expects `aspectRatio` to be a positive number.");
-    }
-    if (near <= MATH_CAMERA_LIMITS.MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
-      throw new RangeError("`FirstPersonCamera` expects `0 < near < far`.");
-    }
-    if (!FIRST_PERSON_CAMERA_MODE_SET.has(mode)) {
-      throw new RangeError("`FirstPersonCamera` expects `mode` to be a valid value from `FirstPersonCamera.Modes`.");
-    }
-    this.#fieldOfViewRadians = fieldOfViewRadians;
-    this.#aspectRatio = aspectRatio;
-    this.#near = near;
-    this.#far = far;
-    this.#projectionMatrix = new Float32Array(MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
     this.#mode = mode;
+    this.#setModeError = errors.SET_MODE;
+  }
+  /**
+   * Supported first-person and third-person camera modes.
+   *
+   * @returns {{ NORMAL: PersonCameraMode, BOBBING: PersonCameraMode }} - Shared mode values.
+   */
+  static get Modes() {
+    return PERSON_CAMERA_MODES;
+  }
+  /**
+   * Returns the current operating mode.
+   *
+   * @returns {PersonCameraMode} - Current camera mode.
+   */
+  get mode() {
+    return this.#mode;
+  }
+  /**
+   * Updates the operating mode without affecting projection or view matrices.
+   *
+   * @param {PersonCameraMode} mode - New camera mode.
+   * @returns {void}
+   * @throws {RangeError}           - If the mode is unsupported.
+   */
+  setMode(mode) {
+    if (!PERSON_CAMERA_ALLOWED_MODES.includes(mode)) {
+      throw new RangeError(this.#setModeError);
+    }
+    this.#mode = mode;
+  }
+};
+
+// core/scene/first-person-camera.js
+var FirstPersonCamera = class extends PersonCamera {
+  /**
+   * Creates a first-person perspective camera.
+   *
+   * @param {FirstPersonCameraOptions} [options = {}] - Camera options.
+   * @throws {TypeError}                              - If options are not a plain object or a numeric value is not finite.
+   * @throws {RangeError}                             - If projection parameters or camera mode are invalid.
+   */
+  constructor(options = {}) {
+    super(options, FIRST_PERSON_CAMERA_DEFAULTS);
+  }
+  /**
+   * Validation messages for first-person camera parameters.
+   *
+   * @protected
+   * @returns {Object} - Camera-specific validation messages.
+   */
+  static get validationMessages() {
+    return FIRST_PERSON_CAMERA_ERRORS;
   }
   /**
    * Supported first-person camera modes.
    *
-   * @returns {{ NORMAL: string, BOBBING: string }} - Supported mode labels.
+   * @returns {{ NORMAL: PersonCameraMode, BOBBING: PersonCameraMode }} - Supported mode values.
    */
   static get Modes() {
-    return FIRST_PERSON_CAMERA_MODES;
-  }
-  /**
-   * Current camera mode.
-   *
-   * @returns {string}
-   */
-  get mode() {
-    return this.#mode;
-  }
-  /**
-   * Updates the camera mode.
-   *
-   * @param {string} mode - New camera mode.
-   */
-  setMode(mode) {
-    if (!FIRST_PERSON_CAMERA_MODE_SET.has(mode)) {
-      throw new RangeError("`FirstPersonCamera.setMode` expects a valid mode from `FirstPersonCamera.Modes`.");
-    }
-    this.#mode = mode;
-  }
-  /**
-   * @inheritdoc
-   */
-  getProjectionMatrix() {
-    if (this.#isProjectionMatrixDirty) {
-      Matrix4.writePerspectiveTo(
-        this.#projectionMatrix,
-        this.#fieldOfViewRadians,
-        this.#aspectRatio,
-        this.#near,
-        this.#far
-      );
-      this.#isProjectionMatrixDirty = false;
-    }
-    return this.#projectionMatrix;
-  }
-  /**
-   * Updates the camera aspect ratio.
-   *
-   * @param {number} aspectRatio - New aspect ratio.
-   */
-  setAspectRatio(aspectRatio) {
-    if (typeof aspectRatio !== "number") {
-      throw new TypeError("`FirstPersonCamera.setAspectRatio` expects `aspectRatio` as a number.");
-    }
-    if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
-      throw new RangeError("`FirstPersonCamera.setAspectRatio` expects a positive number.");
-    }
-    this.#aspectRatio = aspectRatio;
-    this.#isProjectionMatrixDirty = true;
+    return super.Modes;
   }
 };
 
-// core/scene/third-person-camera.js
-var DEFAULT_FIELD_OF_VIEW_DIVISOR2 = 4;
-var DEFAULT_FIELD_OF_VIEW_RADIANS2 = Math.PI / DEFAULT_FIELD_OF_VIEW_DIVISOR2;
-var DEFAULT_ASPECT_RATIO2 = 1;
-var DEFAULT_NEAR2 = 0.1;
-var DEFAULT_FAR2 = 200;
-var THIRD_PERSON_CAMERA_MODE_NORMAL = "NORMAL";
-var THIRD_PERSON_CAMERA_MODE_BOBBING = "BOBBING";
-var THIRD_PERSON_CAMERA_MODES = Object.freeze({
-  NORMAL: THIRD_PERSON_CAMERA_MODE_NORMAL,
-  BOBBING: THIRD_PERSON_CAMERA_MODE_BOBBING
+// core/constants/third-person-camera.js
+var THIRD_PERSON_CAMERA_DEFAULTS = Object.freeze({
+  FIELD_OF_VIEW_RADIANS: Math.PI / 4,
+  ASPECT_RATIO: MATH_COMMON_VALUES.UNIT,
+  NEAR: 0.1,
+  FAR: 200,
+  MODE: PERSON_CAMERA_MODES.NORMAL
 });
-var THIRD_PERSON_CAMERA_MODE_SET = new Set(Object.values(THIRD_PERSON_CAMERA_MODES));
-var ThirdPersonCamera = class extends Camera {
+var THIRD_PERSON_CAMERA_ERRORS = Object.freeze({
+  OPTIONS_TYPE: "`ThirdPersonCamera` expects `options` as a plain object.",
+  FIELD_OF_VIEW_TYPE: "`ThirdPersonCamera` expects `fieldOfViewRadians` as a number.",
+  ASPECT_RATIO_TYPE: "`ThirdPersonCamera` expects `aspectRatio` as a number.",
+  NEAR_TYPE: "`ThirdPersonCamera` expects `near` as a number.",
+  FAR_TYPE: "`ThirdPersonCamera` expects `far` as a number.",
+  FIELD_OF_VIEW_RANGE: "`ThirdPersonCamera` expects `0 < fieldOfViewRadians < Math.PI`.",
+  ASPECT_RATIO_RANGE: "`ThirdPersonCamera` expects `aspectRatio` to be a positive number.",
+  CLIPPING_PLANES: "`ThirdPersonCamera` expects `0 < near < far`.",
+  MODE: "`ThirdPersonCamera` expects `mode` to be a valid value from `ThirdPersonCamera.Modes`.",
+  SET_MODE: "`ThirdPersonCamera.setMode` expects a valid mode from `ThirdPersonCamera.Modes`.",
+  SET_ASPECT_TYPE: "`ThirdPersonCamera.setAspectRatio` expects `aspectRatio` as a number.",
+  SET_ASPECT_RANGE: "`ThirdPersonCamera.setAspectRatio` expects a positive number."
+});
+
+// core/scene/third-person-camera.js
+var ThirdPersonCamera = class extends PersonCamera {
   /**
-   * Vertical field of view in radians.
+   * Creates a third-person perspective camera.
    *
-   * @type {number}
-   * @private
-   */
-  #fieldOfViewRadians;
-  /**
-   * Viewport aspect ratio (width / height).
-   *
-   * @type {number}
-   * @private
-   */
-  #aspectRatio;
-  /**
-   * Near clipping plane distance.
-   *
-   * @type {number}
-   * @private
-   */
-  #near;
-  /**
-   * Far clipping plane distance.
-   *
-   * @type {number}
-   * @private
-   */
-  #far;
-  /**
-   * Cached projection matrix buffer.
-   * The buffer is reused between frames to avoid allocations.
-   *
-   * @type {Float32Array}
-   * @private
-   */
-  #projectionMatrix;
-  /**
-   * When true, projection matrix must be recomputed.
-   *
-   * @type {boolean}
-   * @private
-   */
-  #isProjectionMatrixDirty = true;
-  /**
-   * Current third-person camera mode.
-   *
-   * @type {string}
-   * @private
-   */
-  #mode = THIRD_PERSON_CAMERA_MODE_NORMAL;
-  /**
    * @param {ThirdPersonCameraOptions} [options = {}] - Camera options.
+   * @throws {TypeError}                              - If options are not a plain object or a numeric value is not finite.
+   * @throws {RangeError}                             - If projection parameters or camera mode are invalid.
    */
   constructor(options = {}) {
-    super();
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError("`ThirdPersonCamera` expects `options` as a plain object.");
-    }
-    const {
-      fieldOfViewRadians = DEFAULT_FIELD_OF_VIEW_RADIANS2,
-      aspectRatio = DEFAULT_ASPECT_RATIO2,
-      near = DEFAULT_NEAR2,
-      far = DEFAULT_FAR2,
-      mode = THIRD_PERSON_CAMERA_MODE_NORMAL
-    } = options;
-    if (typeof fieldOfViewRadians !== "number") {
-      throw new TypeError("`ThirdPersonCamera` expects `fieldOfViewRadians` as a number.");
-    }
-    if (typeof aspectRatio !== "number") {
-      throw new TypeError("`ThirdPersonCamera` expects `aspectRatio` as a number.");
-    }
-    if (typeof near !== "number") {
-      throw new TypeError("`ThirdPersonCamera` expects `near` as a number.");
-    }
-    if (typeof far !== "number") {
-      throw new TypeError("`ThirdPersonCamera` expects `far` as a number.");
-    }
-    if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
-      throw new RangeError("`ThirdPersonCamera` expects `aspectRatio` to be a positive number.");
-    }
-    if (near <= MATH_CAMERA_LIMITS.MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
-      throw new RangeError("`ThirdPersonCamera` expects `0 < near < far`.");
-    }
-    if (!THIRD_PERSON_CAMERA_MODE_SET.has(mode)) {
-      throw new RangeError("`ThirdPersonCamera` expects `mode` to be a valid value from `ThirdPersonCamera.Modes`.");
-    }
-    this.#fieldOfViewRadians = fieldOfViewRadians;
-    this.#aspectRatio = aspectRatio;
-    this.#near = near;
-    this.#far = far;
-    this.#projectionMatrix = new Float32Array(MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT);
-    this.#mode = mode;
+    super(options, THIRD_PERSON_CAMERA_DEFAULTS);
+  }
+  /**
+   * Validation messages for third-person camera parameters.
+   *
+   * @protected
+   * @returns {Object} - Camera-specific validation messages.
+   */
+  static get validationMessages() {
+    return THIRD_PERSON_CAMERA_ERRORS;
   }
   /**
    * Supported third-person camera modes.
    *
-   * @returns {{ NORMAL: string, BOBBING: string }} - Supported mode labels.
+   * @returns {{ NORMAL: PersonCameraMode, BOBBING: PersonCameraMode }} - Supported mode values.
    */
   static get Modes() {
-    return THIRD_PERSON_CAMERA_MODES;
-  }
-  /**
-   * Current camera mode.
-   *
-   * @returns {string}
-   */
-  get mode() {
-    return this.#mode;
-  }
-  /**
-   * Updates the camera mode.
-   *
-   * @param {string} mode - New camera mode.
-   */
-  setMode(mode) {
-    if (!THIRD_PERSON_CAMERA_MODE_SET.has(mode)) {
-      throw new RangeError("`ThirdPersonCamera.setMode` expects a valid mode from `ThirdPersonCamera.Modes`.");
-    }
-    this.#mode = mode;
-  }
-  /**
-   * Updates the aspect ratio and marks projection cache as dirty.
-   *
-   * @param {number} aspectRatio - New viewport aspect ratio (canvas width divided by canvas height).
-   */
-  setAspectRatio(aspectRatio) {
-    if (typeof aspectRatio !== "number") {
-      throw new TypeError("`ThirdPersonCamera.setAspectRatio` expects `aspectRatio` as a number.");
-    }
-    if (aspectRatio <= MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
-      throw new RangeError("`ThirdPersonCamera.setAspectRatio` expects a positive number.");
-    }
-    if (aspectRatio === this.#aspectRatio) {
-      return;
-    }
-    this.#aspectRatio = aspectRatio;
-    this.#isProjectionMatrixDirty = true;
-  }
-  /**
-   * Returns the projection matrix for this camera. The returned matrix is cached and reused between calls.
-   *
-   * @returns {Float32Array} - Cached projection matrix.
-   */
-  getProjectionMatrix() {
-    if (this.#isProjectionMatrixDirty === true) {
-      Matrix4.writePerspectiveTo(
-        this.#projectionMatrix,
-        this.#fieldOfViewRadians,
-        this.#aspectRatio,
-        this.#near,
-        this.#far
-      );
-      this.#isProjectionMatrixDirty = false;
-    }
-    return this.#projectionMatrix;
+    return super.Modes;
   }
 };
 
@@ -11348,12 +11247,12 @@ var LightGizmo = class extends Object3D {
    * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
    * @param {SolidColorMaterial} material         - Material to use.
    * @param {Vector3[]} positions                 - Line positions.
-   * @returns {Line}
+   * @returns {Mesh}
    * @private
    */
   #createLine(webglContext, material, positions) {
     const geometry = new PolylineGeometry(webglContext, { positions });
-    return new Line(geometry, material);
+    return new Mesh(geometry, material);
   }
 };
 
@@ -11718,12 +11617,12 @@ var TransformGizmo = class extends Object3D {
    * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
    * @param {SolidColorMaterial} material         - Material to use.
    * @param {Vector3[]} positions                 - Line positions.
-   * @returns {Line}                              - A new line object, built from the provided positions and material.
+   * @returns {Mesh}                              - A new line object, built from the provided positions and material.
    * @private
    */
   #createLine(webglContext, material, positions) {
     const geometry = new PolylineGeometry(webglContext, { positions });
-    return new Line(geometry, material);
+    return new Mesh(geometry, material);
   }
   /**
    * Updates the axis materials based on current hover/active state.
@@ -14226,7 +14125,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
         const color = materialDefinition ? materialDefinition.diffuseColor : this.#defaultColor;
         const material = new PointsMaterial(this.#webglContext, { color });
         material.setOpacity(materialDefinition ? materialDefinition.opacity : DEFAULT_OPACITY3);
-        const points = new Points(entry.geometry, material);
+        const points = new Mesh(entry.geometry, material);
         entry.parent.add(points);
         meshes.push(points);
         materials.push(material);
@@ -14236,7 +14135,7 @@ var ObjMtlLoader = class _ObjMtlLoader {
         const color = materialDefinition ? materialDefinition.diffuseColor : this.#defaultColor;
         const material = new SolidColorMaterial(this.#webglContext, { color });
         material.setOpacity(materialDefinition ? materialDefinition.opacity : DEFAULT_OPACITY3);
-        const line = new Line(entry.geometry, material);
+        const line = new Mesh(entry.geometry, material);
         entry.parent.add(line);
         meshes.push(line);
         materials.push(material);
@@ -15014,7 +14913,7 @@ var KeyboardControls = class _KeyboardControls {
   /**
    * Camera mode value, that enables bobbing.
    *
-   * @type {string | null}
+   * @type {number | null}
    * @private
    */
   #bobbingMode;
@@ -15243,7 +15142,7 @@ var KeyboardControls = class _KeyboardControls {
    * @param {Object} [config]                                   - Internal configuration for derived controls.
    * @param {Function} [config.cameraConstructor = Camera]      - Expected camera constructor for validation.
    * @param {string} [config.controlsName = 'KeyboardControls'] - Controls class name for error messages.
-   * @param {(string|null)} [config.bobbingMode = null]         - Camera mode, that enables bobbing (or null to disable).
+   * @param {(number|null)} [config.bobbingMode = null]         - Camera mode, that enables bobbing (or null to disable).
    */
   constructor(camera, target, element, options = {}, config = {}) {
     if (options === null || typeof options !== "object" || Array.isArray(options)) {
@@ -15269,8 +15168,8 @@ var KeyboardControls = class _KeyboardControls {
     if (!(element instanceof HTMLElement)) {
       throw new TypeError(`\`${controlsName}\` expects \`element\` as an \`HTMLElement\`.`);
     }
-    if (bobbingMode !== null && typeof bobbingMode !== "string") {
-      throw new TypeError("`KeyboardControls` expects `bobbingMode` as a string or null.");
+    if (bobbingMode !== null && !Number.isInteger(bobbingMode)) {
+      throw new TypeError("`KeyboardControls` expects `bobbingMode` as an integer or null.");
     }
     const {
       groundY = DEFAULT_GROUND_Y,
@@ -15600,7 +15499,7 @@ var KeyboardControls = class _KeyboardControls {
     }
     let bobbingOffset = INPUT_NONE;
     let bobbingPitch = INPUT_NONE;
-    if (this.#bobbingMode && this.#camera.mode === this.#bobbingMode && isMoving) {
+    if (this.#bobbingMode !== null && this.#camera.mode === this.#bobbingMode && isMoving) {
       const isRunning = this.#actionStates.get(ACTIONS.RUN);
       const frequency = isRunning ? this.#bobbingFrequencyRun : this.#bobbingFrequencyWalk;
       const amplitude = isRunning ? this.#bobbingAmplitudeRun : this.#bobbingAmplitudeWalk;
@@ -16070,334 +15969,334 @@ var ThirdPersonControls = class extends KeyboardControls {
   }
 };
 
+// core/constants/raycaster.js
+var RAYCASTER_DEFAULTS = Object.freeze({
+  RECURSIVE: true,
+  FILTER: null,
+  SORT: true
+});
+var RAYCASTER_OPTION_KEYS = Object.freeze({
+  RECURSIVE: "recursive",
+  FILTER: "filter",
+  SORT: "sort"
+});
+var RAYCASTER_NDC = Object.freeze({
+  NEAR: -1,
+  FAR: MATH_COMMON_VALUES.UNIT,
+  W: MATH_COMMON_VALUES.UNIT
+});
+var RAYCASTER_RAY = Object.freeze({
+  MIN_PARAMETER: MATH_COMMON_VALUES.ZERO,
+  MAX_PARAMETER: Number.POSITIVE_INFINITY,
+  DIRECTION_EPSILON: 1e-8,
+  INVERSE_NUMERATOR: MATH_COMMON_VALUES.UNIT
+});
+var RAYCASTER_AXES = Object.freeze([
+  Object.freeze({ name: "x", index: MATH_VECTOR3_INDEXES.X }),
+  Object.freeze({ name: "y", index: MATH_VECTOR3_INDEXES.Y }),
+  Object.freeze({ name: "z", index: MATH_VECTOR3_INDEXES.Z })
+]);
+var RAYCASTER_MATRIX_INDEXES = Object.freeze({
+  XX: MATH_VECTOR3_INDEXES.X,
+  XY: MATH_LAYOUT.MATRIX_STRIDE + MATH_VECTOR3_INDEXES.X,
+  XZ: MATH_LAYOUT.MATRIX_STRIDE * MATH_VECTOR3_INDEXES.Z + MATH_VECTOR3_INDEXES.X,
+  XW: MATH_LAYOUT.MATRIX_STRIDE * MATH_LAYOUT.VECTOR3_ELEMENT_COUNT + MATH_VECTOR3_INDEXES.X,
+  YX: MATH_VECTOR3_INDEXES.Y,
+  YY: MATH_LAYOUT.MATRIX_STRIDE + MATH_VECTOR3_INDEXES.Y,
+  YZ: MATH_LAYOUT.MATRIX_STRIDE * MATH_VECTOR3_INDEXES.Z + MATH_VECTOR3_INDEXES.Y,
+  YW: MATH_LAYOUT.MATRIX_STRIDE * MATH_LAYOUT.VECTOR3_ELEMENT_COUNT + MATH_VECTOR3_INDEXES.Y,
+  ZX: MATH_VECTOR3_INDEXES.Z,
+  ZY: MATH_LAYOUT.MATRIX_STRIDE + MATH_VECTOR3_INDEXES.Z,
+  ZZ: MATH_LAYOUT.MATRIX_STRIDE * MATH_VECTOR3_INDEXES.Z + MATH_VECTOR3_INDEXES.Z,
+  ZW: MATH_LAYOUT.MATRIX_STRIDE * MATH_LAYOUT.VECTOR3_ELEMENT_COUNT + MATH_VECTOR3_INDEXES.Z,
+  WX: MATH_LAYOUT.MATRIX_ROW_COUNT - MATH_COMMON_VALUES.UNIT,
+  WY: MATH_LAYOUT.MATRIX_STRIDE + MATH_LAYOUT.MATRIX_ROW_COUNT - MATH_COMMON_VALUES.UNIT,
+  WZ: MATH_LAYOUT.MATRIX_STRIDE * MATH_VECTOR3_INDEXES.Z + MATH_LAYOUT.MATRIX_ROW_COUNT - MATH_COMMON_VALUES.UNIT,
+  WW: MATH_LAYOUT.MATRIX_4X4_ELEMENT_COUNT - MATH_COMMON_VALUES.UNIT
+});
+var RAYCASTER_ERRORS = Object.freeze({
+  SCENE_TYPE: "`Raycaster.raycast` expects scene as a `Scene` instance.",
+  CAMERA_TYPE: "`Raycaster.raycast` expects camera as a `Camera` instance.",
+  MOUSE_NDC_TYPE: "`Raycaster.raycast` expects `mouseNdc` as an object with numeric x/y.",
+  OPTIONS_TYPE: "`Raycaster.raycast` expects options as a plain object.",
+  RECURSIVE_TYPE: "`Raycaster.raycast` option recursive must be a boolean.",
+  FILTER_TYPE: "`Raycaster.raycast` option filter must be a function or null.",
+  SORT_TYPE: "`Raycaster.raycast` option sort must be a boolean.",
+  UNPROJECT_W_ZERO: "`Raycaster.raycast` failed to unproject, `W component` is zero."
+});
+
 // core/interaction/raycaster.js
-var DEFAULT_RECURSIVE = true;
-var DEFAULT_FILTER = null;
-var DEFAULT_SORT = true;
-var NDC_NEAR = -1;
-var NDC_FAR = 1;
-var CLIP_W = 1;
-var ZERO_COMPONENT = 0;
-var ONE_COMPONENT = 1;
-var MATRIX_INDEX_00 = 0;
-var MATRIX_INDEX_01 = 1;
-var MATRIX_INDEX_02 = 2;
-var MATRIX_INDEX_03 = 3;
-var MATRIX_INDEX_10 = 4;
-var MATRIX_INDEX_11 = 5;
-var MATRIX_INDEX_12 = 6;
-var MATRIX_INDEX_13 = 7;
-var MATRIX_INDEX_20 = 8;
-var MATRIX_INDEX_21 = 9;
-var MATRIX_INDEX_22 = 10;
-var MATRIX_INDEX_23 = 11;
-var MATRIX_INDEX_30 = 12;
-var MATRIX_INDEX_31 = 13;
-var MATRIX_INDEX_32 = 14;
-var MATRIX_INDEX_33 = 15;
-var LOOP_START_INDEX2 = 0;
-var LOOP_INCREMENT2 = 1;
-var VECTOR_INDEX_X = 0;
-var VECTOR_INDEX_Y = 1;
-var VECTOR_INDEX_Z = 2;
-var RANGE_MIN_INDEX = 0;
-var RANGE_MAX_INDEX = 1;
-var RAY_T_MIN = 0;
-var RAY_T_MAX_INIT = Number.POSITIVE_INFINITY;
-var RAY_DIRECTION_EPSILON = 1e-8;
-var INVERSE_DIRECTION_NUMERATOR = 1;
-var COMPONENT_X = "x";
-var COMPONENT_Y = "y";
-var COMPONENT_Z = "z";
-var INTERSECTION_OBJECT_KEY = "object";
-var INTERSECTION_DISTANCE_KEY = "distance";
-var INTERSECTION_POINT_KEY = "point";
-var OPTION_RECURSIVE_KEY = "recursive";
-var OPTION_FILTER_KEY = "filter";
-var OPTION_SORT_KEY = "sort";
-var MOUSE_NDC_X_KEY = "x";
-var MOUSE_NDC_Y_KEY = "y";
-var ERROR_SCENE_TYPE = "`Raycaster.raycast` expects scene as a `Scene` instance.";
-var ERROR_CAMERA_TYPE = "`Raycaster.raycast` expects camera as a `Camera` instance.";
-var ERROR_MOUSE_NDC_TYPE = "`Raycaster.raycast` expects `mouseNdc` as an object with numeric x/y.";
-var ERROR_OPTIONS_TYPE5 = "`Raycaster.raycast` expects options as a plain object.";
-var ERROR_OPTION_RECURSIVE_TYPE = "`Raycaster.raycast` option recursive must be a boolean.";
-var ERROR_OPTION_FILTER_TYPE = "`Raycaster.raycast` option filter must be a function or null.";
-var ERROR_OPTION_SORT_TYPE = "`Raycaster.raycast` option sort must be a boolean.";
-var ERROR_UNPROJECT_W_ZERO = "`Raycaster.raycast` failed to unproject, `W component` is zero.";
 var Raycaster = class _Raycaster {
   /**
-   * Performs a raycast against the given scene and returns intersections.
+   * Casts a ray through a point in normalized device coordinates.
    *
    * @param {Scene} scene                     - Scene to query.
-   * @param {Camera} camera                   - Camera used to build the ray.
-   * @param {{x: number, y: number}} mouseNdc - Mouse coordinates in NDC space [-1..1].
-   * @param {RaycastOptions} [options]        - Optional raycast settings.
-   * @returns {Intersection[]}                - Intersection list.
+   * @param {Camera} camera                   - Camera defining the ray.
+   * @param {{x: number, y: number}} mouseNdc - Normalized device coordinates.
+   * @param {RaycastOptions} [options]        - Raycast options.
+   * @returns {Intersection[]}                - Bounding-box intersections.
    */
   raycast(scene, camera, mouseNdc, options = {}) {
-    if (!(scene instanceof Scene)) {
-      throw new TypeError(ERROR_SCENE_TYPE);
-    }
-    if (!(camera instanceof Camera)) {
-      throw new TypeError(ERROR_CAMERA_TYPE);
-    }
-    if (mouseNdc === null || typeof mouseNdc !== "object" || Array.isArray(mouseNdc)) {
-      throw new TypeError(ERROR_MOUSE_NDC_TYPE);
-    }
-    if (typeof mouseNdc[MOUSE_NDC_X_KEY] !== "number" || typeof mouseNdc[MOUSE_NDC_Y_KEY] !== "number") {
-      throw new TypeError(ERROR_MOUSE_NDC_TYPE);
-    }
-    if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new TypeError(ERROR_OPTIONS_TYPE5);
-    }
-    const recursive = OPTION_RECURSIVE_KEY in options ? options[OPTION_RECURSIVE_KEY] : DEFAULT_RECURSIVE;
-    const filter = OPTION_FILTER_KEY in options ? options[OPTION_FILTER_KEY] : DEFAULT_FILTER;
-    const shouldSort = OPTION_SORT_KEY in options ? options[OPTION_SORT_KEY] : DEFAULT_SORT;
-    if (typeof recursive !== "boolean") {
-      throw new TypeError(ERROR_OPTION_RECURSIVE_TYPE);
-    }
-    if (filter !== null && typeof filter !== "function") {
-      throw new TypeError(ERROR_OPTION_FILTER_TYPE);
-    }
-    if (typeof shouldSort !== "boolean") {
-      throw new TypeError(ERROR_OPTION_SORT_TYPE);
+    const { recursive, filter, sort } = _Raycaster.#validateArguments(scene, camera, mouseNdc, options);
+    if (!Number.isFinite(mouseNdc.x) || !Number.isFinite(mouseNdc.y)) {
+      return [];
     }
     scene.updateWorldMatrix({ parentWorldMatrix: null });
-    const viewMatrix = camera.getViewMatrix();
-    const projectionMatrix = camera.getProjectionMatrix();
-    const viewProjectionMatrix = Matrix4.multiply(projectionMatrix, viewMatrix);
-    const inverseViewProjectionMatrix = Matrix4.invert(viewProjectionMatrix);
-    const ray = _Raycaster.#createRay(inverseViewProjectionMatrix, mouseNdc[MOUSE_NDC_X_KEY], mouseNdc[MOUSE_NDC_Y_KEY]);
+    const viewProjectionMatrix = Matrix4.multiply(camera.getProjectionMatrix(), camera.getViewMatrix());
+    const inverseMatrix = Matrix4.invert(viewProjectionMatrix);
+    const ray = _Raycaster.#createRay(inverseMatrix, mouseNdc.x, mouseNdc.y);
     const intersections = [];
+    if (ray.direction.x === MATH_COMMON_VALUES.ZERO && ray.direction.y === MATH_COMMON_VALUES.ZERO && ray.direction.z === MATH_COMMON_VALUES.ZERO) {
+      return [];
+    }
     if (recursive) {
       scene.traverse((object) => _Raycaster.#collectIntersection(object, ray, filter, intersections));
     } else {
-      const children = scene.children;
-      for (let index = LOOP_START_INDEX2; index < children.length; index += LOOP_INCREMENT2) {
-        _Raycaster.#collectIntersection(children[index], ray, filter, intersections);
+      for (const object of scene.children) {
+        _Raycaster.#collectIntersection(object, ray, filter, intersections);
       }
     }
-    if (shouldSort) {
-      intersections.sort((left, right) => left[INTERSECTION_DISTANCE_KEY] - right[INTERSECTION_DISTANCE_KEY]);
+    if (sort) {
+      intersections.sort((left, right) => left.distance - right.distance);
     }
     return intersections;
   }
   /**
-   * @param {Object} object                - Scene object.
-   * @param {Object} ray                   - Ray data with origin/direction.
-   * @param {Function | null} filter       - Optional mesh filter.
-   * @param {Intersection[]} intersections - Output array.
+   * Validates raycast input and resolves its default options.
+   *
+   * @param {Scene} scene            - Scene argument.
+   * @param {Camera} camera          - Camera argument.
+   * @param {Object} mouseNdc        - Mouse coordinates.
+   * @param {RaycastOptions} options - Raycast options.
+   * @returns {RaycastOptions}       - Validated option values.
    * @private
    */
-  static #collectIntersection(object, ray, filter, intersections) {
-    if (!(object instanceof Mesh)) {
-      return;
+  static #validateArguments(scene, camera, mouseNdc, options) {
+    const errors = RAYCASTER_ERRORS;
+    const types = ECMASCRIPT_TYPEOF_RESULTS;
+    if (!(scene instanceof Scene)) {
+      throw new TypeError(errors.SCENE_TYPE);
     }
-    if (object.isDisposed) {
-      return;
+    if (!(camera instanceof Camera)) {
+      throw new TypeError(errors.CAMERA_TYPE);
     }
-    if (filter && filter(object) === false) {
+    if (mouseNdc === null || typeof mouseNdc !== types.OBJECT || Array.isArray(mouseNdc) || typeof mouseNdc.x !== types.NUMBER || typeof mouseNdc.y !== types.NUMBER) {
+      throw new TypeError(errors.MOUSE_NDC_TYPE);
+    }
+    if (options === null || typeof options !== types.OBJECT || Array.isArray(options)) {
+      throw new TypeError(errors.OPTIONS_TYPE);
+    }
+    const optionsPrototype = Object.getPrototypeOf(options);
+    if (optionsPrototype !== Object.prototype && optionsPrototype !== null) {
+      throw new TypeError(errors.OPTIONS_TYPE);
+    }
+    const defaults = RAYCASTER_DEFAULTS;
+    const optionKeys = RAYCASTER_OPTION_KEYS;
+    const recursive = optionKeys.RECURSIVE in options ? options[optionKeys.RECURSIVE] : defaults.RECURSIVE;
+    const filter = optionKeys.FILTER in options ? options[optionKeys.FILTER] : defaults.FILTER;
+    const sort = optionKeys.SORT in options ? options[optionKeys.SORT] : defaults.SORT;
+    if (typeof recursive !== types.BOOLEAN) {
+      throw new TypeError(errors.RECURSIVE_TYPE);
+    }
+    if (filter !== null && typeof filter !== types.FUNCTION) {
+      throw new TypeError(errors.FILTER_TYPE);
+    }
+    if (typeof sort !== types.BOOLEAN) {
+      throw new TypeError(errors.SORT_TYPE);
+    }
+    return { recursive, filter, sort };
+  }
+  /**
+   * Collects an intersection if the object is an eligible mesh and its bounds are hit.
+   *
+   * @param {Object} object          - Scene graph node.
+   * @param {Ray} ray                - Ray in world space.
+   * @param {Function | null} filter - Optional mesh filter.
+   * @param {Intersection[]} output  - Intersection results.
+   * @returns {void}
+   * @private
+   */
+  static #collectIntersection(object, ray, filter, output) {
+    if (!(object instanceof Mesh) || object.isDisposed || filter && filter(object) === false) {
       return;
     }
     const geometry = object.geometry;
     const boundingBoxMin = geometry.getBoundingBoxMin();
     const boundingBoxMax = geometry.getBoundingBoxMax();
     const inverseWorldMatrix = Matrix4.invert(object.worldMatrix);
-    const localOrigin = _Raycaster.#transformPoint(inverseWorldMatrix, ray.origin, ONE_COMPONENT);
-    const localDirection = _Raycaster.#transformPoint(inverseWorldMatrix, ray.direction, ZERO_COMPONENT);
-    const hitDistance = _Raycaster.#intersectRayAabb(localOrigin, localDirection, boundingBoxMin, boundingBoxMax);
-    if (hitDistance === null) {
+    const localOrigin = _Raycaster.#transformPoint(inverseWorldMatrix, ray.origin, RAYCASTER_NDC.W);
+    const localDirection = _Raycaster.#transformPoint(inverseWorldMatrix, ray.direction, MATH_COMMON_VALUES.ZERO);
+    const parameter = _Raycaster.#intersectRayAabb(
+      localOrigin,
+      localDirection,
+      boundingBoxMin,
+      boundingBoxMax
+    );
+    if (parameter === null) {
       return;
     }
     const localPoint = {
-      [COMPONENT_X]: localOrigin[COMPONENT_X] + localDirection[COMPONENT_X] * hitDistance,
-      [COMPONENT_Y]: localOrigin[COMPONENT_Y] + localDirection[COMPONENT_Y] * hitDistance,
-      [COMPONENT_Z]: localOrigin[COMPONENT_Z] + localDirection[COMPONENT_Z] * hitDistance
+      x: localOrigin.x + localDirection.x * parameter,
+      y: localOrigin.y + localDirection.y * parameter,
+      z: localOrigin.z + localDirection.z * parameter
     };
-    const worldPoint = _Raycaster.#transformPoint(object.worldMatrix, localPoint, ONE_COMPONENT);
-    const distance = _Raycaster.#distanceBetween(ray.origin, worldPoint);
-    intersections.push({
-      [INTERSECTION_OBJECT_KEY]: object,
-      [INTERSECTION_DISTANCE_KEY]: distance,
-      [INTERSECTION_POINT_KEY]: worldPoint
+    const worldPoint = _Raycaster.#transformPoint(object.worldMatrix, localPoint, RAYCASTER_NDC.W);
+    output.push({
+      object,
+      distance: _Raycaster.#distanceBetween(ray.origin, worldPoint),
+      point: worldPoint
     });
   }
   /**
-   * @param {Float32Array} inverseViewProjectionMatrix - Inverse view-projection matrix.
-   * @param {number} ndcX                              - Normalized device coordinate X.
-   * @param {number} ndcY                              - Normalized device coordinate Y.
-   * @returns {Ray}                                    - Ray with origin and direction in world space.
+   * Creates a world-space ray from the near and far clip planes.
+   *
+   * @param {Float32Array} inverseMatrix - Inverse view-projection matrix.
+   * @param {number} ndcX                - Horizontal NDC coordinate.
+   * @param {number} ndcY                - Vertical NDC coordinate.
+   * @returns {Ray}                      - Ray with normalized direction.
    * @private
    */
-  static #createRay(inverseViewProjectionMatrix, ndcX, ndcY) {
-    const nearPoint = _Raycaster.#unproject(inverseViewProjectionMatrix, ndcX, ndcY, NDC_NEAR);
-    const farPoint = _Raycaster.#unproject(inverseViewProjectionMatrix, ndcX, ndcY, NDC_FAR);
+  static #createRay(inverseMatrix, ndcX, ndcY) {
+    const ndc = RAYCASTER_NDC;
+    const nearPoint = _Raycaster.#unproject(inverseMatrix, ndcX, ndcY, ndc.NEAR);
+    const farPoint = _Raycaster.#unproject(inverseMatrix, ndcX, ndcY, ndc.FAR);
     const direction = _Raycaster.#normalizeVector({
-      [COMPONENT_X]: farPoint[COMPONENT_X] - nearPoint[COMPONENT_X],
-      [COMPONENT_Y]: farPoint[COMPONENT_Y] - nearPoint[COMPONENT_Y],
-      [COMPONENT_Z]: farPoint[COMPONENT_Z] - nearPoint[COMPONENT_Z]
+      x: farPoint.x - nearPoint.x,
+      y: farPoint.y - nearPoint.y,
+      z: farPoint.z - nearPoint.z
     });
-    return {
-      origin: nearPoint,
-      direction
-    };
+    return { origin: nearPoint, direction };
   }
   /**
+   * Converts clip-space coordinates into a world-space point.
+   *
    * @param {Float32Array} matrix - Inverse view-projection matrix.
-   * @param {number} ndcX         - NDC x.
-   * @param {number} ndcY         - NDC y.
-   * @param {number} ndcZ         - NDC z.
-   * @returns {RaycastPoint}      - Unprojected point in world space.
+   * @param {number} ndcX         - Horizontal NDC coordinate.
+   * @param {number} ndcY         - Vertical NDC coordinate.
+   * @param {number} ndcZ         - Depth NDC coordinate.
+   * @returns {RaycastPoint}      - Unprojected point.
    * @private
    */
   static #unproject(matrix, ndcX, ndcY, ndcZ) {
-    const clipX = ndcX;
-    const clipY = ndcY;
-    const clipZ = ndcZ;
-    const clipW = CLIP_W;
-    const worldX = matrix[MATRIX_INDEX_00] * clipX + matrix[MATRIX_INDEX_10] * clipY + matrix[MATRIX_INDEX_20] * clipZ + matrix[MATRIX_INDEX_30] * clipW;
-    const worldY = matrix[MATRIX_INDEX_01] * clipX + matrix[MATRIX_INDEX_11] * clipY + matrix[MATRIX_INDEX_21] * clipZ + matrix[MATRIX_INDEX_31] * clipW;
-    const worldZ = matrix[MATRIX_INDEX_02] * clipX + matrix[MATRIX_INDEX_12] * clipY + matrix[MATRIX_INDEX_22] * clipZ + matrix[MATRIX_INDEX_32] * clipW;
-    const worldW = matrix[MATRIX_INDEX_03] * clipX + matrix[MATRIX_INDEX_13] * clipY + matrix[MATRIX_INDEX_23] * clipZ + matrix[MATRIX_INDEX_33] * clipW;
-    if (worldW === ZERO_COMPONENT) {
-      throw new Error(ERROR_UNPROJECT_W_ZERO);
+    const indexes = RAYCASTER_MATRIX_INDEXES;
+    const clipW = RAYCASTER_NDC.W;
+    const point = { x: ndcX, y: ndcY, z: ndcZ };
+    const world = _Raycaster.#transformPoint(matrix, point, clipW);
+    const worldW = matrix[indexes.WX] * ndcX + matrix[indexes.WY] * ndcY + matrix[indexes.WZ] * ndcZ + matrix[indexes.WW] * clipW;
+    if (worldW === MATH_COMMON_VALUES.ZERO) {
+      throw new Error(RAYCASTER_ERRORS.UNPROJECT_W_ZERO);
     }
-    const inverseW = ONE_COMPONENT / worldW;
+    const inverseW = RAYCASTER_RAY.INVERSE_NUMERATOR / worldW;
     return {
-      [COMPONENT_X]: worldX * inverseW,
-      [COMPONENT_Y]: worldY * inverseW,
-      [COMPONENT_Z]: worldZ * inverseW
+      x: world.x * inverseW,
+      y: world.y * inverseW,
+      z: world.z * inverseW
     };
   }
   /**
-   * @param {Float32Array} matrix - Matrix to apply.
-   * @param {RaycastPoint} point  - Point to transform.
-   * @param {number} wComponent   - Homogeneous W component (1 for points, 0 for vectors).
-   * @returns {RaycastPoint}      - Transformed (x, y, z) after applying the 4x4 matrix with the given `W component`.
+   * Multiplies a point or direction by a column-major transformation matrix.
+   *
+   * @param {Float32Array} matrix - Transformation matrix.
+   * @param {RaycastPoint} point  - Source point.
+   * @param {number} w            - Homogeneous component.
+   * @returns {RaycastPoint}      - Transformed point.
    * @private
    */
-  static #transformPoint(matrix, point, wComponent) {
-    const x = point[COMPONENT_X];
-    const y = point[COMPONENT_Y];
-    const z = point[COMPONENT_Z];
+  static #transformPoint(matrix, point, w) {
+    const indexes = RAYCASTER_MATRIX_INDEXES;
     return {
-      [COMPONENT_X]: matrix[MATRIX_INDEX_00] * x + matrix[MATRIX_INDEX_10] * y + matrix[MATRIX_INDEX_20] * z + matrix[MATRIX_INDEX_30] * wComponent,
-      [COMPONENT_Y]: matrix[MATRIX_INDEX_01] * x + matrix[MATRIX_INDEX_11] * y + matrix[MATRIX_INDEX_21] * z + matrix[MATRIX_INDEX_31] * wComponent,
-      [COMPONENT_Z]: matrix[MATRIX_INDEX_02] * x + matrix[MATRIX_INDEX_12] * y + matrix[MATRIX_INDEX_22] * z + matrix[MATRIX_INDEX_32] * wComponent
+      x: matrix[indexes.XX] * point.x + matrix[indexes.XY] * point.y + matrix[indexes.XZ] * point.z + matrix[indexes.XW] * w,
+      y: matrix[indexes.YX] * point.x + matrix[indexes.YY] * point.y + matrix[indexes.YZ] * point.z + matrix[indexes.YW] * w,
+      z: matrix[indexes.ZX] * point.x + matrix[indexes.ZY] * point.y + matrix[indexes.ZZ] * point.z + matrix[indexes.ZW] * w
     };
   }
   /**
-   * @param {RaycastPoint} vector - Vector to normalize.
-   * @returns {RaycastPoint}      - Normalized vector, returns zero vector when input length is zero.
+   * Returns a normalized direction, or zero for a degenerate ray.
+   *
+   * @param {RaycastPoint} vector - Direction vector.
+   * @returns {RaycastPoint}      - Normalized vector.
    * @private
    */
   static #normalizeVector(vector) {
-    const x = vector[COMPONENT_X];
-    const y = vector[COMPONENT_Y];
-    const z = vector[COMPONENT_Z];
-    const length = Math.sqrt(x * x + y * y + z * z);
-    if (length === ZERO_COMPONENT) {
+    const length = Math.sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+    if (length === MATH_COMMON_VALUES.ZERO) {
       return {
-        [COMPONENT_X]: ZERO_COMPONENT,
-        [COMPONENT_Y]: ZERO_COMPONENT,
-        [COMPONENT_Z]: ZERO_COMPONENT
+        x: MATH_COMMON_VALUES.ZERO,
+        y: MATH_COMMON_VALUES.ZERO,
+        z: MATH_COMMON_VALUES.ZERO
       };
     }
-    const inverseLength = ONE_COMPONENT / length;
+    const inverseLength = RAYCASTER_RAY.INVERSE_NUMERATOR / length;
     return {
-      [COMPONENT_X]: x * inverseLength,
-      [COMPONENT_Y]: y * inverseLength,
-      [COMPONENT_Z]: z * inverseLength
+      x: vector.x * inverseLength,
+      y: vector.y * inverseLength,
+      z: vector.z * inverseLength
     };
   }
   /**
-   * @param {RaycastPoint} origin    - Ray origin in local space.
-   * @param {RaycastPoint} direction - Ray direction in local space.
-   * @param {Float32Array} min       - AABB minimum.
-   * @param {Float32Array} max       - AABB maximum.
-   * @returns {number | null}        - Intersection distance parameter along the ray direction, null when the ray misses the AABB.
+   * Intersects a local-space ray with a local axis-aligned bounding box.
+   *
+   * @param {RaycastPoint} origin    - Local ray origin.
+   * @param {RaycastPoint} direction - Local ray direction.
+   * @param {Float32Array} min       - Minimum bounds.
+   * @param {Float32Array} max       - Maximum bounds.
+   * @returns {number | null}        - Ray parameter or null when the bounds are missed.
    * @private
    */
   static #intersectRayAabb(origin, direction, min, max) {
-    let tMin = RAY_T_MIN;
-    let tMax = RAY_T_MAX_INIT;
-    const originX = origin[COMPONENT_X];
-    const originY = origin[COMPONENT_Y];
-    const originZ = origin[COMPONENT_Z];
-    const directionX = direction[COMPONENT_X];
-    const directionY = direction[COMPONENT_Y];
-    const directionZ = direction[COMPONENT_Z];
-    const minX = min[VECTOR_INDEX_X];
-    const minY = min[VECTOR_INDEX_Y];
-    const minZ = min[VECTOR_INDEX_Z];
-    const maxX = max[VECTOR_INDEX_X];
-    const maxY = max[VECTOR_INDEX_Y];
-    const maxZ = max[VECTOR_INDEX_Z];
-    const rangeX = _Raycaster.#getAxisRange(originX, directionX, minX, maxX);
-    if (!rangeX) {
-      return null;
+    const ray = RAYCASTER_RAY;
+    let entry = ray.MIN_PARAMETER;
+    let exit = ray.MAX_PARAMETER;
+    for (const axis of RAYCASTER_AXES) {
+      const range = _Raycaster.#getAxisRange(
+        origin[axis.name],
+        direction[axis.name],
+        min[axis.index],
+        max[axis.index]
+      );
+      if (range === null) {
+        return null;
+      }
+      entry = Math.max(entry, range.entry);
+      exit = Math.min(exit, range.exit);
+      if (entry > exit) {
+        return null;
+      }
     }
-    tMin = Math.max(tMin, rangeX[RANGE_MIN_INDEX]);
-    tMax = Math.min(tMax, rangeX[RANGE_MAX_INDEX]);
-    if (tMin > tMax) {
-      return null;
-    }
-    const rangeY = _Raycaster.#getAxisRange(originY, directionY, minY, maxY);
-    if (!rangeY) {
-      return null;
-    }
-    tMin = Math.max(tMin, rangeY[RANGE_MIN_INDEX]);
-    tMax = Math.min(tMax, rangeY[RANGE_MAX_INDEX]);
-    if (tMin > tMax) {
-      return null;
-    }
-    const rangeZ = _Raycaster.#getAxisRange(originZ, directionZ, minZ, maxZ);
-    if (!rangeZ) {
-      return null;
-    }
-    tMin = Math.max(tMin, rangeZ[RANGE_MIN_INDEX]);
-    tMax = Math.min(tMax, rangeZ[RANGE_MAX_INDEX]);
-    if (tMin > tMax) {
-      return null;
-    }
-    if (tMax < RAY_T_MIN) {
-      return null;
-    }
-    return tMin >= RAY_T_MIN ? tMin : tMax;
+    return entry;
   }
   /**
-   * @param {number} origin     - Ray origin component.
-   * @param {number} direction  - Ray direction component.
-   * @param {number} min        - AABB min component.
-   * @param {number} max        - AABB max component.
-   * @returns {number[] | null} - Two-element array for this axis slab, or null if the ray misses the slab.
+   * Returns the entry and exit parameters for a single AABB slab.
+   *
+   * @param {number} origin                          - Ray origin on one axis.
+   * @param {number} direction                       - Ray direction on that axis.
+   * @param {number} min                             - Minimum bound.
+   * @param {number} max                             - Maximum bound.
+   * @returns {{entry: number, exit: number} | null} - Slab interval or null.
    * @private
    */
   static #getAxisRange(origin, direction, min, max) {
-    if (Math.abs(direction) < RAY_DIRECTION_EPSILON) {
-      return origin < min || origin > max ? null : [RAY_T_MIN, RAY_T_MAX_INIT];
+    const ray = RAYCASTER_RAY;
+    if (Math.abs(direction) < ray.DIRECTION_EPSILON) {
+      return origin < min || origin > max ? null : { entry: ray.MIN_PARAMETER, exit: ray.MAX_PARAMETER };
     }
-    const inverseDirection = INVERSE_DIRECTION_NUMERATOR / direction;
-    let axisEntry = (min - origin) * inverseDirection;
-    let axisExit = (max - origin) * inverseDirection;
-    if (axisEntry > axisExit) {
-      const tempValue = axisEntry;
-      axisEntry = axisExit;
-      axisExit = tempValue;
-    }
-    return [axisEntry, axisExit];
+    const inverseDirection = ray.INVERSE_NUMERATOR / direction;
+    const first = (min - origin) * inverseDirection;
+    const second = (max - origin) * inverseDirection;
+    return first > second ? { entry: second, exit: first } : { entry: first, exit: second };
   }
   /**
-   * @param {RaycastPoint} from - Start point.
-   * @param {RaycastPoint} to   - End point.
-   * @returns {number}          - Euclidean distance between the two points.
+   * Returns the world-space distance from the ray origin to the intersection.
+   *
+   * @param {RaycastPoint} from - Ray origin.
+   * @param {RaycastPoint} to   - Intersection point.
+   * @returns {number}          - Euclidean distance.
    * @private
    */
   static #distanceBetween(from, to) {
-    const deltaX = to[COMPONENT_X] - from[COMPONENT_X];
-    const deltaY = to[COMPONENT_Y] - from[COMPONENT_Y];
-    const deltaZ = to[COMPONENT_Z] - from[COMPONENT_Z];
+    const deltaX = to.x - from.x;
+    const deltaY = to.y - from.y;
+    const deltaZ = to.z - from.z;
     return Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
   }
 };
@@ -16417,8 +16316,6 @@ var GeraWebGL = Object.freeze({
   ThirdPersonCamera,
   Object3D,
   Mesh,
-  Points,
-  Line,
   Raycaster,
   Light,
   DirectionalLight,

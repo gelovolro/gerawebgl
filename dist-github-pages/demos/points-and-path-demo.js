@@ -560,7 +560,7 @@ class DemoApp {
     /**
      * Thin path line object.
      *
-     * @type {GeraWebGL.Line}
+     * @type {GeraWebGL.Mesh}
      * @private
      */
     #pathLine;
@@ -568,7 +568,7 @@ class DemoApp {
     /**
      * Debug thick line object.
      *
-     * @type {GeraWebGL.Line}
+     * @type {GeraWebGL.Mesh}
      * @private
      */
     #debugLine;
@@ -685,7 +685,7 @@ class DemoApp {
             color     : POINT_COLOR
         });
 
-        const points = new GeraWebGL.Points(pointsGeometry, pointsMaterial);
+        const points = new GeraWebGL.Mesh(pointsGeometry, pointsMaterial);
         this.#engine.scene.add(points);
 
         const controlPoints = DemoApp.#createControlPoints();
@@ -699,7 +699,7 @@ class DemoApp {
             loop      : true
         });
 
-        this.#pathLine = new GeraWebGL.Line(pathGeometry, pathMaterial);
+        this.#pathLine = new GeraWebGL.Mesh(pathGeometry, pathMaterial);
         this.#engine.scene.add(this.#pathLine);
 
         const debugMaterial = new GeraWebGL.Materials.SolidColorMaterial(webglContext, { color: DEBUG_LINE_COLOR });
@@ -711,7 +711,7 @@ class DemoApp {
             capType        : CAP_TYPE_NONE
         });
 
-        this.#debugLine = new GeraWebGL.Line(debugGeometry, debugMaterial);
+        this.#debugLine = new GeraWebGL.Mesh(debugGeometry, debugMaterial);
         this.#engine.scene.add(this.#debugLine);
 
         const moverMaterial = new GeraWebGL.Materials.SolidColorMaterial(webglContext, { color: MOVING_OBJECT_COLOR });

@@ -35,6 +35,7 @@ digraph FolderDependencies {
     "exception-messages" -> "constants";
     "geometry" -> "constants";
     "geometry" -> "math";
+    "interaction" -> "constants";
     "interaction" -> "math";
     "interaction" -> "scene";
     "light" -> "constants";
