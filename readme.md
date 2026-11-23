@@ -35,7 +35,7 @@ engine.start((delta) => {
 High-level modules are for "get something on screen fast":
 
 - `Engine` (scene + camera + renderer + render loop)
-- Scene objects      : `Scene`, `Object3D`, `Mesh`, `Camera`, `PerspectiveCamera`, `OrthographicCamera`, `FirstPersonCamera`, `ThirdPersonCamera`, `Points`, `Line`
+- Scene objects      : `Scene`, `Object3D`, `Mesh`, `Camera`, `PerspectiveCamera`, `OrthographicCamera`, `FirstPersonCamera`, `ThirdPersonCamera`
 - Built-in geometry  : `CustomGeometry`, `BoxGeometry`, `PlaneGeometry`, `SphereGeometry`, `ConeGeometry`, `TorusGeometry`, `PyramidGeometry`, `PointsGeometry`, `PolylineGeometry`, `TubeLineGeometry`, `HeightmapGeometry` (all of them support segmentation)
 - Built-in materials : `SolidColorMaterial`, `VertexColorMaterial`, `TexturedMaterial`, `NormalMaterial`, `DirectionalLightMaterial`, `LambertMaterial`, `PhongMaterial`, `PointsMaterial`
 - Controls           : `OrbitControls`, `KeyboardControls`, `FirstPersonControls`, `ThirdPersonControls`

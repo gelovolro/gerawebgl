@@ -1,6 +1,8 @@
-import * as MathConstants from '../constants/math.js';
-import { Camera }         from './camera.js';
-import { Matrix4 }        from '../math/matrix4.js';
+import * as MathConstants              from '../constants/math.js';
+import * as PerspectiveCameraConstants from '../constants/perspective-camera.js';
+import { ECMASCRIPT_TYPEOF_RESULTS }   from '../constants/ecmascript-types.js';
+import { Matrix4 }                     from '../math/matrix4.js';
+import { Camera }                      from './camera.js';
 
 /**
  * Perspective camera with a vertical field of view, viewport aspect ratio and near/far clipping planes.
@@ -57,7 +59,15 @@ export class PerspectiveCamera extends Camera {
      * @type {boolean}
      * @private
      */
-    #isProjectionMatrixDirty = true;
+    #isProjectionMatrixDirty = PerspectiveCameraConstants.PERSPECTIVE_CAMERA_DEFAULTS.DIRTY;
+
+    /**
+     * Validation messages selected by the concrete camera class.
+     *
+     * @type {Object}
+     * @private
+     */
+    #validationMessages;
 
     /**
      * Creates a perspective camera.
@@ -72,33 +82,35 @@ export class PerspectiveCamera extends Camera {
     constructor(fieldOfViewRadians, aspectRatio, near, far) {
         super();
 
-        if (typeof fieldOfViewRadians !== 'number' || !Number.isFinite(fieldOfViewRadians)) {
-            throw new TypeError('`PerspectiveCamera` expects `fieldOfViewRadians` as a number.');
+        this.#validationMessages = new.target.validationMessages;
+
+        if (typeof fieldOfViewRadians !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(fieldOfViewRadians)) {
+            throw new TypeError(this.#validationMessages.FIELD_OF_VIEW_TYPE);
         }
 
-        if (typeof aspectRatio !== 'number' || !Number.isFinite(aspectRatio)) {
-            throw new TypeError('`PerspectiveCamera` expects `aspectRatio` as a number.');
+        if (typeof aspectRatio !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(aspectRatio)) {
+            throw new TypeError(this.#validationMessages.ASPECT_RATIO_TYPE);
         }
 
-        if (typeof near !== 'number' || !Number.isFinite(near)) {
-            throw new TypeError('`PerspectiveCamera` expects `near` as a number.');
+        if (typeof near !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(near)) {
+            throw new TypeError(this.#validationMessages.NEAR_TYPE);
         }
 
-        if (typeof far !== 'number' || !Number.isFinite(far)) {
-            throw new TypeError('`PerspectiveCamera` expects `far` as a number.');
+        if (typeof far !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(far)) {
+            throw new TypeError(this.#validationMessages.FAR_TYPE);
         }
 
         if (fieldOfViewRadians <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_FIELD_OF_VIEW_RADIANS ||
             fieldOfViewRadians >= MathConstants.MATH_CAMERA_LIMITS.MAXIMUM_FIELD_OF_VIEW_RADIANS) {
-            throw new RangeError('`PerspectiveCamera` expects `0 < fieldOfViewRadians < Math.PI`.');
+            throw new RangeError(this.#validationMessages.FIELD_OF_VIEW_RANGE);
         }
 
         if (aspectRatio <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
-            throw new RangeError('`PerspectiveCamera` expects a positive `aspect ratio`.');
+            throw new RangeError(this.#validationMessages.ASPECT_RATIO_RANGE);
         }
 
         if (near <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_NEAR_CLIP_DISTANCE || far <= near) {
-            throw new RangeError('`PerspectiveCamera` expects `0 < near < far`.');
+            throw new RangeError(this.#validationMessages.CLIPPING_PLANES);
         }
 
         this.#fieldOfViewRadians = fieldOfViewRadians;
@@ -109,20 +121,30 @@ export class PerspectiveCamera extends Camera {
     }
 
     /**
+     * Validation messages for the concrete perspective camera type.
+     *
+     * @protected
+     * @returns {Object} - Camera-specific validation messages.
+     */
+    static get validationMessages() {
+        return PerspectiveCameraConstants.PERSPECTIVE_CAMERA_ERRORS;
+    }
+
+    /**
      * Updates the viewport aspect ratio and invalidates the projection cache, when the value changes.
      *
      * @param {number} aspectRatio - New viewport aspect ratio (canvas width divided by canvas height).
      * @returns {void}
-     * @throws {TypeError}  - If the aspect ratio is not a finite number.
-     * @throws {RangeError} - If the aspect ratio is not positive.
+     * @throws {TypeError}         - If the aspect ratio is not a finite number.
+     * @throws {RangeError}        - If the aspect ratio is not positive.
      */
     setAspectRatio(aspectRatio) {
-        if (typeof aspectRatio !== 'number' || !Number.isFinite(aspectRatio)) {
-            throw new TypeError('`PerspectiveCamera.setAspectRatio` expects `aspectRatio` as a number.');
+        if (typeof aspectRatio !== ECMASCRIPT_TYPEOF_RESULTS.NUMBER || !Number.isFinite(aspectRatio)) {
+            throw new TypeError(this.#validationMessages.SET_ASPECT_TYPE);
         }
 
         if (aspectRatio <= MathConstants.MATH_CAMERA_LIMITS.MINIMUM_ASPECT_RATIO) {
-            throw new RangeError('`PerspectiveCamera.setAspectRatio` expects a positive number.');
+            throw new RangeError(this.#validationMessages.SET_ASPECT_RANGE);
         }
 
         if (aspectRatio === this.#aspectRatio) {

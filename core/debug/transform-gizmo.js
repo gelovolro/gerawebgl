@@ -1,5 +1,4 @@
 import { Object3D }           from '../scene/object3d.js';
-import { Line }               from '../scene/line.js';
 import { Mesh }               from '../scene/mesh.js';
 import { Vector3 }            from '../math/vector3.js';
 import { PolylineGeometry }   from '../geometry/polyline-geometry.js';
@@ -668,12 +667,12 @@ export class TransformGizmo extends Object3D {
      * @param {WebGL2RenderingContext} webglContext - WebGL2 rendering context.
      * @param {SolidColorMaterial} material         - Material to use.
      * @param {Vector3[]} positions                 - Line positions.
-     * @returns {Line}                              - A new line object, built from the provided positions and material.
+     * @returns {Mesh}                              - A new line object, built from the provided positions and material.
      * @private
      */
     #createLine(webglContext, material, positions) {
         const geometry = new PolylineGeometry(webglContext, { positions });
-        return new Line(geometry, material);
+        return new Mesh(geometry, material);
     }
 
     /**

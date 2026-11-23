@@ -31,8 +31,6 @@ import { MtlStandardMaterial }      from './material/mtl-standard-material.js';
 import { Texture2D }                from './texture/texture2d.js';
 import { Object3D }                 from './scene/object3d.js';
 import { Mesh }                     from './scene/mesh.js';
-import { Points }                   from './scene/points.js';
-import { Line }                     from './scene/line.js';
 import { Scene }                    from './scene/scene.js';
 import { Camera }                   from './scene/camera.js';
 import { PerspectiveCamera }        from './scene/perspective-camera.js';
@@ -81,8 +79,6 @@ export const GeraWebGL = Object.freeze({
     ThirdPersonCamera,
     Object3D,
     Mesh,
-    Points,
-    Line,
     Raycaster,
     Light,
     DirectionalLight,
